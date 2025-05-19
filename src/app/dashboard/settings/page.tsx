@@ -28,7 +28,7 @@ export default function SettingsPage() {
   return (
     <div className="container mx-auto py-8 space-y-10">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground">Application Settings</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-foreground">Settings</h1>
         <p className="text-lg text-muted-foreground mt-2">Customize your TeachMeet experience.</p>
       </div>
 
