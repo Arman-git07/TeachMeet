@@ -34,6 +34,10 @@
     --ring: 180 100% 50%; /* Accent color for focus rings */
     --radius: 0.75rem; /* Rounded corners */
 
+    /* CTA Orange */
+    --cta-orange: 30 100% 50%; /* Vibrant Orange */
+    --cta-orange-foreground: 0 0% 100%; /* White text on orange */
+
     /* Sidebar specific colors - can be same as main theme or slightly adjusted */
     --sidebar-background: 202 34% 18%; /* Slightly darker than main background */
     --sidebar-foreground: 200 20% 85%;
@@ -81,6 +85,10 @@
     --destructive-foreground: 0 0% 100%;
 
     --ring: 180 100% 50%;
+
+    /* CTA Orange */
+    --cta-orange: 30 100% 50%; 
+    --cta-orange-foreground: 0 0% 100%;
 
     --sidebar-background: 202 34% 15%;
     --sidebar-foreground: 200 20% 88%;

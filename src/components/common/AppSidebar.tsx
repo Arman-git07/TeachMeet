@@ -32,12 +32,34 @@ type AppSidebarProps = {
   isAuthenticated: boolean; // This would typically come from an auth context/hook
 };
 
-const NavItem = ({ href, icon: Icon, children, currentPath }: { href: string, icon: React.ElementType, children: React.ReactNode, currentPath: string }) => {
+const NavItem = ({ 
+  href, 
+  icon: Icon, 
+  children, 
+  currentPath,
+  isGreenTheme = false 
+}: { 
+  href: string, 
+  icon: React.ElementType, 
+  children: React.ReactNode, 
+  currentPath: string,
+  isGreenTheme?: boolean 
+}) => {
   const isActive = currentPath === href;
   return (
     <SidebarMenuItem>
       <Link href={href} passHref legacyBehavior>
-        <SidebarMenuButton isActive={isActive} className={cn("w-full justify-start text-base py-3 px-4 rounded-lg", isActive ? "bg-primary text-primary-foreground" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
+        <SidebarMenuButton 
+          isActive={isActive} 
+          className={cn(
+            "w-full justify-start text-base py-3 px-4 rounded-lg", 
+            isActive 
+              ? "bg-primary text-primary-foreground" 
+              : isGreenTheme 
+                ? "text-primary hover:bg-primary hover:text-primary-foreground" 
+                : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          )}
+        >
           <Icon className="mr-3 h-5 w-5" />
           {children}
         </SidebarMenuButton>
@@ -66,8 +88,8 @@ export function AppSidebar({ isAuthenticated }: AppSidebarProps) {
           {isAuthenticated ? (
             <>
               <NavItem href="/dashboard" icon={Home} currentPath={pathname}>Dashboard</NavItem>
-              <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname}>Start Meeting</NavItem>
-              <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname}>Join Meeting</NavItem>
+              <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
+              <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
             </>
           ) : (

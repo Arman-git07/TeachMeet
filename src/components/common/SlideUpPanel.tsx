@@ -33,9 +33,8 @@ export function SlideUpPanel() {
         </Link>
         <Link href="/auth/signin?action=join" passHref legacyBehavior>
           <Button
-            variant="secondary"
             size="lg"
-            className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90 text-lg py-8 px-10 rounded-xl shadow-lg hover:shadow-accent/50"
+            className="w-full sm:w-auto btn-gel text-lg py-8 px-10 rounded-xl shadow-lg hover:shadow-primary/50"
             aria-label="Join Existing Meeting"
           >
             <Video className="mr-2 h-6 w-6" />
@@ -50,7 +49,7 @@ export function SlideUpPanel() {
           className="max-w-xs rounded-lg bg-card border-border focus:ring-accent text-center"
           aria-label="Meeting Code"
         />
-        <Button variant="outline" className="rounded-lg border-accent text-accent hover:bg-accent hover:text-accent-foreground">
+        <Button className="rounded-lg bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90">
           <Code className="mr-2 h-5 w-5" /> Go
         </Button>
       </div>

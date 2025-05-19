@@ -31,7 +31,7 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
             <Input
               type="search"
               placeholder="Search content or start a call..."
-              className="w-full rounded-full bg-muted pl-10 pr-4 py-2 text-sm focus:ring-accent"
+              className="w-full rounded-full bg-accent/10 pl-10 pr-4 py-2 text-sm focus:ring-accent placeholder:text-muted-foreground/80"
               aria-label="Search"
             />
           </div>

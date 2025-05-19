@@ -40,6 +40,10 @@ export default {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
+        'cta-orange': {
+          DEFAULT: 'hsl(var(--cta-orange))',
+          foreground: 'hsl(var(--cta-orange-foreground))',
+        },
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
