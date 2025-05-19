@@ -1,13 +1,14 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mic, MicOff, Video, VideoOff, Settings2, User, Loader2 } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings2, User } from "lucide-react"; // Removed Loader2 as it's not used
 import Image from "next/image";
 import Link from "next/link";
 
-export default function WaitingAreaPage({ params }: { params: { meetingId: string } }) {
+export default function WaitingAreaPage({ params: { meetingId } }: { params: { meetingId: string } }) {
   // Mock state, in real app this would use useState and useEffect for device access
   const isMicOn = true;
   const isCameraOn = true;
@@ -17,7 +18,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       <Card className="w-full max-w-2xl shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <User className="mx-auto h-12 w-12 text-primary mb-3" />
-          <CardTitle className="text-2xl">Joining Meeting: {params.meetingId}</CardTitle>
+          <CardTitle className="text-2xl">Joining Meeting: {meetingId}</CardTitle>
           <CardDescription>Configure your audio and video before entering.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -83,7 +84,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             Advanced Audio/Video Settings
           </Button>
           
-          <Link href={`/dashboard/meeting/${params.meetingId}`} passHref legacyBehavior>
+          <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior>
             <Button className="w-full btn-gel text-lg py-3 rounded-lg">
               Join Now
             </Button>
