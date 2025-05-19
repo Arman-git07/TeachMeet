@@ -20,40 +20,40 @@
     --border: 210 40% 90%; /* Light Gray Border */
     --input: 210 40% 90%; /* Light Gray Input Background */
 
-    --primary: 120 61% 50%; /* Vibrant Green */
+    --primary: 120 55% 45%; /* Softer Green */
     --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 180 80% 40%; /* A slightly darker cyan */
+    --secondary: 180 75% 42%; /* Slightly softer cyan */
     --secondary-foreground: 0 0% 100%; /* White */
     
-    --accent: 180 100% 50%; /* Bright Cyan */
+    --accent: 180 70% 48%; /* Softer Cyan */
     --accent-foreground: 202 34% 10%; /* Dark Blue for text on cyan */
 
     --destructive: 0 72% 51%; /* Red */
     --destructive-foreground: 0 0% 100%; /* White */
 
-    --ring: 180 100% 50%; /* Accent color for focus rings */
+    --ring: 180 70% 48%; /* Softer Accent color for focus rings */
     --radius: 0.75rem; /* Rounded corners */
 
     /* CTA Orange */
-    --cta-orange: 30 100% 50%; /* Vibrant Orange */
+    --cta-orange: 30 90% 50%; /* Softer Orange */
     --cta-orange-foreground: 0 0% 100%; /* White text on orange */
 
     /* Light Sidebar specific colors */
     --sidebar-background: 210 40% 98%; /* Very Light Grayish Blue */
     --sidebar-foreground: 202 34% 25%; /* Darker Blue-Gray for sidebar text */
-    --sidebar-primary: 120 61% 50%; /* Green */
+    --sidebar-primary: 120 55% 45%; /* Softer Green */
     --sidebar-primary-foreground: 0 0% 100%; /* White */
-    --sidebar-accent: 180 100% 50%; /* Cyan */
+    --sidebar-accent: 180 70% 48%; /* Softer Cyan */
     --sidebar-accent-foreground: 202 34% 10%; /* Dark Blue */
     --sidebar-border: 210 40% 85%; /* Slightly darker gray for sidebar border */
-    --sidebar-ring: 180 100% 50%; /* Cyan */
+    --sidebar-ring: 180 70% 48%; /* Softer Cyan */
 
-    --chart-1: 120 61% 50%;
-    --chart-2: 180 100% 50%;
-    --chart-3: 150 70% 45%;
-    --chart-4: 210 70% 55%;
-    --chart-5: 90 60% 40%;
+    --chart-1: 120 55% 45%; /* New Primary */
+    --chart-2: 180 70% 48%; /* New Accent */
+    --chart-3: 150 65% 42%; /* Softer Teal/Green */
+    --chart-4: 210 65% 50%; /* Softer Blue */
+    --chart-5: 90 55% 38%; /* Softer Lime Green */
   }
 
   .dark {
@@ -73,39 +73,39 @@
     --border: 202 30% 35%;
     --input: 202 30% 35%;
 
-    --primary: 120 61% 50%;
+    --primary: 120 60% 55%; /* Brighter, less saturated Green for Dark Mode */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 180 80% 40%;
+    --secondary: 180 75% 50%; /* Brighter, less saturated Cyan for Dark Mode */
     --secondary-foreground: 0 0% 100%;
     
-    --accent: 180 100% 50%;
+    --accent: 180 80% 55%; /* Brighter, less saturated Cyan for Dark Mode */
     --accent-foreground: 202 34% 10%;
 
     --destructive: 0 63% 40%; /* Slightly darker red for dark mode */
     --destructive-foreground: 0 0% 100%;
 
-    --ring: 180 100% 50%;
+    --ring: 180 80% 55%; /* Brighter Accent for Dark Mode rings */
 
     /* CTA Orange */
-    --cta-orange: 30 100% 50%; 
+    --cta-orange: 30 90% 55%; /* Brighter, less saturated Orange for Dark Mode */
     --cta-orange-foreground: 0 0% 100%;
 
     /* Dark Sidebar specific colors */
     --sidebar-background: 202 34% 18%; 
     --sidebar-foreground: 200 20% 85%;
-    --sidebar-primary: 120 61% 50%;
+    --sidebar-primary: 120 60% 55%; /* Brighter Green for Dark Mode */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 180 100% 50%;
+    --sidebar-accent: 180 80% 55%; /* Brighter Cyan for Dark Mode */
     --sidebar-accent-foreground: 202 34% 10%;
     --sidebar-border: 202 30% 30%;
-    --sidebar-ring: 180 100% 50%;
+    --sidebar-ring: 180 80% 55%; /* Brighter Cyan for Dark Mode */
 
-    --chart-1: 120 61% 50%;
-    --chart-2: 180 100% 50%;
-    --chart-3: 150 70% 45%;
-    --chart-4: 210 70% 55%;
-    --chart-5: 90 60% 40%;
+    --chart-1: 120 60% 55%; /* New Primary Dark */
+    --chart-2: 180 80% 55%; /* New Accent Dark */
+    --chart-3: 150 65% 50%; /* Softer Teal/Green Dark */
+    --chart-4: 210 65% 60%; /* Softer Blue Dark */
+    --chart-5: 90 55% 45%; /* Softer Lime Green Dark */
   }
 }
 
