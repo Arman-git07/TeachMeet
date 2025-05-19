@@ -66,12 +66,6 @@ export function UserProfileDropdown() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="/dashboard/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </Link>
-        </DropdownMenuItem>
         {/* You can add more items like "My Profile" if applicable */}
         {/* <DropdownMenuItem asChild className="cursor-pointer">
           <Link href="/dashboard/profile">
