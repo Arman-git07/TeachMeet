@@ -1,3 +1,4 @@
+'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
 import { AppHeader } from '@/components/common/AppHeader';
