@@ -28,9 +28,7 @@ export default function HomePage() {
           />
           <div className="relative z-10 mb-20"> {/* Added mb-20 to avoid overlap with slide panel */}
             <Logo size="large" className="mb-8 animate-fadeIn" />
-            <p className="text-xl text-foreground/80 mb-4 animate-slideUp">
-              Experience seamless 3D meetings with low data usage.
-            </p>
+            {/* Removed paragraph: "Experience seamless 3D meetings with low data usage." */}
             <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg max-w-md mx-auto">
               <h2 className="text-2xl font-semibold text-primary mb-3">Latest Activity</h2>
               <p className="text-muted-foreground">No ongoing meetings. Start one now!</p>
