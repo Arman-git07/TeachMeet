@@ -26,9 +26,8 @@ export default function HomePage() {
               maskImage: "radial-gradient(circle at center, white, transparent 70%)"
             }}
           />
-          <div className="relative z-10 mb-20"> {/* Added mb-20 to avoid overlap with slide panel */}
+          <div className="relative z-10"> {/* Removed mb-20 */}
             <Logo size="large" className="mb-8 animate-fadeIn" />
-            {/* Removed paragraph: "Experience seamless 3D meetings with low data usage." */}
             <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg max-w-md mx-auto">
               <h2 className="text-2xl font-semibold text-primary mb-3">Latest Activity</h2>
               <p className="text-muted-foreground">No ongoing meetings. Start one now!</p>
