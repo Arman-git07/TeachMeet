@@ -4,6 +4,12 @@ import { CalendarDays, Video, Users, Clock, PlusCircle, Trash2, Edit } from "luc
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const meetings = [
   { id: "1", title: "Project Alpha Sync", date: "2024-08-15", time: "10:00 AM", status: "Upcoming", participants: 5, type: "Team Meeting" },
