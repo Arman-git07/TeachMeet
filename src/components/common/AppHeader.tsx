@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Logo } from './Logo';
+import { ThemeToggle } from './ThemeToggle';
+import { UserProfileDropdown } from './UserProfileDropdown';
 
 type AppHeaderProps = {
   showLogo?: boolean;
@@ -37,9 +39,10 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
           </div>
         </div>
         
-        {/* Placeholder for User Profile / Actions if needed */}
-        <div>
-          {/* Example: <UserButton /> */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <UserProfileDropdown />
+          {/* In a real app, UserProfileDropdown might be conditionally rendered based on auth state */}
         </div>
       </div>
     </header>
