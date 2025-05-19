@@ -87,7 +87,7 @@ export function AppSidebar({ isAuthenticated }: AppSidebarProps) {
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
-              <NavItem href="/dashboard" icon={Home} currentPath={pathname}>Dashboard</NavItem>
+              <NavItem href="/dashboard" icon={Home} currentPath={pathname}>Home</NavItem>
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
