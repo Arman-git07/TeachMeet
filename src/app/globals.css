@@ -4,32 +4,33 @@
 
 @layer base {
   :root {
-    --background: 202 34% 21%; /* Dark Desaturated Blue #223D4A */
-    --foreground: 200 20% 90%; /* Light text for dark background */
+    /* Light Theme */
+    --background: 0 0% 100%; /* White */
+    --foreground: 202 34% 15%; /* Dark Blue-Gray */
 
-    --muted: 202 30% 30%;
-    --muted-foreground: 200 20% 70%;
+    --muted: 210 40% 96.1%; /* Light Grayish Blue */
+    --muted-foreground: 210 40% 45%; /* Medium Grayish Blue */
 
-    --popover: 202 34% 18%;
-    --popover-foreground: 200 20% 90%;
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 202 34% 15%; /* Dark Blue-Gray */
 
-    --card: 202 34% 24%;
-    --card-foreground: 200 20% 90%;
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 202 34% 15%; /* Dark Blue-Gray */
 
-    --border: 202 30% 35%;
-    --input: 202 30% 35%;
+    --border: 210 40% 90%; /* Light Gray Border */
+    --input: 210 40% 90%; /* Light Gray Input Background */
 
-    --primary: 120 61% 50%; /* Vibrant Green #32CD32 */
+    --primary: 120 61% 50%; /* Vibrant Green */
     --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 180 80% 40%; /* A slightly darker cyan for secondary elements */
+    --secondary: 180 80% 40%; /* A slightly darker cyan */
     --secondary-foreground: 0 0% 100%; /* White */
     
-    --accent: 180 100% 50%; /* Bright Cyan #00FFFF */
+    --accent: 180 100% 50%; /* Bright Cyan */
     --accent-foreground: 202 34% 10%; /* Dark Blue for text on cyan */
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%; /* Red */
+    --destructive-foreground: 0 0% 100%; /* White */
 
     --ring: 180 100% 50%; /* Accent color for focus rings */
     --radius: 0.75rem; /* Rounded corners */
@@ -38,14 +39,14 @@
     --cta-orange: 30 100% 50%; /* Vibrant Orange */
     --cta-orange-foreground: 0 0% 100%; /* White text on orange */
 
-    /* Sidebar specific colors - can be same as main theme or slightly adjusted */
-    --sidebar-background: 202 34% 18%; /* Slightly darker than main background */
-    --sidebar-foreground: 200 20% 85%;
+    /* Light Sidebar specific colors */
+    --sidebar-background: 210 40% 98%; /* Very Light Grayish Blue */
+    --sidebar-foreground: 202 34% 25%; /* Darker Blue-Gray for sidebar text */
     --sidebar-primary: 120 61% 50%; /* Green */
     --sidebar-primary-foreground: 0 0% 100%; /* White */
     --sidebar-accent: 180 100% 50%; /* Cyan */
     --sidebar-accent-foreground: 202 34% 10%; /* Dark Blue */
-    --sidebar-border: 202 30% 30%;
+    --sidebar-border: 210 40% 85%; /* Slightly darker gray for sidebar border */
     --sidebar-ring: 180 100% 50%; /* Cyan */
 
     --chart-1: 120 61% 50%;
@@ -56,9 +57,9 @@
   }
 
   .dark {
-    /* For dark mode, we can invert or adjust if needed, but current theme is already dark */
-    --background: 202 34% 21%;
-    --foreground: 200 20% 90%;
+    /* Dark Theme */
+    --background: 202 34% 21%; /* Dark Desaturated Blue */
+    --foreground: 200 20% 90%; /* Light text for dark background */
 
     --muted: 202 30% 30%;
     --muted-foreground: 200 20% 70%;
@@ -81,7 +82,7 @@
     --accent: 180 100% 50%;
     --accent-foreground: 202 34% 10%;
 
-    --destructive: 0 63% 40%;
+    --destructive: 0 63% 40%; /* Slightly darker red for dark mode */
     --destructive-foreground: 0 0% 100%;
 
     --ring: 180 100% 50%;
@@ -90,14 +91,21 @@
     --cta-orange: 30 100% 50%; 
     --cta-orange-foreground: 0 0% 100%;
 
-    --sidebar-background: 202 34% 15%;
-    --sidebar-foreground: 200 20% 88%;
+    /* Dark Sidebar specific colors */
+    --sidebar-background: 202 34% 18%; 
+    --sidebar-foreground: 200 20% 85%;
     --sidebar-primary: 120 61% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 180 100% 50%;
     --sidebar-accent-foreground: 202 34% 10%;
-    --sidebar-border: 202 30% 25%;
+    --sidebar-border: 202 30% 30%;
     --sidebar-ring: 180 100% 50%;
+
+    --chart-1: 120 61% 50%;
+    --chart-2: 180 100% 50%;
+    --chart-3: 150 70% 45%;
+    --chart-4: 210 70% 55%;
+    --chart-5: 90 60% 40%;
   }
 }
 
@@ -133,9 +141,20 @@
 .text-gel-gradient {
   @apply bg-gradient-to-b from-primary via-green-400 to-accent bg-clip-text text-transparent;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1)) drop-shadow(0 2px 3px rgba(0,0,0,0.1));
-  -webkit-text-stroke: 0.5px hsl(var(--foreground) / 0.1);
+  /* Consider adjusting text-stroke for light/dark themes if needed */
+  /* For light theme, stroke might be darker, for dark theme, lighter */
+  /* This is a generic one, might need theme-specific adjustment if desired */
   paint-order: stroke fill;
 }
+
+.dark .text-gel-gradient {
+   -webkit-text-stroke: 0.5px hsl(var(--background) / 0.5);
+}
+
+.light .text-gel-gradient {
+   -webkit-text-stroke: 0.5px hsl(var(--foreground) / 0.1);
+}
+
 
 /* Ensure body takes full height for layouts */
 html, body, #__next {
