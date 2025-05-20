@@ -44,8 +44,8 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
         </div>
         
         <div className="flex items-center gap-2">
-          <ThemeToggle />
           <UserProfileDropdown />
+          <ThemeToggle />
         </div>
       </div>
     </header>
