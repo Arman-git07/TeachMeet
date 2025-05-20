@@ -82,7 +82,7 @@ export function AppSidebar({ isAuthenticated }: AppSidebarProps) {
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
-        <Link href="/" passHref>
+        <Link href="/">
           <Logo size="small" />
         </Link>
       </SidebarHeader>
