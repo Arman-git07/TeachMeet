@@ -53,7 +53,7 @@ export function SlideUpPanel() {
 
             {/* The "Go" button, positioned to overlap a corner of the "Join Meeting" button */}
             <Button
-              className="absolute top-1 right-1 bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0 rounded-md shadow-lg z-10 px-3 py-1.5 text-sm flex items-center"
+              className="absolute top-0 right-0 bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0 rounded-md shadow-lg z-10 px-3 py-1.5 text-sm flex items-center"
               aria-label="Submit Meeting Code"
               // onClick logic would need to handle form submission or read from input with id="meetingCodeInputSlideUp"
             >
