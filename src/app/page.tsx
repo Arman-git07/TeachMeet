@@ -16,7 +16,7 @@ export default function HomePage() {
       <AppSidebar isAuthenticated={isAuthenticated} />
       <SidebarInset>
         <AppHeader showLogo={false} />
-        <main className="flex-grow flex flex-col items-center justify-center p-4 text-center relative overflow-hidden">
+        <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
           <div 
             className="absolute inset-0 opacity-10"
             style={{
@@ -26,11 +26,11 @@ export default function HomePage() {
               maskImage: "radial-gradient(circle at center, white, transparent 70%)"
             }}
           />
-          <div className="relative z-10"> {/* Removed mb-20 */}
-            <Logo size="large" className="mb-8 animate-fadeIn" />
-            <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg max-w-md mx-auto">
-              <h2 className="text-2xl font-semibold text-primary mb-3">Latest Activity</h2>
-              <p className="text-muted-foreground">No ongoing meetings. Start one now!</p>
+          <div className="relative z-10 flex flex-col items-center">
+            <Logo size="large" className="mb-8 animate-fadeIn text-center" />
+            <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg max-w-md">
+              <h2 className="text-2xl font-semibold text-primary mb-3 text-center">Latest Activity</h2>
+              <p className="text-muted-foreground text-center">No ongoing meetings. Start one now!</p>
               {/* Placeholder for activity list */}
             </div>
           </div>

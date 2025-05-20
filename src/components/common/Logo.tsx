@@ -17,7 +17,7 @@ export function Logo({ className, size = 'medium' }: LogoProps) {
       className={cn(
         'font-extrabold tracking-tight text-gel-gradient select-none',
         sizeClasses[size],
-        className
+        className // Ensure className (which might include text-center) is applied
       )}
       style={{
         WebkitTextStroke: `1px hsl(var(--background) / 0.5)`, // Simulates inflation
