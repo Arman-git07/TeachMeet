@@ -10,7 +10,8 @@ import {
   Video, 
   PlusCircle,
   Users,
-  LogOut
+  LogOut,
+  Clapperboard // Added Clapperboard icon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -94,6 +95,7 @@ export function AppSidebar({ isAuthenticated }: AppSidebarProps) {
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
+              <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
           ) : (
             <>
