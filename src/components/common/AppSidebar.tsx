@@ -11,7 +11,7 @@ import {
   PlusCircle,
   Users,
   LogOut,
-  Clapperboard // Added Clapperboard icon
+  Clapperboard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
