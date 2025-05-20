@@ -35,9 +35,9 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
                 alert("Opening your phone's contact list directly from a web browser is generally not possible due to security and privacy restrictions. If you'd like to select a contact for use within the app, we could explore the Contact Picker API, or if you intend to call a number, a 'tel:' link could be used.");
               }}
               className="w-full rounded-full bg-accent/10 pl-10 pr-4 py-2 text-sm text-left text-muted-foreground/80 hover:bg-accent/20 focus:outline-none focus:ring-2 focus:ring-accent transition-colors h-[calc(2rem+4px)] flex items-center" // Adjusted height to match input and ensure text aligns
-              aria-label="Open phone contacts"
+              aria-label="Search contact"
             >
-              Open phone contacts
+              Search contact
             </button>
           </div>
         </div>
