@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import { Video, PlusCircle, Code } from 'lucide-react';
@@ -36,31 +37,43 @@ export function SlideUpPanel() {
         </div>
 
         {/* Join Meeting Section */}
-        <div className="w-full sm:flex-1 flex flex-col items-center gap-3">
-          <Link href="/auth/signin?action=join" passHref legacyBehavior className="w-full flex justify-center">
+        <div className="w-full sm:flex-1 flex flex-col items-center">
+          {/* Relative container for the "Join Meeting" button, so "Go" can be positioned over it */}
+          <div className="relative w-full max-w-xs">
+            <Link href="/auth/signin?action=join" passHref legacyBehavior className="block">
+              <Button
+                size="lg"
+                className="w-full btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+                aria-label="Join Existing Meeting"
+              >
+                <Video className="mr-2 h-6 w-6" />
+                Join Meeting
+              </Button>
+            </Link>
+
+            {/* The "Go" button, positioned to overlap a corner of the "Join Meeting" button */}
             <Button
-              size="lg"
-              className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
-              aria-label="Join Existing Meeting"
+              className="absolute top-1 right-1 bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0 rounded-md shadow-lg z-10 px-3 py-1.5 text-sm flex items-center"
+              aria-label="Submit Meeting Code"
+              // onClick logic would need to handle form submission or read from input with id="meetingCodeInputSlideUp"
             >
-              <Video className="mr-2 h-6 w-6" />
-              Join Meeting
+              <Code className="mr-1.5 h-4 w-4" /> Go
             </Button>
-          </Link>
-          {/* Input and Go button for meeting code */}
-          <div className="flex items-center justify-center gap-2 w-full max-w-xs">
+          </div>
+
+          {/* Input field for meeting code, now sits below the Join Meeting button group */}
+          <div className="mt-3 w-full max-w-xs">
             <Input
+              id="meetingCodeInputSlideUp" // Unique ID for this input
               type="text"
               placeholder="Enter Meeting Code"
-              className="flex-grow rounded-lg bg-card border-border focus:ring-accent text-center"
+              className="w-full rounded-lg bg-card border-border focus:ring-accent text-center"
               aria-label="Meeting Code"
             />
-            <Button className="rounded-lg bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0">
-              <Code className="mr-2 h-5 w-5" /> Go
-            </Button>
           </div>
         </div>
       </div>
     </div>
   );
 }
+    
