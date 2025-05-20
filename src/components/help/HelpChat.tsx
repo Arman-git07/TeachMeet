@@ -60,9 +60,22 @@ export function HelpChat() {
       setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
       console.error("AI Help Assistant Error:", err);
-      const errorMessage: Message = { id: (Date.now() + 1).toString(), text: "Sorry, I encountered an error trying to respond. Please try again.", sender: 'system', timestamp: new Date() };
+      let displayMessage = "Sorry, I encountered an error trying to respond. Please try again.";
+      let detailErrorState = "Failed to get response from AI assistant.";
+
+      if (err instanceof Error && err.message.toLowerCase().includes('failed to fetch')) {
+        displayMessage += " This might be due to a network issue or missing API configuration. Please ensure your API key for the AI service is correctly set up in your .env file (e.g., GOOGLE_API_KEY).";
+        detailErrorState = "Failed to get response. Check console and ensure API key is configured.";
+      }
+      
+      const errorMessage: Message = { 
+        id: (Date.now() + 1).toString(), 
+        text: displayMessage, 
+        sender: 'system', 
+        timestamp: new Date() 
+      };
       setMessages(prev => [...prev, errorMessage]);
-      setError("Failed to get response from AI assistant.");
+      setError(detailErrorState);
     } finally {
       setIsLoading(false);
     }
