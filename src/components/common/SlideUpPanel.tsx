@@ -57,7 +57,7 @@ export function SlideUpPanel() {
               aria-label="Submit Meeting Code"
               // onClick logic would need to handle form submission or read from input with id="meetingCodeInputSlideUp"
             >
-              <Code className="mr-1.5 h-4 w-4" /> Go
+              <Code className="h-4 w-4" /> 
             </Button>
           </div>
 
