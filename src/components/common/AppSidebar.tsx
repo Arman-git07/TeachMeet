@@ -2,7 +2,6 @@
 'use client';
 import Link from 'next/link';
 import { 
-  Home, 
   LogIn, 
   UserPlus, 
   HelpCircle, 
@@ -118,7 +117,7 @@ export function AppSidebar() { // Removed isAuthenticated prop
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
-              <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem>
+              {/* <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem> Removed as per request */}
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
