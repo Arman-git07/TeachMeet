@@ -46,6 +46,7 @@ const popularAvatars = [
   { id: 'cat', src: 'https://placehold.co/80x80.png', alt: 'Cat Avatar', hint: 'cat animal' },
   { id: 'robot', src: 'https://placehold.co/80x80.png', alt: 'Robot Avatar', hint: 'robot technology' },
   { id: 'astronaut', src: 'https://placehold.co/80x80.png', alt: 'Astronaut Avatar', hint: 'astronaut space' },
+  { id: 'boy', src: 'https://placehold.co/80x80.png', alt: 'Cartoon Boy Avatar', hint: 'boy cartoon' },
 ];
 
 export function UserProfileDropdown() {
@@ -187,18 +188,18 @@ export function UserProfileDropdown() {
           </DialogHeader>
           <div className="py-4 space-y-4">
             <p className="text-sm font-medium text-foreground">Popular Avatars</p>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
               {popularAvatars.map((avatar) => (
                 <button
                   key={avatar.id}
                   onClick={() => setSelectedAvatar(avatar.id)}
                   className={cn(
-                    "rounded-full overflow-hidden border-2 p-0.5 transition-all",
+                    "rounded-full overflow-hidden border-2 p-0.5 transition-all aspect-square",
                     selectedAvatar === avatar.id ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50"
                   )}
                   aria-label={`Select ${avatar.alt}`}
                 >
-                  <Image src={avatar.src} alt={avatar.alt} width={80} height={80} className="rounded-full" data-ai-hint={avatar.hint} />
+                  <Image src={avatar.src} alt={avatar.alt} width={80} height={80} className="rounded-full object-cover w-full h-full" data-ai-hint={avatar.hint} />
                 </button>
               ))}
             </div>
@@ -258,3 +259,4 @@ export function UserProfileDropdown() {
     </AlertDialog>
   );
 }
+
