@@ -44,7 +44,7 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
         }
       } catch (ex: any) {
         console.error('Error selecting contact:', ex);
-        if (ex.message && ex.message.includes("top frame")) {
+        if (ex.message && ex.message.toLowerCase().includes("top frame")) {
           alert('Could not open contact picker. This feature might not work in embedded windows (like some development previews) and requires the app to be in the top browser window.');
         } else {
           alert('Could not open contact picker. This feature might not be fully supported by your browser, or an error occurred.');
