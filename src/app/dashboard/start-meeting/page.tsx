@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Share2, Copy, Users, XCircle, Video } from "lucide-react";
 import Link from "next/link";
-import { useToast } from "@/hooks/use-toast"; // Import useToast
+import { useToast } from "@/hooks/use-toast"; 
 
 export default function StartMeetingPage() {
   const meetingLink = "https://teachmeet.example.com/join/xyz123"; // Placeholder
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast(); 
 
   const handleShareInvite = async () => {
     if (navigator.share) {
@@ -20,20 +20,25 @@ export default function StartMeetingPage() {
           url: meetingLink,
         });
         toast({ title: "Invite Shared", description: "The meeting invite has been shared." });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error sharing invite:', error);
         // Check if the error is due to user cancellation, which is common
         if ((error as DOMException)?.name === 'AbortError') {
-          // User cancelled the share operation
           toast({ variant: "default", title: "Sharing Cancelled", description: "You cancelled the share dialog."});
+        } else if ((error as DOMException)?.name === 'NotAllowedError' || (error as DOMException)?.message.toLowerCase().includes('permission denied')) {
+          toast({ 
+            variant: "destructive", 
+            title: "Sharing Failed", 
+            description: "Could not share the invite. Permission was denied or the feature is blocked in this context (e.g., not HTTPS, or in an iframe). Link copied to clipboard as fallback." 
+          });
+          copyToClipboard();
         } else {
           toast({ variant: "destructive", title: "Sharing Failed", description: "Could not share the invite using the native share dialog. Link copied to clipboard as fallback." });
-          // Fallback to copy if native share fails for other reasons
           copyToClipboard();
         }
       }
     } else {
-      // Fallback for browsers that don't support navigator.share
+      toast({ title: "Native Sharing Not Supported", description: "Your browser doesn't support native sharing. Link copied to clipboard instead." });
       copyToClipboard();
     }
   };
