@@ -1,12 +1,12 @@
 
 'use client';
 import Link from 'next/link';
-import { 
-  LogIn, 
-  UserPlus, 
-  HelpCircle, 
-  Settings, 
-  Video, 
+import {
+  LogIn,
+  UserPlus,
+  HelpCircle,
+  Settings,
+  Video,
   PlusCircle,
   Users,
   LogOut,
@@ -25,37 +25,48 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar, // Import useSidebar
   // SidebarGroup, // Not used
   // SidebarGroupLabel, // Not used
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth'; // Import real useAuth
 import { Skeleton } from '../ui/skeleton';
 
-type NavItemProps = { 
-  href: string, 
-  icon: React.ElementType, 
-  children: React.ReactNode, 
+type NavItemProps = {
+  href: string,
+  icon: React.ElementType,
+  children: React.ReactNode,
   currentPath: string,
   isGreenTheme?: boolean,
   onClick?: () => void;
 };
 
-const NavItem = ({ 
-  href, 
-  icon: Icon, 
-  children, 
+const NavItem = ({
+  href,
+  icon: Icon,
+  children,
   currentPath,
   isGreenTheme = false,
-  onClick
+  onClick: onClickProp // Renamed to avoid conflict
 }: NavItemProps) => {
   const isActive = currentPath === href;
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
+  const { isMobile, setOpenMobile } = useSidebar(); // Get sidebar context
 
-  if (onClick) {
+  const handleClick = () => {
+    if (onClickProp) {
+      onClickProp();
+    }
+    if (isMobile) {
+      setOpenMobile(false); // Close sidebar on mobile
+    }
+  };
+
+  if (onClickProp) { // For items like "Sign Out" that have a direct onClick action
      return (
         <SidebarMenuItem>
-            <SidebarMenuButton 
-            onClick={onClick}
+            <SidebarMenuButton
+            onClick={handleClick}
             className={cn(
                 commonClasses,
                 "hover:bg-destructive hover:text-destructive-foreground" // Specific for sign out
@@ -68,17 +79,19 @@ const NavItem = ({
      );
   }
 
+  // For navigation links
   return (
     <SidebarMenuItem>
       <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
-        <SidebarMenuButton 
-          isActive={isActive} 
+        <SidebarMenuButton
+          onClick={handleClick} // Also close sidebar on navigation
+          isActive={isActive}
           className={cn(
-            commonClasses, 
-            isActive 
-              ? "bg-primary text-primary-foreground" 
-              : isGreenTheme 
-                ? "text-primary hover:bg-primary hover:text-primary-foreground" 
+            commonClasses,
+            isActive
+              ? "bg-primary text-primary-foreground"
+              : isGreenTheme
+                ? "text-primary hover:bg-primary hover:text-primary-foreground"
                 : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
         >
@@ -93,17 +106,24 @@ const NavItem = ({
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isAuthenticated, signOut, loading } = useAuth(); 
-  // const router = useRouter(); // Removed router instance
+  const { isAuthenticated, signOut, loading } = useAuth();
+  const router = useRouter(); // Use useRouter for navigation
+
+  const handleLogoClick = () => {
+    router.push('/');
+  };
 
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
-        <Link href="/" legacyBehavior>
-          <a>
-            <Logo size="small" />
-          </a>
-        </Link>
+        {/* Updated to be a button for navigation */}
+        <button
+          onClick={handleLogoClick}
+          aria-label="Go to homepage"
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+        >
+          <Logo size="small" />
+        </button>
       </SidebarHeader>
       <SidebarContent className="flex-grow p-4">
         {loading ? (
@@ -152,3 +172,6 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+// Added useRouter import to fix error
+import { useRouter } from 'next/navigation';
