@@ -5,9 +5,49 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Share2, Copy, Users, XCircle, Video } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 export default function StartMeetingPage() {
   const meetingLink = "https://teachmeet.example.com/join/xyz123"; // Placeholder
+  const { toast } = useToast(); // Initialize toast
+
+  const handleShareInvite = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join My TeachMeet Meeting',
+          text: `You're invited to join my TeachMeet meeting. Meeting Link: ${meetingLink}`,
+          url: meetingLink,
+        });
+        toast({ title: "Invite Shared", description: "The meeting invite has been shared." });
+      } catch (error) {
+        console.error('Error sharing invite:', error);
+        // Check if the error is due to user cancellation, which is common
+        if ((error as DOMException)?.name === 'AbortError') {
+          // User cancelled the share operation
+          toast({ variant: "default", title: "Sharing Cancelled", description: "You cancelled the share dialog."});
+        } else {
+          toast({ variant: "destructive", title: "Sharing Failed", description: "Could not share the invite using the native share dialog. Link copied to clipboard as fallback." });
+          // Fallback to copy if native share fails for other reasons
+          copyToClipboard();
+        }
+      }
+    } else {
+      // Fallback for browsers that don't support navigator.share
+      copyToClipboard();
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(meetingLink)
+      .then(() => {
+        toast({ title: "Link Copied!", description: "Meeting link copied to clipboard. You can now paste it to share." });
+      })
+      .catch(err => {
+        console.error('Failed to copy link: ', err);
+        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting link automatically." });
+      });
+  };
 
   return (
     <div className="container mx-auto py-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -30,14 +70,14 @@ export default function StartMeetingPage() {
                 value={meetingLink}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
-              <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(meetingLink)} aria-label="Copy link">
+              <Button variant="outline" size="icon" onClick={copyToClipboard} aria-label="Copy link">
                 <Copy className="h-5 w-5" />
               </Button>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" className="rounded-lg py-6 text-base">
+            <Button variant="outline" className="rounded-lg py-6 text-base" onClick={handleShareInvite}>
               <Share2 className="mr-2 h-5 w-5" />
               Share Invite
             </Button>
