@@ -1,3 +1,6 @@
+
+'use client'; // Added this directive
+
 import { HelpChat } from '@/components/help/HelpChat';
 import { AppHeader } from '@/components/common/AppHeader'; // For consistency if needed
 import { Button } from '@/components/ui/button';
