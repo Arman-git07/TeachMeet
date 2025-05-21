@@ -16,7 +16,7 @@ import {
 // import { Separator } from '@/components/ui/separator'; // Separator not directly used here
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import {
   Sidebar,
   SidebarHeader,
@@ -94,15 +94,18 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth(); 
-  
+  const router = useRouter(); // Initialize useRouter
+
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
-        <Link href="/" legacyBehavior>
-          <a>
-            <Logo size="small" />
-          </a>
-        </Link>
+        <button
+          onClick={() => router.push('/')}
+          className="appearance-none bg-transparent border-none p-0 m-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-sidebar-ring rounded-md w-auto inline-block"
+          aria-label="Go to TeachMeet homepage"
+        >
+          <Logo size="small" />
+        </button>
       </SidebarHeader>
       <SidebarContent className="flex-grow p-4">
         {loading ? (
@@ -117,6 +120,7 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
+              {/* <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem> */}
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
