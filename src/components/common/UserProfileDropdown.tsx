@@ -44,13 +44,9 @@ import { auth, storage } from '@/lib/firebase'; // Import storage
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Firebase storage functions
 import { updateProfile } from 'firebase/auth'; // Firebase auth function
 
-// Popular avatars array removed as per request
-
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
   const { toast } = useToast();
-  // selectedAvatar state is no longer needed for popular avatars
-  // const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -77,8 +73,6 @@ export function UserProfileDropdown() {
   const userName = user.displayName || user.email?.split('@')[0] || "User";
   const userEmail = user.email || "No email";
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40.png?text=${userName.charAt(0).toUpperCase()}`;
-
-  // handleSavePopularAvatar function is removed as popular avatars are removed
 
   const handleUploadCustomAvatar = () => {
     fileInputRef.current?.click();
@@ -210,8 +204,6 @@ export function UserProfileDropdown() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            {/* Popular Avatars section removed */}
-            {/* "Or" separator removed as it's no longer needed */}
             <input
               type="file"
               ref={fileInputRef}
@@ -231,10 +223,6 @@ export function UserProfileDropdown() {
                 Cancel
               </Button>
             </DialogClose>
-            {/* The "Save Changes" button was primarily for popular avatars. 
-                Since custom uploads handle their own save, this button is less critical.
-                It's kept here but disabled as selectedAvatar state is removed. 
-                Could be removed entirely or repurposed if other dialog settings are added. */}
             <Button type="button" className="btn-gel rounded-md" disabled={isUploading || true}>
               Save Changes
             </Button>
