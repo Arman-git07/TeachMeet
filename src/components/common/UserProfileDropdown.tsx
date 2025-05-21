@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, Settings, UserCircle as UserIconFallback } from 'lucide-react'; // Renamed UserCircle to avoid conflict
+import { LogOut, UserCircle as UserIconFallback, Phone } from 'lucide-react'; // Added Phone
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,12 +13,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAuth } from '@/hooks/useAuth'; // Import the real useAuth hook
+import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
+import { useToast } from '@/hooks/use-toast'; // Added useToast
 
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
-  
+  const { toast } = useToast(); // Initialize toast
+
   if (loading) {
     return (
       <div className="flex items-center gap-2">
@@ -41,7 +43,6 @@ export function UserProfileDropdown() {
 
   const userName = user.displayName || user.email?.split('@')[0] || "User";
   const userEmail = user.email || "No email";
-  // Placeholder image, ideally from user data (user.photoURL)
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40/223D4A/FFFFFF.png?text=${userName.charAt(0).toUpperCase()}`;
 
   return (
@@ -64,14 +65,20 @@ export function UserProfileDropdown() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {/* You can add more items like "My Profile" if applicable */}
-        {/* <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="/dashboard/profile">
-            <UserCircle className="mr-2 h-4 w-4" />
-            <span>My Profile</span>
-          </Link>
-        </DropdownMenuItem> */}
-        {/* <DropdownMenuSeparator /> */} {/* Separator removed as requested earlier */}
+        <DropdownMenuItem
+          onClick={() => {
+            toast({
+              title: 'Feature Coming Soon',
+              description: 'Ability to add or update your phone number will be available shortly.',
+            });
+          }}
+          className="cursor-pointer"
+        >
+          <Phone className="mr-2 h-4 w-4" />
+          <span>Add Phone Number</span>
+        </DropdownMenuItem>
+        {/* Separator can be added here if more items are expected between phone and sign out */}
+        {/* <DropdownMenuSeparator /> */} 
         <DropdownMenuItem onClick={signOut} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign Out</span>
