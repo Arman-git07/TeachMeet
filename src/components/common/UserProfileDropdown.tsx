@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, UserCircle as UserIconFallback, ExternalLink, Phone } from 'lucide-react';
+import { LogOut, UserCircle as UserIconFallback, ExternalLink } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -27,6 +27,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
@@ -82,9 +83,17 @@ export function UserProfileDropdown() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="mx-1" />
-          <DropdownMenuItem asChild className="cursor-pointer px-3 py-2">
-            <a href="https://myaccount.google.com/" target="_blank" rel="noopener noreferrer" className="flex items-center w-full">
-              <ExternalLink className="mr-2.5 h-4 w-4 text-muted-foreground" />
+          <DropdownMenuItem asChild className="p-1 cursor-pointer focus:bg-transparent">
+            <a
+              href="https://myaccount.google.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                buttonVariants({ variant: 'outline', size: 'sm' }),
+                "w-full flex items-center justify-start text-sm" // Ensure icon and text alignment, explicitly set text-sm
+              )}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" /> {/* Icon size is handled by buttonVariants */}
               <span>Manage Google Account</span>
             </a>
           </DropdownMenuItem>
@@ -111,7 +120,7 @@ export function UserProfileDropdown() {
           <AlertDialogCancel className="rounded-md">Cancel</AlertDialogCancel>
           <AlertDialogAction 
             onClick={signOut} 
-            className={buttonVariants({variant: "destructive", className: "rounded-md"})}
+            className={cn(buttonVariants({variant: "destructive", className: "rounded-md"}))}
           >
             Sign Out
           </AlertDialogAction>
