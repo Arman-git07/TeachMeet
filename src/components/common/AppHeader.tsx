@@ -42,9 +42,13 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
         } else {
           alert('No contact selected.');
         }
-      } catch (ex) {
+      } catch (ex: any) {
         console.error('Error selecting contact:', ex);
-        alert('Could not open contact picker. This feature might not be fully supported by your browser, or an error occurred.');
+        if (ex.message && ex.message.includes("top frame")) {
+          alert('Could not open contact picker. This feature might not work in embedded windows (like some development previews) and requires the app to be in the top browser window.');
+        } else {
+          alert('Could not open contact picker. This feature might not be fully supported by your browser, or an error occurred.');
+        }
       }
     } else {
       alert("The Contact Picker API is not supported by your browser. This feature allows you to select contacts from your device's address book. It's currently best supported on Chrome for Android.");
