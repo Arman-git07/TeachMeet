@@ -39,7 +39,7 @@ import { Skeleton } from '../ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 const popularAvatars = [
   { id: 'panda', src: 'https://placehold.co/80x80.png', alt: 'Panda Avatar', hint: 'panda animal' },
@@ -53,6 +53,7 @@ export function UserProfileDropdown() {
   const { toast } = useToast();
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (loading) {
     return (
@@ -97,10 +98,21 @@ export function UserProfileDropdown() {
   };
 
   const handleUploadCustomAvatar = () => {
-    toast({
-      title: "Feature Coming Soon",
-      description: "Custom avatar upload will be available soon!",
-    });
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      toast({
+        title: "Image Selected (Mock)",
+        description: `You selected: ${file.name}. Uploading and processing would happen here.`,
+      });
+      // In a real app, you would handle the file upload here
+      if (event.target) {
+        event.target.value = ""; // Reset file input to allow selecting the same file again
+      }
+    }
   };
 
   return (
@@ -200,6 +212,13 @@ export function UserProfileDropdown() {
                 </span>
               </div>
             </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelected}
+              accept="image/*"
+              className="hidden"
+            />
             <Button variant="outline" className="w-full rounded-md" onClick={handleUploadCustomAvatar}>
               <ImageIcon className="mr-2 h-4 w-4" />
               Upload Custom Avatar
