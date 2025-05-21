@@ -15,16 +15,18 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, User, CalendarIcon } from 'lucide-react'; // Added User and CalendarIcon
 import { useToast } from '@/hooks/use-toast';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // Added updateProfile
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 
 const formSchema = z.object({
+  profileName: z.string().min(1, { message: 'Profile name is required.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
   confirmPassword: z.string(),
+  dateOfBirth: z.string().optional(), // Optional for now, browser's date input handles format
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match.",
   path: ['confirmPassword'],
@@ -37,19 +39,27 @@ export function SignUpForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      profileName: '',
       email: '',
       password: '',
       confirmPassword: '',
+      dateOfBirth: '',
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      // Update Firebase profile with displayName
+      if (userCredential.user) {
+        await updateProfile(userCredential.user, {
+          displayName: values.profileName,
+        });
+      }
       toast({
         title: "Sign Up Successful",
-        description: `Account created for ${values.email}. Please sign in.`,
+        description: `Account created for ${values.profileName}. Please sign in.`,
       });
       router.push('/auth/signin');
     } catch (error: any) {
@@ -74,7 +84,23 @@ export function SignUpForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4"> {/* Reduced space-y for compactness */}
+        <FormField
+          control={form.control}
+          name="profileName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-foreground/80">Profile Name</FormLabel>
+              <FormControl>
+                 <div className="relative">
+                  <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input placeholder="Your Name" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="email"
@@ -85,6 +111,29 @@ export function SignUpForm() {
                  <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                   <Input placeholder="you@example.com" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+         <FormField
+          control={form.control}
+          name="dateOfBirth"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-foreground/80">Date of Birth</FormLabel>
+              <FormControl>
+                 <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input 
+                    type="date" 
+                    placeholder="YYYY-MM-DD" 
+                    {...field} 
+                    className="pl-10 rounded-lg text-base" 
+                    disabled={isLoading}
+                    // To prevent future dates, you could add max={new Date().toISOString().split("T")[0]}
+                  />
                 </div>
               </FormControl>
               <FormMessage />
@@ -123,7 +172,7 @@ export function SignUpForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg" disabled={isLoading}>
+        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg mt-6" disabled={isLoading}> {/* Added mt-6 for spacing */}
           {isLoading ? 'Creating Account...' : 'Create Account'}
         </Button>
         <div className="text-center text-sm text-muted-foreground">
