@@ -1,19 +1,18 @@
+
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
 import { AppHeader } from '@/components/common/AppHeader';
-import { AppSidebar } from '@/components/common/AppSidebar'; // For mobile view and unauth options
-import { SidebarInset } from '@/components/ui/sidebar'; // Main content area wrapper
+import { AppSidebar } from '@/components/common/AppSidebar';
+import { SidebarInset } from '@/components/ui/sidebar';
+// import { useAuth } from '@/hooks/useAuth'; // Not needed here directly for this page's content
 
 export default function HomePage() {
-  // This page will serve as the public landing.
-  // Authentication status would typically determine if user sees this or is redirected.
-  // For now, we assume it's the public view.
-  const isAuthenticated = false; // Mock auth state
+  // const { isAuthenticated } = useAuth(); // AppSidebar now uses useAuth internally
 
   return (
     <div className="flex flex-col min-h-screen">
-      <AppSidebar isAuthenticated={isAuthenticated} />
+      <AppSidebar /> {/* Removed isAuthenticated prop */}
       <SidebarInset>
         <AppHeader showLogo={false} />
         <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -28,7 +27,7 @@ export default function HomePage() {
           />
           <div className="relative z-10 flex flex-col items-center">
             <Logo size="large" className="mb-8 animate-fadeIn text-center" />
-            <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg max-w-md">
+            <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg max-w-md text-center">
               <h2 className="text-2xl font-semibold text-primary mb-3 text-center">Latest Activity</h2>
               <p className="text-muted-foreground text-center">No ongoing meetings. Start one now!</p>
               {/* Placeholder for activity list */}

@@ -1,10 +1,12 @@
-import type {Metadata} from 'next';
+
+import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { SidebarProvider } from '@/components/ui/sidebar'; // Import SidebarProvider
-import { ThemeProvider } from 'next-themes'; // Import ThemeProvider
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { ThemeProvider } from 'next-themes';
+import { AuthProvider } from '@/hooks/useAuth'; // Import AuthProvider
 
 const geistSans = GeistSans;
 const geistMono = GeistMono;
@@ -28,9 +30,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SidebarProvider defaultOpen={false}>
-            {children}
-          </SidebarProvider>
+          <AuthProvider> {/* Wrap with AuthProvider */}
+            <SidebarProvider defaultOpen={false}>
+              {children}
+            </SidebarProvider>
+          </AuthProvider>
           <Toaster />
         </ThemeProvider>
       </body>

@@ -1,3 +1,4 @@
+
 'use client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -16,6 +17,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Mail, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useState } from 'react';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -29,6 +33,7 @@ const formSchema = z.object({
 export function SignUpForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -38,14 +43,33 @@ export function SignUpForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // Mock sign-up logic
-    console.log(values);
-    toast({
-      title: "Sign Up Successful (Mock)",
-      description: `Account created for ${values.email}. Please sign in.`,
-    });
-    router.push('/auth/signin');
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true);
+    try {
+      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      toast({
+        title: "Sign Up Successful",
+        description: `Account created for ${values.email}. Please sign in.`,
+      });
+      router.push('/auth/signin');
+    } catch (error: any) {
+      console.error("Sign Up Error:", error);
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "This email address is already in use. Please try another.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "The email address is not valid.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "The password is too weak. Please choose a stronger password.";
+      }
+      toast({
+        variant: "destructive",
+        title: "Sign Up Failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -60,7 +84,7 @@ export function SignUpForm() {
               <FormControl>
                  <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="you@example.com" {...field} className="pl-10 rounded-lg text-base" />
+                  <Input placeholder="you@example.com" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
                 </div>
               </FormControl>
               <FormMessage />
@@ -76,7 +100,7 @@ export function SignUpForm() {
               <FormControl>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" />
+                  <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
                 </div>
               </FormControl>
               <FormMessage />
@@ -92,15 +116,15 @@ export function SignUpForm() {
               <FormControl>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" />
+                  <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
                 </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg">
-          Create Account
+        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg" disabled={isLoading}>
+          {isLoading ? 'Creating Account...' : 'Create Account'}
         </Button>
         <div className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}

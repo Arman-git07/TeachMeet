@@ -1,7 +1,8 @@
+
 'use client';
 
 import Link from 'next/link';
-import { LogOut, Settings, UserCircle } from 'lucide-react';
+import { LogOut, Settings, UserCircle as UserIconFallback } from 'lucide-react'; // Renamed UserCircle to avoid conflict
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,39 +13,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
-// In a real app, authentication state would come from a context or hook.
-// For this example, we'll use a mock state.
-// import { useAuth } from '@/hooks/useAuth'; // Fictional auth hook
+import { useAuth } from '@/hooks/useAuth'; // Import the real useAuth hook
+import { Skeleton } from '../ui/skeleton';
 
 export function UserProfileDropdown() {
-  const { toast } = useToast();
-  // const { user, isAuthenticated, signOut } = useAuth(); // Fictional auth hook
+  const { user, isAuthenticated, signOut, loading } = useAuth();
   
-  // Mocked authentication state and user data
-  const isAuthenticated = true; // Change this to false to see the "Sign In" button
-  const userName = "Demo User";
-  const userEmail = "demo@example.com";
-  // Placeholder image, ideally from user data
-  const userAvatarSrc = `https://placehold.co/40x40/223D4A/FFFFFF.png?text=${userName.charAt(0)}`;
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <Skeleton className="h-5 w-20 rounded-md" />
+      </div>
+    );
+  }
 
-
-  const handleSignOut = async () => {
-    // await signOut(); // Fictional sign out
-    toast({ title: "Signed Out (Mock)", description: "You have been signed out." });
-    // router.push('/'); // Redirect to home or sign-in page
-  };
-
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return (
       <Link href="/auth/signin" passHref legacyBehavior>
         <Button variant="ghost" className="rounded-full">
-          <UserCircle className="mr-2 h-5 w-5" />
+          <UserIconFallback className="mr-2 h-5 w-5" />
           Sign In
         </Button>
       </Link>
     );
   }
+
+  const userName = user.displayName || user.email?.split('@')[0] || "User";
+  const userEmail = user.email || "No email";
+  // Placeholder image, ideally from user data (user.photoURL)
+  const userAvatarSrc = user.photoURL || `https://placehold.co/40x40/223D4A/FFFFFF.png?text=${userName.charAt(0).toUpperCase()}`;
 
   return (
     <DropdownMenu>
@@ -73,8 +71,8 @@ export function UserProfileDropdown() {
             <span>My Profile</span>
           </Link>
         </DropdownMenuItem> */}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
+        {/* <DropdownMenuSeparator /> */} {/* Separator removed as requested earlier */}
+        <DropdownMenuItem onClick={signOut} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign Out</span>
         </DropdownMenuItem>

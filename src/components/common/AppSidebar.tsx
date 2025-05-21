@@ -13,8 +13,8 @@ import {
   LogOut,
   Clapperboard
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+// import { Button } from '@/components/ui/button'; // Button not directly used here for items
+// import { Separator } from '@/components/ui/separator'; // Separator not directly used here
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
@@ -26,12 +26,19 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarGroup,
-  SidebarGroupLabel,
+  // SidebarGroup, // Not used
+  // SidebarGroupLabel, // Not used
 } from '@/components/ui/sidebar';
+import { useAuth } from '@/hooks/useAuth'; // Import real useAuth
+import { Skeleton } from '../ui/skeleton';
 
-type AppSidebarProps = {
-  isAuthenticated: boolean; // This would typically come from an auth context/hook
+type NavItemProps = { 
+  href: string, 
+  icon: React.ElementType, 
+  children: React.ReactNode, 
+  currentPath: string,
+  isGreenTheme?: boolean,
+  onClick?: () => void;
 };
 
 const NavItem = ({ 
@@ -39,22 +46,36 @@ const NavItem = ({
   icon: Icon, 
   children, 
   currentPath,
-  isGreenTheme = false 
-}: { 
-  href: string, 
-  icon: React.ElementType, 
-  children: React.ReactNode, 
-  currentPath: string,
-  isGreenTheme?: boolean 
-}) => {
+  isGreenTheme = false,
+  onClick
+}: NavItemProps) => {
   const isActive = currentPath === href;
+  const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
+
+  if (onClick) {
+     return (
+        <SidebarMenuItem>
+            <SidebarMenuButton 
+            onClick={onClick}
+            className={cn(
+                commonClasses,
+                "hover:bg-destructive hover:text-destructive-foreground" // Specific for sign out
+            )}
+            >
+            <Icon className="mr-3 h-5 w-5" />
+            {children}
+            </SidebarMenuButton>
+        </SidebarMenuItem>
+     );
+  }
+
   return (
     <SidebarMenuItem>
-      <Link href={href} passHref legacyBehavior>
+      <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
         <SidebarMenuButton 
           isActive={isActive} 
           className={cn(
-            "w-full justify-start text-base py-3 px-4 rounded-lg", 
+            commonClasses, 
             isActive 
               ? "bg-primary text-primary-foreground" 
               : isGreenTheme 
@@ -71,14 +92,9 @@ const NavItem = ({
 };
 
 
-export function AppSidebar({ isAuthenticated }: AppSidebarProps) {
+export function AppSidebar() { // Removed isAuthenticated prop
   const pathname = usePathname();
-
-  // Mock authentication actions
-  const handleSignOut = () => {
-    alert("Simulating Sign Out. Implement actual sign out logic.");
-    // Example: router.push('/');
-  };
+  const { isAuthenticated, signOut, loading, user } = useAuth(); // Use real auth state
   
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
@@ -90,6 +106,15 @@ export function AppSidebar({ isAuthenticated }: AppSidebarProps) {
         </Link>
       </SidebarHeader>
       <SidebarContent className="flex-grow p-4">
+        {loading ? (
+          <SidebarMenu className="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <SidebarMenuItem key={i}>
+                <Skeleton className="h-10 w-full rounded-lg" />
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        ) : (
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
@@ -106,20 +131,23 @@ export function AppSidebar({ isAuthenticated }: AppSidebarProps) {
             </>
           )}
         </SidebarMenu>
+        )}
       </SidebarContent>
       <SidebarFooter className="p-4 border-t border-sidebar-border">
+         {loading ? (
+            <SidebarMenu className="space-y-2">
+                <Skeleton className="h-10 w-full rounded-lg" />
+                <Skeleton className="h-10 w-full rounded-lg" />
+            </SidebarMenu>
+         ) : (
         <SidebarMenu className="space-y-2">
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
           {isAuthenticated && (
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={handleSignOut} className="w-full justify-start text-base py-3 px-4 rounded-lg hover:bg-destructive hover:text-destructive-foreground">
-                <LogOut className="mr-3 h-5 w-5" />
-                Sign Out
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <NavItem href="#" icon={LogOut} currentPath={pathname} onClick={signOut}>Sign Out</NavItem>
           )}
         </SidebarMenu>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
