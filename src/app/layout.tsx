@@ -10,7 +10,7 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: 'TeachMeet 3D',
+  title: 'TeachMeet',
   description: 'A study meeting app with a 3D interface.',
 };
 
