@@ -42,10 +42,10 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 
 const popularAvatars = [
-  { id: 'panda', src: 'https://placehold.co/80x80/A0A0A0/FFFFFF.png?text=Panda', alt: 'Panda Avatar', hint: 'panda animal' },
-  { id: 'cat', src: 'https://placehold.co/80x80/F0A0A0/FFFFFF.png?text=Cat', alt: 'Cat Avatar', hint: 'cat animal' },
-  { id: 'robot', src: 'https://placehold.co/80x80/A0A0F0/FFFFFF.png?text=Robot', alt: 'Robot Avatar', hint: 'robot technology' },
-  { id: 'astronaut', src: 'https://placehold.co/80x80/A0F0A0/FFFFFF.png?text=Astro', alt: 'Astronaut Avatar', hint: 'astronaut space' },
+  { id: 'panda', src: 'https://placehold.co/80x80.png', alt: 'Panda Avatar', hint: 'panda animal' },
+  { id: 'cat', src: 'https://placehold.co/80x80.png', alt: 'Cat Avatar', hint: 'cat animal' },
+  { id: 'robot', src: 'https://placehold.co/80x80.png', alt: 'Robot Avatar', hint: 'robot technology' },
+  { id: 'astronaut', src: 'https://placehold.co/80x80.png', alt: 'Astronaut Avatar', hint: 'astronaut space' },
 ];
 
 export function UserProfileDropdown() {
@@ -79,13 +79,16 @@ export function UserProfileDropdown() {
 
   const handleSaveAvatar = () => {
     if (selectedAvatar) {
+      const chosenAvatar = popularAvatars.find(avatar => avatar.id === selectedAvatar);
       toast({
         title: "Avatar Changed (Mock)",
-        description: `Your avatar is now ${selectedAvatar}. (This is a mock action)`,
+        description: `Your avatar is now ${chosenAvatar?.alt || selectedAvatar}. (This is a mock action)`,
       });
       // In a real app, you would update user.photoURL here via Firebase
+      // For example: updateProfile(auth.currentUser, { photoURL: chosenAvatar.src })
     } else {
       toast({
+        variant: "destructive",
         title: "No Avatar Selected",
         description: "Please select an avatar first.",
       });
