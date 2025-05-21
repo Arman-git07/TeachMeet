@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
@@ -99,7 +100,7 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto shadow-2xl rounded-xl border-border/50 flex flex-col h-[calc(100vh-10rem)] min-h-[400px]">
+    <Card className="w-full max-w-2xl mx-auto shadow-2xl rounded-xl border-border/50 flex flex-col h-full min-h-[400px]">
       <CardHeader className="border-b">
         <CardTitle className="flex items-center text-xl font-semibold">
           <MessageSquare className="h-7 w-7 mr-3 text-primary" />
