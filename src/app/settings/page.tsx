@@ -32,7 +32,7 @@ export default function PublicSettingsPage() {
         </Card>
       </main>
       <footer className="py-8 text-center text-muted-foreground text-sm border-t border-border">
-        © {new Date().getFullYear()} TeachMeet 3D. All rights reserved.
+        © {new Date().getFullYear()} TeachMeet. All rights reserved.
       </footer>
     </div>
   );

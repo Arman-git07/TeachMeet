@@ -28,7 +28,7 @@ export default function PublicHelpPage() {
         <HelpChat />
       </main>
        <footer className="py-8 text-center text-muted-foreground text-sm border-t border-border">
-        © {new Date().getFullYear()} TeachMeet 3D. All rights reserved.
+        © {new Date().getFullYear()} TeachMeet. All rights reserved.
         <div className="mt-2">
           <Link href="/auth/signin" className="hover:text-accent hover:underline mx-2">Sign In</Link> | 
           <Link href="/auth/signup" className="hover:text-accent hover:underline mx-2">Sign Up</Link>
