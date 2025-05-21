@@ -46,7 +46,10 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
         console.error('Error selecting contact:', ex);
         if (ex.message && ex.message.toLowerCase().includes("top frame")) {
           alert('Could not open contact picker. This feature might not work in embedded windows (like some development previews) and requires the app to be in the top browser window.');
-        } else {
+        } else if (ex.name === 'InvalidStateError' && ex.message.toLowerCase().includes("user activation is required")) {
+          alert('Could not open contact picker. Please try clicking the button again. This feature requires a direct user interaction.');
+        }
+         else {
           alert('Could not open contact picker. This feature might not be fully supported by your browser, or an error occurred.');
         }
       }
