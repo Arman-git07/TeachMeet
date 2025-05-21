@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, UserCircle as UserIconFallback, Phone } from 'lucide-react'; // Added Phone
+import { LogOut, UserCircle as UserIconFallback, Phone } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,13 +13,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { useToast } from '@/hooks/use-toast';
 
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
 
   if (loading) {
     return (
@@ -46,44 +57,64 @@ export function UserProfileDropdown() {
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40/223D4A/FFFFFF.png?text=${userName.charAt(0).toUpperCase()}`;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-          <Avatar className="h-10 w-10 border-2 border-border hover:border-primary transition-colors">
-            <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user" />
-            <AvatarFallback>{userName.charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56 rounded-lg shadow-lg" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1 py-1">
-            <p className="text-sm font-medium leading-none">{userName}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {userEmail}
-            </p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => {
-            toast({
-              title: 'Feature Coming Soon',
-              description: 'Ability to add or update your phone number will be available shortly.',
-            });
-          }}
-          className="cursor-pointer"
-        >
-          <Phone className="mr-2 h-4 w-4" />
-          <span>Add Phone Number</span>
-        </DropdownMenuItem>
-        {/* Separator can be added here if more items are expected between phone and sign out */}
-        {/* <DropdownMenuSeparator /> */} 
-        <DropdownMenuItem onClick={signOut} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Sign Out</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <AlertDialog>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+            <Avatar className="h-10 w-10 border-2 border-border hover:border-primary transition-colors">
+              <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user" />
+              <AvatarFallback>{userName.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56 rounded-lg shadow-lg" align="end" forceMount>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1 py-1">
+              <p className="text-sm font-medium leading-none">{userName}</p>
+              <p className="text-xs leading-none text-muted-foreground">
+                {userEmail}
+              </p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => {
+              toast({
+                title: 'Feature Coming Soon',
+                description: 'Ability to add or update your phone number will be available shortly.',
+              });
+            }}
+            className="cursor-pointer"
+          >
+            <Phone className="mr-2 h-4 w-4" />
+            <span>Add Phone Number</span>
+          </DropdownMenuItem>
+          {/* <DropdownMenuSeparator /> */}
+          <AlertDialogTrigger asChild>
+            <DropdownMenuItem
+              onSelect={(event) => event.preventDefault()} // Prevents DropdownMenu from closing
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sign Out</span>
+            </DropdownMenuItem>
+          </AlertDialogTrigger>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You will be logged out of your TeachMeet account. You can always sign back in later.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={signOut} className={Button({variant: "destructive"}).className}>
+            Sign Out
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
