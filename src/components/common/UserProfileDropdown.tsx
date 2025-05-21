@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { LogOut, UserCircle as UserIconFallback, Phone } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,7 +110,7 @@ export function UserProfileDropdown() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={signOut} className={Button({variant: "destructive"}).className}>
+          <AlertDialogAction onClick={signOut} className={buttonVariants({variant: "destructive"})}>
             Sign Out
           </AlertDialogAction>
         </AlertDialogFooter>
