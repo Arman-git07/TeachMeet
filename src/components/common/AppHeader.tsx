@@ -5,7 +5,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
-import { UserProfileDropdown } from './UserProfileDropdown';
+// import { UserProfileDropdown } from './UserProfileDropdown'; // Removed
 
 type AppHeaderProps = {
   showLogo?: boolean;
@@ -84,7 +84,7 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
         </div>
         
         <div className="flex items-center gap-2">
-          <UserProfileDropdown />
+          {/* <UserProfileDropdown /> */} {/* Removed */}
           <ThemeToggle />
         </div>
       </div>
