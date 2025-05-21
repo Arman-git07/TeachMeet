@@ -22,7 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger as SignOutAlertDialogTrigger, // Alias to avoid conflict
+  AlertDialogTrigger as SignOutAlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -40,6 +40,9 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import React, { useState, useRef } from 'react';
+import { auth, storage } from '@/lib/firebase'; // Import storage
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Firebase storage functions
+import { updateProfile } from 'firebase/auth'; // Firebase auth function
 
 const popularAvatars = [
   { id: 'panda', src: 'https://placehold.co/80x80.png', alt: 'Panda Avatar', hint: 'panda animal' },
@@ -55,6 +58,7 @@ export function UserProfileDropdown() {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   if (loading) {
     return (
@@ -79,15 +83,27 @@ export function UserProfileDropdown() {
   const userEmail = user.email || "No email";
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40.png?text=${userName.charAt(0).toUpperCase()}`;
 
-  const handleSaveAvatar = () => {
+  const handleSavePopularAvatar = async () => {
+    if (!auth.currentUser) {
+        toast({ variant: "destructive", title: "Error", description: "User not authenticated."});
+        return;
+    }
     if (selectedAvatar) {
       const chosenAvatar = popularAvatars.find(avatar => avatar.id === selectedAvatar);
-      toast({
-        title: "Avatar Changed (Mock)",
-        description: `Your avatar is now ${chosenAvatar?.alt || selectedAvatar}. (This is a mock action)`,
-      });
-      // In a real app, you would update user.photoURL here via Firebase
-      // For example: updateProfile(auth.currentUser, { photoURL: chosenAvatar.src })
+      if (chosenAvatar) {
+        try {
+          await updateProfile(auth.currentUser, { photoURL: chosenAvatar.src });
+          toast({
+            title: "Avatar Changed",
+            description: `Your avatar is now ${chosenAvatar.alt}.`,
+          });
+          // Force a re-render or state update if useAuth doesn't immediately pick up changes
+          // This might require a mechanism within useAuth to refresh the user object
+        } catch (error) {
+          console.error("Error updating profile with popular avatar:", error);
+          toast({ variant: "destructive", title: "Error", description: "Could not update avatar."});
+        }
+      }
     } else {
       toast({
         variant: "destructive",
@@ -95,26 +111,71 @@ export function UserProfileDropdown() {
         description: "Please select an avatar first.",
       });
     }
-    setIsAvatarDialogOpen(false); // Close dialog
+    setIsAvatarDialogOpen(false);
   };
 
   const handleUploadCustomAvatar = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
+    if (file && auth.currentUser) {
+      setIsUploading(true);
       toast({
-        title: "Image Selected (Mock)",
-        description: `You selected: ${file.name}. Uploading and processing would happen here.`,
+        title: "Uploading Avatar...",
+        description: `Uploading ${file.name}. Please wait.`,
       });
-      // In a real app, you would handle the file upload here
+
+      // Use a more specific path, like the user's UID, to store avatars.
+      // Overwrite existing avatar by using a consistent file name e.g., 'avatar.png'
+      const filePath = `avatars/${auth.currentUser.uid}/avatar.png`;
+      const fileRef = storageRef(storage, filePath);
+      const uploadTask = uploadBytesResumable(fileRef, file);
+
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          // Optionally, update progress here
+          // const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          // console.log('Upload is ' + progress + '% done');
+        },
+        (error) => {
+          console.error("Avatar Upload Error:", error);
+          toast({
+            variant: "destructive",
+            title: "Upload Failed",
+            description: "Could not upload your avatar. Please try again.",
+          });
+          setIsUploading(false);
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            await updateProfile(auth.currentUser!, { photoURL: downloadURL });
+            toast({
+              title: "Avatar Uploaded!",
+              description: "Your new avatar has been set.",
+            });
+            setIsAvatarDialogOpen(false); // Close dialog on success
+          } catch (error) {
+            console.error("Error setting avatar URL:", error);
+            toast({
+              variant: "destructive",
+              title: "Update Failed",
+              description: "Could not update your profile with the new avatar.",
+            });
+          } finally {
+            setIsUploading(false);
+          }
+        }
+      );
+
       if (event.target) {
-        event.target.value = ""; // Reset file input to allow selecting the same file again
+        event.target.value = ""; // Reset file input
       }
     }
   };
+
 
   return (
     <AlertDialog>
@@ -198,6 +259,7 @@ export function UserProfileDropdown() {
                     selectedAvatar === avatar.id ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50"
                   )}
                   aria-label={`Select ${avatar.alt}`}
+                  disabled={isUploading}
                 >
                   <Image src={avatar.src} alt={avatar.alt} width={80} height={80} className="rounded-full object-cover w-full h-full" data-ai-hint={avatar.hint} />
                 </button>
@@ -219,19 +281,20 @@ export function UserProfileDropdown() {
               onChange={handleFileSelected}
               accept="image/*"
               className="hidden"
+              disabled={isUploading}
             />
-            <Button variant="outline" className="w-full rounded-md" onClick={handleUploadCustomAvatar}>
+            <Button variant="outline" className="w-full rounded-md" onClick={handleUploadCustomAvatar} disabled={isUploading}>
               <ImageIcon className="mr-2 h-4 w-4" />
-              Upload Custom Avatar
+              {isUploading ? "Uploading..." : "Upload Custom Avatar"}
             </Button>
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="outline" className="rounded-md">
+              <Button type="button" variant="outline" className="rounded-md" disabled={isUploading}>
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="button" onClick={handleSaveAvatar} className="btn-gel rounded-md">
+            <Button type="button" onClick={handleSavePopularAvatar} className="btn-gel rounded-md" disabled={isUploading || !selectedAvatar}>
               Save Changes
             </Button>
           </DialogFooter>
@@ -259,4 +322,3 @@ export function UserProfileDropdown() {
     </AlertDialog>
   );
 }
-
