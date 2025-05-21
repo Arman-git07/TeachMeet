@@ -48,7 +48,21 @@ export function SignInForm() {
       });
       router.push('/dashboard');
     } catch (error: any) {
-      console.error("Sign In Error:", error);
+      const knownErrorCodes = [
+        'auth/user-not-found', 
+        'auth/wrong-password', 
+        'auth/invalid-credential', 
+        'auth/invalid-email', 
+        'auth/too-many-requests'
+      ];
+
+      if (!knownErrorCodes.includes(error.code)) {
+        console.error("Unexpected Sign In Error:", error);
+      } else {
+        // Log handled errors as info to reduce console noise, or remove if not needed
+        console.info(`Handled Sign In Error: ${error.code}`);
+      }
+
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         errorMessage = "Invalid email or password. Please try again.";
