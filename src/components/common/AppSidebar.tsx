@@ -91,9 +91,9 @@ const NavItem = ({
 };
 
 
-export function AppSidebar() { // Removed isAuthenticated prop
+export function AppSidebar() {
   const pathname = usePathname();
-  const { isAuthenticated, signOut, loading, user } = useAuth(); // Use real auth state
+  const { isAuthenticated, signOut, loading } = useAuth(); 
   
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
@@ -117,7 +117,6 @@ export function AppSidebar() { // Removed isAuthenticated prop
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
-              {/* <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem> Removed as per request */}
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
