@@ -46,7 +46,7 @@ export function SignInForm() {
         title: "Sign In Successful",
         description: "Welcome back!",
       });
-      router.push('/dashboard');
+      router.push('/'); // Changed from '/dashboard' to '/'
     } catch (error: any) {
       const knownErrorCodes = [
         'auth/user-not-found', 
