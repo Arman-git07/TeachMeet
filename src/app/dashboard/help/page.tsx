@@ -1,3 +1,4 @@
+
 'use client';
 
 import { HelpChat, type HelpChatRef } from '@/components/help/HelpChat';
