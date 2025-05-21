@@ -1,8 +1,6 @@
 
 'use client';
-import { Search, PanelLeftOpen } from 'lucide-react'; // Changed Menu to PanelLeftOpen
-// import { Input } from '@/components/ui/input'; // No longer using Input for search
-// import { Button as UIButton } from '@/components/ui/button'; // Not needed
+import { Search, PanelLeftOpen } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Logo } from './Logo';
@@ -63,7 +61,7 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden">
-            <PanelLeftOpen className="h-6 w-6" /> {/* Changed Menu to PanelLeftOpen */}
+            <PanelLeftOpen className="h-6 w-6" />
           </SidebarTrigger>
           {showLogo && (
             <Link href="/" className="hidden md:block">
