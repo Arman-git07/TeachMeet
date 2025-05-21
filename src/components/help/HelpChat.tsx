@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -22,15 +22,27 @@ const predefinedFAQs = [
   { q: "Where can I find settings?", a: "You can access settings by clicking the 'Settings' button in the left sidebar or the icon in the top right corner during a meeting." },
 ];
 
-export function HelpChat() {
+export interface HelpChatRef {
+  focusChatInput: () => void;
+}
+
+const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusChatInput: () => {
+      chatInputRef.current?.focus();
+      // Scroll the specific input into view smoothly
+      chatInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }));
 
   useEffect(() => {
-    // Initial greeting
     setMessages([
       { id: 'greeting', text: "Hello! I'm TeachMeet AI Assistant. How can I help you today?", sender: 'ai', timestamp: new Date() },
       { id: 'faq-intro', text: "Here are some frequently asked questions:", sender: 'system', timestamp: new Date() }
@@ -82,8 +94,8 @@ export function HelpChat() {
   };
   
   const handleFAQClick = (question: string) => {
-    setInputValue(question); // Pre-fill input to allow editing
-    handleSendMessage(question); // Send the FAQ question directly
+    setInputValue(question);
+    handleSendMessage(question);
   };
 
   return (
@@ -162,6 +174,7 @@ export function HelpChat() {
             <span className="sr-only">Attach file</span>
           </Button>
           <Input
+            ref={chatInputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -178,4 +191,7 @@ export function HelpChat() {
       </CardFooter>
     </Card>
   );
-}
+});
+HelpChatComponent.displayName = 'HelpChat';
+
+export { HelpChatComponent as HelpChat };
