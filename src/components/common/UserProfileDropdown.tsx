@@ -44,18 +44,13 @@ import { auth, storage } from '@/lib/firebase'; // Import storage
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Firebase storage functions
 import { updateProfile } from 'firebase/auth'; // Firebase auth function
 
-const popularAvatars = [
-  { id: 'panda', src: 'https://placehold.co/80x80.png', alt: 'Panda Avatar', hint: 'panda animal' },
-  { id: 'cat', src: 'https://placehold.co/80x80.png', alt: 'Cat Avatar', hint: 'cat animal' },
-  { id: 'robot', src: 'https://placehold.co/80x80.png', alt: 'Robot Avatar', hint: 'robot technology' },
-  { id: 'astronaut', src: 'https://placehold.co/80x80.png', alt: 'Astronaut Avatar', hint: 'astronaut space' },
-  { id: 'boy', src: 'https://placehold.co/80x80.png', alt: 'Cartoon Boy Avatar', hint: 'boy cartoon' },
-];
+// Popular avatars array removed as per request
 
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
   const { toast } = useToast();
-  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
+  // selectedAvatar state is no longer needed for popular avatars
+  // const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -83,36 +78,7 @@ export function UserProfileDropdown() {
   const userEmail = user.email || "No email";
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40.png?text=${userName.charAt(0).toUpperCase()}`;
 
-  const handleSavePopularAvatar = async () => {
-    if (!auth.currentUser) {
-        toast({ variant: "destructive", title: "Error", description: "User not authenticated."});
-        return;
-    }
-    if (selectedAvatar) {
-      const chosenAvatar = popularAvatars.find(avatar => avatar.id === selectedAvatar);
-      if (chosenAvatar) {
-        try {
-          await updateProfile(auth.currentUser, { photoURL: chosenAvatar.src });
-          toast({
-            title: "Avatar Changed",
-            description: `Your avatar is now ${chosenAvatar.alt}.`,
-          });
-          // Force a re-render or state update if useAuth doesn't immediately pick up changes
-          // This might require a mechanism within useAuth to refresh the user object
-        } catch (error) {
-          console.error("Error updating profile with popular avatar:", error);
-          toast({ variant: "destructive", title: "Error", description: "Could not update avatar."});
-        }
-      }
-    } else {
-      toast({
-        variant: "destructive",
-        title: "No Avatar Selected",
-        description: "Please select an avatar first.",
-      });
-    }
-    setIsAvatarDialogOpen(false);
-  };
+  // handleSavePopularAvatar function is removed as popular avatars are removed
 
   const handleUploadCustomAvatar = () => {
     fileInputRef.current?.click();
@@ -127,8 +93,6 @@ export function UserProfileDropdown() {
         description: `Uploading ${file.name}. Please wait.`,
       });
 
-      // Use a more specific path, like the user's UID, to store avatars.
-      // Overwrite existing avatar by using a consistent file name e.g., 'avatar.png'
       const filePath = `avatars/${auth.currentUser.uid}/avatar.png`;
       const fileRef = storageRef(storage, filePath);
       const uploadTask = uploadBytesResumable(fileRef, file);
@@ -136,8 +100,6 @@ export function UserProfileDropdown() {
       uploadTask.on('state_changed',
         (snapshot) => {
           // Optionally, update progress here
-          // const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          // console.log('Upload is ' + progress + '% done');
         },
         (error) => {
           console.error("Avatar Upload Error:", error);
@@ -156,7 +118,7 @@ export function UserProfileDropdown() {
               title: "Avatar Uploaded!",
               description: "Your new avatar has been set.",
             });
-            setIsAvatarDialogOpen(false); // Close dialog on success
+            setIsAvatarDialogOpen(false); 
           } catch (error) {
             console.error("Error setting avatar URL:", error);
             toast({
@@ -171,7 +133,7 @@ export function UserProfileDropdown() {
       );
 
       if (event.target) {
-        event.target.value = ""; // Reset file input
+        event.target.value = ""; 
       }
     }
   };
@@ -242,39 +204,14 @@ export function UserProfileDropdown() {
         {/* Avatar Change Dialog Content */}
         <DialogContent className="sm:max-w-md rounded-lg">
           <DialogHeader>
-            <DialogTitle>Choose Your Avatar</DialogTitle>
+            <DialogTitle>Change Your Avatar</DialogTitle>
             <DialogDescription>
-              Select one of the popular avatars or upload your own.
+              Upload a custom avatar.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <p className="text-sm font-medium text-foreground">Popular Avatars</p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-              {popularAvatars.map((avatar) => (
-                <button
-                  key={avatar.id}
-                  onClick={() => setSelectedAvatar(avatar.id)}
-                  className={cn(
-                    "rounded-full overflow-hidden border-2 p-0.5 transition-all aspect-square",
-                    selectedAvatar === avatar.id ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50"
-                  )}
-                  aria-label={`Select ${avatar.alt}`}
-                  disabled={isUploading}
-                >
-                  <Image src={avatar.src} alt={avatar.alt} width={80} height={80} className="rounded-full object-cover w-full h-full" data-ai-hint={avatar.hint} />
-                </button>
-              ))}
-            </div>
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or
-                </span>
-              </div>
-            </div>
+            {/* Popular Avatars section removed */}
+            {/* "Or" separator removed as it's no longer needed */}
             <input
               type="file"
               ref={fileInputRef}
@@ -294,7 +231,11 @@ export function UserProfileDropdown() {
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="button" onClick={handleSavePopularAvatar} className="btn-gel rounded-md" disabled={isUploading || !selectedAvatar}>
+            {/* The "Save Changes" button was primarily for popular avatars. 
+                Since custom uploads handle their own save, this button is less critical.
+                It's kept here but disabled as selectedAvatar state is removed. 
+                Could be removed entirely or repurposed if other dialog settings are added. */}
+            <Button type="button" className="btn-gel rounded-md" disabled={isUploading || true}>
               Save Changes
             </Button>
           </DialogFooter>
