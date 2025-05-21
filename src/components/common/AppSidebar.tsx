@@ -16,7 +16,7 @@ import {
 // import { Separator } from '@/components/ui/separator'; // Separator not directly used here
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
-import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
+import { usePathname } from 'next/navigation'; // Removed useRouter
 import {
   Sidebar,
   SidebarHeader,
@@ -94,18 +94,16 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth(); 
-  const router = useRouter(); // Initialize useRouter
+  // const router = useRouter(); // Removed router instance
 
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
-        <button
-          onClick={() => router.push('/')}
-          className="appearance-none bg-transparent border-none p-0 m-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-sidebar-ring rounded-md w-auto inline-block"
-          aria-label="Go to TeachMeet homepage"
-        >
-          <Logo size="small" />
-        </button>
+        <Link href="/" legacyBehavior>
+          <a>
+            <Logo size="small" />
+          </a>
+        </Link>
       </SidebarHeader>
       <SidebarContent className="flex-grow p-4">
         {loading ? (
