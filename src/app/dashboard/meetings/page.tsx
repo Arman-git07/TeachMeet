@@ -1,3 +1,6 @@
+
+'use client'; // Add this directive
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Video, Users, Clock, PlusCircle, Trash2, Edit } from "lucide-react";
@@ -53,11 +56,11 @@ export default function MyMeetingsPage() {
           {meetings.map(meeting => (
             <Card key={meeting.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border-border/50">
               <div className="relative h-32 w-full">
-                 <Image 
+                 <Image
                     src={`https://placehold.co/400x200.png/223D4A/FFFFFF?text=${meeting.type.replace(' ', '+')}`}
-                    alt={meeting.title} 
-                    layout="fill" 
-                    objectFit="cover" 
+                    alt={meeting.title}
+                    layout="fill"
+                    objectFit="cover"
                     className="rounded-t-xl opacity-70"
                     data-ai-hint="meeting abstract"
                  />
