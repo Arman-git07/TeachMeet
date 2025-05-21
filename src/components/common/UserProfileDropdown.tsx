@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, UserCircle as UserIconFallback, ExternalLink } from 'lucide-react';
+import { LogOut, UserCircle as UserIconFallback, ExternalLink, ImageIcon, Phone } from 'lucide-react'; // Added ImageIcon
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -37,8 +37,6 @@ export function UserProfileDropdown() {
     return (
       <div className="flex items-center gap-2">
         <Skeleton className="h-10 w-10 rounded-full" />
-        {/* Optionally show a small text skeleton if a name placeholder is desired during loading */}
-        {/* <Skeleton className="h-5 w-20 rounded-md hidden sm:block" /> */}
       </div>
     );
   }
@@ -56,9 +54,15 @@ export function UserProfileDropdown() {
 
   const userName = user.displayName || user.email?.split('@')[0] || "User";
   const userEmail = user.email || "No email";
-  // Updated placeholder to use theme colors for better contrast
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40.png?text=${userName.charAt(0).toUpperCase()}`;
 
+
+  const handleChangeAvatar = () => {
+    toast({
+      title: "Feature Coming Soon",
+      description: "You'll soon be able to change your avatar here!",
+    });
+  };
 
   return (
     <AlertDialog>
@@ -90,12 +94,16 @@ export function UserProfileDropdown() {
               rel="noopener noreferrer"
               className={cn(
                 buttonVariants({ variant: 'outline', size: 'sm' }),
-                "w-full flex items-center justify-start text-sm" // Ensure icon and text alignment, explicitly set text-sm
+                "w-full flex items-center justify-start text-sm"
               )}
             >
-              <ExternalLink className="mr-2 h-4 w-4" /> {/* Icon size is handled by buttonVariants */}
+              <ExternalLink className="mr-2 h-4 w-4" />
               <span>Manage Google Account</span>
             </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleChangeAvatar} className="cursor-pointer px-3 py-2">
+            <ImageIcon className="mr-2.5 h-4 w-4" />
+            <span>Change Avatar</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator className="mx-1" />
           <AlertDialogTrigger asChild>
