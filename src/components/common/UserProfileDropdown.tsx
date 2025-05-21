@@ -2,9 +2,9 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, UserCircle as UserIconFallback } from 'lucide-react'; // Removed Phone icon
+import { LogOut, UserCircle as UserIconFallback, ExternalLink } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,11 +26,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
-// import { useToast } from '@/hooks/use-toast'; // Toast not needed if phone option is removed
 
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
-  // const { toast } = useToast(); // Toast not needed
 
   if (loading) {
     return (
@@ -77,10 +75,16 @@ export function UserProfileDropdown() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {/* Removed "Add Phone Number" DropdownMenuItem */}
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <a href="https://myaccount.google.com/" target="_blank" rel="noopener noreferrer" className="flex items-center w-full">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              <span>Manage Google Account</span>
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <AlertDialogTrigger asChild>
             <DropdownMenuItem
-              onSelect={(event) => event.preventDefault()} // Prevents DropdownMenu from closing
+              onSelect={(event) => event.preventDefault()} 
               className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
             >
               <LogOut className="mr-2 h-4 w-4" />
