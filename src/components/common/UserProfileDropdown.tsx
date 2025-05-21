@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, UserCircle as UserIconFallback, Phone } from 'lucide-react';
+import { LogOut, UserCircle as UserIconFallback } from 'lucide-react'; // Removed Phone icon
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import {
@@ -26,11 +26,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+// import { useToast } from '@/hooks/use-toast'; // Toast not needed if phone option is removed
 
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
-  const { toast } = useToast();
+  // const { toast } = useToast(); // Toast not needed
 
   if (loading) {
     return (
@@ -77,19 +77,7 @@ export function UserProfileDropdown() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => {
-              toast({
-                title: 'Feature Coming Soon',
-                description: 'Ability to add or update your phone number will be available shortly.',
-              });
-            }}
-            className="cursor-pointer"
-          >
-            <Phone className="mr-2 h-4 w-4" />
-            <span>Add Phone Number</span>
-          </DropdownMenuItem>
-          {/* <DropdownMenuSeparator /> */}
+          {/* Removed "Add Phone Number" DropdownMenuItem */}
           <AlertDialogTrigger asChild>
             <DropdownMenuItem
               onSelect={(event) => event.preventDefault()} // Prevents DropdownMenu from closing
