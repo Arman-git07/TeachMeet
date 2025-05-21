@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Paperclip, Send, MessageSquare, AlertTriangle } from 'lucide-react';
 import { aiHelpAssistant, AiHelpAssistantInput, AiHelpAssistantOutput } from '@/ai/flows/ai-help-assistant';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -34,11 +35,11 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
   const [error, setError] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useImperativeHandle(ref, () => ({
     focusChatInput: () => {
       chatInputRef.current?.focus();
-      // Scroll the specific input into view smoothly
       chatInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }));
@@ -97,6 +98,19 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
   const handleFAQClick = (question: string) => {
     setInputValue(question);
     handleSendMessage(question);
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      console.log("File selected:", file.name, file.type, file.size);
+      toast({
+        title: "File Selected (Mock)",
+        description: `You selected: ${file.name}. Actual upload/processing is not yet implemented.`,
+      });
+      // Reset the input value to allow selecting the same file again if needed
+      event.target.value = '';
+    }
   };
 
   return (
@@ -170,10 +184,20 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
       </CardContent>
       <CardFooter className="p-4 border-t">
         <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex w-full items-center gap-3">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-accent">
-            <Paperclip className="h-5 w-5" />
-            <span className="sr-only">Attach file</span>
+          <Button asChild variant="ghost" size="icon" className="text-muted-foreground hover:text-accent cursor-pointer">
+            <label htmlFor="file-upload-input">
+              <Paperclip className="h-5 w-5" />
+              <span className="sr-only">Attach file</span>
+            </label>
           </Button>
+          <input 
+            type="file" 
+            id="file-upload-input" 
+            className="hidden" 
+            onChange={handleFileChange} 
+            disabled={isLoading}
+            accept="image/*,application/pdf,.doc,.docx,.txt" // Example file types
+          />
           <Input
             ref={chatInputRef}
             type="text"
