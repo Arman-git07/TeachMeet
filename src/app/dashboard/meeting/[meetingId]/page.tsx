@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, use } from 'react'; 
+import { useState, useEffect, use } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3 } from "lucide-react";
@@ -10,23 +10,23 @@ import Image from "next/image";
 
 const ParticipantView = ({ name, isMe = false, isMicMuted = false, isCameraOff = false }: { name: string, isMe?: boolean, isMicMuted?: boolean, isCameraOff?: boolean }) => {
   return (
-    <Card className="aspect-video rounded-lg overflow-hidden relative shadow-lg border-2 border-transparent group hover:border-primary transition-all">
+    <Card className="aspect-video rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group">
       {isCameraOff ? (
-        <div className="w-full h-full bg-muted flex flex-col items-center justify-center">
-          <Avatar className="w-16 h-16 mb-2">
-            <AvatarImage src={`https://placehold.co/64x64.png?text=${name.charAt(0)}`} alt={name} data-ai-hint="avatar user" />
-            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+        <div className="w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
+          <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
+            <AvatarImage src={`https://placehold.co/128x128.png?text=${name.charAt(0).toUpperCase()}`} alt={name} data-ai-hint="avatar user" />
+            <AvatarFallback className="text-3xl md:text-4xl">{name.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <VideoOff className="w-8 h-8 text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">{name}</p>
+          <VideoOff className="w-7 h-7 text-muted-foreground mb-1" />
+          <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
         </div>
       ) : (
-        <Image src={`https://placehold.co/400x225.png`} alt={`${name}'s video`} layout="fill" objectFit="cover" data-ai-hint="participant video" />
+        <Image src={`https://placehold.co/600x338.png`} alt={`${name}'s video`} layout="fill" objectFit="cover" data-ai-hint="participant video" />
       )}
-      <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs backdrop-blur-sm">
-        {name} {isMe && "(You)"}
+      <div className="absolute bottom-2 left-2 bg-gradient-to-r from-black/70 to-transparent px-3 py-1.5 rounded-md backdrop-blur-sm">
+        <p className="text-sm font-medium text-white shadow-sm">{name} {isMe && <span className="text-xs opacity-80">(You)</span>}</p>
       </div>
-      <div className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full backdrop-blur-sm">
+      <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full backdrop-blur-sm shadow-md">
         {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </div>
     </Card>
@@ -34,13 +34,12 @@ const ParticipantView = ({ name, isMe = false, isMicMuted = false, isCameraOff =
 };
 
 export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
-  const { meetingId } = use(paramsPromise); 
+  const { meetingId } = use(paramsPromise);
 
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isHandRaised, setIsHandRaised] = useState(false);
-  
-  // Updated placeholder participants
+
   const participants = [
     { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff },
     { id: "guestUserA", name: "User A", isMicMuted: false, isCameraOff: true },
@@ -50,9 +49,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const toggleMic = () => setIsMicMuted(prev => !prev);
   const toggleCamera = () => setIsCameraOff(prev => !prev);
   const toggleHandRaise = () => setIsHandRaised(prev => !prev);
-  const leaveMeeting = () => { 
-    alert("Leaving meeting (mock action)"); 
-    // router.push('/dashboard'); 
+  const leaveMeeting = () => {
+    alert("Leaving meeting (mock action)");
+    // router.push('/dashboard');
   };
 
   return (
