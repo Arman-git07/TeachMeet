@@ -5,9 +5,10 @@ import type { HTMLAttributes } from 'react';
 type LogoProps = {
   className?: string;
   size?: 'small' | 'medium' | 'large';
+  text?: string; // New prop to allow dynamic text
 } & HTMLAttributes<HTMLHeadingElement>; // Allow all HTML heading attributes, including onClick
 
-export function Logo({ className, size = 'medium', ...props }: LogoProps) {
+export function Logo({ className, size = 'medium', text, ...props }: LogoProps) {
   const sizeClasses = {
     small: 'text-3xl md:text-4xl',
     medium: 'text-5xl md:text-6xl',
@@ -32,7 +33,7 @@ export function Logo({ className, size = 'medium', ...props }: LogoProps) {
       }}
       {...props} // Spread other props like onClick here
     >
-      TeachMeet
+      {text || 'TeachMeet'} {/* Use text prop or default to "TeachMeet" */}
     </h1>
   );
 }
