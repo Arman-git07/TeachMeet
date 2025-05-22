@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Mic, MicOff, Video, VideoOff, Settings2, User, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import React, { useState, useEffect, useRef, use } from "react"; // Added React and use
+import React, { useState, useEffect, useRef, use } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -16,19 +16,23 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const { meetingId } = resolvedParams;
 
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isMicActive, setIsMicActive] = useState(false); // Visual toggle for now
+  const [isMicActive, setIsMicActive] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  // const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null); // For future mic implementation
+  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const currentStreamRef = useRef<MediaStream | null>(null);
+  const currentVideoStreamRef = useRef<MediaStream | null>(null);
+  const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
-  // Cleanup stream on component unmount
+  // Cleanup streams on component unmount
   useEffect(() => {
     return () => {
-      if (currentStreamRef.current) {
-        currentStreamRef.current.getTracks().forEach(track => track.stop());
+      if (currentVideoStreamRef.current) {
+        currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (currentMicStreamRef.current) {
+        currentMicStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
@@ -36,9 +40,9 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const handleToggleCamera = async () => {
     if (isCameraActive) {
       // Turn camera off
-      if (currentStreamRef.current) {
-        currentStreamRef.current.getTracks().forEach(track => track.stop());
-        currentStreamRef.current = null;
+      if (currentVideoStreamRef.current) {
+        currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
+        currentVideoStreamRef.current = null;
       }
       if (videoRef.current) {
         videoRef.current.srcObject = null;
@@ -56,7 +60,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
       }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        currentStreamRef.current = stream;
+        currentVideoStreamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -75,16 +79,44 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
     }
   };
 
-  const handleToggleMic = () => {
-    // Placeholder for mic toggle, only visual for now
-    setIsMicActive(prev => !prev);
-    if (!isMicActive) {
-        // Logic to request mic permission and start stream would go here
-        // For now, just a toast if we were to implement it
-        // toast({ title: "Microphone On (Mock)", description: "Microphone access would be requested here." });
+  const handleToggleMic = async () => {
+    if (isMicActive) {
+      // Turn mic off
+      if (currentMicStreamRef.current) {
+        currentMicStreamRef.current.getTracks().forEach(track => track.stop());
+        currentMicStreamRef.current = null;
+      }
+      setIsMicActive(false);
     } else {
-        // Logic to stop mic stream
-        // toast({ title: "Microphone Off (Mock)" });
+      // Try to turn mic on
+      if (hasMicPermission === false) { // Permission previously denied
+        toast({
+          variant: "destructive",
+          title: "Microphone Access Denied",
+          description: "Please enable microphone permissions in your browser settings.",
+        });
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        currentMicStreamRef.current = stream;
+        // We don't visually display the mic stream here, but it's active
+        setHasMicPermission(true);
+        setIsMicActive(true);
+        toast({
+          title: "Microphone On",
+          description: "Your microphone is now active.",
+        });
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+        setHasMicPermission(false);
+        setIsMicActive(false);
+        toast({
+          variant: 'destructive',
+          title: 'Microphone Access Failed',
+          description: 'Could not access the microphone. Please ensure it is not in use and permissions are allowed.',
+        });
+      }
     }
   };
 
@@ -116,18 +148,18 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
               </div>
             )}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-10">
-              <Button 
-                variant={isMicActive ? "secondary" : "destructive"} 
-                size="icon" 
+              <Button
+                variant={isMicActive ? "secondary" : "destructive"}
+                size="icon"
                 className="rounded-full shadow-md"
                 onClick={handleToggleMic}
                 aria-label={isMicActive ? "Mute microphone" : "Unmute microphone"}
               >
                 {isMicActive ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
               </Button>
-              <Button 
-                variant={isCameraActive ? "secondary" : "destructive"} 
-                size="icon" 
+              <Button
+                variant={isCameraActive ? "secondary" : "destructive"}
+                size="icon"
                 className="rounded-full shadow-md"
                 onClick={handleToggleCamera}
                 aria-label={isCameraActive ? "Turn camera off" : "Turn camera on"}
@@ -136,14 +168,25 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
               </Button>
             </div>
           </div>
-          
+
           {hasCameraPermission === false && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Camera Permission Required</AlertTitle>
               <AlertDescription>
-                TeachMeet needs access to your camera to share your video. 
+                TeachMeet needs access to your camera to share your video.
                 Please enable camera permissions in your browser settings and refresh the page or try toggling the camera again.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {hasMicPermission === false && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Microphone Permission Required</AlertTitle>
+              <AlertDescription>
+                TeachMeet needs access to your microphone to share your audio.
+                Please enable microphone permissions in your browser settings and try toggling the microphone again.
               </AlertDescription>
             </Alert>
           )}
@@ -167,7 +210,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
               </a>
             </Button>
           </Link>
-          
+
           <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior>
             <Button className="w-full btn-gel text-lg py-3 rounded-lg">
               Join Now
