@@ -41,32 +41,7 @@ export default function WaitingAreaPage({ params: { meetingId } }: { params: { m
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="micSource">Microphone</Label>
-              <Select defaultValue="default">
-                <SelectTrigger id="micSource" className="mt-1 rounded-lg">
-                  <SelectValue placeholder="Select microphone" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default Microphone</SelectItem>
-                  <SelectItem value="mic1">External Mic (Example)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="cameraSource">Camera</Label>
-              <Select defaultValue="default">
-                <SelectTrigger id="cameraSource" className="mt-1 rounded-lg">
-                  <SelectValue placeholder="Select camera" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default Camera</SelectItem>
-                  <SelectItem value="cam1">Integrated Webcam (Example)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {/* Removed Microphone and Camera source selection dropdowns */}
           
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
