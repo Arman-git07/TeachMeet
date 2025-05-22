@@ -1,18 +1,36 @@
 
+'use client';
+
 import { cn } from '@/lib/utils';
 import type { HTMLAttributes } from 'react';
 
 type LogoProps = {
   className?: string;
   size?: 'small' | 'medium' | 'large';
-  text?: string; // New prop to allow dynamic text
-} & HTMLAttributes<HTMLHeadingElement>; // Allow all HTML heading attributes, including onClick
+  text?: string;
+  animateChars?: boolean; // New prop to trigger character animation
+} & HTMLAttributes<HTMLHeadingElement>;
 
-export function Logo({ className, size = 'medium', text, ...props }: LogoProps) {
+export function Logo({ className, size = 'medium', text = 'TeachMeet', animateChars = false, ...props }: LogoProps) {
   const sizeClasses = {
     small: 'text-3xl md:text-4xl',
     medium: 'text-5xl md:text-6xl',
     large: 'text-7xl md:text-8xl',
+  };
+
+  const renderText = () => {
+    if (animateChars && text === 'TeachMeet') {
+      return text.split('').map((char, index) => (
+        <span
+          key={index}
+          className={cn('logo-animated-char', `char-${index}`)}
+          style={{ animationDelay: `${index * 0.05}s` }} // Stagger animation
+        >
+          {char}
+        </span>
+      ));
+    }
+    return text;
   };
 
   return (
@@ -31,9 +49,9 @@ export function Logo({ className, size = 'medium', text, ...props }: LogoProps) 
           2px 2px 3px hsl(var(--primary-foreground) / 0.05)
         `,
       }}
-      {...props} // Spread other props like onClick here
+      {...props}
     >
-      {text || 'TeachMeet'} {/* Use text prop or default to "TeachMeet" */}
+      {renderText()}
     </h1>
   );
 }

@@ -9,29 +9,29 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 export default function HomePage() {
-  const [logoTextContent, setLogoTextContent] = useState('TeachMeet');
-  const [isAnimatingComplex, setIsAnimatingComplex] = useState(false);
+  const [logoText, setLogoText] = useState('TeachMeet');
+  const [isAnimatingChars, setIsAnimatingChars] = useState(false);
+  const [animationLock, setAnimationLock] = useState(false);
 
   const handleComplexLogoAnimation = () => {
-    if (isAnimatingComplex) return;
+    if (animationLock) return;
 
-    setIsAnimatingComplex(true);
-    setLogoTextContent('TM');
+    setAnimationLock(true);
+    setIsAnimatingChars(false); // Ensure no char animation when "TM" is shown
+    setLogoText('TM');
 
-    // Duration "TM" is visible
-    const tmVisibleDuration = 300;
-    // Duration of the (now removed) expansion animation for "TeachMeet"
-    // This timeout is now just for the sequence of text change
-    const textChangeSequenceDuration = 400; // Kept for consistent timing if needed
+    const tmVisibleDuration = 300; // How long "TM" is visible
+    const charAnimationTotalDuration = 8 * 50 + 500; // (number of chars * delay) + base animation duration
 
     setTimeout(() => {
-      setLogoTextContent('TeachMeet');
-
-      // Reset animation states after the sequence
-      setTimeout(() => {
-        setIsAnimatingComplex(false); // Allow re-triggering
-      }, textChangeSequenceDuration); // This can be adjusted or removed if immediate re-trigger is fine
+      setLogoText('TeachMeet');
+      setIsAnimatingChars(true); // Trigger character animation for "TeachMeet"
     }, tmVisibleDuration);
+
+    setTimeout(() => {
+      setIsAnimatingChars(false); // End character animation state
+      setAnimationLock(false); // Release lock
+    }, tmVisibleDuration + charAnimationTotalDuration + 100); // Add a small buffer
   };
 
   return (
@@ -51,10 +51,12 @@ export default function HomePage() {
           />
           <div className="relative z-10 flex flex-col items-center">
             <Logo
-              text={logoTextContent}
+              text={logoText}
               size="large"
+              animateChars={isAnimatingChars}
               className={cn(
-                "mb-8 animate-fadeIn text-center cursor-pointer"
+                "mb-8 animate-fadeIn text-center cursor-pointer",
+                // The 'animate-logoExpand' class is no longer used here directly
               )}
               onClick={handleComplexLogoAnimation}
             />
@@ -76,9 +78,41 @@ export default function HomePage() {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        /* Removed logoExpand keyframes and class */
         .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; }
         .animate-slideUp { animation: slideUp 0.8s ease-out 0.2s forwards; }
+
+        /* Character Animation */
+        .logo-animated-char {
+          display: inline-block; /* Needed for transform */
+          opacity: 0;
+          transform: translateY(20px);
+          animation: charReveal 0.5s forwards;
+        }
+
+        @keyframes charReveal {
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        /* Specific animation for T to slide from left (example) */
+        .logo-animated-char.char-0 {
+           /* Keep default charReveal, or specialize if needed */
+           /* For a more distinct "T" animation, you could do:
+           opacity: 0;
+           transform: translateX(-30px);
+           animation: tReveal 0.6s forwards;
+           */
+        }
+        /*
+        @keyframes tReveal {
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        */
       `}</style>
     </div>
   );
