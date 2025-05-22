@@ -41,8 +41,11 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
 import { auth, storage } from '@/lib/firebase'; // Import storage
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Firebase storage functions
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage'; // Firebase storage functions
 import { updateProfile } from 'firebase/auth'; // Firebase auth function
+
+const MAX_AVATAR_SIZE_MB = 5;
+const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;
 
 export function UserProfileDropdown() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
@@ -50,7 +53,7 @@ export function UserProfileDropdown() {
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  // const [selectedPopularAvatar, setSelectedPopularAvatar] = useState<string | null>(null);
+  // const [selectedPopularAvatar, setSelectedPopularAvatar] = useState<string | null>(null); // Removed as popular avatars are removed
 
   if (loading) {
     return (
@@ -73,7 +76,6 @@ export function UserProfileDropdown() {
 
   const userName = user.displayName || user.email?.split('@')[0] || "User";
   const userEmail = user.email || "No email";
-  // userAvatarSrc will be re-calculated on each render, reflecting the latest user.photoURL
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40.png?text=${userName.charAt(0).toUpperCase()}`;
 
   const handleUploadCustomAvatar = () => {
@@ -83,23 +85,38 @@ export function UserProfileDropdown() {
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && auth.currentUser) {
+      if (file.size > MAX_AVATAR_SIZE_BYTES) {
+        toast({
+          variant: "destructive",
+          title: "File Too Large",
+          description: `Please select an image smaller than ${MAX_AVATAR_SIZE_MB}MB.`,
+        });
+        if (event.target) event.target.value = ""; // Reset file input
+        return;
+      }
+
       setIsUploading(true);
-      toast({
+      const toastInstance = toast({ // Capture the toast instance
         title: "Uploading Avatar...",
-        description: `Uploading ${file.name}. Please wait.`,
+        description: `Starting upload of ${file.name}. Please wait. (0%)`,
       });
 
-      const filePath = `avatars/${auth.currentUser.uid}/${file.name}`; // Use unique file name or fixed name like 'avatar.png'
+      const filePath = `avatars/${auth.currentUser.uid}/${file.name}`;
       const fileRef = storageRef(storage, filePath);
       const uploadTask = uploadBytesResumable(fileRef, file);
 
       uploadTask.on('state_changed',
-        (snapshot) => {
-          // Optionally, update progress here
+        (snapshot: UploadTaskSnapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          toastInstance.update({ // Update the existing toast
+            id: toastInstance.id, // Pass the ID to update the correct toast
+            description: `Uploading ${file.name}. Please wait. (${Math.round(progress)}%)`,
+          });
         },
         (error) => {
           console.error("Avatar Upload Error:", error);
-          toast({
+          toastInstance.update({
+            id: toastInstance.id,
             variant: "destructive",
             title: "Upload Failed",
             description: "Could not upload your avatar. Please try again.",
@@ -110,15 +127,16 @@ export function UserProfileDropdown() {
           try {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             await updateProfile(auth.currentUser!, { photoURL: downloadURL });
-            toast({
+            toastInstance.update({
+              id: toastInstance.id,
               title: "Avatar Uploaded!",
               description: "Your new avatar has been set.",
             });
-            // setIsAvatarDialogOpen(false); // Close dialog on successful custom upload
-            // No need to set local state for photoURL, as re-render will pick up from user object due to key change
+            // setIsAvatarDialogOpen(false); // Optionally close dialog
           } catch (error) {
             console.error("Error setting avatar URL:", error);
-            toast({
+            toastInstance.update({
+              id: toastInstance.id,
               variant: "destructive",
               title: "Update Failed",
               description: "Could not update your profile with the new avatar.",
@@ -130,10 +148,23 @@ export function UserProfileDropdown() {
       );
 
       if (event.target) {
-        event.target.value = ""; 
+        event.target.value = "";
       }
     }
   };
+  
+  // const handleSaveAvatar = async () => { // Removed logic for popular avatars
+  //   if (!auth.currentUser) return;
+  //   setIsUploading(true); // Should be handled by individual upload/selection methods
+
+  //   // Custom upload already handled by handleFileSelected
+  //   // Popular avatar selection logic was here, now removed.
+
+  //   // If we reach here, it means no new popular avatar was selected, and custom upload handles its own saving.
+  //   // toast({ title: "No Changes", description: "No new avatar was selected to save." });
+  //   setIsAvatarDialogOpen(false); // Close dialog
+  // };
+
 
   return (
     <AlertDialog>
@@ -141,7 +172,6 @@ export function UserProfileDropdown() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 group">
-              {/* Add key prop here */}
               <Avatar key={user.photoURL || 'fallback-avatar-key'} className="h-10 w-10 border-2 border-border group-hover:border-primary transition-colors">
                 <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user" />
                 <AvatarFallback className="bg-muted text-muted-foreground">
@@ -202,7 +232,7 @@ export function UserProfileDropdown() {
           <DialogHeader>
             <DialogTitle>Change Your Avatar</DialogTitle>
             <DialogDescription>
-              Upload a custom image to use as your avatar.
+              Upload a custom image to use as your avatar. Max file size: {MAX_AVATAR_SIZE_MB}MB.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
@@ -226,7 +256,7 @@ export function UserProfileDropdown() {
               </Button>
             </DialogClose>
             {/* "Save Changes" button is less relevant now as custom upload saves immediately */}
-            <Button type="button" className="btn-gel rounded-md" disabled={true}>
+            <Button type="button" className="btn-gel rounded-md" disabled={true} > 
               Save Changes
             </Button>
           </DialogFooter>
