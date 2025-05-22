@@ -17,14 +17,15 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
   const [meetingCode, setMeetingCode] = useState('');
   const { toast } = useToast();
+  const { isAuthenticated, loading: authLoading } = useAuth(); // Get auth state
 
   useEffect(() => {
-    // Trigger slide up animation after a short delay for visual effect
     const timer = setTimeout(() => setShowPanel(true), 300);
     return () => clearTimeout(timer);
   }, []);
@@ -35,12 +36,8 @@ export function SlideUpPanel() {
         title: "Joining Meeting (Dialog)",
         description: `Attempting to join with code: ${meetingCode}`,
       });
-      // In a real app, you'd navigate:
-      // router.push(`/dashboard/join-meeting?code=${meetingCode}`);
-      // Or directly to:
-      // router.push(`/dashboard/meeting/${meetingCode}/wait`);
-      setMeetingCode(''); // Clear input after submission
-      // Dialog will close if DialogClose is part of the button or manage open state
+      // In a real app, navigate: router.push(`/dashboard/meeting/${meetingCode}/wait`);
+      setMeetingCode('');
     } else {
       toast({
         variant: "destructive",
@@ -49,6 +46,15 @@ export function SlideUpPanel() {
       });
     }
   };
+
+  const startMeetingHref = isAuthenticated ? "/dashboard/start-meeting" : "/auth/signin?action=start";
+  const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
+
+  if (authLoading) {
+    // Optionally, render a loading state for the panel or buttons
+    // For simplicity, we'll just let the links update once auth state is known
+    // Users might see a flicker if they click very fast, but panel animates in anyway.
+  }
 
   return (
     <div
@@ -59,11 +65,12 @@ export function SlideUpPanel() {
       <div className="container mx-auto max-w-3xl flex flex-col sm:flex-row items-center sm:items-start justify-center gap-x-6 gap-y-4">
         {/* Start New Meeting Button */}
         <div className="w-full sm:flex-1 flex justify-center">
-          <Link href="/auth/signin?action=start" passHref legacyBehavior>
+          <Link href={startMeetingHref} passHref legacyBehavior>
             <Button
               size="lg"
               className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
               aria-label="Start New Meeting"
+              disabled={authLoading}
             >
               <PlusCircle className="mr-2 h-6 w-6" />
               Start New Meeting
@@ -74,11 +81,12 @@ export function SlideUpPanel() {
         {/* Join Meeting Section */}
         <div className="w-full sm:flex-1 flex flex-col items-center">
           <div className="relative w-full max-w-xs">
-            <Link href="/auth/signin?action=join" passHref legacyBehavior className="block">
+            <Link href={joinMeetingHref} passHref legacyBehavior className="block">
               <Button
                 size="lg"
                 className="w-full btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
                 aria-label="Join Existing Meeting"
+                disabled={authLoading}
               >
                 <Video className="mr-2 h-6 w-6" />
                 Join Meeting
@@ -122,8 +130,6 @@ export function SlideUpPanel() {
                     </Button>
                   </DialogClose>
                   <DialogClose asChild>
-                     {/* Using DialogClose here will close the dialog upon click. If validation fails, you might want to prevent closing.
-                         For more complex scenarios, manage dialog open state manually. */}
                     <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-md">
                       Join
                     </Button>
@@ -132,18 +138,6 @@ export function SlideUpPanel() {
               </DialogContent>
             </Dialog>
           </div>
-          {/* The input field below is removed as per the requirement */}
-          {/* 
-          <div className="mt-3 w-full max-w-xs">
-            <Input
-              id="meetingCodeInputSlideUp" 
-              type="text"
-              placeholder="Enter Meeting Code"
-              className="w-full rounded-lg bg-card border-border focus:ring-accent text-center"
-              aria-label="Meeting Code"
-            />
-          </div> 
-          */}
         </div>
       </div>
     </div>
