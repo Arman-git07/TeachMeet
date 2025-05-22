@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 
 export default function HomePage() {
   const [logoTextContent, setLogoTextContent] = useState('TeachMeet');
-  const [isLogoExpanding, setIsLogoExpanding] = useState(false);
   const [isAnimatingComplex, setIsAnimatingComplex] = useState(false);
 
   const handleComplexLogoAnimation = () => {
@@ -18,21 +17,20 @@ export default function HomePage() {
 
     setIsAnimatingComplex(true);
     setLogoTextContent('TM');
-    setIsLogoExpanding(false); // Ensure expansion animation is off for "TM"
 
     // Duration "TM" is visible
     const tmVisibleDuration = 300;
-    // Duration of the expansion animation for "TeachMeet"
-    const expandAnimationDuration = 400;
+    // Duration of the (now removed) expansion animation for "TeachMeet"
+    // This timeout is now just for the sequence of text change
+    const textChangeSequenceDuration = 400; // Kept for consistent timing if needed
 
     setTimeout(() => {
       setLogoTextContent('TeachMeet');
-      setIsLogoExpanding(true); // Trigger expansion animation for "TeachMeet"
 
+      // Reset animation states after the sequence
       setTimeout(() => {
-        setIsLogoExpanding(false); // Reset expansion animation state
         setIsAnimatingComplex(false); // Allow re-triggering
-      }, expandAnimationDuration);
+      }, textChangeSequenceDuration); // This can be adjusted or removed if immediate re-trigger is fine
     }, tmVisibleDuration);
   };
 
@@ -56,8 +54,7 @@ export default function HomePage() {
               text={logoTextContent}
               size="large"
               className={cn(
-                "mb-8 animate-fadeIn text-center cursor-pointer",
-                isLogoExpanding && "animate-logoExpand" // Apply expansion animation
+                "mb-8 animate-fadeIn text-center cursor-pointer"
               )}
               onClick={handleComplexLogoAnimation}
             />
@@ -79,13 +76,9 @@ export default function HomePage() {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes logoExpand { /* Animation for "TeachMeet" expanding */
-          0% { transform: scale(0.6); opacity: 0.4; }
-          100% { transform: scale(1); opacity: 1; }
-        }
+        /* Removed logoExpand keyframes and class */
         .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; }
         .animate-slideUp { animation: slideUp 0.8s ease-out 0.2s forwards; }
-        .animate-logoExpand { animation: logoExpand 0.4s ease-out forwards; }
       `}</style>
     </div>
   );
