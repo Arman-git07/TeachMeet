@@ -7,11 +7,30 @@ import { AppSidebar } from '@/components/common/AppSidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Video } from 'lucide-react';
+
+interface OngoingMeeting {
+  id: string;
+  title: string;
+  participants?: number; // Optional: for future use
+}
+
+// Mock data for ongoing meetings
+const mockOngoingMeetings: OngoingMeeting[] = [
+  { id: 'alpha-beta-gamma', title: 'Project Sync: Q3 Roadmap', participants: 5 },
+  { id: 'delta-echo-foxtrot', title: 'Weekly Team Huddle', participants: 8 },
+  // Add more mock meetings here or leave empty to show "No ongoing meetings"
+  // { id: 'zeta-eta-theta', title: 'Client Demo Prep', participants: 3 },
+];
+
 
 export default function HomePage() {
   const [logoText, setLogoText] = useState('TeachMeet');
   const [animateChars, setAnimateChars] = useState(false);
   const [animationLock, setAnimationLock] = useState(false);
+  const [ongoingMeetings, setOngoingMeetings] = useState<OngoingMeeting[]>(mockOngoingMeetings);
 
   const handleComplexLogoAnimation = () => {
     if (animationLock) return;
@@ -20,20 +39,18 @@ export default function HomePage() {
     setAnimateChars(false); // Reset char animation state before showing "TM"
     setLogoText('TM');
 
-    const tmVisibleDuration = 300; // How long "TM" is visible
-    // Duration for all char animations to complete - based on longest animation + its delay.
-    // Longest is the last 't' in "eet": 0.5s animation + 0.4s delay = 0.9s
+    const tmVisibleDuration = 300; 
     const charAnimationTotalDuration = 900; 
 
     setTimeout(() => {
-      setLogoText('TeachMeet'); // Switch text back
-      setAnimateChars(true);    // Enable character animation
+      setLogoText('TeachMeet'); 
+      setAnimateChars(true);    
     }, tmVisibleDuration);
 
     setTimeout(() => {
-      setAnimateChars(false); // Reset animation state so it's clean for next time
-      setAnimationLock(false);  // Release lock
-    }, tmVisibleDuration + charAnimationTotalDuration + 100); // Add a small buffer
+      setAnimateChars(false); 
+      setAnimationLock(false);  
+    }, tmVisibleDuration + charAnimationTotalDuration + 100); 
   };
 
   return (
@@ -61,10 +78,32 @@ export default function HomePage() {
               )}
               onClick={handleComplexLogoAnimation}
             />
-            <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg max-w-md text-center">
-              <h2 className="text-2xl font-semibold text-primary mb-3 text-center">Latest Activity</h2>
-              <p className="text-muted-foreground text-center">No ongoing meetings. Start one now!</p>
-              {/* Placeholder for activity list */}
+            <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
+              <h2 className="text-2xl font-semibold text-primary mb-4">Latest Activity</h2>
+              {ongoingMeetings.length > 0 ? (
+                <ul className="space-y-3 text-left">
+                  {ongoingMeetings.map((meeting) => (
+                    <li key={meeting.id}>
+                      <Link href={`/dashboard/meeting/${meeting.id}`} passHref legacyBehavior>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-base py-3 px-4 rounded-lg hover:bg-primary/10 hover:border-primary"
+                        >
+                          <Video className="mr-3 h-5 w-5 text-primary/80" />
+                          <span className="truncate flex-grow text-foreground">{meeting.title}</span>
+                           {meeting.participants && (
+                            <span className="text-xs text-muted-foreground ml-auto pl-2">
+                              {meeting.participants} users
+                            </span>
+                          )}
+                        </Button>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground text-center">No ongoing meetings. Start one now!</p>
+              )}
             </div>
           </div>
         </main>
@@ -82,13 +121,11 @@ export default function HomePage() {
         .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; }
         .animate-slideUp { animation: slideUp 0.8s ease-out 0.2s forwards; }
 
-        /* Complex Character Animation */
         .logo-animated-span {
           display: inline-block;
-          opacity: 0; /* Start invisible */
+          opacity: 0; 
         }
 
-        /* Animation for T */
         .logo-animated-span.char-index-0 { /* T */
           animation: slideInT 0.6s forwards;
           animation-delay: 0s; 
@@ -98,7 +135,6 @@ export default function HomePage() {
           to { transform: translateX(0) scaleX(1); opacity: 1; }
         }
 
-        /* Animation for M */
         .logo-animated-span.char-index-5 { /* M */
           animation: slideInM 0.6s forwards;
           animation-delay: 0.2s; 
@@ -108,7 +144,6 @@ export default function HomePage() {
           to { transform: translateX(0) scaleX(1); opacity: 1; }
         }
 
-        /* Animation for "each" group (e,a,c,h) */
         .logo-animated-span.char-index-1,
         .logo-animated-span.char-index-2,
         .logo-animated-span.char-index-3,
@@ -125,7 +160,6 @@ export default function HomePage() {
           to { transform: translate(0, 0) scale(1); opacity: 1; }
         }
 
-        /* Animation for "eet" group (e,e,t) */
         .logo-animated-span.char-index-6,
         .logo-animated-span.char-index-7,
         .logo-animated-span.char-index-8 {
