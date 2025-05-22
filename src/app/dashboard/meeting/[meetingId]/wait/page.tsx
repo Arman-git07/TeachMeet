@@ -76,3 +76,4 @@ export default function WaitingAreaPage({ params: { meetingId } }: { params: { m
     </div>
   );
 }
+
