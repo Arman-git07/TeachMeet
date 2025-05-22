@@ -22,7 +22,7 @@ export default function WaitingAreaPage({ params: { meetingId } }: { params: { m
           <CardDescription>Configure your audio and video before entering.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
+          <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             {isCameraOn ? (
               <Image src="https://placehold.co/600x338.png" alt="Camera Preview" layout="fill" objectFit="cover" data-ai-hint="webcam preview" />
             ) : (
