@@ -156,7 +156,6 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
                 ) : (
                   <>
                     <VideoOff className="h-8 w-8 mx-auto mb-1" />
-                    <p>Camera is off</p>
                   </>
                 )}
               </div>
