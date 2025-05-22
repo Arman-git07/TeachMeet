@@ -5,15 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Video, VideoOff, Settings2, User, AlertTriangle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef, use } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/hooks/useAuth"; // Import useAuth
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; // Import Avatar components
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
   const { meetingId } = resolvedParams;
+  const { user, loading: authLoading } = useAuth(); // Get user from useAuth
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
@@ -100,7 +103,6 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         currentMicStreamRef.current = stream;
-        // We don't visually display the mic stream here, but it's active
         setHasMicPermission(true);
         setIsMicActive(true);
         toast({
@@ -120,11 +122,15 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
     }
   };
 
+  const userName = user?.displayName || user?.email?.split('@')[0] || "User";
+  const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
+  const userFallback = userName.charAt(0).toUpperCase();
+
   return (
     <div className="container mx-auto py-8 flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-2xl shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
-          <User className="mx-auto h-12 w-12 text-primary mb-3" />
+          <UserIcon className="mx-auto h-12 w-12 text-primary mb-3" />
           <CardTitle className="text-2xl">Joining Meeting: {meetingId}</CardTitle>
           <CardDescription>Configure your audio and video before entering.</CardDescription>
         </CardHeader>
@@ -133,15 +139,23 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
             {(!isCameraActive || hasCameraPermission === false) && (
               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                {authLoading ? (
+                  <p>Loading user info...</p>
+                ) : (
+                  <Avatar className="w-24 h-24 md:w-32 md:h-32 mb-4 border-4 border-background shadow-lg">
+                    <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                    <AvatarFallback className="text-4xl md:text-5xl">{userFallback}</AvatarFallback>
+                  </Avatar>
+                )}
                 {hasCameraPermission === false ? (
                   <>
-                    <VideoOff className="h-16 w-16 mx-auto mb-2 text-destructive" />
+                    <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
                     <p className="font-semibold">Camera permission denied</p>
                     <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
                   </>
                 ) : (
                   <>
-                    <VideoOff className="h-16 w-16 mx-auto mb-2" />
+                    <VideoOff className="h-8 w-8 mx-auto mb-1" />
                     <p>Camera is off</p>
                   </>
                 )}
