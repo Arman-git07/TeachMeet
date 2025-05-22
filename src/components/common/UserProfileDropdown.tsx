@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, UserCircle as UserIconFallback, ExternalLink, ImageIcon, Phone } from 'lucide-react';
+import { LogOut, UserCircle as UserIconFallback, ExternalLink, ImageIcon, Phone, Edit3 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -39,7 +39,7 @@ import { Skeleton } from '../ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { auth, storage } from '@/lib/firebase'; // Import storage
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Firebase storage functions
 import { updateProfile } from 'firebase/auth'; // Firebase auth function
@@ -50,6 +50,7 @@ export function UserProfileDropdown() {
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // const [selectedPopularAvatar, setSelectedPopularAvatar] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -72,6 +73,7 @@ export function UserProfileDropdown() {
 
   const userName = user.displayName || user.email?.split('@')[0] || "User";
   const userEmail = user.email || "No email";
+  // userAvatarSrc will be re-calculated on each render, reflecting the latest user.photoURL
   const userAvatarSrc = user.photoURL || `https://placehold.co/40x40.png?text=${userName.charAt(0).toUpperCase()}`;
 
   const handleUploadCustomAvatar = () => {
@@ -87,7 +89,7 @@ export function UserProfileDropdown() {
         description: `Uploading ${file.name}. Please wait.`,
       });
 
-      const filePath = `avatars/${auth.currentUser.uid}/avatar.png`;
+      const filePath = `avatars/${auth.currentUser.uid}/${file.name}`; // Use unique file name or fixed name like 'avatar.png'
       const fileRef = storageRef(storage, filePath);
       const uploadTask = uploadBytesResumable(fileRef, file);
 
@@ -112,7 +114,8 @@ export function UserProfileDropdown() {
               title: "Avatar Uploaded!",
               description: "Your new avatar has been set.",
             });
-            setIsAvatarDialogOpen(false); 
+            // setIsAvatarDialogOpen(false); // Close dialog on successful custom upload
+            // No need to set local state for photoURL, as re-render will pick up from user object due to key change
           } catch (error) {
             console.error("Error setting avatar URL:", error);
             toast({
@@ -132,14 +135,14 @@ export function UserProfileDropdown() {
     }
   };
 
-
   return (
     <AlertDialog>
       <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 group">
-              <Avatar className="h-10 w-10 border-2 border-border group-hover:border-primary transition-colors">
+              {/* Add key prop here */}
+              <Avatar key={user.photoURL || 'fallback-avatar-key'} className="h-10 w-10 border-2 border-border group-hover:border-primary transition-colors">
                 <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user" />
                 <AvatarFallback className="bg-muted text-muted-foreground">
                   {userName.charAt(0).toUpperCase()}
@@ -195,12 +198,11 @@ export function UserProfileDropdown() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Avatar Change Dialog Content */}
         <DialogContent className="sm:max-w-md rounded-lg">
           <DialogHeader>
             <DialogTitle>Change Your Avatar</DialogTitle>
             <DialogDescription>
-              Upload a custom avatar.
+              Upload a custom image to use as your avatar.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
@@ -223,14 +225,14 @@ export function UserProfileDropdown() {
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="button" className="btn-gel rounded-md" disabled={isUploading || true}>
+            {/* "Save Changes" button is less relevant now as custom upload saves immediately */}
+            <Button type="button" className="btn-gel rounded-md" disabled={true}>
               Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Sign Out Alert Dialog Content */}
       <AlertDialogContent className="rounded-xl shadow-xl">
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
