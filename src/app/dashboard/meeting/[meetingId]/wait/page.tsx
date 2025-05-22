@@ -7,11 +7,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Mic, MicOff, Video, VideoOff, Settings2, User, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, use } from "react"; // Added React and use
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-export default function WaitingAreaPage({ params: { meetingId } }: { params: { meetingId: string } }) {
+export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
+  const resolvedParams = use(props.params);
+  const { meetingId } = resolvedParams;
+
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false); // Visual toggle for now
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
