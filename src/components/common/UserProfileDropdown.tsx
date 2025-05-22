@@ -53,7 +53,6 @@ export function UserProfileDropdown() {
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  // const [selectedPopularAvatar, setSelectedPopularAvatar] = useState<string | null>(null); // Removed as popular avatars are removed
 
   if (loading) {
     return (
@@ -96,7 +95,7 @@ export function UserProfileDropdown() {
       }
 
       setIsUploading(true);
-      const toastInstance = toast({ // Capture the toast instance
+      const toastInstance = toast({ 
         title: "Uploading Avatar...",
         description: `Starting upload of ${file.name}. Please wait. (0%)`,
       });
@@ -108,8 +107,8 @@ export function UserProfileDropdown() {
       uploadTask.on('state_changed',
         (snapshot: UploadTaskSnapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          toastInstance.update({ // Update the existing toast
-            id: toastInstance.id, // Pass the ID to update the correct toast
+          toastInstance.update({ 
+            id: toastInstance.id, 
             description: `Uploading ${file.name}. Please wait. (${Math.round(progress)}%)`,
           });
         },
@@ -132,7 +131,6 @@ export function UserProfileDropdown() {
               title: "Avatar Uploaded!",
               description: "Your new avatar has been set.",
             });
-            // setIsAvatarDialogOpen(false); // Optionally close dialog
           } catch (error) {
             console.error("Error setting avatar URL:", error);
             toastInstance.update({
@@ -153,19 +151,6 @@ export function UserProfileDropdown() {
     }
   };
   
-  // const handleSaveAvatar = async () => { // Removed logic for popular avatars
-  //   if (!auth.currentUser) return;
-  //   setIsUploading(true); // Should be handled by individual upload/selection methods
-
-  //   // Custom upload already handled by handleFileSelected
-  //   // Popular avatar selection logic was here, now removed.
-
-  //   // If we reach here, it means no new popular avatar was selected, and custom upload handles its own saving.
-  //   // toast({ title: "No Changes", description: "No new avatar was selected to save." });
-  //   setIsAvatarDialogOpen(false); // Close dialog
-  // };
-
-
   return (
     <AlertDialog>
       <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
@@ -255,7 +240,6 @@ export function UserProfileDropdown() {
                 Cancel
               </Button>
             </DialogClose>
-            {/* "Save Changes" button is less relevant now as custom upload saves immediately */}
             <Button type="button" className="btn-gel rounded-md" disabled={true} > 
               Save Changes
             </Button>
