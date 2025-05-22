@@ -1,11 +1,13 @@
+
 import { cn } from '@/lib/utils';
+import type { HTMLAttributes } from 'react';
 
 type LogoProps = {
   className?: string;
   size?: 'small' | 'medium' | 'large';
-};
+} & HTMLAttributes<HTMLHeadingElement>; // Allow all HTML heading attributes, including onClick
 
-export function Logo({ className, size = 'medium' }: LogoProps) {
+export function Logo({ className, size = 'medium', ...props }: LogoProps) {
   const sizeClasses = {
     small: 'text-3xl md:text-4xl',
     medium: 'text-5xl md:text-6xl',
@@ -17,17 +19,18 @@ export function Logo({ className, size = 'medium' }: LogoProps) {
       className={cn(
         'font-extrabold tracking-tight text-gel-gradient select-none',
         sizeClasses[size],
-        className // Ensure className (which might include text-center) is applied
+        className
       )}
       style={{
-        WebkitTextStroke: `1px hsl(var(--background) / 0.5)`, // Simulates inflation
+        WebkitTextStroke: `1px hsl(var(--background) / 0.5)`,
         textShadow: `
           0px 2px 2px hsl(var(--background) / 0.3),
           0px 4px 5px hsl(var(--primary) / 0.2),
           0px 0px 10px hsl(var(--accent) / 0.2),
           2px 2px 3px hsl(var(--primary-foreground) / 0.05)
-        `, // Complex shadow for 3D gel effect
+        `,
       }}
+      {...props} // Spread other props like onClick here
     >
       TeachMeet
     </h1>
