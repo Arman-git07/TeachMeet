@@ -142,9 +142,9 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
                 {authLoading ? (
                   <p>Loading user info...</p>
                 ) : (
-                  <Avatar className="w-24 h-24 md:w-32 md:h-32 mb-4 border-4 border-background shadow-lg">
+                  <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
                     <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                    <AvatarFallback className="text-4xl md:text-5xl">{userFallback}</AvatarFallback>
+                    <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
                   </Avatar>
                 )}
                 {hasCameraPermission === false ? (
