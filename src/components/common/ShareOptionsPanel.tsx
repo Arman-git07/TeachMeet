@@ -11,6 +11,7 @@ interface ShareOptionsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   meetingLink: string;
+  meetingCode: string; // Added meetingCode
   meetingTitle: string;
 }
 
@@ -25,19 +26,21 @@ const ShareButton = ({ icon: Icon, label, onClick, className }: { icon: React.El
   </Button>
 );
 
-export function ShareOptionsPanel({ isOpen, onClose, meetingLink, meetingTitle }: ShareOptionsPanelProps) {
+export function ShareOptionsPanel({ isOpen, onClose, meetingLink, meetingCode, meetingTitle }: ShareOptionsPanelProps) {
   const { toast } = useToast();
-  const textToShare = `You're invited to join my TeachMeet meeting: ${meetingTitle}`;
+  const fullTextToShare = `You're invited to join my TeachMeet meeting: ${meetingTitle}.\nLink: ${meetingLink}\nOr use Code: ${meetingCode}`;
+  const linkAndCodeText = `Link: ${meetingLink}\nCode: ${meetingCode}`;
+
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(meetingLink)
+    navigator.clipboard.writeText(fullTextToShare)
       .then(() => {
-        toast({ title: "Link Copied!", description: "Meeting link copied to clipboard." });
+        toast({ title: "Invite Copied!", description: "Meeting link and code copied to clipboard." });
         onClose();
       })
       .catch(err => {
-        console.error('Failed to copy link: ', err);
-        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting link." });
+        console.error('Failed to copy invite: ', err);
+        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting invite." });
       });
   };
 
@@ -49,27 +52,27 @@ export function ShareOptionsPanel({ isOpen, onClose, meetingLink, meetingTitle }
   const shareOptions = [
     {
       label: 'WhatsApp',
-      icon: MessageCircle, // Using MessageCircle as a generic messaging icon
-      onClick: () => openShareLink(`https://wa.me/?text=${encodeURIComponent(textToShare + ' ' + meetingLink)}`),
+      icon: MessageCircle,
+      onClick: () => openShareLink(`https://wa.me/?text=${encodeURIComponent(fullTextToShare)}`),
       color: 'text-green-500 hover:bg-green-500/10',
     },
     {
       label: 'Twitter',
       icon: Twitter,
-      onClick: () => openShareLink(`https://twitter.com/intent/tweet?url=${encodeURIComponent(meetingLink)}&text=${encodeURIComponent(textToShare)}`),
+      onClick: () => openShareLink(`https://twitter.com/intent/tweet?text=${encodeURIComponent(fullTextToShare)}`),
       color: 'text-sky-500 hover:bg-sky-500/10',
     },
     {
       label: 'Facebook',
       icon: Facebook,
-      onClick: () => openShareLink(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(meetingLink)}`),
+      onClick: () => openShareLink(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(meetingLink)}&quote=${encodeURIComponent(fullTextToShare)}`),
       color: 'text-blue-600 hover:bg-blue-600/10',
     },
     {
       label: 'Instagram',
       icon: Instagram,
       onClick: () => {
-        toast({ title: "Share to Instagram", description: "Please share manually via the Instagram app. Link copied for convenience." });
+        toast({ title: "Share to Instagram", description: "Please share manually via the Instagram app. Invite details copied for convenience." });
         copyToClipboard(); // Instagram sharing via web link is limited
       },
        color: 'text-pink-500 hover:bg-pink-500/10',
@@ -77,11 +80,11 @@ export function ShareOptionsPanel({ isOpen, onClose, meetingLink, meetingTitle }
     {
       label: 'Gmail',
       icon: Mail,
-      onClick: () => openShareLink(`mailto:?subject=${encodeURIComponent(meetingTitle)}&body=${encodeURIComponent(textToShare + '\n\nLink: ' + meetingLink)}`),
+      onClick: () => openShareLink(`mailto:?subject=${encodeURIComponent("TeachMeet Invitation: " + meetingTitle)}&body=${encodeURIComponent(fullTextToShare)}`),
       color: 'text-red-500 hover:bg-red-500/10',
     },
     {
-      label: 'Copy Link',
+      label: 'Copy Invite',
       icon: Copy,
       onClick: copyToClipboard,
       color: 'text-muted-foreground hover:bg-muted/20',
@@ -94,7 +97,7 @@ export function ShareOptionsPanel({ isOpen, onClose, meetingLink, meetingTitle }
         <SheetHeader className="p-6 pb-4 border-b">
           <SheetTitle className="text-xl">Share Meeting Invite</SheetTitle>
           <SheetDescription>
-            Choose an option below to share your meeting link.
+            Choose an option below to share your meeting invite.
           </SheetDescription>
         </SheetHeader>
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 p-6">
@@ -113,12 +116,12 @@ export function ShareOptionsPanel({ isOpen, onClose, meetingLink, meetingTitle }
               onClick={() => {
                 if (navigator.share) {
                   navigator.share({
-                    title: meetingTitle,
-                    text: textToShare,
-                    url: meetingLink,
+                    title: `TeachMeet Invitation: ${meetingTitle}`,
+                    text: fullTextToShare,
+                    url: meetingLink, // Main URL for sharing
                   }).then(() => onClose()).catch(console.error);
                 } else {
-                  toast({ title: "More Options", description: "Native sharing not supported. Try copying the link." });
+                  toast({ title: "More Options", description: "Native sharing not supported. Try copying the invite." });
                 }
               }}
               className="text-muted-foreground hover:bg-muted/20"

@@ -7,7 +7,7 @@ import { Share2, Copy, Users, XCircle, Video, Hash } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast"; 
 import { useState } from "react";
-import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel"; // Import the new component
+import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 
 export default function StartMeetingPage() {
   const meetingLink = "https://teachmeet.example.com/join/xyz123"; // Placeholder
@@ -37,6 +37,49 @@ export default function StartMeetingPage() {
         toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting code." });
       });
   };
+
+  // This handler is a fallback if the ShareOptionsPanel is not used,
+  // or if the "More Options" in ShareOptionsPanel invokes navigator.share.
+  // The main sharing logic is now in ShareOptionsPanel.
+  const handleShareInvite = async () => {
+    const shareText = `You're invited to join my TeachMeet meeting: ${meetingTitle}.\nLink: ${meetingLink}\nOr use Code: ${meetingCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: meetingTitle,
+          text: shareText,
+          url: meetingLink, // URL is often primary for navigator.share
+        });
+        toast({ title: "Invite Shared", description: "Meeting invite shared successfully!" });
+      } catch (error: any) {
+        // Handle specific errors or fallbacks if needed
+        if (error.name === 'AbortError') {
+          // User cancelled the share action, no toast needed
+          console.log('Share aborted by user.');
+        } else if (error.name === 'NotAllowedError' || (error.message && error.message.toLowerCase().includes("permission denied"))) {
+          toast({
+            variant: "destructive",
+            title: "Sharing Failed",
+            description: "Permission to share was denied. Please try copying the link.",
+          });
+          copyLinkToClipboard(); // Fallback
+        } 
+        else {
+          console.error('Error sharing invite:', error);
+          toast({
+            variant: "destructive",
+            title: "Sharing Failed",
+            description: "Could not share the invite. Please try copying the link.",
+          });
+          copyLinkToClipboard(); // Fallback
+        }
+      }
+    } else {
+      // Fallback for browsers that don't support navigator.share
+      setIsSharePanelOpen(true); // Open custom panel if navigator.share not present
+    }
+  };
+
 
   return (
     <>
@@ -115,6 +158,7 @@ export default function StartMeetingPage() {
         isOpen={isSharePanelOpen}
         onClose={() => setIsSharePanelOpen(false)}
         meetingLink={meetingLink}
+        meetingCode={meetingCode}
         meetingTitle={meetingTitle}
       />
     </>
