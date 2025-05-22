@@ -54,15 +54,12 @@ export default function StartMeetingPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4"> {/* Changed from grid-cols-2 */}
               <Button variant="outline" className="rounded-lg py-6 text-base" onClick={() => setIsSharePanelOpen(true)}>
                 <Share2 className="mr-2 h-5 w-5" />
                 Share Invite
               </Button>
-              <Button variant="outline" className="rounded-lg py-6 text-base">
-                <Users className="mr-2 h-5 w-5" />
-                Manage Participants
-              </Button>
+              {/* Manage Participants button removed */}
             </div>
             
             <Link href="/dashboard/meeting/new-meeting-id/wait" passHref legacyBehavior>
