@@ -68,15 +68,17 @@ export default function StartMeetingPage() {
           toast({
             variant: "destructive",
             title: "Sharing Failed",
-            description: "Permission to share was denied. Please try copying the link or use other share options.",
+            description: "Permission to use native sharing was denied. Opening sharing options panel instead.",
           });
+          setIsSharePanelOpen(true); // Fallback to custom panel
         } else {
           console.error('Error sharing invite:', error);
           toast({
             variant: "destructive",
             title: "Sharing Failed",
-            description: "Could not share the invite. Please try other options or copy the link.",
+            description: "Could not use native sharing. Opening sharing options panel instead.",
           });
+          setIsSharePanelOpen(true); // Fallback to custom panel
         }
       }
     } else {
@@ -113,14 +115,14 @@ export default function StartMeetingPage() {
             </div>
 
             <div>
-              <label htmlFor="meetingCode" className="block text-sm font-medium text-muted-foreground mb-1">
+              <label htmlFor="meetingCodeDisplay" className="block text-sm font-medium text-muted-foreground mb-1">
                 Meeting Code
               </label>
               <div className="flex items-center space-x-2">
                 <div className="relative flex-grow">
                   <Hash className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                   <input
-                    id="meetingCode"
+                    id="meetingCodeDisplay"
                     type="text"
                     readOnly
                     value={meetingCode || "Generating..."}
@@ -148,10 +150,10 @@ export default function StartMeetingPage() {
 
           </CardContent>
           <CardFooter className="flex justify-between border-t pt-4">
-              <Link href="/" passHref legacyBehavior>
+              <Link href="/dashboard" passHref legacyBehavior>
                   <Button variant="ghost" className="text-muted-foreground hover:text-destructive rounded-lg">
                       <XCircle className="mr-2 h-5 w-5" />
-                      Dismiss
+                      Cancel
                   </Button>
               </Link>
           </CardFooter>
