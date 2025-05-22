@@ -65,7 +65,7 @@ export default function SettingsPage() {
       <SettingsSection title="Advanced Meeting Settings" description="Configure your camera and visual effects." icon={VideoIcon}>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="virtualBackground" className="flex-grow">Enable Virtual Background</Label>
+            <Label htmlFor="virtualBackground" className="flex-grow">Add virtual background</Label>
             <Switch id="virtualBackground" />
           </div>
           <div className="flex items-center justify-between">
