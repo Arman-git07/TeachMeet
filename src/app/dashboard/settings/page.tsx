@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3 } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon } from "lucide-react"; // Added VideoIcon
 
 const SettingsSection = ({ title, description, icon: Icon, children }: { title: string, description: string, icon: React.ElementType, children: React.ReactNode }) => (
   <Card className="shadow-lg rounded-xl border-border/50">
@@ -60,6 +60,20 @@ export default function SettingsPage() {
           </div>
         </div>
         <Button className="mt-6 btn-gel rounded-lg">Save General Settings</Button>
+      </SettingsSection>
+
+      <SettingsSection title="Advanced Meeting Settings" description="Configure your camera and visual effects." icon={VideoIcon}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="virtualBackground" className="flex-grow">Enable Virtual Background</Label>
+            <Switch id="virtualBackground" />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="cameraFilter" className="flex-grow">Apply Camera Filter</Label>
+            <Switch id="cameraFilter" />
+          </div>
+        </div>
+        <Button className="mt-6 btn-gel rounded-lg">Save Meeting Visuals</Button>
       </SettingsSection>
 
       <SettingsSection title="Notifications" description="Control how you receive notifications." icon={Bell}>
