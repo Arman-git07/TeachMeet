@@ -8,7 +8,7 @@ type LogoProps = {
   className?: string;
   size?: 'small' | 'medium' | 'large';
   text?: string;
-  animateChars?: boolean; // New prop to trigger character animation
+  animateChars?: boolean; // Used for complex character animation
 } & HTMLAttributes<HTMLHeadingElement>;
 
 export function Logo({ className, size = 'medium', text = 'TeachMeet', animateChars = false, ...props }: LogoProps) {
@@ -23,14 +23,16 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       return text.split('').map((char, index) => (
         <span
           key={index}
-          className={cn('logo-animated-char', `char-${index}`)}
-          style={{ animationDelay: `${index * 0.05}s` }} // Stagger animation
+          className={cn(
+            'logo-animated-span', // Base class for individual char styling if needed
+            `char-index-${index}`  // Specific class for targeting individual chars
+          )}
         >
           {char}
         </span>
       ));
     }
-    return text;
+    return text; // Render plain text if not animating or if text is "TM"
   };
 
   return (

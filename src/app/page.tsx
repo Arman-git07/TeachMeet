@@ -10,27 +10,29 @@ import { cn } from '@/lib/utils';
 
 export default function HomePage() {
   const [logoText, setLogoText] = useState('TeachMeet');
-  const [isAnimatingChars, setIsAnimatingChars] = useState(false);
+  const [animateChars, setAnimateChars] = useState(false);
   const [animationLock, setAnimationLock] = useState(false);
 
   const handleComplexLogoAnimation = () => {
     if (animationLock) return;
 
     setAnimationLock(true);
-    setIsAnimatingChars(false); // Ensure no char animation when "TM" is shown
+    setAnimateChars(false); // Reset char animation state before showing "TM"
     setLogoText('TM');
 
     const tmVisibleDuration = 300; // How long "TM" is visible
-    const charAnimationTotalDuration = 8 * 50 + 500; // (number of chars * delay) + base animation duration
+    // Duration for all char animations to complete - based on longest animation + its delay.
+    // Longest is the last 't' in "eet": 0.5s animation + 0.4s delay = 0.9s
+    const charAnimationTotalDuration = 900; 
 
     setTimeout(() => {
-      setLogoText('TeachMeet');
-      setIsAnimatingChars(true); // Trigger character animation for "TeachMeet"
+      setLogoText('TeachMeet'); // Switch text back
+      setAnimateChars(true);    // Enable character animation
     }, tmVisibleDuration);
 
     setTimeout(() => {
-      setIsAnimatingChars(false); // End character animation state
-      setAnimationLock(false); // Release lock
+      setAnimateChars(false); // Reset animation state so it's clean for next time
+      setAnimationLock(false);  // Release lock
     }, tmVisibleDuration + charAnimationTotalDuration + 100); // Add a small buffer
   };
 
@@ -53,10 +55,9 @@ export default function HomePage() {
             <Logo
               text={logoText}
               size="large"
-              animateChars={isAnimatingChars}
+              animateChars={animateChars}
               className={cn(
                 "mb-8 animate-fadeIn text-center cursor-pointer",
-                // The 'animate-logoExpand' class is no longer used here directly
               )}
               onClick={handleComplexLogoAnimation}
             />
@@ -81,38 +82,63 @@ export default function HomePage() {
         .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; }
         .animate-slideUp { animation: slideUp 0.8s ease-out 0.2s forwards; }
 
-        /* Character Animation */
-        .logo-animated-char {
-          display: inline-block; /* Needed for transform */
-          opacity: 0;
-          transform: translateY(20px);
-          animation: charReveal 0.5s forwards;
+        /* Complex Character Animation */
+        .logo-animated-span {
+          display: inline-block;
+          opacity: 0; /* Start invisible */
         }
 
-        @keyframes charReveal {
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        /* Animation for T */
+        .logo-animated-span.char-index-0 { /* T */
+          animation: slideInT 0.6s forwards;
+          animation-delay: 0s; 
+        }
+        @keyframes slideInT {
+          from { transform: translateX(-30px) scaleX(0.8); opacity: 0; }
+          to { transform: translateX(0) scaleX(1); opacity: 1; }
         }
 
-        /* Specific animation for T to slide from left (example) */
-        .logo-animated-char.char-0 {
-           /* Keep default charReveal, or specialize if needed */
-           /* For a more distinct "T" animation, you could do:
-           opacity: 0;
-           transform: translateX(-30px);
-           animation: tReveal 0.6s forwards;
-           */
+        /* Animation for M */
+        .logo-animated-span.char-index-5 { /* M */
+          animation: slideInM 0.6s forwards;
+          animation-delay: 0.2s; 
         }
-        /*
-        @keyframes tReveal {
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+        @keyframes slideInM {
+          from { transform: translateX(30px) scaleX(0.8); opacity: 0; } 
+          to { transform: translateX(0) scaleX(1); opacity: 1; }
         }
-        */
+
+        /* Animation for "each" group (e,a,c,h) */
+        .logo-animated-span.char-index-1,
+        .logo-animated-span.char-index-2,
+        .logo-animated-span.char-index-3,
+        .logo-animated-span.char-index-4 {
+          animation: emergeEach 0.5s forwards;
+        }
+        .logo-animated-span.char-index-1 { animation-delay: 0.1s; } /* e */
+        .logo-animated-span.char-index-2 { animation-delay: 0.15s; } /* a */
+        .logo-animated-span.char-index-3 { animation-delay: 0.2s; } /* c */
+        .logo-animated-span.char-index-4 { animation-delay: 0.25s; } /* h */
+
+        @keyframes emergeEach {
+          from { transform: translate(20px, 5px) scale(0.5); opacity: 0; }
+          to { transform: translate(0, 0) scale(1); opacity: 1; }
+        }
+
+        /* Animation for "eet" group (e,e,t) */
+        .logo-animated-span.char-index-6,
+        .logo-animated-span.char-index-7,
+        .logo-animated-span.char-index-8 {
+          animation: emergeEet 0.5s forwards;
+        }
+        .logo-animated-span.char-index-6 { animation-delay: 0.3s; } /* e */
+        .logo-animated-span.char-index-7 { animation-delay: 0.35s; } /* e */
+        .logo-animated-span.char-index-8 { animation-delay: 0.4s; } /* t */
+
+        @keyframes emergeEet {
+          from { transform: translate(-20px, 5px) scale(0.5); opacity: 0; } 
+          to { transform: translate(0, 0) scale(1); opacity: 1; }
+        }
       `}</style>
     </div>
   );
