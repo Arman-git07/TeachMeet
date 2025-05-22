@@ -28,8 +28,8 @@ interface OngoingMeeting {
   participants?: number;
 }
 
-// Mock data for ongoing meetings
-const mockOngoingMeetings: OngoingMeeting[] = [
+// Initial mock data for ongoing meetings
+const initialMockOngoingMeetings: OngoingMeeting[] = [
   { id: 'alpha-beta-gamma', title: 'Project Sync: Q3 Roadmap', participants: 5 },
   { id: 'delta-echo-foxtrot', title: 'Weekly Team Huddle', participants: 8 },
 ];
@@ -38,7 +38,7 @@ export default function HomePage() {
   const [logoText, setLogoText] = useState('TeachMeet');
   const [animateChars, setAnimateChars] = useState(false);
   const [animationLock, setAnimationLock] = useState(false);
-  const [ongoingMeetings, setOngoingMeetings] = useState<OngoingMeeting[]>(mockOngoingMeetings);
+  const [ongoingMeetings, setOngoingMeetings] = useState<OngoingMeeting[]>(initialMockOngoingMeetings);
 
   const [isMeetingDialogVisible, setIsMeetingDialogVisible] = useState(false);
   const [selectedMeetingForDialog, setSelectedMeetingForDialog] = useState<OngoingMeeting | null>(null);
@@ -69,16 +69,23 @@ export default function HomePage() {
 
   const openMeetingDialog = (meeting: OngoingMeeting) => {
     setSelectedMeetingForDialog(meeting);
-    // Reset mic/camera states for dialog if needed, or load from persisted state
-    setIsMicMutedInDialog(false); // Example: default mic to on
-    setIsCameraOffInDialog(true);  // Example: default camera to off
+    setIsMicMutedInDialog(false);
+    setIsCameraOffInDialog(true);
     setIsMeetingDialogVisible(true);
   };
 
   const handleJoinMeetingFromDialog = () => {
     if (selectedMeetingForDialog) {
       router.push(`/dashboard/meeting/${selectedMeetingForDialog.id}/wait`);
-      setIsMeetingDialogVisible(false); // Close dialog after initiating join
+      setIsMeetingDialogVisible(false); 
+    }
+  };
+
+  const handleDismissMeeting = () => {
+    if (selectedMeetingForDialog) {
+      setOngoingMeetings(prevMeetings => prevMeetings.filter(m => m.id !== selectedMeetingForDialog.id));
+      setIsMeetingDialogVisible(false);
+      setSelectedMeetingForDialog(null);
     }
   };
 
@@ -104,7 +111,7 @@ export default function HomePage() {
               animateChars={animateChars}
               className={cn(
                 "mb-8 animate-fadeIn cursor-pointer text-center",
-                 animateChars && 'char-animation-active' // A helper class if needed for complex states
+                 animateChars && 'char-animation-active' 
               )}
               onClick={handleComplexLogoAnimation}
             />
@@ -116,7 +123,7 @@ export default function HomePage() {
                     <li key={meeting.id}>
                       <Dialog open={isMeetingDialogVisible && selectedMeetingForDialog?.id === meeting.id} onOpenChange={(isOpen) => {
                         if (!isOpen) {
-                          setSelectedMeetingForDialog(null); // Clear selection when dialog closes
+                          setSelectedMeetingForDialog(null); 
                         }
                         setIsMeetingDialogVisible(isOpen);
                       }}>
@@ -168,11 +175,10 @@ export default function HomePage() {
                             </div>
                           </div>
                           <DialogFooter className="gap-2 sm:gap-0">
-                            <DialogClose asChild>
-                              <Button type="button" variant="outline" className="rounded-md">
+                            {/* Updated Dismiss button */}
+                            <Button type="button" variant="outline" className="rounded-md" onClick={handleDismissMeeting}>
                                 <X className="mr-2 h-4 w-4" /> Dismiss
-                              </Button>
-                            </DialogClose>
+                            </Button>
                             <Button type="button" onClick={handleJoinMeetingFromDialog} className="btn-gel rounded-md">
                               <LogIn className="mr-2 h-4 w-4" /> Join Meeting
                             </Button>
