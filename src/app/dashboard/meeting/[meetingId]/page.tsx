@@ -1,5 +1,6 @@
+
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react'; // Added 'use'
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3 } from "lucide-react";
@@ -32,7 +33,9 @@ const ParticipantView = ({ name, isMe = false, isMicMuted = false, isCameraOff =
   );
 };
 
-export default function MeetingPage({ params }: { params: { meetingId: string } }) {
+export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
+  const { meetingId } = use(paramsPromise); // Use React.use to resolve the promise
+
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isHandRaised, setIsHandRaised] = useState(false);
@@ -58,7 +61,7 @@ export default function MeetingPage({ params }: { params: { meetingId: string } 
       {/* Top Bar for Meeting Info & Actions */}
       <header className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Meeting: {params.meetingId}</h2>
+          <h2 className="text-xl font-semibold text-foreground">Meeting: {meetingId}</h2>
           <span className="text-sm text-muted-foreground">4 Participants</span>
         </div>
         <DropdownMenu>
