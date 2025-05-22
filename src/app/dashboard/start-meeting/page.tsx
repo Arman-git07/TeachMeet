@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Share2, Copy, Users, XCircle, Video } from "lucide-react";
+import { Share2, Copy, Users, XCircle, Video, Hash } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast"; 
 import { useState } from "react";
@@ -11,18 +11,30 @@ import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel"; // Im
 
 export default function StartMeetingPage() {
   const meetingLink = "https://teachmeet.example.com/join/xyz123"; // Placeholder
+  const meetingCode = "xyz-123-abc"; // Placeholder for meeting code
   const meetingTitle = "My TeachMeet Meeting"; // Placeholder
   const { toast } = useToast(); 
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
-  const copyToClipboard = () => {
+  const copyLinkToClipboard = () => {
     navigator.clipboard.writeText(meetingLink)
       .then(() => {
-        toast({ title: "Link Copied!", description: "Meeting link copied to clipboard. You can now paste it to share." });
+        toast({ title: "Link Copied!", description: "Meeting link copied to clipboard." });
       })
       .catch(err => {
         console.error('Failed to copy link: ', err);
-        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting link automatically." });
+        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting link." });
+      });
+  };
+
+  const copyCodeToClipboard = () => {
+    navigator.clipboard.writeText(meetingCode)
+      .then(() => {
+        toast({ title: "Code Copied!", description: "Meeting code copied to clipboard." });
+      })
+      .catch(err => {
+        console.error('Failed to copy code: ', err);
+        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting code." });
       });
   };
 
@@ -33,7 +45,7 @@ export default function StartMeetingPage() {
           <CardHeader className="text-center">
             <Video className="mx-auto h-12 w-12 text-primary mb-3" />
             <CardTitle className="text-2xl">Start a New Meeting</CardTitle>
-            <CardDescription>Your meeting is ready. Share the link to invite others.</CardDescription>
+            <CardDescription>Your meeting is ready. Share the link or code to invite others.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -48,18 +60,38 @@ export default function StartMeetingPage() {
                   value={meetingLink}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 />
-                <Button variant="outline" size="icon" onClick={copyToClipboard} aria-label="Copy link">
+                <Button variant="outline" size="icon" onClick={copyLinkToClipboard} aria-label="Copy link">
                   <Copy className="h-5 w-5" />
                 </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4"> {/* Changed from grid-cols-2 */}
+            <div>
+              <label htmlFor="meetingCode" className="block text-sm font-medium text-muted-foreground mb-1">
+                Meeting Code
+              </label>
+              <div className="flex items-center space-x-2">
+                <div className="relative flex-grow">
+                  <Hash className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    id="meetingCode"
+                    type="text"
+                    readOnly
+                    value={meetingCode}
+                    className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                <Button variant="outline" size="icon" onClick={copyCodeToClipboard} aria-label="Copy code">
+                  <Copy className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
               <Button variant="outline" className="rounded-lg py-6 text-base" onClick={() => setIsSharePanelOpen(true)}>
                 <Share2 className="mr-2 h-5 w-5" />
                 Share Invite
               </Button>
-              {/* Manage Participants button removed */}
             </div>
             
             <Link href="/dashboard/meeting/new-meeting-id/wait" passHref legacyBehavior>
