@@ -77,9 +77,12 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
       let displayMessage = "Sorry, I encountered an error trying to respond. Please try again.";
       let detailErrorState = "Failed to get response from AI assistant.";
 
-      if (err instanceof Error && err.message.toLowerCase().includes('failed to fetch')) {
-        displayMessage += " This might be due to a network issue or missing API configuration. Please ensure your API key for the AI service is correctly set up in your .env file (e.g., GOOGLE_API_KEY).";
-        detailErrorState = "Failed to get response. Check console and ensure API key is configured.";
+      if (err instanceof Error) {
+        const errorMessageLower = err.message.toLowerCase();
+        if (errorMessageLower.includes('failed to fetch') || errorMessageLower.includes('network error') || errorMessageLower.includes('disconnected')) {
+          displayMessage += " This could be due to a network issue, the AI service being temporarily unavailable, or missing API configuration. Please ensure your API key for the AI service is correctly set up in your .env file (e.g., GOOGLE_API_KEY) and check your internet connection.";
+          detailErrorState = "Network or connection error. Check console, API key, and internet.";
+        }
       }
       
       const errorMessage: Message = { 
@@ -108,7 +111,6 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
         title: "File Selected (Mock)",
         description: `You selected: ${file.name}. Actual upload/processing is not yet implemented.`,
       });
-      // Reset the input value to allow selecting the same file again if needed
       event.target.value = '';
     }
   };
@@ -196,7 +198,7 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
             className="hidden" 
             onChange={handleFileChange} 
             disabled={isLoading}
-            accept="image/*,application/pdf,.doc,.docx,.txt" // Example file types
+            accept="image/*,application/pdf,.doc,.docx,.txt"
           />
           <Input
             ref={chatInputRef}
