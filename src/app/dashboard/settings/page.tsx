@@ -69,7 +69,7 @@ export default function SettingsPage() {
             <Switch id="virtualBackground" />
           </div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="cameraFilter" className="flex-grow">Apply Camera Filter</Label>
+            <Label htmlFor="cameraFilter" className="flex-grow">Select camera filter</Label>
             <Switch id="cameraFilter" />
           </div>
         </div>
