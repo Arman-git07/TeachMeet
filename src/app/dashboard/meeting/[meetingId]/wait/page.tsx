@@ -79,10 +79,14 @@ export default function WaitingAreaPage({ params: { meetingId } }: { params: { m
             </div>
           </div>
 
-          <Button variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
-            <Settings2 className="h-5 w-5" />
-            Advanced Settings
-          </Button>
+          <Link href="/dashboard/settings" passHref legacyBehavior>
+            <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
+              <a> {/* Added anchor tag for proper Link behavior with Button asChild */}
+                <Settings2 className="h-5 w-5" />
+                Advanced Settings
+              </a>
+            </Button>
+          </Link>
           
           <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior>
             <Button className="w-full btn-gel text-lg py-3 rounded-lg">
