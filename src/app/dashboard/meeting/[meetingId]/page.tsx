@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, use } from 'react'; // Added 'use'
+import { useState, useEffect, use } from 'react'; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3 } from "lucide-react";
@@ -34,18 +34,17 @@ const ParticipantView = ({ name, isMe = false, isMicMuted = false, isCameraOff =
 };
 
 export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
-  const { meetingId } = use(paramsPromise); // Use React.use to resolve the promise
+  const { meetingId } = use(paramsPromise); 
 
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isHandRaised, setIsHandRaised] = useState(false);
   
-  // Placeholder participants
+  // Updated placeholder participants
   const participants = [
-    { id: "1", name: "Alice", isMicMuted: false, isCameraOff: false },
-    { id: "2", name: "Bob", isMicMuted: true, isCameraOff: false },
-    { id: "3", name: "You", isMe: true, isMicMuted, isCameraOff },
-    { id: "4", name: "Charlie", isMicMuted: false, isCameraOff: true },
+    { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff },
+    { id: "guestUserA", name: "User A", isMicMuted: false, isCameraOff: true },
+    { id: "guestUserB", name: "User B", isMicMuted: true, isCameraOff: false },
   ];
 
   const toggleMic = () => setIsMicMuted(prev => !prev);
@@ -62,7 +61,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       <header className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <div>
           <h2 className="text-xl font-semibold text-foreground">Meeting: {meetingId}</h2>
-          <span className="text-sm text-muted-foreground">4 Participants</span>
+          <span className="text-sm text-muted-foreground">{participants.length} Participants</span>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
