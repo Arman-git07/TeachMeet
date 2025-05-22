@@ -1,20 +1,60 @@
 
 'use client';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3 } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-const ParticipantView = ({ name, isMe = false, isMicMuted = false, isCameraOff = false }: { name: string, isMe?: boolean, isMicMuted?: boolean, isCameraOff?: boolean }) => {
+const ParticipantView = ({ 
+  name, 
+  isMe = false, 
+  isMicMuted = false, 
+  isCameraOff = false, 
+  videoRef,
+  hasCameraPermissionForView 
+}: { 
+  name: string, 
+  isMe?: boolean, 
+  isMicMuted?: boolean, 
+  isCameraOff?: boolean,
+  videoRef?: React.RefObject<HTMLVideoElement>,
+  hasCameraPermissionForView?: boolean | null
+}) => {
+  const showAvatar = (isMe && isCameraOff) || (isMe && hasCameraPermissionForView === false) || (!isMe && isCameraOff);
+
   return (
     <Card className="aspect-video rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
-      {isCameraOff ? (
+      {isMe ? (
+        <>
+          <video 
+            ref={videoRef} 
+            muted 
+            autoPlay 
+            playsInline 
+            className={cn("w-full h-full object-cover", { 'hidden': isCameraOff || hasCameraPermissionForView === false })} 
+          />
+          {showAvatar && (
+            <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
+              <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
+                <AvatarImage src={`https://placehold.co/128x128.png?text=${name.charAt(0).toUpperCase()}`} alt={name} data-ai-hint="avatar user" />
+                <AvatarFallback className="text-3xl md:text-4xl">{name.charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              {hasCameraPermissionForView === false && <VideoOff className="w-7 h-7 text-muted-foreground mb-1" />}
+              <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
+              {hasCameraPermissionForView === false && <p className="text-xs text-muted-foreground">Camera permission denied</p>}
+            </div>
+          )}
+        </>
+      ) : isCameraOff ? (
         <div className="w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
           <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
-            <AvatarImage src={`https://placehold.co/128x128.png?text=${name.charAt(0).toUpperCase()}`} alt={name} data-ai-hint="avatar user" />
+            <AvatarImage src={`https://placehold.co/128x128.png?text=${name.charAt(0).toUpperCase()}`} alt={name} data-ai-hint="avatar user"/>
             <AvatarFallback className="text-3xl md:text-4xl">{name.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <VideoOff className="w-7 h-7 text-muted-foreground mb-1" />
@@ -35,30 +75,106 @@ const ParticipantView = ({ name, isMe = false, isMicMuted = false, isCameraOff =
 
 export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
   const { meetingId } = use(paramsPromise);
+  const { toast } = useToast();
 
   const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isCameraOff, setIsCameraOff] = useState(false);
+  const [isCameraOff, setIsCameraOff] = useState(false); // Initial state for local camera
   const [isHandRaised, setIsHandRaised] = useState(false);
+  
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const currentLocalStreamRef = useRef<MediaStream | null>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
-  // Mock participants - "You" and a couple of others to test grid and single view
-  // To test single view, comment out User A and User B
-  const participants = [
-    { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff },
-    // { id: "guestUserA", name: "User A", isMicMuted: false, isCameraOff: true },
-    // { id: "guestUserB", name: "User B", isMicMuted: true, isCameraOff: false },
-  ];
+  useEffect(() => {
+    const initCamera = async () => {
+      if (!isCameraOff) { // Only try to init if camera is supposed to be on by default
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          currentLocalStreamRef.current = stream;
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+          setHasCameraPermission(true);
+        } catch (err) {
+          console.error("Failed to get camera on mount:", err);
+          setHasCameraPermission(false);
+          setIsCameraOff(true); // Force camera off if permission failed
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings.',
+          });
+        }
+      } else {
+         // If camera is off by default, still check for permission silently or prompt if desired
+         // For now, if it's off by default, we assume permission will be asked on toggle
+         navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            setHasCameraPermission(true);
+            stream.getTracks().forEach(track => track.stop()); // Got permission, stop tracks immediately
+          })
+          .catch(() => setHasCameraPermission(false));
+      }
+    };
+    initCamera();
+
+    return () => {
+      currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+    };
+  }, []); // isCameraOff is not in dependency array to avoid re-running on toggle
+
 
   const toggleMic = () => setIsMicMuted(prev => !prev);
-  const toggleCamera = () => setIsCameraOff(prev => !prev);
+
+  const toggleCamera = async () => {
+    const newCameraStateIsOff = !isCameraOff; 
+
+    if (!newCameraStateIsOff) { // Turning camera ON
+      if (hasCameraPermission === false) {
+        toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
+        return;
+      }
+      if (!currentLocalStreamRef.current?.active) { 
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          currentLocalStreamRef.current = stream;
+          setHasCameraPermission(true); // In case it was null
+        } catch (err) {
+          console.error("Failed to get camera on toggle:", err);
+          setHasCameraPermission(false);
+          toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
+          return; 
+        }
+      }
+      if (localVideoRef.current && currentLocalStreamRef.current) {
+        localVideoRef.current.srcObject = currentLocalStreamRef.current;
+      }
+      setIsCameraOff(false);
+    } else { // Turning camera OFF
+      currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+      // currentLocalStreamRef.current = null; // Optionally clear the stream ref
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      setIsCameraOff(true);
+    }
+  };
+  
   const toggleHandRaise = () => setIsHandRaised(prev => !prev);
   const leaveMeeting = () => {
     alert("Leaving meeting (mock action)");
-    // router.push('/dashboard');
+    // router.push('/dashboard'); // Add router import if re-enabling
   };
+
+  const participants = [
+    { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff, videoRef: localVideoRef, hasCameraPermissionForView: hasCameraPermission },
+    { id: "guestUserA", name: "User A", isMicMuted: false, isCameraOff: true },
+    { id: "guestUserB", name: "User B", isMicMuted: true, isCameraOff: false },
+  ];
+
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Top Bar for Meeting Info & Actions */}
       <header className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <div>
           <h2 className="text-xl font-semibold text-foreground">Meeting: {meetingId}</h2>
@@ -84,31 +200,47 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         </DropdownMenu>
       </header>
 
-      {/* Main meeting content - Participant grid or single view */}
       <main className="flex-1 p-4 overflow-y-auto flex flex-col">
+        {hasCameraPermission === false && (
+           <Alert variant="destructive" className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Camera Permission Required</AlertTitle>
+              <AlertDescription>
+                TeachMeet needs access to your camera to share your video.
+                Please enable camera permissions in your browser settings.
+              </AlertDescription>
+            </Alert>
+        )}
         {participants.length === 1 && participants[0].isMe ? (
-          // Single participant view (You)
           <div className="flex-grow flex items-center justify-center">
-            <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative"> {/* Adjust max-h to account for header/footer */}
+            <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
               <ParticipantView
                 name={participants[0].name}
                 isMe={participants[0].isMe}
                 isMicMuted={participants[0].isMicMuted}
                 isCameraOff={participants[0].isCameraOff}
+                videoRef={localVideoRef}
+                hasCameraPermissionForView={hasCameraPermission}
               />
             </div>
           </div>
         ) : (
-          // Grid view for multiple participants
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {participants.map(p => (
-              <ParticipantView key={p.id} name={p.name} isMe={p.isMe} isMicMuted={p.isMicMuted} isCameraOff={p.isCameraOff} />
+              <ParticipantView 
+                key={p.id} 
+                name={p.name} 
+                isMe={p.isMe} 
+                isMicMuted={p.isMicMuted} 
+                isCameraOff={p.isMe ? isCameraOff : p.isCameraOff} // Ensure local state for local user
+                videoRef={p.isMe ? localVideoRef : undefined}
+                hasCameraPermissionForView={p.isMe ? hasCameraPermission : undefined}
+              />
             ))}
           </div>
         )}
       </main>
 
-      {/* Bottom Controls Bar */}
       <footer className="p-4 border-t border-border bg-background/80 backdrop-blur-md sticky bottom-0">
         <div className="max-w-2xl mx-auto flex justify-around items-center">
           <Button variant={isMicMuted ? "destructive" : "secondary"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleMic} aria-label={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}>
