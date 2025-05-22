@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mic, MicOff, Video, VideoOff, Settings2, User } from "lucide-react"; // Removed Loader2 as it's not used
+import { Mic, MicOff, Video, VideoOff, Settings2, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -81,7 +81,7 @@ export default function WaitingAreaPage({ params: { meetingId } }: { params: { m
 
           <Button variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
             <Settings2 className="h-5 w-5" />
-            Advanced Audio/Video Settings
+            Advanced Settings
           </Button>
           
           <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior>
