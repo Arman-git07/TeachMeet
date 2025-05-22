@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
+import { useRouter } from "next/navigation"; // useRouter is not explicitly used here but good for client components
 
 export default function StartMeetingPage() {
   const [meetingLink, setMeetingLink] = useState("");
@@ -16,6 +17,7 @@ export default function StartMeetingPage() {
   const meetingTitle = "My TeachMeet Meeting"; // Placeholder
   const { toast } = useToast();
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const router = useRouter(); // Initialize router if needed for other functionality
 
   useEffect(() => {
     // Generate unique meeting identifiers on component mount
@@ -47,43 +49,13 @@ export default function StartMeetingPage() {
       });
   };
 
-  const handleShareInvite = async () => {
+  const handleShareInvite = () => {
     if (!meetingLink || !meetingCode) {
       toast({ variant: "destructive", title: "Cannot Share", description: "Meeting details are not yet generated." });
       return;
     }
-    const shareText = `You're invited to join my TeachMeet meeting: ${meetingTitle}.\nLink: ${meetingLink}\nOr use Code: ${meetingCode}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: meetingTitle,
-          text: shareText,
-          url: meetingLink,
-        });
-        toast({ title: "Invite Shared", description: "Meeting invite shared successfully!" });
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.log('Share aborted by user.');
-        } else if (error.name === 'NotAllowedError' || (error.message && error.message.toLowerCase().includes("permission denied"))) {
-          toast({
-            variant: "destructive",
-            title: "Sharing Failed",
-            description: "Permission to use native sharing was denied. Opening sharing options panel instead.",
-          });
-          setIsSharePanelOpen(true); // Fallback to custom panel
-        } else {
-          console.error('Error sharing invite:', error);
-          toast({
-            variant: "destructive",
-            title: "Sharing Failed",
-            description: "Could not use native sharing. Opening sharing options panel instead.",
-          });
-          setIsSharePanelOpen(true); // Fallback to custom panel
-        }
-      }
-    } else {
-      setIsSharePanelOpen(true); // Open custom panel if navigator.share not present
-    }
+    // Always open the custom share panel for a consistent experience
+    setIsSharePanelOpen(true);
   };
 
   return (
