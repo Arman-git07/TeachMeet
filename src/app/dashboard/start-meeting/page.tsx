@@ -5,81 +5,84 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Share2, Copy, Users, XCircle, Video, Hash } from "lucide-react";
 import Link from "next/link";
-import { useToast } from "@/hooks/use-toast"; 
-import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 
 export default function StartMeetingPage() {
-  const meetingLink = "https://teachmeet.example.com/join/xyz123"; // Placeholder
-  const meetingCode = "xyz-123-abc"; // Placeholder for meeting code
+  const [meetingLink, setMeetingLink] = useState("");
+  const [meetingCode, setMeetingCode] = useState("");
+  const [meetingId, setMeetingId] = useState(""); // For the "Join Now" button path
   const meetingTitle = "My TeachMeet Meeting"; // Placeholder
-  const { toast } = useToast(); 
+  const { toast } = useToast();
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
-  const copyLinkToClipboard = () => {
-    navigator.clipboard.writeText(meetingLink)
+  useEffect(() => {
+    // Generate unique meeting identifiers on component mount
+    const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
+    
+    const newMeetingId = randomString(8);
+    setMeetingId(newMeetingId);
+
+    setMeetingLink(`https://teachmeet.example.com/join/${newMeetingId}`);
+    
+    const codePart1 = randomString(3);
+    const codePart2 = randomString(3);
+    const codePart3 = randomString(3);
+    setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
+  }, []);
+
+  const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
+    if (!textToCopy) {
+        toast({ variant: "destructive", title: "Nothing to Copy", description: `${type} has not been generated yet.` });
+        return;
+    }
+    navigator.clipboard.writeText(textToCopy)
       .then(() => {
-        toast({ title: "Link Copied!", description: "Meeting link copied to clipboard." });
+        toast({ title: `${type} Copied!`, description: `Meeting ${type.toLowerCase()} copied to clipboard.` });
       })
       .catch(err => {
-        console.error('Failed to copy link: ', err);
-        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting link." });
+        console.error(`Failed to copy ${type.toLowerCase()}: `, err);
+        toast({ variant: "destructive", title: "Copy Failed", description: `Could not copy the meeting ${type.toLowerCase()}.` });
       });
   };
 
-  const copyCodeToClipboard = () => {
-    navigator.clipboard.writeText(meetingCode)
-      .then(() => {
-        toast({ title: "Code Copied!", description: "Meeting code copied to clipboard." });
-      })
-      .catch(err => {
-        console.error('Failed to copy code: ', err);
-        toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the meeting code." });
-      });
-  };
-
-  // This handler is a fallback if the ShareOptionsPanel is not used,
-  // or if the "More Options" in ShareOptionsPanel invokes navigator.share.
-  // The main sharing logic is now in ShareOptionsPanel.
   const handleShareInvite = async () => {
+    if (!meetingLink || !meetingCode) {
+      toast({ variant: "destructive", title: "Cannot Share", description: "Meeting details are not yet generated." });
+      return;
+    }
     const shareText = `You're invited to join my TeachMeet meeting: ${meetingTitle}.\nLink: ${meetingLink}\nOr use Code: ${meetingCode}`;
     if (navigator.share) {
       try {
         await navigator.share({
           title: meetingTitle,
           text: shareText,
-          url: meetingLink, // URL is often primary for navigator.share
+          url: meetingLink,
         });
         toast({ title: "Invite Shared", description: "Meeting invite shared successfully!" });
       } catch (error: any) {
-        // Handle specific errors or fallbacks if needed
         if (error.name === 'AbortError') {
-          // User cancelled the share action, no toast needed
           console.log('Share aborted by user.');
         } else if (error.name === 'NotAllowedError' || (error.message && error.message.toLowerCase().includes("permission denied"))) {
           toast({
             variant: "destructive",
             title: "Sharing Failed",
-            description: "Permission to share was denied. Please try copying the link.",
+            description: "Permission to share was denied. Please try copying the link or use other share options.",
           });
-          copyLinkToClipboard(); // Fallback
-        } 
-        else {
+        } else {
           console.error('Error sharing invite:', error);
           toast({
             variant: "destructive",
             title: "Sharing Failed",
-            description: "Could not share the invite. Please try copying the link.",
+            description: "Could not share the invite. Please try other options or copy the link.",
           });
-          copyLinkToClipboard(); // Fallback
         }
       }
     } else {
-      // Fallback for browsers that don't support navigator.share
       setIsSharePanelOpen(true); // Open custom panel if navigator.share not present
     }
   };
-
 
   return (
     <>
@@ -100,10 +103,10 @@ export default function StartMeetingPage() {
                   id="meetingLink"
                   type="text"
                   readOnly
-                  value={meetingLink}
+                  value={meetingLink || "Generating..."}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 />
-                <Button variant="outline" size="icon" onClick={copyLinkToClipboard} aria-label="Copy link">
+                <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink}>
                   <Copy className="h-5 w-5" />
                 </Button>
               </div>
@@ -120,32 +123,32 @@ export default function StartMeetingPage() {
                     id="meetingCode"
                     type="text"
                     readOnly
-                    value={meetingCode}
+                    value={meetingCode || "Generating..."}
                     className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
-                <Button variant="outline" size="icon" onClick={copyCodeToClipboard} aria-label="Copy code">
+                <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode}>
                   <Copy className="h-5 w-5" />
                 </Button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              <Button variant="outline" className="rounded-lg py-6 text-base" onClick={() => setIsSharePanelOpen(true)}>
+              <Button variant="outline" className="rounded-lg py-6 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode}>
                 <Share2 className="mr-2 h-5 w-5" />
                 Share Invite
               </Button>
             </div>
             
-            <Link href="/dashboard/meeting/new-meeting-id/wait" passHref legacyBehavior>
-               <Button className="w-full btn-gel text-lg py-3 rounded-lg">
-                  Join Meeting Now
+            <Link href={meetingId ? `/dashboard/meeting/${meetingId}/wait` : "#"} passHref legacyBehavior>
+               <Button className="w-full btn-gel text-lg py-3 rounded-lg" disabled={!meetingId}>
+                  {meetingId ? "Join Meeting Now" : "Generating ID..."}
                </Button>
             </Link>
 
           </CardContent>
           <CardFooter className="flex justify-between border-t pt-4">
-              <Link href="/dashboard" passHref legacyBehavior>
+              <Link href="/" passHref legacyBehavior>
                   <Button variant="ghost" className="text-muted-foreground hover:text-destructive rounded-lg">
                       <XCircle className="mr-2 h-5 w-5" />
                       Dismiss
@@ -154,7 +157,7 @@ export default function StartMeetingPage() {
           </CardFooter>
         </Card>
       </div>
-      <ShareOptionsPanel 
+      <ShareOptionsPanel
         isOpen={isSharePanelOpen}
         onClose={() => setIsSharePanelOpen(false)}
         meetingLink={meetingLink}
