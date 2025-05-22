@@ -10,13 +10,14 @@ import {
   PlusCircle,
   Users,
   LogOut,
-  Clapperboard
+  Clapperboard,
+  Home // Added Home icon
 } from 'lucide-react';
 // import { Button } from '@/components/ui/button'; // Button not directly used here for items
 // import { Separator } from '@/components/ui/separator'; // Separator not directly used here
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation'; // Removed useRouter
+import { usePathname } from 'next/navigation';
 import {
   Sidebar,
   SidebarHeader,
@@ -25,12 +26,11 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  useSidebar, // Import useSidebar
-  // SidebarGroup, // Not used
-  // SidebarGroupLabel, // Not used
+  useSidebar, 
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/useAuth'; // Import real useAuth
+import { useAuth } from '@/hooks/useAuth'; 
 import { Skeleton } from '../ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 type NavItemProps = {
   href: string,
@@ -47,29 +47,29 @@ const NavItem = ({
   children,
   currentPath,
   isGreenTheme = false,
-  onClick: onClickProp // Renamed to avoid conflict
+  onClick: onClickProp
 }: NavItemProps) => {
   const isActive = currentPath === href;
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
-  const { isMobile, setOpenMobile } = useSidebar(); // Get sidebar context
+  const { isMobile, setOpenMobile } = useSidebar(); 
 
   const handleClick = () => {
     if (onClickProp) {
       onClickProp();
     }
     if (isMobile) {
-      setOpenMobile(false); // Close sidebar on mobile
+      setOpenMobile(false); 
     }
   };
 
-  if (onClickProp) { // For items like "Sign Out" that have a direct onClick action
+  if (onClickProp) { 
      return (
         <SidebarMenuItem>
             <SidebarMenuButton
             onClick={handleClick}
             className={cn(
                 commonClasses,
-                "hover:bg-destructive hover:text-destructive-foreground" // Specific for sign out
+                "hover:bg-destructive hover:text-destructive-foreground" 
             )}
             >
             <Icon className="mr-3 h-5 w-5" />
@@ -79,12 +79,12 @@ const NavItem = ({
      );
   }
 
-  // For navigation links
   return (
     <SidebarMenuItem>
       <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
         <SidebarMenuButton
-          onClick={handleClick} // Also close sidebar on navigation
+          as="a" // Ensure it renders as an anchor for proper Link behavior
+          onClick={handleClick} 
           isActive={isActive}
           className={cn(
             commonClasses,
@@ -107,7 +107,7 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter(); // Use useRouter for navigation
+  const router = useRouter(); 
 
   const handleLogoClick = () => {
     router.push('/');
@@ -116,19 +116,20 @@ export function AppSidebar() {
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
-        {/* Updated to be a button for navigation */}
-        <button
-          onClick={handleLogoClick}
-          aria-label="Go to homepage"
-          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-        >
-          <Logo size="small" />
-        </button>
+        <Link href="/" legacyBehavior>
+          <a
+            onClick={handleLogoClick}
+            aria-label="Go to homepage"
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md cursor-pointer"
+          >
+            <Logo size="small" />
+          </a>
+        </Link>
       </SidebarHeader>
       <SidebarContent className="flex-grow p-4">
         {loading ? (
           <SidebarMenu className="space-y-2">
-            {[...Array(4)].map((_, i) => (
+            {[...Array(5)].map((_, i) => ( // Increased skeleton items
               <SidebarMenuItem key={i}>
                 <Skeleton className="h-10 w-full rounded-lg" />
               </SidebarMenuItem>
@@ -138,7 +139,7 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
-              {/* <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem> */}
+              <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem>
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
@@ -172,6 +173,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-
-// Added useRouter import to fix error
-import { useRouter } from 'next/navigation';
