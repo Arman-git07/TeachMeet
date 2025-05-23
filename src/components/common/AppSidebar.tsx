@@ -11,13 +11,14 @@ import {
   Users,
   LogOut,
   Clapperboard,
-  Home // Added Home icon
+  Home,
+  FileText // Added FileText icon
 } from 'lucide-react';
 // import { Button } from '@/components/ui/button'; // Button not directly used here for items
 // import { Separator } from '@/components/ui/separator'; // Separator not directly used here
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
 import {
   Sidebar,
   SidebarHeader,
@@ -26,11 +27,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  useSidebar, 
+  useSidebar,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/useAuth'; 
+import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
-import { useRouter } from 'next/navigation';
 
 type NavItemProps = {
   href: string,
@@ -51,25 +51,25 @@ const NavItem = ({
 }: NavItemProps) => {
   const isActive = currentPath === href;
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
-  const { isMobile, setOpenMobile } = useSidebar(); 
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const handleClick = () => {
     if (onClickProp) {
       onClickProp();
     }
     if (isMobile) {
-      setOpenMobile(false); 
+      setOpenMobile(false);
     }
   };
 
-  if (onClickProp) { 
+  if (onClickProp) {
      return (
         <SidebarMenuItem>
             <SidebarMenuButton
             onClick={handleClick}
             className={cn(
                 commonClasses,
-                "hover:bg-destructive hover:text-destructive-foreground" 
+                "hover:bg-destructive hover:text-destructive-foreground"
             )}
             >
             <Icon className="mr-3 h-5 w-5" />
@@ -84,7 +84,7 @@ const NavItem = ({
       <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
         <SidebarMenuButton
           as="a" // Ensure it renders as an anchor for proper Link behavior
-          onClick={handleClick} 
+          onClick={handleClick}
           isActive={isActive}
           className={cn(
             commonClasses,
@@ -107,7 +107,7 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter(); 
+  const router = useRouter();
 
   const handleLogoClick = () => {
     router.push('/');
@@ -142,7 +142,7 @@ export function AppSidebar() {
               <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem>
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
-              <NavItem href="/dashboard/meetings" icon={Users} currentPath={pathname}>My Meetings</NavItem>
+              <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
           ) : (
