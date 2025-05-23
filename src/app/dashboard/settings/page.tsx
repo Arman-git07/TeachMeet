@@ -1,6 +1,8 @@
 
 'use client';
 
+import React, { useEffect, useState, useRef } from "react";
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -8,10 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon } from "lucide-react"; // Added VideoIcon
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const SettingsSection = ({ title, description, icon: Icon, children }: { title: string, description: string, icon: React.ElementType, children: React.ReactNode }) => (
-  <Card className="shadow-lg rounded-xl border-border/50">
+const SettingsSection = React.forwardRef<
+  HTMLDivElement,
+  { title: string, description: string, icon: React.ElementType, children: React.ReactNode, className?: string, id?: string }
+>(({ title, description, icon: Icon, children, className, id }, ref) => (
+  <Card id={id} ref={ref} className={cn("shadow-lg rounded-xl border-border/50", className)}>
     <CardHeader>
       <div className="flex items-center gap-3">
         <Icon className="h-7 w-7 text-primary" />
@@ -25,9 +31,33 @@ const SettingsSection = ({ title, description, icon: Icon, children }: { title: 
       {children}
     </CardContent>
   </Card>
-);
+));
+SettingsSection.displayName = "SettingsSection";
+
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
+  const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
+  const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const highlightParam = searchParams.get('highlight');
+    if (highlightParam) {
+      setHighlightedSectionId(highlightParam); // e.g., "advancedMeeting"
+      
+      // Scroll to section
+      if (highlightParam === 'advancedMeeting' && advancedMeetingSettingsRef.current) {
+        advancedMeetingSettingsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      // Remove highlight after animation
+      const timer = setTimeout(() => {
+        setHighlightedSectionId(null);
+      }, 2000); // Duration of the animation (1s * 2 iterations)
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
   return (
     <div className="container mx-auto py-8 space-y-10">
       <div className="text-center mb-12">
@@ -62,7 +92,14 @@ export default function SettingsPage() {
         <Button className="mt-6 btn-gel rounded-lg">Save General Settings</Button>
       </SettingsSection>
 
-      <SettingsSection title="Advanced Meeting Settings" description="Configure your camera and visual effects." icon={VideoIcon}>
+      <SettingsSection 
+        id="advancedMeetingSettings"
+        ref={advancedMeetingSettingsRef}
+        title="Advanced Meeting Settings" 
+        description="Configure your camera and visual effects." 
+        icon={VideoIcon}
+        className={highlightedSectionId === 'advancedMeeting' ? 'highlight-blink' : ''}
+      >
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label htmlFor="virtualBackground" className="flex-grow">Add virtual background</Label>

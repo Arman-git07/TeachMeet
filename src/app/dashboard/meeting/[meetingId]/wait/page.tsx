@@ -147,15 +147,11 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
                     <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
                   </Avatar>
                 )}
-                {hasCameraPermission === false ? (
+                {hasCameraPermission === false && (
                   <>
                     <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
                     <p className="font-semibold">Camera permission denied</p>
                     <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
-                  </>
-                ) : (
-                  <>
-                    {/* VideoOff icon removed from here */}
                   </>
                 )}
               </div>
@@ -215,7 +211,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             </div>
           </div>
 
-          <Link href="/dashboard/settings" passHref legacyBehavior>
+          <Link href="/dashboard/settings?highlight=advancedMeeting" passHref legacyBehavior>
             <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
               <a>
                 <Settings2 className="h-5 w-5" />

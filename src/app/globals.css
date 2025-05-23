@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -159,4 +160,20 @@
 /* Ensure body takes full height for layouts */
 html, body, #__next {
   height: 100%;
+}
+
+/* Highlighting animation for settings page */
+@keyframes blink-border-effect {
+  0%, 100% {
+    border-color: hsl(var(--border));
+    box-shadow: 0 0 0px hsl(var(--primary) / 0); /* Use a transparent shadow */
+  }
+  50% {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.5); /* Add a glow effect */
+  }
+}
+
+.highlight-blink {
+  animation: blink-border-effect 1s ease-in-out 2; /* Blinks twice for 1s each */
 }
