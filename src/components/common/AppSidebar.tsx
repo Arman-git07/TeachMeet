@@ -8,17 +8,16 @@ import {
   Settings,
   Video,
   PlusCircle,
-  Users,
   LogOut,
   Clapperboard,
   Home,
-  FileText // Added FileText icon
+  FileText,
+  Lock,
+  Globe,
 } from 'lucide-react';
-// import { Button } from '@/components/ui/button'; // Button not directly used here for items
-// import { Separator } from '@/components/ui/separator'; // Separator not directly used here
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
-import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Sidebar,
   SidebarHeader,
@@ -29,6 +28,12 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from '@/components/ui/sidebar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
 
@@ -57,7 +62,7 @@ const NavItem = ({
     if (onClickProp) {
       onClickProp();
     }
-    if (isMobile) {
+    if (isMobile && !onClickProp) { // Close sidebar on navigation, but not for actions like sign out
       setOpenMobile(false);
     }
   };
@@ -83,7 +88,7 @@ const NavItem = ({
     <SidebarMenuItem>
       <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
         <SidebarMenuButton
-          as="a" // Ensure it renders as an anchor for proper Link behavior
+          as="a" 
           onClick={handleClick}
           isActive={isActive}
           className={cn(
@@ -108,20 +113,23 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
   const router = useRouter();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const handleLogoClick = () => {
     router.push('/');
+  };
+
+  const handleDropdownItemClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
   };
 
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
         <Link href="/" legacyBehavior>
-          <a
-            onClick={handleLogoClick}
-            aria-label="Go to homepage"
-            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md cursor-pointer"
-          >
+          <a>
             <Logo size="small" />
           </a>
         </Link>
@@ -129,7 +137,7 @@ export function AppSidebar() {
       <SidebarContent className="flex-grow p-4">
         {loading ? (
           <SidebarMenu className="space-y-2">
-            {[...Array(5)].map((_, i) => ( // Increased skeleton items
+            {[...Array(5)].map((_, i) => ( 
               <SidebarMenuItem key={i}>
                 <Skeleton className="h-10 w-full rounded-lg" />
               </SidebarMenuItem>
@@ -142,7 +150,37 @@ export function AppSidebar() {
               <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem>
               <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
-              <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
+              
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                      className={cn(
+                        "w-full justify-start text-base py-3 px-4 rounded-lg",
+                        (pathname.startsWith('/dashboard/documents/private') || pathname.startsWith('/dashboard/documents/public'))
+                          ? "bg-primary text-primary-foreground" 
+                          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <FileText className="mr-3 h-5 w-5" />
+                      Documents
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start" className="ml-2 rounded-lg shadow-lg w-56">
+                    <DropdownMenuItem asChild onClick={handleDropdownItemClick}>
+                      <Link href="/dashboard/documents/private" className="flex items-center w-full">
+                        <Lock className="mr-2 h-4 w-4" /> Private
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild onClick={handleDropdownItemClick}>
+                      <Link href="/dashboard/documents/public" className="flex items-center w-full">
+                        <Globe className="mr-2 h-4 w-4" /> Public
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
           ) : (
