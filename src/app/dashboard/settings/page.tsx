@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon } from "lucide-react"; // Removed ImageIcon
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-// Removed useToast as it's not used after virtual bg removal
+import { useToast } from "@/hooks/use-toast";
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -39,7 +39,26 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
-  // Removed toast import and usage for virtual background
+  const { toast } = useToast();
+
+  const [selectedFilter, setSelectedFilter] = useState<string>("none");
+
+  useEffect(() => {
+    const storedFilter = localStorage.getItem("teachmeet-camera-filter");
+    if (storedFilter) {
+      setSelectedFilter(storedFilter);
+    }
+  }, []);
+
+  const handleFilterChange = (value: string) => {
+    setSelectedFilter(value);
+    localStorage.setItem("teachmeet-camera-filter", value);
+    toast({
+      title: "Filter Selected",
+      description: `${value === "none" ? "No filter" : value.charAt(0).toUpperCase() + value.slice(1)} filter has been applied.`,
+    });
+  };
+  
 
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
@@ -105,10 +124,20 @@ export default function SettingsPage() {
         className={highlightedSectionId === 'advancedMeetingSettings' ? 'highlight-blink' : ''}
       >
         <div className="space-y-4">
-          {/* Virtual Background UI removed */}
-          <div className="flex items-center justify-between pt-4">
-            <Label htmlFor="cameraFilter" className="flex-grow">Select camera filter</Label>
-            <Switch id="cameraFilter" />
+          <div className="pt-4">
+            <Label htmlFor="cameraFilterSelect" className="block mb-1">Select camera filter</Label>
+            <Select value={selectedFilter} onValueChange={handleFilterChange}>
+              <SelectTrigger id="cameraFilterSelect" className="w-full mt-1 rounded-lg">
+                <SelectValue placeholder="Select a filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Filter</SelectItem>
+                <SelectItem value="grayscale">Grayscale</SelectItem>
+                <SelectItem value="sepia">Sepia</SelectItem>
+                <SelectItem value="invert">Invert</SelectItem>
+                <SelectItem value="vintage">Vintage</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <Button className="mt-6 btn-gel rounded-lg">Save Meeting Visuals</Button>

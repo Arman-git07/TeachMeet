@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle } from "lucide-react"; // Removed ImageIconLucide
+import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef, use } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth"; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
 import { useSearchParams } from "next/navigation";
-// Removed next/image as it's not used after virtual background removal
+import Image from 'next/image';
+import { cn } from "@/lib/utils";
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
@@ -27,13 +28,20 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const [isMicActive, setIsMicActive] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
+  const [appliedFilter, setAppliedFilter] = useState<string>("none");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoStreamRef = useRef<MediaStream | null>(null);
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
-  // Removed virtual background state and effect
+  useEffect(() => {
+    const storedFilter = localStorage.getItem("teachmeet-camera-filter");
+    if (storedFilter) {
+      setAppliedFilter(storedFilter);
+    }
+  }, []);
+
   useEffect(() => {
     // Cleanup streams on unmount
     return () => {
@@ -129,8 +137,20 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const userFallback = userName.charAt(0).toUpperCase();
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
-  const joinNowLink = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+  const joinNowLink = topic 
+    ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+    : `/dashboard/meeting/${meetingId}`;
 
+
+  const videoClassNames = cn(
+    "w-full h-full object-cover",
+    {
+      "video-filter-grayscale": appliedFilter === "grayscale" && isCameraActive,
+      "video-filter-sepia": appliedFilter === "sepia" && isCameraActive,
+      "video-filter-invert": appliedFilter === "invert" && isCameraActive,
+      "video-filter-vintage": appliedFilter === "vintage" && isCameraActive,
+    }
+  );
 
   return (
     <div className="container mx-auto py-8 flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -144,7 +164,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+            <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
             {(!isCameraActive || hasCameraPermission === false) && (
               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                  {authLoading ? (
@@ -209,14 +229,17 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
           )}
 
           <div className="space-y-2">
-            {/* Virtual Background Checkbox removed */}
              <div className="flex items-center space-x-2">
-              <Checkbox id="cameraFilter" />
-              <Label htmlFor="cameraFilter">Apply Camera Filter</Label>
+              <Checkbox id="cameraFilterInfo" checked={appliedFilter !== "none"} disabled/>
+              <Label htmlFor="cameraFilterInfo">
+                {appliedFilter !== "none" 
+                  ? `Camera filter active: ${appliedFilter.charAt(0).toUpperCase() + appliedFilter.slice(1)} (from settings)`
+                  : "No camera filter active (set in settings)"}
+              </Label>
             </div>
           </div>
 
-          <Link href="/dashboard/settings?highlight=advancedMeetingSettings" passHref legacyBehavior>
+          <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`} passHref legacyBehavior>
             <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
               <a>
                 <Settings2 className="h-5 w-5" />
