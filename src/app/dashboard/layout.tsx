@@ -7,6 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button'; // Added Button
+import { Menu } from 'lucide-react'; // Added Menu icon
 
 export default function DashboardLayout({
   children,
@@ -43,17 +45,10 @@ export default function DashboardLayout({
           </div>
         )}
         <div className="flex flex-1 flex-col">
+          {/* Skeleton for the new minimal header */}
           <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
-            <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-8 w-8 rounded-md md:hidden" />
-                <Skeleton className="h-8 w-32 rounded-lg hidden md:block" />
-              </div>
-              <Skeleton className="h-8 w-1/2 max-w-md rounded-full" />
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-8 w-8 rounded-full" />
-                <Skeleton className="h-8 w-8 rounded-full" />
-              </div>
+            <div className="container mx-auto flex h-16 items-center justify-end px-4 sm:px-6 lg:px-8">
+              <Skeleton className="h-8 w-8 rounded-md" />
             </div>
           </header>
           <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
@@ -71,7 +66,15 @@ export default function DashboardLayout({
       <AppSidebar /> {/* Removed isAuthenticated prop, it will use useAuth internally */}
       <SidebarInset>
         <div className="flex flex-1 flex-col">
-          {/* AppHeader has been removed from here */}
+          {/* New minimal header for the dashboard content area */}
+          <header className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur-md">
+            <div className="container mx-auto flex h-16 items-center justify-end px-4 sm:px-6 lg:px-8">
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Dashboard Menu</span>
+              </Button>
+            </div>
+          </header>
           <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
             {children}
           </main>
@@ -80,3 +83,4 @@ export default function DashboardLayout({
     </div>
   );
 }
+
