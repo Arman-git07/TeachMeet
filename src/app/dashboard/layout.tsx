@@ -47,7 +47,7 @@ export default function DashboardLayout({
         <div className="flex flex-1 flex-col">
           {/* Skeleton for the new minimal header */}
           <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
-            <div className="container mx-auto flex h-16 items-center justify-end px-4 sm:px-6 lg:px-8">
+            <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
               <Skeleton className="h-8 w-8 rounded-md" />
             </div>
           </header>
@@ -68,7 +68,7 @@ export default function DashboardLayout({
         <div className="flex flex-1 flex-col">
           {/* New minimal header for the dashboard content area */}
           <header className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur-md">
-            <div className="container mx-auto flex h-16 items-center justify-end px-4 sm:px-6 lg:px-8">
+            <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">Dashboard Menu</span>
