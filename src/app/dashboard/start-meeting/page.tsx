@@ -3,20 +3,20 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Share2, Copy, Users, XCircle, Video, Hash } from "lucide-react";
+import { Share2, Copy, XCircle, Video, Hash } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { useRouter } from "next/navigation";
-import { Textarea } from "@/components/ui/textarea"; // Import Textarea
-import { Label } from "@/components/ui/label"; // Import Label
+import { Input } from "@/components/ui/input"; // Import Input
+import { Label } from "@/components/ui/label"; 
 
 export default function StartMeetingPage() {
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
   const [meetingId, setMeetingId] = useState("");
-  const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting"); // State for meeting title
+  const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting"); 
   const { toast } = useToast();
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   const router = useRouter();
@@ -72,12 +72,12 @@ export default function StartMeetingPage() {
               <Label htmlFor="meetingTopic" className="block text-sm font-medium text-muted-foreground mb-1">
                 Meeting Topic / Purpose
               </Label>
-              <Textarea
+              <Input
                 id="meetingTopic"
                 placeholder="e.g., Weekly Sync, Project Brainstorm..."
                 value={meetingTitle}
                 onChange={(e) => setMeetingTitle(e.target.value)}
-                className="rounded-lg text-base min-h-[80px]"
+                className="rounded-lg text-base"
               />
             </div>
 
