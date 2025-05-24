@@ -7,8 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button'; // Added Button
-import { Menu } from 'lucide-react'; // Added Menu icon
+import { Button } from '@/components/ui/button';
+import { PanelLeftOpen } from 'lucide-react'; // Changed from Menu to PanelLeftOpen
 
 export default function DashboardLayout({
   children,
@@ -70,7 +70,7 @@ export default function DashboardLayout({
           <header className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
               <Button variant="ghost" size="icon" className="rounded-full">
-                <Menu className="h-6 w-6" />
+                <PanelLeftOpen className="h-6 w-6" /> {/* Changed from Menu to PanelLeftOpen */}
                 <span className="sr-only">Dashboard Menu</span>
               </Button>
             </div>
@@ -83,4 +83,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-
