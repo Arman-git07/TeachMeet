@@ -43,10 +43,10 @@ export default function SettingsPage() {
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
     if (highlightParam) {
-      setHighlightedSectionId(highlightParam); // e.g., "advancedMeeting"
+      setHighlightedSectionId(highlightParam); // e.g., "advancedMeetingSettings"
       
       // Scroll to section
-      if (highlightParam === 'advancedMeeting' && advancedMeetingSettingsRef.current) {
+      if (highlightParam === 'advancedMeetingSettings' && advancedMeetingSettingsRef.current) {
         advancedMeetingSettingsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       
@@ -98,7 +98,7 @@ export default function SettingsPage() {
         title="Advanced Meeting Settings" 
         description="Configure your camera and visual effects." 
         icon={VideoIcon}
-        className={highlightedSectionId === 'advancedMeeting' ? 'highlight-blink' : ''}
+        className={highlightedSectionId === 'advancedMeetingSettings' ? 'highlight-blink' : ''}
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between">
