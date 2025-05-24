@@ -8,19 +8,20 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
-import { useRouter } from "next/navigation"; // useRouter is not explicitly used here but good for client components
+import { useRouter } from "next/navigation";
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea
+import { Label } from "@/components/ui/label"; // Import Label
 
 export default function StartMeetingPage() {
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
-  const [meetingId, setMeetingId] = useState(""); // For the "Join Now" button path
-  const meetingTitle = "My TeachMeet Meeting"; // Placeholder
+  const [meetingId, setMeetingId] = useState("");
+  const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting"); // State for meeting title
   const { toast } = useToast();
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-  const router = useRouter(); // Initialize router if needed for other functionality
+  const router = useRouter();
 
   useEffect(() => {
-    // Generate unique meeting identifiers on component mount
     const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
     
     const newMeetingId = randomString(8);
@@ -54,7 +55,6 @@ export default function StartMeetingPage() {
       toast({ variant: "destructive", title: "Cannot Share", description: "Meeting details are not yet generated." });
       return;
     }
-    // Always open the custom share panel for a consistent experience
     setIsSharePanelOpen(true);
   };
 
@@ -65,13 +65,26 @@ export default function StartMeetingPage() {
           <CardHeader className="text-center">
             <Video className="mx-auto h-12 w-12 text-primary mb-3" />
             <CardTitle className="text-2xl">Start a New Meeting</CardTitle>
-            <CardDescription>Your meeting is ready. Share the link or code to invite others.</CardDescription>
+            <CardDescription>Set a topic and share the invite to begin.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <label htmlFor="meetingLink" className="block text-sm font-medium text-muted-foreground mb-1">
+              <Label htmlFor="meetingTopic" className="block text-sm font-medium text-muted-foreground mb-1">
+                Meeting Topic / Purpose
+              </Label>
+              <Textarea
+                id="meetingTopic"
+                placeholder="e.g., Weekly Sync, Project Brainstorm..."
+                value={meetingTitle}
+                onChange={(e) => setMeetingTitle(e.target.value)}
+                className="rounded-lg text-base min-h-[80px]"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="meetingLink" className="block text-sm font-medium text-muted-foreground mb-1">
                 Meeting Link
-              </label>
+              </Label>
               <div className="flex items-center space-x-2">
                 <input
                   id="meetingLink"
@@ -87,9 +100,9 @@ export default function StartMeetingPage() {
             </div>
 
             <div>
-              <label htmlFor="meetingCodeDisplay" className="block text-sm font-medium text-muted-foreground mb-1">
+              <Label htmlFor="meetingCodeDisplay" className="block text-sm font-medium text-muted-foreground mb-1">
                 Meeting Code
-              </label>
+              </Label>
               <div className="flex items-center space-x-2">
                 <div className="relative flex-grow">
                   <Hash className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -136,7 +149,7 @@ export default function StartMeetingPage() {
         onClose={() => setIsSharePanelOpen(false)}
         meetingLink={meetingLink}
         meetingCode={meetingCode}
-        meetingTitle={meetingTitle}
+        meetingTitle={meetingTitle} 
       />
     </>
   );
