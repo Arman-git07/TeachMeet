@@ -17,13 +17,14 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/useAuth';
+import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Import the new dialog content
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
-  const [meetingCode, setMeetingCode] = useState('');
+  const [meetingCodeDialogInput, setMeetingCodeDialogInput] = useState(''); // Renamed to avoid conflict
   const { toast } = useToast();
-  const { isAuthenticated, loading: authLoading } = useAuth(); // Get auth state
+  const { isAuthenticated, loading: authLoading } = useAuth(); 
 
   useEffect(() => {
     const timer = setTimeout(() => setShowPanel(true), 300);
@@ -31,13 +32,13 @@ export function SlideUpPanel() {
   }, []);
 
   const handleJoinFromDialog = () => {
-    if (meetingCode.trim()) {
+    if (meetingCodeDialogInput.trim()) {
       toast({
         title: "Joining Meeting (Dialog)",
-        description: `Attempting to join with code: ${meetingCode}`,
+        description: `Attempting to join with code: ${meetingCodeDialogInput}`,
       });
-      // In a real app, navigate: router.push(`/dashboard/meeting/${meetingCode}/wait`);
-      setMeetingCode('');
+      // In a real app, navigate: router.push(`/dashboard/join/${meetingCodeDialogInput}`);
+      setMeetingCodeDialogInput('');
     } else {
       toast({
         variant: "destructive",
@@ -47,13 +48,11 @@ export function SlideUpPanel() {
     }
   };
 
-  const startMeetingHref = isAuthenticated ? "/dashboard/start-meeting" : "/auth/signin?action=start";
+  // For "Join Meeting" button, direct link changes based on auth state
   const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
 
   if (authLoading) {
-    // Optionally, render a loading state for the panel or buttons
-    // For simplicity, we'll just let the links update once auth state is known
-    // Users might see a flicker if they click very fast, but panel animates in anyway.
+    // Optional loading state
   }
 
   return (
@@ -63,19 +62,24 @@ export function SlideUpPanel() {
       } bg-gradient-to-t from-background to-background/90 backdrop-blur-sm p-6 shadow-2xl rounded-t-2xl border-t border-border`}
     >
       <div className="container mx-auto max-w-3xl flex flex-col sm:flex-row items-center sm:items-start justify-center gap-x-6 gap-y-4">
-        {/* Start New Meeting Button */}
+        {/* Start New Meeting Button with Dialog */}
         <div className="w-full sm:flex-1 flex justify-center">
-          <Link href={startMeetingHref} passHref legacyBehavior>
-            <Button
-              size="lg"
-              className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
-              aria-label="Start New Meeting"
-              disabled={authLoading}
-            >
-              <PlusCircle className="mr-2 h-6 w-6" />
-              Start New Meeting
-            </Button>
-          </Link>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                size="lg"
+                className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+                aria-label="Start New Meeting"
+                disabled={authLoading}
+              >
+                <PlusCircle className="mr-2 h-6 w-6" />
+                Start New Meeting
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <StartMeetingDialogContent />
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Join Meeting Section */}
@@ -111,13 +115,13 @@ export function SlideUpPanel() {
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="dialogMeetingCode" className="text-right">
+                    <Label htmlFor="dialogMeetingCodeInput" className="text-right">
                       Code
                     </Label>
                     <Input
-                      id="dialogMeetingCode"
-                      value={meetingCode}
-                      onChange={(e) => setMeetingCode(e.target.value)}
+                      id="dialogMeetingCodeInput"
+                      value={meetingCodeDialogInput}
+                      onChange={(e) => setMeetingCodeDialogInput(e.target.value)}
                       placeholder="e.g., abc-xyz-123"
                       className="col-span-3 rounded-md"
                     />
@@ -143,4 +147,3 @@ export function SlideUpPanel() {
     </div>
   );
 }
-    

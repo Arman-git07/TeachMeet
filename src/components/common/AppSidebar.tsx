@@ -30,14 +30,17 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"; // Added Dialog imports
+import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Import the new dialog content
 
 type NavItemProps = {
-  href: string,
+  href?: string, // Make href optional for non-navigation triggers
   icon: React.ElementType,
   children: React.ReactNode,
   currentPath: string,
   isGreenTheme?: boolean,
   onClick?: () => void;
+  asDialogTrigger?: boolean; // New prop
 };
 
 const NavItem = ({
@@ -46,59 +49,88 @@ const NavItem = ({
   children,
   currentPath,
   isGreenTheme = false,
-  onClick: onClickProp
+  onClick: onClickProp,
+  asDialogTrigger = false, // Default to false
 }: NavItemProps) => {
-  const isActive = currentPath === href;
+  const isActive = href ? currentPath === href || (href === "/dashboard/documents" && currentPath.startsWith("/dashboard/documents/")) : false;
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
   const { isMobile, setOpenMobile } = useSidebar();
 
   const handleClick = () => {
-    if (onClickProp) {
+    if (onClickProp && !asDialogTrigger) { // Don't close sidebar if it's opening a dialog from sidebar
       onClickProp();
     }
-    if (isMobile && !onClickProp) { // Close sidebar on navigation, but not for actions like sign out
+    if (isMobile && href && !asDialogTrigger) { 
       setOpenMobile(false);
     }
   };
 
-  if (onClickProp) {
-     return (
-        <SidebarMenuItem>
+  const buttonContent = (
+    <>
+      <Icon className="mr-3 h-5 w-5" />
+      {children}
+    </>
+  );
+
+  const buttonClassName = cn(
+    commonClasses,
+    isActive
+      ? "bg-primary text-primary-foreground"
+      : isGreenTheme
+        ? "text-primary hover:bg-primary hover:text-primary-foreground"
+        : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+  );
+
+  if (asDialogTrigger) {
+    return (
+      <SidebarMenuItem>
+        <Dialog>
+          <DialogTrigger asChild>
             <SidebarMenuButton
-            onClick={handleClick}
-            className={cn(
-                commonClasses,
-                "hover:bg-destructive hover:text-destructive-foreground"
-            )}
+              onClick={handleClick}
+              className={buttonClassName}
             >
-            <Icon className="mr-3 h-5 w-5" />
-            {children}
+              {buttonContent}
             </SidebarMenuButton>
-        </SidebarMenuItem>
-     );
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <StartMeetingDialogContent />
+          </DialogContent>
+        </Dialog>
+      </SidebarMenuItem>
+    );
   }
 
+  if (href) {
+    return (
+      <SidebarMenuItem>
+        <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
+          <SidebarMenuButton
+            as="a"
+            onClick={handleClick}
+            isActive={isActive}
+            className={buttonClassName}
+          >
+            {buttonContent}
+          </SidebarMenuButton>
+        </Link>
+      </SidebarMenuItem>
+    );
+  }
+
+  // Fallback for non-link, non-dialog trigger buttons (like Sign Out)
   return (
-    <SidebarMenuItem>
-      <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
-        <SidebarMenuButton
-          as="a"
-          onClick={handleClick}
-          isActive={isActive}
-          className={cn(
-            commonClasses,
-            isActive
-              ? "bg-primary text-primary-foreground"
-              : isGreenTheme
-                ? "text-primary hover:bg-primary hover:text-primary-foreground"
-                : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          )}
-        >
-          <Icon className="mr-3 h-5 w-5" />
-          {children}
-        </SidebarMenuButton>
-      </Link>
-    </SidebarMenuItem>
+     <SidebarMenuItem>
+         <SidebarMenuButton
+         onClick={handleClick}
+         className={cn(
+             commonClasses,
+             "hover:bg-destructive hover:text-destructive-foreground" // Default for actions like signout
+         )}
+         >
+         {buttonContent}
+         </SidebarMenuButton>
+     </SidebarMenuItem>
   );
 };
 
@@ -106,12 +138,9 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter();
+  const router = useRouter(); // Keep router for potential future use or if other items need it
   const { isMobile, setOpenMobile } = useSidebar();
 
-  const handleLogoClick = () => {
-    router.push('/');
-  };
 
   const handleDropdownItemClick = () => {
     if (isMobile) {
@@ -142,7 +171,7 @@ export function AppSidebar() {
           {isAuthenticated ? (
             <>
               <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem>
-              <NavItem href="/dashboard/start-meeting" icon={PlusCircle} currentPath={pathname} isGreenTheme>Start Meeting</NavItem>
+              <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme asDialogTrigger>Start New Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
@@ -167,7 +196,7 @@ export function AppSidebar() {
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
           {isAuthenticated && (
-            <NavItem href="#" icon={LogOut} currentPath={pathname} onClick={signOut}>Sign Out</NavItem>
+            <NavItem icon={LogOut} currentPath={pathname} onClick={signOut}>Sign Out</NavItem>
           )}
         </SidebarMenu>
         )}
