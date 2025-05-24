@@ -17,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { useRouter } from 'next/navigation';
 
@@ -36,11 +35,7 @@ const initialMockOngoingMeetings: OngoingMeeting[] = [
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
 export default function HomePage() {
-  const [logoText, setLogoText] = useState('TeachMeet');
-  const [animateChars, setAnimateChars] = useState(false);
-  const [animationLock, setAnimationLock] = useState(false);
   const [ongoingMeetings, setOngoingMeetings] = useState<OngoingMeeting[]>([]);
-
   const [isMeetingDialogVisible, setIsMeetingDialogVisible] = useState(false);
   const [selectedMeetingForDialog, setSelectedMeetingForDialog] = useState<OngoingMeeting | null>(null);
   const [isMicMutedInDialog, setIsMicMutedInDialog] = useState(false);
@@ -57,28 +52,6 @@ export default function HomePage() {
     );
     setOngoingMeetings(activeMeetings);
   }, []);
-
-
-  const handleComplexLogoAnimation = () => {
-    if (animationLock) return;
-
-    setAnimationLock(true);
-    setAnimateChars(false); 
-    setLogoText('TM');
-
-    const tmVisibleDuration = 300; 
-    const charAnimationTotalDuration = 900; 
-
-    setTimeout(() => {
-      setLogoText('TeachMeet');
-      setAnimateChars(true); 
-    }, tmVisibleDuration);
-
-    setTimeout(() => {
-      setAnimateChars(false); 
-      setAnimationLock(false);
-    }, tmVisibleDuration + charAnimationTotalDuration + 100); 
-  };
 
   const openMeetingDialog = (meeting: OngoingMeeting) => {
     setSelectedMeetingForDialog(meeting);
@@ -128,14 +101,9 @@ export default function HomePage() {
           />
           <div className="relative z-10 flex flex-col items-center text-center">
             <Logo
-              text={logoText}
+              text="TeachMeet" // Default text, no animation props
               size="large"
-              animateChars={animateChars}
-              className={cn(
-                "mb-8 animate-fadeIn cursor-pointer text-center",
-                 animateChars && 'char-animation-active' 
-              )}
-              onClick={handleComplexLogoAnimation}
+              className="mb-8 animate-fadeIn text-center" // Removed cursor-pointer and animation-active class
             />
             <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
               <h2 className="text-2xl font-semibold text-primary mb-4">Latest Activity</h2>
@@ -231,61 +199,9 @@ export default function HomePage() {
         .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; }
         .animate-slideUp { animation: slideUp 0.8s ease-out 0.2s forwards; }
 
-        .logo-animated-span {
-          display: inline-block;
-          opacity: 0; 
-        }
-        
-        .char-animation-active .logo-animated-span.char-index-0 { 
-          animation: slideInT 0.6s forwards;
-          animation-delay: 0s;
-        }
-        @keyframes slideInT {
-          from { transform: translateX(-30px) scaleX(0.8); opacity: 0; }
-          to { transform: translateX(0) scaleX(1); opacity: 1; }
-        }
-
-        .char-animation-active .logo-animated-span.char-index-5 { 
-          animation: slideInM 0.6s forwards;
-          animation-delay: 0.2s; 
-        }
-        @keyframes slideInM {
-          from { transform: translateX(30px) scaleX(0.8); opacity: 0; }
-          to { transform: translateX(0) scaleX(1); opacity: 1; }
-        }
-
-        .char-animation-active .logo-animated-span.char-index-1,
-        .char-animation-active .logo-animated-span.char-index-2,
-        .char-animation-active .logo-animated-span.char-index-3,
-        .char-animation-active .logo-animated-span.char-index-4 {
-          animation: emergeEach 0.5s forwards;
-        }
-        .char-animation-active .logo-animated-span.char-index-1 { animation-delay: 0.1s; } 
-        .char-animation-active .logo-animated-span.char-index-2 { animation-delay: 0.15s; } 
-        .char-animation-active .logo-animated-span.char-index-3 { animation-delay: 0.2s; } 
-        .char-animation-active .logo-animated-span.char-index-4 { animation-delay: 0.25s; } 
-
-        @keyframes emergeEach {
-          from { transform: translate(20px, 5px) scale(0.5); opacity: 0; } 
-          to { transform: translate(0, 0) scale(1); opacity: 1; }
-        }
-
-        .char-animation-active .logo-animated-span.char-index-6,
-        .char-animation-active .logo-animated-span.char-index-7,
-        .char-animation-active .logo-animated-span.char-index-8 {
-          animation: emergeEet 0.5s forwards;
-        }
-        .char-animation-active .logo-animated-span.char-index-6 { animation-delay: 0.3s; } 
-        .char-animation-active .logo-animated-span.char-index-7 { animation-delay: 0.35s; } 
-        .char-animation-active .logo-animated-span.char-index-8 { animation-delay: 0.4s; } 
-
-        @keyframes emergeEet {
-          from { transform: translate(-20px, 5px) scale(0.5); opacity: 0; } 
-          to { transform: translate(0, 0) scale(1); opacity: 1; }
-        }
+        /* Removed complex character-specific logo animations */
 
       `}</style>
     </div>
   );
 }
-
