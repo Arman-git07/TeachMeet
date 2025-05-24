@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Image as ImageIcon } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon } from "lucide-react"; // Removed ImageIcon
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+// Removed useToast as it's not used after virtual bg removal
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -39,22 +39,9 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
-
-  const [virtualBackgroundEnabled, setVirtualBackgroundEnabled] = useState(false);
-  const [selectedVirtualBgName, setSelectedVirtualBgName] = useState<string | null>(null);
-  const [selectedVirtualBgDataUrl, setSelectedVirtualBgDataUrl] = useState<string | null>(null);
-  const virtualBgInputRef = useRef<HTMLInputElement>(null);
+  // Removed toast import and usage for virtual background
 
   useEffect(() => {
-    // Load initial virtual background state from localStorage
-    const storedEnabled = localStorage.getItem('teachmeet-virtual-bg-enabled') === 'true';
-    setVirtualBackgroundEnabled(storedEnabled);
-    const storedImageName = localStorage.getItem('teachmeet-virtual-bg-name');
-    const storedImageDataUrl = localStorage.getItem('teachmeet-virtual-bg-image');
-    if (storedImageName) setSelectedVirtualBgName(storedImageName);
-    if (storedImageDataUrl) setSelectedVirtualBgDataUrl(storedImageDataUrl);
-    
     const highlightParam = searchParams.get('highlight');
     if (highlightParam) {
       setHighlightedSectionId(highlightParam);
@@ -74,61 +61,6 @@ export default function SettingsPage() {
       return () => clearTimeout(timer);
     }
   }, [searchParams]);
-
-  const handleVirtualBgSwitchChange = (checked: boolean) => {
-    setVirtualBackgroundEnabled(checked);
-    if (checked) {
-      localStorage.setItem('teachmeet-virtual-bg-enabled', 'true');
-      if (selectedVirtualBgDataUrl) {
-        localStorage.setItem('teachmeet-virtual-bg-image', selectedVirtualBgDataUrl);
-        localStorage.setItem('teachmeet-virtual-bg-name', selectedVirtualBgName || '');
-        toast({
-          title: "Virtual Background Enabled",
-          description: selectedVirtualBgName ? `${selectedVirtualBgName} will be used.` : "Your selected background will be used.",
-        });
-      } else {
-        toast({
-          title: "Virtual Background Enabled",
-          description: "Please choose an image to use as your background.",
-        });
-      }
-    } else {
-      localStorage.setItem('teachmeet-virtual-bg-enabled', 'false');
-      toast({
-        title: "Virtual Background Disabled",
-      });
-    }
-  };
-
-  const handleVirtualBgFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedVirtualBgName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        setSelectedVirtualBgDataUrl(dataUrl);
-        // If the switch is already enabled, update localStorage immediately
-        if (virtualBackgroundEnabled) {
-          localStorage.setItem('teachmeet-virtual-bg-image', dataUrl);
-          localStorage.setItem('teachmeet-virtual-bg-name', file.name);
-          toast({
-            title: "Virtual Background Updated",
-            description: `${file.name} is now set as your virtual background.`,
-          });
-        } else {
-          toast({
-            title: "Background Image Selected",
-            description: `${file.name} is ready. Enable the switch to use it.`,
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-    if (event.target) {
-      event.target.value = "";
-    }
-  };
 
   return (
     <div className="container mx-auto py-8 space-y-10">
@@ -173,40 +105,7 @@ export default function SettingsPage() {
         className={highlightedSectionId === 'advancedMeetingSettings' ? 'highlight-blink' : ''}
       >
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="virtualBackgroundSwitch" className="flex-grow">Enable Virtual Background</Label>
-            <Switch 
-              id="virtualBackgroundSwitch" 
-              checked={virtualBackgroundEnabled}
-              onCheckedChange={handleVirtualBgSwitchChange}
-            />
-          </div>
-          {virtualBackgroundEnabled && (
-            <div className="mt-4 space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full rounded-lg" 
-                onClick={() => virtualBgInputRef.current?.click()}
-              >
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Choose Background Image
-              </Button>
-              <input 
-                type="file" 
-                accept="image/*" 
-                ref={virtualBgInputRef} 
-                onChange={handleVirtualBgFileChange}
-                className="hidden" 
-              />
-              {selectedVirtualBgName && (
-                <p className="text-sm text-muted-foreground">Selected: {selectedVirtualBgName}</p>
-              )}
-               <p className="text-xs text-muted-foreground pt-2">
-                Note: When your camera is off in the meeting waiting room, this image will be shown instead of your avatar.
-                Actual real-time background replacement during video calls is not yet implemented.
-              </p>
-            </div>
-          )}
+          {/* Virtual Background UI removed */}
           <div className="flex items-center justify-between pt-4">
             <Label htmlFor="cameraFilter" className="flex-grow">Select camera filter</Label>
             <Switch id="cameraFilter" />

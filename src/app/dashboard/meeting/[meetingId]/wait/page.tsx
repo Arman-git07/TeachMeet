@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, Image as ImageIconLucide } from "lucide-react"; // Added ImageIconLucide
+import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle } from "lucide-react"; // Removed ImageIconLucide
 import Link from "next/link";
 import React, { useState, useEffect, useRef, use } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth"; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
 import { useSearchParams } from "next/navigation";
-import Image from "next/image"; // Import next/image
+// Removed next/image as it's not used after virtual background removal
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
@@ -33,21 +33,8 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
-  const [isVirtualBgActive, setIsVirtualBgActive] = useState(false);
-  const [virtualBgImageUrl, setVirtualBgImageUrl] = useState<string | null>(null);
-
+  // Removed virtual background state and effect
   useEffect(() => {
-    // Load virtual background settings from localStorage
-    const enabled = localStorage.getItem('teachmeet-virtual-bg-enabled') === 'true';
-    const imageUrl = localStorage.getItem('teachmeet-virtual-bg-image');
-    if (enabled && imageUrl) {
-      setIsVirtualBgActive(true);
-      setVirtualBgImageUrl(imageUrl);
-    } else {
-      setIsVirtualBgActive(false);
-      setVirtualBgImageUrl(null);
-    }
-
     // Cleanup streams on unmount
     return () => {
       if (currentVideoStreamRef.current) {
@@ -142,6 +129,8 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const userFallback = userName.charAt(0).toUpperCase();
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
+  const joinNowLink = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+
 
   return (
     <div className="container mx-auto py-8 flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -155,21 +144,10 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-            <video ref={videoRef} className="w-full h-full object-cover relative z-10" autoPlay muted playsInline />
+            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
             {(!isCameraActive || hasCameraPermission === false) && (
-              <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4 z-20">
-                {isVirtualBgActive && virtualBgImageUrl ? (
-                  <Image
-                    src={virtualBgImageUrl}
-                    alt="Selected virtual background"
-                    layout="fill"
-                    objectFit="cover"
-                    className="rounded-lg"
-                    data-ai-hint="virtual background preview"
-                  />
-                ) : (
-                  <>
-                    {authLoading ? (
+              <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                 {authLoading ? (
                       <p>Loading user info...</p>
                     ) : (
                       <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
@@ -177,13 +155,11 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
                         <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
                       </Avatar>
                     )}
-                    {hasCameraPermission === false && (
-                      <>
-                        <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
-                        <p className="font-semibold">Camera permission denied</p>
-                        <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
-                      </>
-                    )}
+                {hasCameraPermission === false && (
+                  <>
+                    <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
+                    <p className="font-semibold">Camera permission denied</p>
+                    <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
                   </>
                 )}
               </div>
@@ -233,12 +209,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
           )}
 
           <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox id="virtualBackground" checked={isVirtualBgActive} disabled/>
-              <Label htmlFor="virtualBackground">
-                {isVirtualBgActive ? "Virtual background active (from settings)" : "Enable virtual background in settings"}
-              </Label>
-            </div>
+            {/* Virtual Background Checkbox removed */}
              <div className="flex items-center space-x-2">
               <Checkbox id="cameraFilter" />
               <Label htmlFor="cameraFilter">Apply Camera Filter</Label>
@@ -254,7 +225,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             </Button>
           </Link>
 
-          <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior>
+          <Link href={joinNowLink} passHref legacyBehavior>
             <Button className="w-full btn-gel text-lg py-3 rounded-lg">
               Join Now
             </Button>
