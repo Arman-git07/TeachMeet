@@ -1,7 +1,6 @@
 
 'use client'; // Required for using hooks like useAuth and useRouter
 
-import { AppHeader } from '@/components/common/AppHeader';
 import { AppSidebar } from '@/components/common/AppSidebar';
 import { SidebarInset, useSidebar } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
@@ -72,7 +71,7 @@ export default function DashboardLayout({
       <AppSidebar /> {/* Removed isAuthenticated prop, it will use useAuth internally */}
       <SidebarInset>
         <div className="flex flex-1 flex-col">
-          <AppHeader showLogo />
+          {/* AppHeader has been removed from here */}
           <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
             {children}
           </main>
