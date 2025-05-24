@@ -1,5 +1,5 @@
 
-'use client'; // Required for using hooks like useAuth and useRouter
+'use client'; // Required for using hooks like useAuth, useRouter, and useSidebar
 
 import { AppSidebar } from '@/components/common/AppSidebar';
 import { SidebarInset, useSidebar } from '@/components/ui/sidebar';
@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { PanelLeftOpen } from 'lucide-react'; // Changed from Menu to PanelLeftOpen
+import { PanelLeftOpen } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -17,7 +17,7 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const sidebarContext = useSidebar(); // Get sidebar context if needed for loading UI
+  const { toggleSidebar, state: sidebarState, isMobile: sidebarIsMobile } = useSidebar(); // Get sidebar context
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -25,10 +25,10 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, loading, router]);
 
-  if (loading || (!isAuthenticated && !loading) ) { // Show loading skeleton or a blank screen while checking auth
+  if (loading || (!isAuthenticated && !loading) ) {
     return (
       <div className="flex h-screen bg-background">
-        {!sidebarContext.isMobile && sidebarContext.state === 'expanded' && (
+        {!sidebarIsMobile && sidebarState === 'expanded' && (
           <div className="w-[16rem] border-r bg-sidebar p-4">
             <Skeleton className="h-10 w-32 mb-8 rounded-lg" />
             <Skeleton className="h-8 w-full mb-2 rounded-lg" />
@@ -36,7 +36,7 @@ export default function DashboardLayout({
             <Skeleton className="h-8 w-full mb-2 rounded-lg" />
           </div>
         )}
-         {!sidebarContext.isMobile && sidebarContext.state === 'collapsed' && (
+         {!sidebarIsMobile && sidebarState === 'collapsed' && (
           <div className="w-[3rem] border-r bg-sidebar p-2">
             <Skeleton className="h-8 w-8 mb-8 rounded-full" />
             <Skeleton className="h-6 w-6 mb-3 rounded-full" />
@@ -45,7 +45,6 @@ export default function DashboardLayout({
           </div>
         )}
         <div className="flex flex-1 flex-col">
-          {/* Skeleton for the new minimal header */}
           <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
               <Skeleton className="h-8 w-8 rounded-md" />
@@ -60,18 +59,16 @@ export default function DashboardLayout({
     );
   }
 
-
   return (
     <div className="flex h-screen bg-background">
-      <AppSidebar /> {/* Removed isAuthenticated prop, it will use useAuth internally */}
+      <AppSidebar />
       <SidebarInset>
         <div className="flex flex-1 flex-col">
-          {/* New minimal header for the dashboard content area */}
           <header className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <PanelLeftOpen className="h-6 w-6" /> {/* Changed from Menu to PanelLeftOpen */}
-                <span className="sr-only">Dashboard Menu</span>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={toggleSidebar}>
+                <PanelLeftOpen className="h-6 w-6" />
+                <span className="sr-only">Toggle Dashboard Menu</span>
               </Button>
             </div>
           </header>
