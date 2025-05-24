@@ -1,0 +1,107 @@
+
+'use client';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { FileText, Lock, Globe, FolderOpen, PlusCircle, Search, UploadCloud } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import Link from "next/link";
+
+// Mock data - replace with actual data fetching later
+const mockPrivateDocuments = [
+  { id: "doc_priv_1", name: "Project Proposal Q3.docx", lastModified: "2024-08-15", size: "1.2MB" },
+  { id: "doc_priv_2", name: "Personal Notes.txt", lastModified: "2024-08-10", size: "5KB" },
+  { id: "doc_priv_3", name: "Financial Report Draft.pdf", lastModified: "2024-08-01", size: "3.5MB" },
+];
+
+const mockPublicDocuments = [
+  { id: "doc_pub_1", name: "Company Brochure.pdf", lastModified: "2024-07-20", size: "5.0MB" },
+  { id: "doc_pub_2", name: "Product Roadmap.pptx", lastModified: "2024-07-15", size: "2.1MB" },
+];
+
+const DocumentItem = ({ name, lastModified, size }: { name: string, lastModified: string, size: string }) => (
+  <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
+    <div className="flex items-center gap-3">
+      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+      <div className="flex-grow">
+        <p className="text-sm font-medium text-foreground truncate" title={name}>{name}</p>
+        <p className="text-xs text-muted-foreground">
+          Modified: {new Date(lastModified).toLocaleDateString()} | Size: {size}
+        </p>
+      </div>
+    </div>
+    <Button variant="ghost" size="sm" className="rounded-md">View</Button>
+  </div>
+);
+
+export default function DocumentsPage() {
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">My Documents</h1>
+          <p className="text-muted-foreground">Manage your private and public documents.</p>
+        </div>
+        <div className="flex items-center gap-2">
+            <div className="relative w-full md:w-auto md:max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input 
+                type="search" 
+                placeholder="Search documents..." 
+                className="pl-10 rounded-lg w-full" 
+            />
+            </div>
+             <Button className="btn-gel rounded-lg">
+                <UploadCloud className="mr-2 h-5 w-5" /> Upload
+            </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Private Documents Column */}
+        <Card className="shadow-lg rounded-xl border-border/50">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Lock className="h-6 w-6 text-primary" />
+              <CardTitle className="text-xl">Private Documents</CardTitle>
+            </div>
+            <CardDescription>Only visible to you.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {mockPrivateDocuments.length > 0 ? (
+              mockPrivateDocuments.map(doc => <DocumentItem key={doc.id} {...doc} />)
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <FolderOpen className="mx-auto h-12 w-12 mb-2" />
+                <p>No private documents yet.</p>
+                <p className="text-xs">Upload files to keep them private.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Public Documents Column */}
+        <Card className="shadow-lg rounded-xl border-border/50">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Globe className="h-6 w-6 text-accent" />
+              <CardTitle className="text-xl">Public Documents</CardTitle>
+            </div>
+            <CardDescription>Visible to others you share with.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {mockPublicDocuments.length > 0 ? (
+              mockPublicDocuments.map(doc => <DocumentItem key={doc.id} {...doc} />)
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <FolderOpen className="mx-auto h-12 w-12 mb-2" />
+                <p>No public documents yet.</p>
+                <p className="text-xs">Upload and share files publicly.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
