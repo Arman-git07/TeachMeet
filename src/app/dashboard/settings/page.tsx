@@ -4,7 +4,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -44,16 +43,24 @@ export default function SettingsPage() {
 
   const [virtualBackgroundEnabled, setVirtualBackgroundEnabled] = useState(false);
   const [selectedVirtualBgName, setSelectedVirtualBgName] = useState<string | null>(null);
+  const [selectedVirtualBgDataUrl, setSelectedVirtualBgDataUrl] = useState<string | null>(null);
   const virtualBgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Load initial virtual background state from localStorage
+    const storedEnabled = localStorage.getItem('teachmeet-virtual-bg-enabled') === 'true';
+    setVirtualBackgroundEnabled(storedEnabled);
+    const storedImageName = localStorage.getItem('teachmeet-virtual-bg-name');
+    const storedImageDataUrl = localStorage.getItem('teachmeet-virtual-bg-image');
+    if (storedImageName) setSelectedVirtualBgName(storedImageName);
+    if (storedImageDataUrl) setSelectedVirtualBgDataUrl(storedImageDataUrl);
+    
     const highlightParam = searchParams.get('highlight');
     if (highlightParam) {
       setHighlightedSectionId(highlightParam);
       
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
-        // Add other section refs here if needed
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -68,17 +75,56 @@ export default function SettingsPage() {
     }
   }, [searchParams]);
 
+  const handleVirtualBgSwitchChange = (checked: boolean) => {
+    setVirtualBackgroundEnabled(checked);
+    if (checked) {
+      localStorage.setItem('teachmeet-virtual-bg-enabled', 'true');
+      if (selectedVirtualBgDataUrl) {
+        localStorage.setItem('teachmeet-virtual-bg-image', selectedVirtualBgDataUrl);
+        localStorage.setItem('teachmeet-virtual-bg-name', selectedVirtualBgName || '');
+        toast({
+          title: "Virtual Background Enabled",
+          description: selectedVirtualBgName ? `${selectedVirtualBgName} will be used.` : "Your selected background will be used.",
+        });
+      } else {
+        toast({
+          title: "Virtual Background Enabled",
+          description: "Please choose an image to use as your background.",
+        });
+      }
+    } else {
+      localStorage.setItem('teachmeet-virtual-bg-enabled', 'false');
+      toast({
+        title: "Virtual Background Disabled",
+      });
+    }
+  };
+
   const handleVirtualBgFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedVirtualBgName(file.name);
-      toast({
-        title: "Background Image Selected",
-        description: `${file.name} has been selected. Applying the background requires further implementation.`,
-      });
-      // In a real implementation, you would store or process this file (e.g., upload, save Data URI)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        setSelectedVirtualBgDataUrl(dataUrl);
+        // If the switch is already enabled, update localStorage immediately
+        if (virtualBackgroundEnabled) {
+          localStorage.setItem('teachmeet-virtual-bg-image', dataUrl);
+          localStorage.setItem('teachmeet-virtual-bg-name', file.name);
+          toast({
+            title: "Virtual Background Updated",
+            description: `${file.name} is now set as your virtual background.`,
+          });
+        } else {
+          toast({
+            title: "Background Image Selected",
+            description: `${file.name} is ready. Enable the switch to use it.`,
+          });
+        }
+      };
+      reader.readAsDataURL(file);
     }
-     // Reset file input to allow selecting the same file again
     if (event.target) {
       event.target.value = "";
     }
@@ -132,7 +178,7 @@ export default function SettingsPage() {
             <Switch 
               id="virtualBackgroundSwitch" 
               checked={virtualBackgroundEnabled}
-              onCheckedChange={setVirtualBackgroundEnabled}
+              onCheckedChange={handleVirtualBgSwitchChange}
             />
           </div>
           {virtualBackgroundEnabled && (
@@ -156,8 +202,8 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">Selected: {selectedVirtualBgName}</p>
               )}
                <p className="text-xs text-muted-foreground pt-2">
-                Note: This allows you to select an image. Applying it as a live virtual background
-                requires complex image processing (body segmentation) not yet implemented.
+                Note: When your camera is off in the meeting waiting room, this image will be shown instead of your avatar.
+                Actual real-time background replacement during video calls is not yet implemented.
               </p>
             </div>
           )}

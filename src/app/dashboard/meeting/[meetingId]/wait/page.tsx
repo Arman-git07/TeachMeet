@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, Image as ImageIconLucide } from "lucide-react"; // Added ImageIconLucide
 import Link from "next/link";
 import React, { useState, useEffect, useRef, use } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth"; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
 import { useSearchParams } from "next/navigation";
+import Image from "next/image"; // Import next/image
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
@@ -32,7 +33,22 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
+  const [isVirtualBgActive, setIsVirtualBgActive] = useState(false);
+  const [virtualBgImageUrl, setVirtualBgImageUrl] = useState<string | null>(null);
+
   useEffect(() => {
+    // Load virtual background settings from localStorage
+    const enabled = localStorage.getItem('teachmeet-virtual-bg-enabled') === 'true';
+    const imageUrl = localStorage.getItem('teachmeet-virtual-bg-image');
+    if (enabled && imageUrl) {
+      setIsVirtualBgActive(true);
+      setVirtualBgImageUrl(imageUrl);
+    } else {
+      setIsVirtualBgActive(false);
+      setVirtualBgImageUrl(null);
+    }
+
+    // Cleanup streams on unmount
     return () => {
       if (currentVideoStreamRef.current) {
         currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
@@ -139,27 +155,40 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+            <video ref={videoRef} className="w-full h-full object-cover relative z-10" autoPlay muted playsInline />
             {(!isCameraActive || hasCameraPermission === false) && (
-              <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                {authLoading ? (
-                  <p>Loading user info...</p>
+              <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4 z-20">
+                {isVirtualBgActive && virtualBgImageUrl ? (
+                  <Image
+                    src={virtualBgImageUrl}
+                    alt="Selected virtual background"
+                    layout="fill"
+                    objectFit="cover"
+                    className="rounded-lg"
+                    data-ai-hint="virtual background preview"
+                  />
                 ) : (
-                  <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
-                    <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                    <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
-                  </Avatar>
-                )}
-                {hasCameraPermission === false && (
                   <>
-                    <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
-                    <p className="font-semibold">Camera permission denied</p>
-                    <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
+                    {authLoading ? (
+                      <p>Loading user info...</p>
+                    ) : (
+                      <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
+                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                        <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
+                      </Avatar>
+                    )}
+                    {hasCameraPermission === false && (
+                      <>
+                        <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
+                        <p className="font-semibold">Camera permission denied</p>
+                        <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
+                      </>
+                    )}
                   </>
                 )}
               </div>
             )}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-10">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-30">
               <Button
                 variant={isMicActive ? "secondary" : "destructive"}
                 size="icon"
@@ -205,8 +234,10 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
 
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
-              <Checkbox id="virtualBackground" />
-              <Label htmlFor="virtualBackground">Enable Virtual Background</Label>
+              <Checkbox id="virtualBackground" checked={isVirtualBgActive} disabled/>
+              <Label htmlFor="virtualBackground">
+                {isVirtualBgActive ? "Virtual background active (from settings)" : "Enable virtual background in settings"}
+              </Label>
             </div>
              <div className="flex items-center space-x-2">
               <Checkbox id="cameraFilter" />
