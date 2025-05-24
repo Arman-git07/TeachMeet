@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -155,6 +154,8 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
       "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous" && isCameraActive,
       "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic" && isCameraActive,
       "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour" && isCameraActive,
+      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus" && isCameraActive,
+      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear" && isCameraActive,
     }
   );
 

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef } from "react";
@@ -138,6 +137,8 @@ export default function SettingsPage() {
                 <SelectItem value="goldenhour">Golden Hour</SelectItem>
                 <SelectItem value="grayscale">Grayscale</SelectItem>
                 <SelectItem value="sepia">Sepia</SelectItem>
+                <SelectItem value="softfocus">Soft Focus</SelectItem>
+                <SelectItem value="brightclear">Bright & Clear</SelectItem>
               </SelectContent>
             </Select>
           </div>
