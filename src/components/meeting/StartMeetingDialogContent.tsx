@@ -28,7 +28,7 @@ export function StartMeetingDialogContent() {
     setMeetingId(newMeetingId);
 
     // Ensure meetingLink is a full URL for sharing purposes, adjust domain as needed
-    setMeetingLink(`${window.location.origin}/dashboard/join/${newMeetingId}`);
+    setMeetingLink(`${window.location.origin}/dashboard/join-meeting?code=${newMeetingId}`); // Adjusted to use join-meeting page with code
     
     const codePart1 = randomString(3);
     const codePart2 = randomString(3);
@@ -58,6 +58,10 @@ export function StartMeetingDialogContent() {
     }
     setIsSharePanelOpen(true);
   };
+
+  const joinMeetingHref = meetingId && meetingTitle 
+    ? `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle)}` 
+    : "#";
 
   return (
     <>
@@ -138,8 +142,8 @@ export function StartMeetingDialogContent() {
           </Button>
         </DialogClose>
         <DialogClose asChild>
-           <Link href={meetingId ? `/dashboard/meeting/${meetingId}/wait` : "#"} passHref legacyBehavior>
-             <Button asChild className="btn-gel rounded-md" disabled={!meetingId}>
+           <Link href={joinMeetingHref} passHref legacyBehavior>
+             <Button asChild className="btn-gel rounded-md" disabled={!meetingId || !meetingTitle}>
                 <a>{meetingId ? "Join Meeting Now" : "Generating ID..."}</a>
              </Button>
            </Link>

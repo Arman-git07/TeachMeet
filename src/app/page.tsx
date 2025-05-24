@@ -17,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import { useRouter } from 'next/navigation';
@@ -64,44 +63,42 @@ export default function HomePage() {
     if (animationLock) return;
 
     setAnimationLock(true);
-    setAnimateChars(false); // Ensure char animation is off before "TM"
+    setAnimateChars(false); 
     setLogoText('TM');
 
-    const tmVisibleDuration = 300;
-    const charAnimationTotalDuration = 900; // Rough estimate for TeachMeet reveal
+    const tmVisibleDuration = 300; 
+    const charAnimationTotalDuration = 900; 
 
     setTimeout(() => {
       setLogoText('TeachMeet');
-      setAnimateChars(true); // Trigger character animation for "TeachMeet"
+      setAnimateChars(true); 
     }, tmVisibleDuration);
 
-    // Total duration before lock is released
     setTimeout(() => {
-      setAnimateChars(false); // Reset char animation state
+      setAnimateChars(false); 
       setAnimationLock(false);
-    }, tmVisibleDuration + charAnimationTotalDuration + 100); // Add a small buffer
+    }, tmVisibleDuration + charAnimationTotalDuration + 100); 
   };
 
   const openMeetingDialog = (meeting: OngoingMeeting) => {
     setSelectedMeetingForDialog(meeting);
-    setIsMicMutedInDialog(false); // Reset mic/cam state for new dialog instance
+    setIsMicMutedInDialog(false); 
     setIsCameraOffInDialog(true);
     setIsMeetingDialogVisible(true);
   };
 
   const handleJoinMeetingFromDialog = () => {
     if (selectedMeetingForDialog) {
-      router.push(`/dashboard/meeting/${selectedMeetingForDialog.id}/wait`);
+      const topicQueryParam = selectedMeetingForDialog.title ? `?topic=${encodeURIComponent(selectedMeetingForDialog.title)}` : '';
+      router.push(`/dashboard/meeting/${selectedMeetingForDialog.id}/wait${topicQueryParam}`);
       setIsMeetingDialogVisible(false); 
     }
   };
 
   const handleDismissMeeting = () => {
     if (selectedMeetingForDialog) {
-      // Update state to remove from current view
       setOngoingMeetings(prevMeetings => prevMeetings.filter(m => m.id !== selectedMeetingForDialog!.id));
       
-      // Update localStorage
       const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
       const dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
       if (!dismissedIds.includes(selectedMeetingForDialog.id)) {
@@ -148,11 +145,6 @@ export default function HomePage() {
                     <li key={meeting.id}>
                       <Dialog open={isMeetingDialogVisible && selectedMeetingForDialog?.id === meeting.id} onOpenChange={(isOpen) => {
                         if (!isOpen) {
-                           // Only reset selectedMeetingForDialog if the dialog is truly closing,
-                           // not just if a different trigger is clicked while one is open.
-                           // The main trigger `openMeetingDialog` handles setting the new selected meeting.
-                           // This ensures that if isMeetingDialogVisible becomes false for any reason,
-                           // selectedMeetingForDialog is cleared.
                           setSelectedMeetingForDialog(null); 
                         }
                         setIsMeetingDialogVisible(isOpen);
@@ -173,7 +165,7 @@ export default function HomePage() {
                             )}
                           </Button>
                         </DialogTrigger>
-                        {selectedMeetingForDialog && ( // Ensure dialog content only renders if a meeting is selected
+                        {selectedMeetingForDialog && ( 
                           <DialogContent className="sm:max-w-md rounded-lg">
                             <DialogHeader>
                               <DialogTitle className="text-xl">Rejoin: {selectedMeetingForDialog?.title}</DialogTitle>
@@ -239,13 +231,12 @@ export default function HomePage() {
         .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; }
         .animate-slideUp { animation: slideUp 0.8s ease-out 0.2s forwards; }
 
-        /* Individual character animation for Logo */
         .logo-animated-span {
           display: inline-block;
-          opacity: 0; /* Start hidden */
+          opacity: 0; 
         }
         
-        .char-animation-active .logo-animated-span.char-index-0 { /* T */
+        .char-animation-active .logo-animated-span.char-index-0 { 
           animation: slideInT 0.6s forwards;
           animation-delay: 0s;
         }
@@ -254,44 +245,42 @@ export default function HomePage() {
           to { transform: translateX(0) scaleX(1); opacity: 1; }
         }
 
-        .char-animation-active .logo-animated-span.char-index-5 { /* M */
+        .char-animation-active .logo-animated-span.char-index-5 { 
           animation: slideInM 0.6s forwards;
-          animation-delay: 0.2s; /* Delay M slightly */
+          animation-delay: 0.2s; 
         }
         @keyframes slideInM {
           from { transform: translateX(30px) scaleX(0.8); opacity: 0; }
           to { transform: translateX(0) scaleX(1); opacity: 1; }
         }
 
-        /* Animation for 'each' - e,a,c,h */
         .char-animation-active .logo-animated-span.char-index-1,
         .char-animation-active .logo-animated-span.char-index-2,
         .char-animation-active .logo-animated-span.char-index-3,
         .char-animation-active .logo-animated-span.char-index-4 {
           animation: emergeEach 0.5s forwards;
         }
-        .char-animation-active .logo-animated-span.char-index-1 { animation-delay: 0.1s; } /* e */
-        .char-animation-active .logo-animated-span.char-index-2 { animation-delay: 0.15s; } /* a */
-        .char-animation-active .logo-animated-span.char-index-3 { animation-delay: 0.2s; } /* c */
-        .char-animation-active .logo-animated-span.char-index-4 { animation-delay: 0.25s; } /* h */
+        .char-animation-active .logo-animated-span.char-index-1 { animation-delay: 0.1s; } 
+        .char-animation-active .logo-animated-span.char-index-2 { animation-delay: 0.15s; } 
+        .char-animation-active .logo-animated-span.char-index-3 { animation-delay: 0.2s; } 
+        .char-animation-active .logo-animated-span.char-index-4 { animation-delay: 0.25s; } 
 
         @keyframes emergeEach {
-          from { transform: translate(20px, 5px) scale(0.5); opacity: 0; } /* Emerge from right-ish */
+          from { transform: translate(20px, 5px) scale(0.5); opacity: 0; } 
           to { transform: translate(0, 0) scale(1); opacity: 1; }
         }
 
-        /* Animation for 'eet' - e,e,t */
         .char-animation-active .logo-animated-span.char-index-6,
         .char-animation-active .logo-animated-span.char-index-7,
         .char-animation-active .logo-animated-span.char-index-8 {
           animation: emergeEet 0.5s forwards;
         }
-        .char-animation-active .logo-animated-span.char-index-6 { animation-delay: 0.3s; } /* e */
-        .char-animation-active .logo-animated-span.char-index-7 { animation-delay: 0.35s; } /* e */
-        .char-animation-active .logo-animated-span.char-index-8 { animation-delay: 0.4s; } /* t */
+        .char-animation-active .logo-animated-span.char-index-6 { animation-delay: 0.3s; } 
+        .char-animation-active .logo-animated-span.char-index-7 { animation-delay: 0.35s; } 
+        .char-animation-active .logo-animated-span.char-index-8 { animation-delay: 0.4s; } 
 
         @keyframes emergeEet {
-          from { transform: translate(-20px, 5px) scale(0.5); opacity: 0; } /* Emerge from left-ish */
+          from { transform: translate(-20px, 5px) scale(0.5); opacity: 0; } 
           to { transform: translate(0, 0) scale(1); opacity: 1; }
         }
 

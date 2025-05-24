@@ -10,13 +10,17 @@ import Link from "next/link";
 import React, { useState, useEffect, useRef, use } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAuth } from "@/hooks/useAuth"; // Import useAuth
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; // Import Avatar components
+import { useAuth } from "@/hooks/useAuth"; 
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
+import { useSearchParams } from "next/navigation";
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
   const { meetingId } = resolvedParams;
-  const { user, loading: authLoading } = useAuth(); // Get user from useAuth
+  const searchParams = useSearchParams();
+  const topic = searchParams.get("topic");
+
+  const { user, loading: authLoading } = useAuth(); 
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
@@ -28,7 +32,6 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
-  // Cleanup streams on component unmount
   useEffect(() => {
     return () => {
       if (currentVideoStreamRef.current) {
@@ -42,7 +45,6 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
 
   const handleToggleCamera = async () => {
     if (isCameraActive) {
-      // Turn camera off
       if (currentVideoStreamRef.current) {
         currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
         currentVideoStreamRef.current = null;
@@ -52,8 +54,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
       }
       setIsCameraActive(false);
     } else {
-      // Try to turn camera on
-      if (hasCameraPermission === false) { // Permission previously denied
+      if (hasCameraPermission === false) { 
         toast({
           variant: "destructive",
           title: "Camera Access Denied",
@@ -84,15 +85,13 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
 
   const handleToggleMic = async () => {
     if (isMicActive) {
-      // Turn mic off
       if (currentMicStreamRef.current) {
         currentMicStreamRef.current.getTracks().forEach(track => track.stop());
         currentMicStreamRef.current = null;
       }
       setIsMicActive(false);
     } else {
-      // Try to turn mic on
-      if (hasMicPermission === false) { // Permission previously denied
+      if (hasMicPermission === false) { 
         toast({
           variant: "destructive",
           title: "Microphone Access Denied",
@@ -126,12 +125,16 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
   const userFallback = userName.charAt(0).toUpperCase();
 
+  const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
+
   return (
     <div className="container mx-auto py-8 flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-2xl shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <UserIcon className="mx-auto h-12 w-12 text-primary mb-3" />
-          <CardTitle className="text-2xl">Joining Meeting: {meetingId}</CardTitle>
+          <CardTitle className="text-2xl">
+            Joining: {displayTitle}
+          </CardTitle>
           <CardDescription>Configure your audio and video before entering.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -211,7 +214,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             </div>
           </div>
 
-          <Link href="/dashboard/settings?highlight=advancedMeeting" passHref legacyBehavior>
+          <Link href="/dashboard/settings?highlight=advancedMeetingSettings" passHref legacyBehavior>
             <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
               <a>
                 <Settings2 className="h-5 w-5" />
