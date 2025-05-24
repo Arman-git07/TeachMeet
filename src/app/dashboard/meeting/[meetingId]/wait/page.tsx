@@ -147,8 +147,10 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
     {
       "video-filter-grayscale": appliedFilter === "grayscale" && isCameraActive,
       "video-filter-sepia": appliedFilter === "sepia" && isCameraActive,
-      "video-filter-invert": appliedFilter === "invert" && isCameraActive,
       "video-filter-vintage": appliedFilter === "vintage" && isCameraActive,
+      "video-filter-luminous": appliedFilter === "luminous" && isCameraActive,
+      "video-filter-dramatic": appliedFilter === "dramatic" && isCameraActive,
+      "video-filter-goldenhour": appliedFilter === "goldenhour" && isCameraActive,
     }
   );
 

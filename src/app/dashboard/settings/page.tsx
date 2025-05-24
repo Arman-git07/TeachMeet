@@ -132,10 +132,12 @@ export default function SettingsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No Filter</SelectItem>
+                <SelectItem value="vintage">Vintage</SelectItem>
+                <SelectItem value="luminous">Luminous</SelectItem>
+                <SelectItem value="dramatic">Dramatic</SelectItem>
+                <SelectItem value="goldenhour">Golden Hour</SelectItem>
                 <SelectItem value="grayscale">Grayscale</SelectItem>
                 <SelectItem value="sepia">Sepia</SelectItem>
-                <SelectItem value="invert">Invert</SelectItem>
-                <SelectItem value="vintage">Vintage</SelectItem>
               </SelectContent>
             </Select>
           </div>
