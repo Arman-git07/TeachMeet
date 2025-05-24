@@ -3,7 +3,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle } from "lucide-react";
 import Link from "next/link";
@@ -15,6 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useSearchParams } from "next/navigation";
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch"; // Import Switch
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
@@ -28,7 +28,9 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const [isMicActive, setIsMicActive] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
+  
   const [appliedFilter, setAppliedFilter] = useState<string>("none");
+  const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false); // New state for the switch
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoStreamRef = useRef<MediaStream | null>(null);
@@ -39,6 +41,9 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
     const storedFilter = localStorage.getItem("teachmeet-camera-filter");
     if (storedFilter) {
       setAppliedFilter(storedFilter);
+      if (storedFilter !== "none") {
+        setIsFilterToggleOn(true); // Default to ON if a filter is set
+      }
     }
   }, []);
 
@@ -137,22 +142,23 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const userFallback = userName.charAt(0).toUpperCase();
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
-  const joinNowLink = topic 
+  const joinNowLinkPath = topic 
     ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
     : `/dashboard/meeting/${meetingId}`;
-
 
   const videoClassNames = cn(
     "w-full h-full object-cover",
     {
-      "video-filter-grayscale": appliedFilter === "grayscale" && isCameraActive,
-      "video-filter-sepia": appliedFilter === "sepia" && isCameraActive,
-      "video-filter-vintage": appliedFilter === "vintage" && isCameraActive,
-      "video-filter-luminous": appliedFilter === "luminous" && isCameraActive,
-      "video-filter-dramatic": appliedFilter === "dramatic" && isCameraActive,
-      "video-filter-goldenhour": appliedFilter === "goldenhour" && isCameraActive,
+      "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale" && isCameraActive,
+      "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia" && isCameraActive,
+      "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage" && isCameraActive,
+      "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous" && isCameraActive,
+      "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic" && isCameraActive,
+      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour" && isCameraActive,
     }
   );
+
+  const filterDisplayName = appliedFilter === "none" ? "No filter" : appliedFilter.charAt(0).toUpperCase() + appliedFilter.slice(1);
 
   return (
     <div className="container mx-auto py-8 flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -230,14 +236,19 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             </Alert>
           )}
 
-          <div className="space-y-2">
-             <div className="flex items-center space-x-2">
-              <Checkbox id="cameraFilterInfo" checked={appliedFilter !== "none"} disabled/>
-              <Label htmlFor="cameraFilterInfo">
-                {appliedFilter !== "none" 
-                  ? `Camera filter active: ${appliedFilter.charAt(0).toUpperCase() + appliedFilter.slice(1)} (from settings)`
-                  : "No camera filter active (set in settings)"}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+              <Label htmlFor="filter-toggle" className="text-sm text-muted-foreground">
+                Apply Filter: <span className="font-medium text-foreground">{filterDisplayName}</span>
+                {appliedFilter !== "none" && <span className="text-xs"> (from settings)</span>}
               </Label>
+              <Switch
+                id="filter-toggle"
+                checked={isFilterToggleOn}
+                onCheckedChange={setIsFilterToggleOn}
+                disabled={appliedFilter === "none"}
+                aria-label="Toggle camera filter"
+              />
             </div>
           </div>
 
@@ -250,7 +261,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             </Button>
           </Link>
 
-          <Link href={joinNowLink} passHref legacyBehavior>
+          <Link href={joinNowLinkPath} passHref legacyBehavior>
             <Button className="w-full btn-gel text-lg py-3 rounded-lg">
               Join Now
             </Button>
