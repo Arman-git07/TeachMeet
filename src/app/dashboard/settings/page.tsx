@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef } from "react";
@@ -94,8 +95,8 @@ export default function SettingsPage() {
             <Input id="displayName" defaultValue="Current User Name" className="mt-1 rounded-lg" />
           </div>
           <div>
-            <Label htmlFor="email">Email Address</Label>
-            <Input id="email" type="email" defaultValue="user@example.com" disabled className="mt-1 rounded-lg bg-muted/50" />
+            {/* <Label htmlFor="email">Email Address</Label> */}
+            <Input id="email" type="email" defaultValue="user@example.com" disabled className="mt-1 rounded-lg bg-muted/50" placeholder="Email Address" aria-label="Email Address"/>
           </div>
           <div>
             <Label htmlFor="language">Language</Label>
