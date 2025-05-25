@@ -95,13 +95,11 @@ export default function SettingsPage() {
             <Input id="displayName" defaultValue="Current User Name" className="mt-1 rounded-lg" />
           </div>
           <div>
-            {/* <Label htmlFor="email">Email Address</Label> */}
             <Input id="email" type="email" defaultValue="user@example.com" disabled className="mt-1 rounded-lg bg-muted/50" placeholder="Email Address" aria-label="Email Address"/>
           </div>
           <div>
-            <Label htmlFor="language">Language</Label>
             <Select defaultValue="en">
-              <SelectTrigger className="w-full mt-1 rounded-lg">
+              <SelectTrigger className="w-full mt-1 rounded-lg" aria-label="Language">
                 <SelectValue placeholder="Select language" />
               </SelectTrigger>
               <SelectContent>
