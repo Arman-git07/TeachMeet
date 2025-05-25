@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -201,4 +202,13 @@ html, body, #__next {
 }
 .video-filter-brightclear {
   filter: brightness(1.1) saturate(1.1);
+}
+.video-filter-naturalglow {
+  filter: brightness(1.05) saturate(1.1) contrast(1.05);
+}
+.video-filter-radiantskin {
+  filter: brightness(1.1) saturate(1.15) contrast(1.1);
+}
+.video-filter-smoothbright {
+  filter: brightness(1.12) contrast(1.08) saturate(1.05);
 }

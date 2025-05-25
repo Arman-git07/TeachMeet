@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -156,10 +157,13 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
       "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour" && isCameraActive,
       "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus" && isCameraActive,
       "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear" && isCameraActive,
+      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow" && isCameraActive,
+      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin" && isCameraActive,
+      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright" && isCameraActive,
     }
   );
 
-  const filterDisplayName = appliedFilter === "none" ? "No filter" : appliedFilter.charAt(0).toUpperCase() + appliedFilter.slice(1);
+  const filterDisplayName = appliedFilter === "none" ? "No filter" : appliedFilter.charAt(0).toUpperCase() + appliedFilter.slice(1).replace(/([A-Z])/g, ' $1');;
 
   return (
     <div className="container mx-auto py-8 flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">

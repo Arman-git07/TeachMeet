@@ -55,7 +55,7 @@ export default function SettingsPage() {
     localStorage.setItem("teachmeet-camera-filter", value);
     toast({
       title: "Filter Selected",
-      description: `${value === "none" ? "No filter" : value.charAt(0).toUpperCase() + value.slice(1)} filter has been applied.`,
+      description: `${value === "none" ? "No filter" : value.charAt(0).toUpperCase() + value.slice(1).replace(/([A-Z])/g, ' $1')} filter has been applied.`,
     });
   };
   
@@ -138,6 +138,9 @@ export default function SettingsPage() {
                 <SelectItem value="sepia">Sepia</SelectItem>
                 <SelectItem value="softfocus">Soft Focus</SelectItem>
                 <SelectItem value="brightclear">Bright & Clear</SelectItem>
+                <SelectItem value="naturalglow">Natural Glow</SelectItem>
+                <SelectItem value="radiantskin">Radiant Skin</SelectItem>
+                <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -181,7 +184,7 @@ export default function SettingsPage() {
         <Button className="mt-6 btn-gel rounded-lg">Save Whiteboard Settings</Button>
       </SettingsSection>
       
-      <SettingsSection title="Privacy & Security" description="Manage your account security and data." icon={ShieldCheck}>
+      <SettingsSection title="Privacy &amp; Security" description="Manage your account security and data." icon={ShieldCheck}>
         <div className="space-y-4">
            <div>
             <Button variant="outline" className="w-full rounded-lg">Change Password</Button>
@@ -196,7 +199,7 @@ export default function SettingsPage() {
         </div>
       </SettingsSection>
 
-       <SettingsSection title="Data & Usage" description="Understand and manage your app data." icon={BarChart3}>
+       <SettingsSection title="Data &amp; Usage" description="Understand and manage your app data." icon={BarChart3}>
         <div className="space-y-4">
            <div>
             <Button variant="outline" className="w-full rounded-lg">Export My Data</Button>
