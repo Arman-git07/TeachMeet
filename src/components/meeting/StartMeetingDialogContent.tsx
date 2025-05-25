@@ -100,10 +100,10 @@ export function StartMeetingDialogContent() {
                 type="text"
                 readOnly
                 value={meetingLink || "Generating..."}
-                className="pl-10"
+                className="pl-10 rounded-lg"
                 />
             </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink}>
+            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink} className="rounded-md">
               <Copy className="h-5 w-5" />
             </Button>
           </div>
@@ -121,10 +121,10 @@ export function StartMeetingDialogContent() {
                 type="text"
                 readOnly
                 value={meetingCode || "Generating..."}
-                className="pl-10"
+                className="pl-10 rounded-lg"
               />
             </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode}>
+            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode} className="rounded-md">
               <Copy className="h-5 w-5" />
             </Button>
           </div>
