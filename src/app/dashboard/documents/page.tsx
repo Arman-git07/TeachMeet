@@ -67,7 +67,7 @@ export default function DocumentsPage() {
             </div>
             <CardDescription>Only visible to you.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="flex flex-col space-y-2">
             {mockPrivateDocuments.length > 0 ? (
               mockPrivateDocuments.map(doc => <DocumentItem key={doc.id} {...doc} />)
             ) : (
@@ -89,7 +89,7 @@ export default function DocumentsPage() {
             </div>
             <CardDescription>Visible to others you share with.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="flex flex-col space-y-2">
             {mockPublicDocuments.length > 0 ? (
               mockPublicDocuments.map(doc => <DocumentItem key={doc.id} {...doc} />)
             ) : (
