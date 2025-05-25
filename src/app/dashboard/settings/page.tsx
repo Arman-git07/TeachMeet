@@ -94,21 +94,6 @@ export default function SettingsPage() {
             <Label htmlFor="displayName">Display Name</Label>
             <Input id="displayName" defaultValue="Current User Name" className="mt-1 rounded-lg" />
           </div>
-          <div>
-            <Input id="email" type="email" defaultValue="user@example.com" disabled className="mt-1 rounded-lg bg-muted/50" placeholder="Email Address" aria-label="Email Address"/>
-          </div>
-          <div>
-            <Select defaultValue="en">
-              <SelectTrigger className="w-full mt-1 rounded-lg" aria-label="Language">
-                <SelectValue placeholder="Select language" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="es">Español</SelectItem>
-                <SelectItem value="fr">Français</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
         <Button className="mt-6 btn-gel rounded-lg">Save General Settings</Button>
       </SettingsSection>
