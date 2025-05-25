@@ -42,8 +42,8 @@ interface DocumentSectionProps {
   icon: React.ElementType;
   iconColor: string;
   onHeaderClick: () => void;
-  isFocusedView: boolean; // True if this section is the single, focused view
-  isInSplitView: boolean; // True if the parent view shows both private and public
+  isFocusedView: boolean; 
+  isInSplitView: boolean; 
 }
 
 const DocumentSection = ({ title, description, documents, icon: Icon, iconColor, onHeaderClick, isFocusedView, isInSplitView }: DocumentSectionProps) => (
@@ -76,8 +76,17 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor,
 export default function DocumentsPage() {
   const [activeView, setActiveView] = useState<'both' | 'private' | 'public'>('both');
 
+  const handlePublicHeaderClick = () => {
+    if (activeView === 'public') { // If public is focused
+      setActiveView('both');      // Unfocus it
+    } else if (activeView === 'private') { // If private is focused
+      setActiveView('both');             // Switch to both (showing public beside private)
+    }
+    // If activeView is 'both', do nothing, keeping it side-by-side.
+  };
+
   return (
-    <div className="space-y-8 flex flex-col h-full"> {/* Page container takes full height and is a flex column */}
+    <div className="space-y-8 flex flex-col h-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">My Documents</h1>
@@ -99,8 +108,8 @@ export default function DocumentsPage() {
       </div>
 
       <div className={cn(
-        "mt-8 flex-1", // This div will grow to fill available vertical space
-        activeView === 'both' ? "grid grid-cols-1 md:grid-cols-2 gap-8" : "w-full flex" // Use flex for single view so child h-full works
+        "mt-8 flex-1", 
+        activeView === 'both' ? "grid grid-cols-1 md:grid-cols-2 gap-8" : "w-full flex" 
       )}>
         {(activeView === 'both' || activeView === 'private') && (
           <DocumentSection
@@ -121,7 +130,7 @@ export default function DocumentsPage() {
             documents={mockPublicDocuments}
             icon={Globe}
             iconColor="text-accent"
-            onHeaderClick={() => setActiveView(activeView === 'public' ? 'both' : 'public')}
+            onHeaderClick={handlePublicHeaderClick}
             isFocusedView={activeView === 'public'}
             isInSplitView={activeView === 'both'}
           />
@@ -130,5 +139,3 @@ export default function DocumentsPage() {
     </div>
   );
 }
-
-    
