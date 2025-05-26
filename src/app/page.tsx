@@ -2,9 +2,6 @@
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
-import { AppHeader } from '@/components/common/AppHeader';
-import { AppSidebar } from '@/components/common/AppSidebar';
-import { SidebarInset } from '@/components/ui/sidebar';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -17,6 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useRouter } from 'next/navigation';
 
@@ -40,6 +38,12 @@ export default function HomePage() {
   const [selectedMeetingForDialog, setSelectedMeetingForDialog] = useState<OngoingMeeting | null>(null);
   const [isMicMutedInDialog, setIsMicMutedInDialog] = useState(false);
   const [isCameraOffInDialog, setIsCameraOffInDialog] = useState(true); // Default camera to off in dialog
+  
+  // State for logo animation
+  const [logoTextContent, setLogoTextContent] = useState('TeachMeet');
+  const [animationLock, setAnimationLock] = useState(false);
+  const [animateChars, setAnimateChars] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -84,124 +88,132 @@ export default function HomePage() {
     }
   };
 
+  const tmVisibleDuration = 350; // Duration "TM" is visible in ms
+  const characterAnimationTotalDuration = 1000; // Max duration for all characters to animate in
+
+  const handleComplexLogoAnimation = () => {
+    if (animationLock) return;
+
+    setAnimationLock(true);
+    setAnimateChars(false); // Ensure char animation class is removed
+    setLogoTextContent('TM');
+
+    setTimeout(() => {
+      setLogoTextContent('TeachMeet');
+      setAnimateChars(true); // Trigger character animation
+      setTimeout(() => {
+        setAnimateChars(false); // Reset for next click, if needed after anim
+        setAnimationLock(false);
+      }, characterAnimationTotalDuration); // Wait for character animation to complete
+    }, tmVisibleDuration);
+  };
+
+
   return (
     <div className="flex flex-col min-h-screen">
-      <AppSidebar />
-      <SidebarInset>
-        <AppHeader showLogo={false} />
-        <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
-          <div
-            className="absolute inset-0 opacity-10"
-            style={{
-              backgroundImage: "radial-gradient(hsl(var(--primary)) 1px, transparent 1px), radial-gradient(hsl(var(--accent)) 1px, transparent 1px)",
-              backgroundSize: "30px 30px, 30px 30px",
-              backgroundPosition: "0 0, 15px 15px",
-              maskImage: "radial-gradient(circle at center, white, transparent 70%)"
-            }}
+      {/* AppSidebar is rendered by the layout, not directly here if using DashboardLayout pattern */}
+      {/* SidebarInset is also part of layout patterns */}
+      {/* AppHeader is rendered by the layout, not directly here if using DashboardLayout pattern */}
+      <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: "radial-gradient(hsl(var(--primary)) 1px, transparent 1px), radial-gradient(hsl(var(--accent)) 1px, transparent 1px)",
+            backgroundSize: "30px 30px, 30px 30px",
+            backgroundPosition: "0 0, 15px 15px",
+            maskImage: "radial-gradient(circle at center, white, transparent 70%)"
+          }}
+        />
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <Logo
+            text={logoTextContent}
+            size="large"
+            className="mb-8 text-center cursor-pointer"
+            onClick={handleComplexLogoAnimation}
+            animateChars={animateChars && logoTextContent === 'TeachMeet'}
           />
-          <div className="relative z-10 flex flex-col items-center text-center">
-            <Logo
-              text="TeachMeet" // Default text, no animation props
-              size="large"
-              className="mb-8 animate-fadeIn text-center" // Removed cursor-pointer and animation-active class
-            />
-            <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
-              <h2 className="text-2xl font-semibold text-primary mb-4">Latest Activity</h2>
-              {ongoingMeetings.length > 0 ? (
-                <ul className="space-y-3 text-left">
-                  {ongoingMeetings.map((meeting) => (
-                    <li key={meeting.id}>
-                      <Dialog open={isMeetingDialogVisible && selectedMeetingForDialog?.id === meeting.id} onOpenChange={(isOpen) => {
-                        if (!isOpen) {
-                          setSelectedMeetingForDialog(null); 
-                        }
-                        setIsMeetingDialogVisible(isOpen);
-                      }}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-base py-3 px-4 rounded-lg hover:bg-primary/10 hover:border-primary"
-                            onClick={() => openMeetingDialog(meeting)}
-                          >
-                            <Video className="mr-3 h-5 w-5 text-primary/80" />
-                            <span className="truncate flex-grow text-foreground">{meeting.title}</span>
-                            {meeting.participants && (
-                              <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
-                                <UsersIcon className="h-3 w-3 mr-1"/>
-                                {meeting.participants}
-                              </span>
-                            )}
-                          </Button>
-                        </DialogTrigger>
-                        {selectedMeetingForDialog && ( 
-                          <DialogContent className="sm:max-w-md rounded-lg">
-                            <DialogHeader>
-                              <DialogTitle className="text-xl">Rejoin: {selectedMeetingForDialog?.title}</DialogTitle>
-                              <DialogDescription>
-                                Configure your audio/video before rejoining.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="py-4 space-y-4">
-                              <div className="flex justify-around">
-                                <Button
-                                  variant={isCameraOffInDialog ? "destructive" : "secondary"}
-                                  size="lg"
-                                  className="rounded-full p-3 btn-gel flex flex-col h-auto items-center gap-1"
-                                  onClick={() => setIsCameraOffInDialog(!isCameraOffInDialog)}
-                                  aria-label={isCameraOffInDialog ? "Turn Camera On" : "Turn Camera Off"}
-                                >
-                                  {isCameraOffInDialog ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
-                                  <span className="text-xs mt-1">{isCameraOffInDialog ? "Cam Off" : "Cam On"}</span>
-                                </Button>
-                                <Button
-                                  variant={isMicMutedInDialog ? "destructive" : "secondary"}
-                                  size="lg"
-                                  className="rounded-full p-3 btn-gel flex flex-col h-auto items-center gap-1"
-                                  onClick={() => setIsMicMutedInDialog(!isMicMutedInDialog)}
-                                  aria-label={isMicMutedInDialog ? "Unmute Mic" : "Mute Mic"}
-                                >
-                                  {isMicMutedInDialog ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-                                  <span className="text-xs mt-1">{isMicMutedInDialog ? "Mic Off" : "Mic On"}</span>
-                                </Button>
-                              </div>
+          <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
+            <h2 className="text-2xl font-semibold text-primary mb-4">Latest Activity</h2>
+            {ongoingMeetings.length > 0 ? (
+              <ul className="space-y-3 text-left">
+                {ongoingMeetings.map((meeting) => (
+                  <li key={meeting.id}>
+                    <Dialog open={isMeetingDialogVisible && selectedMeetingForDialog?.id === meeting.id} onOpenChange={(isOpen) => {
+                      if (!isOpen) {
+                        setSelectedMeetingForDialog(null); 
+                      }
+                      setIsMeetingDialogVisible(isOpen);
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-base py-3 px-4 rounded-lg hover:bg-primary/10 hover:border-primary"
+                          onClick={() => openMeetingDialog(meeting)}
+                        >
+                          <Video className="mr-3 h-5 w-5 text-primary/80" />
+                          <span className="truncate flex-grow text-foreground">{meeting.title}</span>
+                          {meeting.participants && (
+                            <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
+                              <UsersIcon className="h-3 w-3 mr-1"/>
+                              {meeting.participants}
+                            </span>
+                          )}
+                        </Button>
+                      </DialogTrigger>
+                      {selectedMeetingForDialog && ( 
+                        <DialogContent className="sm:max-w-md rounded-lg">
+                          <DialogHeader>
+                            <DialogTitle className="text-xl">Rejoin: {selectedMeetingForDialog?.title}</DialogTitle>
+                            <DialogDescription>
+                              Configure your audio/video before rejoining.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="py-4 space-y-4">
+                            <div className="flex justify-around">
+                              <Button
+                                variant={isCameraOffInDialog ? "destructive" : "secondary"}
+                                size="lg"
+                                className="rounded-full p-3 btn-gel flex flex-col h-auto items-center gap-1"
+                                onClick={() => setIsCameraOffInDialog(!isCameraOffInDialog)}
+                                aria-label={isCameraOffInDialog ? "Turn Camera On" : "Turn Camera Off"}
+                              >
+                                {isCameraOffInDialog ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+                                <span className="text-xs mt-1">{isCameraOffInDialog ? "Cam Off" : "Cam On"}</span>
+                              </Button>
+                              <Button
+                                variant={isMicMutedInDialog ? "destructive" : "secondary"}
+                                size="lg"
+                                className="rounded-full p-3 btn-gel flex flex-col h-auto items-center gap-1"
+                                onClick={() => setIsMicMutedInDialog(!isMicMutedInDialog)}
+                                aria-label={isMicMutedInDialog ? "Unmute Mic" : "Mute Mic"}
+                              >
+                                {isMicMutedInDialog ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                                <span className="text-xs mt-1">{isMicMutedInDialog ? "Mic Off" : "Mic On"}</span>
+                              </Button>
                             </div>
-                            <DialogFooter className="gap-2 sm:gap-0">
-                              <Button type="button" variant="outline" className="rounded-md" onClick={handleDismissMeeting}>
-                                  <X className="mr-2 h-4 w-4" /> Dismiss
-                              </Button>
-                              <Button type="button" onClick={handleJoinMeetingFromDialog} className="btn-gel rounded-md">
-                                <LogIn className="mr-2 h-4 w-4" /> Join Meeting
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        )}
-                      </Dialog>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted-foreground text-center">No ongoing meetings. Start one now!</p>
-              )}
-            </div>
+                          </div>
+                          <DialogFooter className="gap-2 sm:gap-0">
+                            <Button type="button" variant="outline" className="rounded-md" onClick={handleDismissMeeting}>
+                                <X className="mr-2 h-4 w-4" /> Dismiss
+                            </Button>
+                            <Button type="button" onClick={handleJoinMeetingFromDialog} className="btn-gel rounded-md">
+                              <LogIn className="mr-2 h-4 w-4" /> Join Meeting
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      )}
+                    </Dialog>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground text-center">No ongoing meetings. Start one now!</p>
+            )}
           </div>
-        </main>
-        <SlideUpPanel />
-      </SidebarInset>
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn { animation: fadeIn 0.8s ease-out forwards; }
-        .animate-slideUp { animation: slideUp 0.8s ease-out 0.2s forwards; }
-
-        /* Removed complex character-specific logo animations */
-
-      `}</style>
+        </div>
+      </main>
+      <SlideUpPanel />
+      {/* Removed <style jsx global> block that defined fadeIn animation */}
     </div>
   );
 }
