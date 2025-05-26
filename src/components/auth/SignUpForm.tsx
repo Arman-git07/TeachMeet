@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // Added updateProfile
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
+import { Checkbox } from '../ui/checkbox';
 
 const formSchema = z.object({
   profileName: z.string().min(1, { message: 'Profile name is required.' }),
@@ -32,6 +33,9 @@ const formSchema = z.object({
     .regex(/[^a-zA-Z0-9]/, { message: 'Password must contain at least one special character.' }),
   confirmPassword: z.string(),
   dateOfBirth: z.string().optional(), // Optional for now, browser's date input handles format
+  agreeToTerms: z.boolean().refine(val => val === true, {
+    message: "You must agree to the Terms of Service and Privacy Policy.",
+  }),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match.",
   path: ['confirmPassword'],
@@ -49,6 +53,7 @@ export function SignUpForm() {
       password: '',
       confirmPassword: '',
       dateOfBirth: '',
+      agreeToTerms: false,
     },
   });
 
@@ -177,7 +182,38 @@ export function SignUpForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg mt-6" disabled={isLoading}> {/* Added mt-6 for spacing */}
+
+        <FormField
+          control={form.control}
+          name="agreeToTerms"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-background/50">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  disabled={isLoading}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel className="text-sm text-muted-foreground">
+                  I agree to the TeachMeet{' '}
+                  <Link href="/terms-of-service" target="_blank" className="text-accent hover:underline">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy-policy" target="_blank" className="text-accent hover:underline">
+                    Privacy Policy
+                  </Link>
+                  .
+                </FormLabel>
+                <FormMessage />
+              </div>
+            </FormItem>
+          )}
+        />
+
+        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg mt-6" disabled={isLoading}>
           {isLoading ? 'Creating Account...' : 'Create Account'}
         </Button>
         <div className="text-center text-sm text-muted-foreground">

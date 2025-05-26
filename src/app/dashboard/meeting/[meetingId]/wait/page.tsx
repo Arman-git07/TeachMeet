@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef, use } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,7 @@ import { useSearchParams } from "next/navigation";
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch"; // Import Switch
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
@@ -30,7 +31,9 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   
   const [appliedFilter, setAppliedFilter] = useState<string>("none");
-  const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false); // New state for the switch
+  const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false); 
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoStreamRef = useRef<MediaStream | null>(null);
@@ -42,13 +45,12 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
     if (storedFilter) {
       setAppliedFilter(storedFilter);
       if (storedFilter !== "none") {
-        setIsFilterToggleOn(true); // Default to ON if a filter is set
+        setIsFilterToggleOn(true); 
       }
     }
   }, []);
 
   useEffect(() => {
-    // Cleanup streams on unmount
     return () => {
       if (currentVideoStreamRef.current) {
         currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
@@ -265,14 +267,38 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
               </a>
             </Button>
           </Link>
+          
+          <div className="flex items-center space-x-2 p-3 border rounded-lg shadow-sm">
+            <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
+            <Label htmlFor="terms" className="text-xs text-muted-foreground">
+              I agree to the{' '}
+              <Link href="/terms-of-service" target="_blank" className="text-accent hover:underline">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/community-guidelines" target="_blank" className="text-accent hover:underline">
+                Community Guidelines
+              </Link>
+              .
+            </Label>
+          </div>
+
 
           <Link href={joinNowLinkPath} passHref legacyBehavior>
-            <Button className="w-full btn-gel text-lg py-3 rounded-lg">
-              Join Now
+            <Button asChild className="w-full btn-gel text-lg py-3 rounded-lg" disabled={!agreedToTerms}>
+              <a>Join Now</a>
             </Button>
           </Link>
+          {!agreedToTerms && (
+            <p className="text-xs text-destructive text-center">
+              You must agree to the terms and guidelines to join the meeting.
+            </p>
+          )}
           <p className="text-xs text-muted-foreground text-center">
-            By joining, you agree to TeachMeet&apos;s Terms of Service and Privacy Policy.
+            By joining, you acknowledge our{' '}
+             <Link href="/privacy-policy" target="_blank" className="text-accent hover:underline">
+                Privacy Policy
+              </Link>.
           </p>
         </CardContent>
       </Card>

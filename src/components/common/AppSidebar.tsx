@@ -14,6 +14,9 @@ import {
   FileText,
   Lock,
   Globe,
+  BookOpen, // For Terms of Service
+  ShieldQuestion, // For Privacy Policy
+  Users, // For Community Guidelines
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -44,6 +47,7 @@ type NavItemProps = {
   asDialogTrigger?: boolean;
   isDropdown?: boolean;
   dropdownItems?: { href: string; label: string; icon: React.ElementType }[];
+  target?: string; // for opening in new tab
 };
 
 const NavItem = ({
@@ -56,6 +60,7 @@ const NavItem = ({
   asDialogTrigger = false,
   isDropdown = false,
   dropdownItems = [],
+  target,
 }: NavItemProps) => {
   const isActive = href ? currentPath.startsWith(href) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
@@ -65,7 +70,6 @@ const NavItem = ({
     if (onClickProp && !asDialogTrigger && !isDropdown) {
       onClickProp();
     }
-    // Close sidebar on mobile if it's a link, a dialog trigger, or a dropdown trigger
     if (isMobile && (href || asDialogTrigger || isDropdown)) {
       setOpenMobile(false);
     }
@@ -113,7 +117,7 @@ const NavItem = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
-              onClick={handleClick} // Handles closing mobile sidebar
+              onClick={handleClick} 
               className={buttonClassName}
               isActive={isActive}
             >
@@ -131,7 +135,7 @@ const NavItem = ({
                       "cursor-pointer p-3 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md",
                       isSubItemActive && "bg-sidebar-primary text-sidebar-primary-foreground"
                     )}
-                    onSelect={() => { if (isMobile) setOpenMobile(false); }} // Close mobile sidebar on sub-item click
+                    onSelect={() => { if (isMobile) setOpenMobile(false); }} 
                   >
                     <a>
                       <item.icon className="mr-2 h-4 w-4" />
@@ -150,12 +154,13 @@ const NavItem = ({
   if (href) {
     return (
       <SidebarMenuItem>
-        <Link href={href} passHref legacyBehavior={href.startsWith('http') ? undefined : true}>
+        <Link href={href} passHref legacyBehavior={target ? undefined : true} target={target}>
           <SidebarMenuButton
             as="a"
             onClick={handleClick}
             isActive={isActive}
             className={buttonClassName}
+            target={target}
           >
             {buttonContent}
           </SidebarMenuButton>
@@ -183,8 +188,8 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const router = useRouter(); // Added to fix previous error, though not used in NavItem directly
+  const { isMobile, setOpenMobile } = useSidebar(); // Added to fix previous error
 
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
@@ -211,18 +216,7 @@ export function AppSidebar() {
               <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem>
               <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme asDialogTrigger>Start New Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
-              <NavItem 
-                icon={FileText} 
-                currentPath={pathname} 
-                isDropdown 
-                dropdownItems={[
-                  { href: '/dashboard/documents', label: 'Private', icon: Lock }, 
-                  // Assuming you'll have separate pages or logic for public, if not, adjust href
-                  { href: '/dashboard/documents', label: 'Public', icon: Globe } 
-                ]}
-              >
-                Documents
-              </NavItem>
+              <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
           ) : (
@@ -244,6 +238,9 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
+          <NavItem href="/terms-of-service" icon={BookOpen} currentPath={pathname} target="_blank">Terms</NavItem>
+          <NavItem href="/privacy-policy" icon={ShieldQuestion} currentPath={pathname} target="_blank">Privacy</NavItem>
+          <NavItem href="/community-guidelines" icon={Users} currentPath={pathname} target="_blank">Guidelines</NavItem>
           {isAuthenticated && (
             <NavItem icon={LogOut} currentPath={pathname} onClick={signOut}>Sign Out</NavItem>
           )}

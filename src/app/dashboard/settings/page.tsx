@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -42,7 +42,7 @@ export default function SettingsPage() {
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
   
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
-  const recordingSettingsRef = useRef<HTMLDivElement>(null); // Ref for Recording Settings
+  const recordingSettingsRef = useRef<HTMLDivElement>(null); 
 
   const { toast } = useToast();
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
@@ -71,7 +71,7 @@ export default function SettingsPage() {
       
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
-        recordingSettings: recordingSettingsRef, // Add recording settings ref to map
+        recordingSettings: recordingSettingsRef, 
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -81,8 +81,6 @@ export default function SettingsPage() {
       
       const timer = setTimeout(() => {
         setHighlightedSectionId(null);
-        // Optionally remove the query param from URL without reloading
-        // router.replace('/dashboard/settings', { scroll: false }); 
       }, 2000); 
       return () => clearTimeout(timer);
     }
@@ -166,8 +164,8 @@ export default function SettingsPage() {
       </SettingsSection>
 
       <SettingsSection 
-        id="recordingSettings" // Ensure this ID matches the highlightParam
-        ref={recordingSettingsRef} // Assign the ref
+        id="recordingSettings" 
+        ref={recordingSettingsRef} 
         title="Recording Settings" 
         description="Manage cloud storage and auto-recording preferences." 
         icon={Clapperboard} 
@@ -222,7 +220,7 @@ export default function SettingsPage() {
         <Button className="mt-6 btn-gel rounded-lg">Save Whiteboard Settings</Button>
       </SettingsSection>
       
-      <SettingsSection title="Privacy &amp; Security" description="Manage your account security and data." icon={ShieldCheck}>
+      <SettingsSection title="Privacy & Security" description="Manage your account security and data." icon={ShieldCheck}>
         <div className="space-y-4">
            <div>
             <Button variant="outline" className="w-full rounded-lg">Change Password</Button>
@@ -234,10 +232,30 @@ export default function SettingsPage() {
             <Label htmlFor="twoFactorAuth" className="flex-grow">Two-Factor Authentication</Label>
             <Button variant="link" className="text-accent">Enable</Button>
           </div>
+          <div className="mt-4 space-y-2">
+             <Link href="/privacy-policy" passHref legacyBehavior>
+                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
+                    <a><ShieldQuestion className="mr-2 h-4 w-4"/> View Privacy Policy</a>
+                </Button>
+             </Link>
+             <Link href="/terms-of-service" passHref legacyBehavior>
+                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
+                    <a><BookOpen className="mr-2 h-4 w-4"/> View Terms of Service</a>
+                </Button>
+             </Link>
+             <Link href="/community-guidelines" passHref legacyBehavior>
+                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
+                    <a><Users className="mr-2 h-4 w-4"/> View Community Guidelines</a>
+                </Button>
+             </Link>
+          </div>
+           <p className="text-xs text-muted-foreground mt-2">
+              Communications are secured using HTTPS. Data stored with Firebase is encrypted at rest.
+            </p>
         </div>
       </SettingsSection>
 
-       <SettingsSection title="Data &amp; Usage" description="Understand and manage your app data." icon={BarChart3}>
+       <SettingsSection title="Data & Usage" description="Understand and manage your app data." icon={BarChart3}>
         <div className="space-y-4">
            <div>
             <Button variant="outline" className="w-full rounded-lg">Export My Data</Button>

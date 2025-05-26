@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
@@ -78,7 +78,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const { toast } = useToast();
 
   const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isCameraOff, setIsCameraOff] = useState(false); // Initial state for local camera
+  const [isCameraOff, setIsCameraOff] = useState(false); 
   const [isHandRaised, setIsHandRaised] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -87,7 +87,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   useEffect(() => {
     const initCamera = async () => {
-      if (!isCameraOff) { // Only try to init if camera is supposed to be on by default
+      if (!isCameraOff) { 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
@@ -98,7 +98,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         } catch (err) {
           console.error("Failed to get camera on mount:", err);
           setHasCameraPermission(false);
-          setIsCameraOff(true); // Force camera off if permission failed
+          setIsCameraOff(true); 
           toast({
             variant: 'destructive',
             title: 'Camera Access Denied',
@@ -106,12 +106,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           });
         }
       } else {
-         // If camera is off by default, still check for permission silently or prompt if desired
-         // For now, if it's off by default, we assume permission will be asked on toggle
          navigator.mediaDevices.getUserMedia({ video: true })
           .then(stream => {
             setHasCameraPermission(true);
-            stream.getTracks().forEach(track => track.stop()); // Got permission, stop tracks immediately
+            stream.getTracks().forEach(track => track.stop()); 
           })
           .catch(() => setHasCameraPermission(false));
       }
@@ -121,7 +119,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     return () => {
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, []); // isCameraOff is not in dependency array to avoid re-running on toggle
+  }, []); 
 
 
   const toggleMic = () => setIsMicMuted(prev => !prev);
@@ -129,7 +127,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const toggleCamera = async () => {
     const newCameraStateIsOff = !isCameraOff; 
 
-    if (!newCameraStateIsOff) { // Turning camera ON
+    if (!newCameraStateIsOff) { 
       if (hasCameraPermission === false) {
         toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
         return;
@@ -138,7 +136,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
-          setHasCameraPermission(true); // In case it was null
+          setHasCameraPermission(true); 
         } catch (err) {
           console.error("Failed to get camera on toggle:", err);
           setHasCameraPermission(false);
@@ -150,9 +148,8 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         localVideoRef.current.srcObject = currentLocalStreamRef.current;
       }
       setIsCameraOff(false);
-    } else { // Turning camera OFF
+    } else { 
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
-      // currentLocalStreamRef.current = null; // Optionally clear the stream ref
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
       }
@@ -162,14 +159,20 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   
   const toggleHandRaise = () => setIsHandRaised(prev => !prev);
   const leaveMeeting = () => {
-    alert("Leaving meeting (mock action)");
-    // router.push('/dashboard'); // Add router import if re-enabling
+    toast({ title: "Leaving Meeting", description: "You have left the meeting (mock action)." });
+    // In a real app: router.push('/dashboard'); 
+  };
+
+  const handleReportIssue = () => {
+    toast({
+      title: "Report Issue",
+      description: "Issue reporting feature is planned. For now, please note the issue and report through help channels.",
+      duration: 5000,
+    });
   };
 
   const participants = [
     { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff, videoRef: localVideoRef, hasCameraPermissionForView: hasCameraPermission },
-    // { id: "guestUserA", name: "User A", isMicMuted: false, isCameraOff: true },
-    // { id: "guestUserB", name: "User B", isMicMuted: true, isCameraOff: false },
   ];
 
 
@@ -194,6 +197,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             <DropdownMenuSeparator />
             <DropdownMenuItem><Maximize className="mr-2 h-4 w-4" /> Full Screen</DropdownMenuItem>
             <DropdownMenuItem><Columns className="mr-2 h-4 w-4" /> Change Layout</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleReportIssue} className="text-destructive focus:text-destructive">
+              <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem><Settings className="mr-2 h-4 w-4" /> Settings</DropdownMenuItem>
           </DropdownMenuContent>
@@ -232,7 +239,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 name={p.name} 
                 isMe={p.isMe} 
                 isMicMuted={p.isMicMuted} 
-                isCameraOff={p.isMe ? isCameraOff : p.isCameraOff} // Ensure local state for local user
+                isCameraOff={p.isMe ? isCameraOff : p.isCameraOff} 
                 videoRef={p.isMe ? localVideoRef : undefined}
                 hasCameraPermissionForView={p.isMe ? hasCameraPermission : undefined}
               />
