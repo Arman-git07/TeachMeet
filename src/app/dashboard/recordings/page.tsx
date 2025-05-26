@@ -287,11 +287,6 @@ export default function RecordingsPage() {
               <Button className="btn-gel rounded-lg" onClick={handleUploadClick}>
                   <UploadCloud className="mr-2 h-5 w-5" /> Upload
               </Button>
-               <Link href="/dashboard/settings?highlight=recordingSettings" passHref legacyBehavior>
-                <Button variant="outline" className="rounded-lg">
-                  <Settings className="mr-2 h-5 w-5" /> Settings
-                </Button>
-              </Link>
               <input 
                 type="file" 
                 ref={fileInputRef} 
