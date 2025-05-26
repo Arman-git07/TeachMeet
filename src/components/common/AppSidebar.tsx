@@ -30,17 +30,17 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"; // Added Dialog imports
-import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Import the new dialog content
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"; 
+import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; 
 
 type NavItemProps = {
-  href?: string, // Make href optional for non-navigation triggers
+  href?: string, 
   icon: React.ElementType,
   children: React.ReactNode,
   currentPath: string,
   isGreenTheme?: boolean,
   onClick?: () => void;
-  asDialogTrigger?: boolean; // New prop
+  asDialogTrigger?: boolean; 
 };
 
 const NavItem = ({
@@ -50,17 +50,17 @@ const NavItem = ({
   currentPath,
   isGreenTheme = false,
   onClick: onClickProp,
-  asDialogTrigger = false, // Default to false
+  asDialogTrigger = false, 
 }: NavItemProps) => {
-  const isActive = href ? currentPath === href || (href === "/dashboard/documents" && currentPath.startsWith("/dashboard/documents/")) : false;
+  const isActive = href ? currentPath === href || (href === "/dashboard/documents" && currentPath.startsWith("/dashboard/documents")) : false;
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
   const { isMobile, setOpenMobile } = useSidebar();
 
   const handleClick = () => {
-    if (onClickProp && !asDialogTrigger) { // Don't close sidebar if it's opening a dialog from sidebar
+    if (onClickProp && !asDialogTrigger) { 
       onClickProp();
     }
-    if (isMobile && href && !asDialogTrigger) { 
+    if (isMobile && (href || asDialogTrigger) ) {  // Close sidebar on mobile if it's a link OR a dialog trigger
       setOpenMobile(false);
     }
   };
@@ -87,7 +87,7 @@ const NavItem = ({
         <Dialog>
           <DialogTrigger asChild>
             <SidebarMenuButton
-              onClick={handleClick}
+              onClick={handleClick} 
               className={buttonClassName}
             >
               {buttonContent}
@@ -118,14 +118,13 @@ const NavItem = ({
     );
   }
 
-  // Fallback for non-link, non-dialog trigger buttons (like Sign Out)
   return (
      <SidebarMenuItem>
          <SidebarMenuButton
          onClick={handleClick}
          className={cn(
              commonClasses,
-             "hover:bg-destructive hover:text-destructive-foreground" // Default for actions like signout
+             "hover:bg-destructive hover:text-destructive-foreground" 
          )}
          >
          {buttonContent}
@@ -138,7 +137,7 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter(); // Keep router for potential future use or if other items need it
+  const router = useRouter(); 
   const { isMobile, setOpenMobile } = useSidebar();
 
 

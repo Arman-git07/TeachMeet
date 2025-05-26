@@ -1,6 +1,6 @@
 
 'use client';
-import { Search, PanelLeftOpen } from 'lucide-react';
+import { PanelLeftOpen, Search } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Logo } from './Logo';
