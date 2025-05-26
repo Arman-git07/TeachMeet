@@ -10,7 +10,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useSearchParams } from 'next/navigation'; // Import useSearchParams
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const ParticipantView = ({ 
   name, 
@@ -18,14 +18,16 @@ const ParticipantView = ({
   isMicMuted = false, 
   isCameraOff = false, 
   videoRef,
-  hasCameraPermissionForView 
+  hasCameraPermissionForView,
+  isHandRaisedForView // New prop
 }: { 
   name: string, 
   isMe?: boolean, 
   isMicMuted?: boolean, 
   isCameraOff?: boolean,
   videoRef?: React.RefObject<HTMLVideoElement>,
-  hasCameraPermissionForView?: boolean | null
+  hasCameraPermissionForView?: boolean | null,
+  isHandRaisedForView?: boolean // New prop
 }) => {
   const showAvatar = (isMe && isCameraOff) || (isMe && hasCameraPermissionForView === false) || (!isMe && isCameraOff);
 
@@ -70,6 +72,11 @@ const ParticipantView = ({
       <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full backdrop-blur-sm shadow-md">
         {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </div>
+      {isHandRaisedForView && (
+        <div className="absolute top-2 left-2 bg-primary/80 text-primary-foreground p-1.5 rounded-full backdrop-blur-sm shadow-md animate-pulse">
+          <Hand className="h-4 w-4" />
+        </div>
+      )}
     </Card>
   );
 };
@@ -79,6 +86,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const searchParams = useSearchParams(); 
   const topic = searchParams.get('topic'); 
   const { toast } = useToast();
+  const router = useRouter();
 
   const [isMicMuted, setIsMicMuted] = useState(false); 
   const [isCameraOff, setIsCameraOff] = useState(() => {
@@ -188,8 +196,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const leaveMeeting = () => {
-    toast({ title: "Leaving Meeting", description: "You have left the meeting (mock action)." });
+    toast({ title: "Leaving Meeting", description: "You have left the meeting." });
     // In a real app, you would navigate away, e.g., router.push('/dashboard');
+    router.push('/');
   };
 
   const handleReportIssue = () => {
@@ -201,7 +210,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const participants = [
-    { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff, videoRef: localVideoRef, hasCameraPermissionForView: hasCameraPermission },
+    { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff, videoRef: localVideoRef, hasCameraPermissionForView: hasCameraPermission, isHandRaisedForView: isHandRaised },
+    // { id: "userA", name: "User A", isMicMuted: false, isCameraOff: false, isHandRaisedForView: false },
+    // { id: "userB", name: "User B", isMicMuted: true, isCameraOff: true, isHandRaisedForView: true },
   ];
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
@@ -258,6 +269,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 isCameraOff={participants[0].isCameraOff} 
                 videoRef={localVideoRef}
                 hasCameraPermissionForView={hasCameraPermission}
+                isHandRaisedForView={participants[0].isHandRaisedForView}
               />
             </div>
           </div>
@@ -272,6 +284,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 isCameraOff={p.isMe ? isCameraOff : p.isCameraOff} 
                 videoRef={p.isMe ? localVideoRef : undefined}
                 hasCameraPermissionForView={p.isMe ? hasCameraPermission : undefined}
+                isHandRaisedForView={p.isHandRaisedForView}
               />
             ))}
           </div>
@@ -297,4 +310,3 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
-
