@@ -1,4 +1,3 @@
-
 'use client';
 import Link from 'next/link';
 import {
@@ -17,6 +16,7 @@ import {
   BookOpen, // For Terms of Service
   ShieldQuestion, // For Privacy Policy
   Users, // For Community Guidelines
+  ShieldAlert, // For new Legal & Info dropdown
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -46,7 +46,7 @@ type NavItemProps = {
   onClick?: () => void;
   asDialogTrigger?: boolean;
   isDropdown?: boolean;
-  dropdownItems?: { href: string; label: string; icon: React.ElementType }[];
+  dropdownItems?: { href: string; label: string; icon: React.ElementType, target?: string }[];
   target?: string; // for opening in new tab
 };
 
@@ -65,6 +65,7 @@ const NavItem = ({
   const isActive = href ? currentPath.startsWith(href) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
   const { isMobile, setOpenMobile } = useSidebar();
+  const router = useRouter(); // Added router for programmatic navigation if needed
 
   const handleClick = () => {
     if (onClickProp && !asDialogTrigger && !isDropdown) {
@@ -128,7 +129,7 @@ const NavItem = ({
             {dropdownItems.map(item => {
               const isSubItemActive = currentPath.startsWith(item.href);
               return (
-                <Link key={item.label} href={item.href} passHref legacyBehavior>
+                <Link key={item.label} href={item.href} passHref legacyBehavior={item.target ? undefined : true} target={item.target}>
                   <DropdownMenuItem
                     asChild
                     className={cn(
@@ -137,7 +138,7 @@ const NavItem = ({
                     )}
                     onSelect={() => { if (isMobile) setOpenMobile(false); }}
                   >
-                    <a>
+                    <a target={item.target}>
                       <item.icon className="mr-2 h-4 w-4" />
                       {item.label}
                     </a>
@@ -191,6 +192,12 @@ export function AppSidebar() {
   const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
 
+  const legalAndInfoItems = [
+    { href: "/terms-of-service", label: "Terms of Service", icon: BookOpen, target: "_blank" },
+    { href: "/privacy-policy", label: "Privacy Policy", icon: ShieldQuestion, target: "_blank" },
+    { href: "/community-guidelines", label: "Community Guidelines", icon: Users, target: "_blank" },
+  ];
+
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
@@ -238,9 +245,7 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
-          <NavItem href="/terms-of-service" icon={BookOpen} currentPath={pathname} target="_blank">Terms</NavItem>
-          <NavItem href="/privacy-policy" icon={ShieldQuestion} currentPath={pathname} target="_blank">Privacy</NavItem>
-          <NavItem href="/community-guidelines" icon={Users} currentPath={pathname} target="_blank">Guidelines</NavItem>
+          <NavItem icon={ShieldAlert} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal &amp; Info</NavItem>
           {isAuthenticated && (
             <NavItem icon={LogOut} currentPath={pathname} onClick={signOut}>Sign Out</NavItem>
           )}
