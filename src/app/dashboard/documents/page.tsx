@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle } from "lucide-react";
+import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
@@ -66,10 +66,12 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor 
           <FolderOpen className="mx-auto h-12 w-12 mb-2" />
           {title === "Private Documents" ? (
             <p className="text-sm">The private uploaded documents will show here and can be accessed and seen by users device only</p>
+          ) : title === "Public Documents" ? (
+            <p className="text-sm">The public uploaded documents will show here and can be accessed and seen by any device</p>
           ) : (
             <>
               <p>No documents yet.</p>
-              <p className="text-xs">Upload and share files publicly.</p>
+              <p className="text-xs">Upload and share files.</p>
             </>
           )}
         </div>
@@ -296,3 +298,6 @@ export default function DocumentsPage() {
     </>
   );
 }
+
+
+    
