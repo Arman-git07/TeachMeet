@@ -7,8 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { PanelLeftOpen } from 'lucide-react';
+import { AppHeader } from '@/components/common/AppHeader'; // Import AppHeader
 
 export default function DashboardLayout({
   children,
@@ -17,7 +16,7 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const { toggleSidebar, state: sidebarState, isMobile: sidebarIsMobile } = useSidebar(); // Get sidebar context
+  const { state: sidebarState, isMobile: sidebarIsMobile } = useSidebar(); // Get sidebar context
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -47,7 +46,11 @@ export default function DashboardLayout({
         <div className="flex flex-1 flex-col">
           <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
-              <Skeleton className="h-8 w-8 rounded-md" />
+              {/* Minimal skeleton for header elements */}
+              <Skeleton className="h-8 w-8 rounded-md mr-4" /> 
+              <Skeleton className="h-8 w-full max-w-md rounded-full" />
+              <Skeleton className="h-8 w-8 rounded-full ml-auto mr-2" />
+              <Skeleton className="h-8 w-8 rounded-full" />
             </div>
           </header>
           <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
@@ -64,14 +67,7 @@ export default function DashboardLayout({
       <AppSidebar />
       <SidebarInset>
         <div className="flex flex-1 flex-col">
-          <header className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur-md">
-            <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
-              <Button variant="ghost" size="icon" className="rounded-full" onClick={toggleSidebar}>
-                <PanelLeftOpen className="h-6 w-6" />
-                <span className="sr-only">Toggle Dashboard Menu</span>
-              </Button>
-            </div>
-          </header>
+          <AppHeader /> {/* Restore the AppHeader here */}
           <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
             {children}
           </main>
