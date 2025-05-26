@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -53,9 +54,10 @@ export default function SettingsPage() {
   const handleFilterChange = (value: string) => {
     setSelectedFilter(value);
     localStorage.setItem("teachmeet-camera-filter", value);
+    const filterDisplayName = value === "none" ? "No filter" : value.charAt(0).toUpperCase() + value.slice(1).replace(/([A-Z])/g, ' $1');
     toast({
       title: "Filter Selected",
-      description: `${value === "none" ? "No filter" : value.charAt(0).toUpperCase() + value.slice(1).replace(/([A-Z])/g, ' $1')} filter has been applied.`,
+      description: `${filterDisplayName} filter has been applied. This will take effect in the meeting waiting area.`,
     });
   };
   
@@ -67,6 +69,7 @@ export default function SettingsPage() {
       
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
+        // Add other section refs here if needed
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -131,6 +134,20 @@ export default function SettingsPage() {
           </div>
         </div>
         <Button className="mt-6 btn-gel rounded-lg">Save Meeting Visuals</Button>
+      </SettingsSection>
+
+      <SettingsSection title="Recording Settings" description="Manage cloud storage and auto-recording preferences." icon={Clapperboard} id="recordingSettings">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Cloud Storage Used: <span className="font-semibold text-foreground">0 GB / 5 GB</span></span>
+            <Button variant="outline" size="sm" className="rounded-md">Manage Storage</Button>
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="autoRecord" className="flex-grow">Auto-record new meetings</Label>
+            <Switch id="autoRecord" />
+          </div>
+        </div>
+        <Button className="mt-6 btn-gel rounded-lg">Save Recording Settings</Button>
       </SettingsSection>
 
       <SettingsSection title="Notifications" description="Control how you receive notifications." icon={Bell} id="notifications">

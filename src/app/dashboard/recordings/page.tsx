@@ -70,24 +70,6 @@ export default function RecordingsPage() {
           ))}
         </div>
       )}
-       <Card className="mt-8 p-6 rounded-xl shadow-lg border-border/50 bg-card">
-        <CardHeader className="p-0 pb-4">
-          <CardTitle className="text-xl">Recording Settings</CardTitle>
-          <CardDescription>Manage your cloud storage and auto-recording preferences.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Cloud Storage Used: <span className="font-semibold text-foreground">1.5 GB / 5 GB</span></span>
-            <Button variant="outline" size="sm" className="rounded-md">Manage Storage</Button>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Auto-record new meetings:</span>
-            <Link href="/dashboard/settings#notifications" passHref> {/* Example link to settings section */}
-                <Button variant="link" className="text-accent">Configure</Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
