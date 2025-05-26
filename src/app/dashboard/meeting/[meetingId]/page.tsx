@@ -289,7 +289,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           <Button variant={isHandRaised ? "primary" : "secondary"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleHandRaise} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}>
             <Hand className="h-6 w-6" />
           </Button>
-          <Button variant="destructive" size="lg" className="rounded-full p-4 btn-gel" onClick={leaveMeeting} aria-label="Leave Meeting">
+          <Button variant="destructive" size="lg" className="rounded-full p-4" onClick={leaveMeeting} aria-label="Leave Meeting">
             <PhoneOff className="h-6 w-6" />
           </Button>
         </div>
@@ -297,3 +297,4 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
+
