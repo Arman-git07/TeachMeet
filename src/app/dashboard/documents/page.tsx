@@ -28,7 +28,7 @@ const DocumentItem = ({ name, lastModified, size }: { name: string, lastModified
         </p>
       </div>
     </div>
-    <Button variant="ghost" size="sm" className="rounded-md flex-shrink-0 ml-2">View</Button>
+    <Button variant="ghost" size="sm" className="rounded-lg flex-shrink-0 ml-2">View</Button> {/* Changed to rounded-lg */}
   </div>
 );
 
@@ -187,7 +187,7 @@ export default function DocumentsPage() {
                 <span>{errorMessage}</span>
               </div>
             ),
-            duration: 10000, // Increased duration for timeout message
+            duration: 10000, 
           });
         },
         async () => {
@@ -266,9 +266,9 @@ export default function DocumentsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'private' | 'public')} className="flex flex-col flex-grow">
-          <TabsList className="mb-4 self-start rounded-lg">
-            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger>
-            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger>
+          <TabsList className="mb-4 self-start rounded-lg"> {/* Changed to rounded-lg */}
+            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger> {/* Kept as rounded-md for inner items */}
+            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger> {/* Kept as rounded-md for inner items */}
           </TabsList>
           
           <div className="relative flex-1 overflow-hidden">
@@ -310,7 +310,7 @@ export default function DocumentsPage() {
       </div>
 
       <Dialog open={isUploadChoiceDialogOpen} onOpenChange={setIsUploadChoiceDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-lg">
+        <DialogContent className="sm:max-w-md rounded-xl"> {/* Changed to rounded-xl */}
           <DialogHeader>
             <DialogTitle className="text-xl">Choose Upload Destination</DialogTitle>
             <DialogDescription>
@@ -335,7 +335,7 @@ export default function DocumentsPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="secondary" className="rounded-md">
+              <Button type="button" variant="secondary" className="rounded-lg"> {/* Changed to rounded-lg */}
                 Cancel
               </Button>
             </DialogClose>

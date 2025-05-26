@@ -34,7 +34,7 @@
     --destructive-foreground: 0 0% 100%; /* White */
 
     --ring: 180 70% 48%; /* Softer Accent color for focus rings */
-    --radius: 0.75rem; /* Rounded corners */
+    --radius: 0.75rem; /* Increased Rounded corners */
 
     /* CTA Orange */
     --cta-orange: 30 90% 50%; /* Softer Orange */
@@ -211,4 +211,76 @@ html, body, #__next {
 }
 .video-filter-smoothbright {
   filter: brightness(1.12) contrast(1.08) saturate(1.05);
+}
+
+/* Logo character animation */
+.logo-animate-chars .logo-animated-span {
+  display: inline-block; /* Needed for transform */
+  opacity: 0;
+  transform: translateY(10px) scale(0.8);
+  animation: charReveal 0.5s forwards;
+}
+
+@keyframes charReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Stagger delays for TeachMeet */
+.logo-animate-chars .char-index-0 { animation-delay: 0s; }
+.logo-animate-chars .char-index-1 { animation-delay: 0.05s; }
+.logo-animate-chars .char-index-2 { animation-delay: 0.1s; }
+.logo-animate-chars .char-index-3 { animation-delay: 0.15s; }
+.logo-animate-chars .char-index-4 { animation-delay: 0.2s; }
+.logo-animate-chars .char-index-5 { animation-delay: 0.25s; } /* M */
+.logo-animate-chars .char-index-6 { animation-delay: 0.3s; }
+.logo-animate-chars .char-index-7 { animation-delay: 0.35s; }
+.logo-animate-chars .char-index-8 { animation-delay: 0.4s; }
+
+/* Specific animations for complex logo if animateComplex is true */
+.logo-animate-complex .char-index-0 { /* T */
+  animation: slideInT 0.5s forwards 0.1s;
+}
+.logo-animate-complex .char-index-1, /* e */
+.logo-animate-complex .char-index-2, /* a */
+.logo-animate-complex .char-index-3, /* c */
+.logo-animate-complex .char-index-4 { /* h */
+  animation: emergeEach 0.4s forwards;
+}
+.logo-animate-complex .char-index-1 { animation-delay: 0.3s; }
+.logo-animate-complex .char-index-2 { animation-delay: 0.35s; }
+.logo-animate-complex .char-index-3 { animation-delay: 0.4s; }
+.logo-animate-complex .char-index-4 { animation-delay: 0.45s; }
+
+.logo-animate-complex .char-index-5 { /* M */
+  animation: slideInM 0.5s forwards 0.1s;
+}
+
+.logo-animate-complex .char-index-6, /* e */
+.logo-animate-complex .char-index-7, /* e */
+.logo-animate-complex .char-index-8 { /* t */
+  animation: emergeEet 0.4s forwards;
+}
+.logo-animate-complex .char-index-6 { animation-delay: 0.5s; }
+.logo-animate-complex .char-index-7 { animation-delay: 0.55s; }
+.logo-animate-complex .char-index-8 { animation-delay: 0.6s; }
+
+
+@keyframes slideInT {
+  from { transform: translateX(-30px) scale(0.8); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+@keyframes slideInM {
+  from { transform: translateX(30px) scale(0.8); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+@keyframes emergeEach { /* From right of T */
+  from { transform: translateX(5px) scale(0.5); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+@keyframes emergeEet { /* From left of M */
+  from { transform: translateX(-5px) scale(0.5); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
 }

@@ -1,3 +1,4 @@
+
 import { Logo } from '@/components/common/Logo';
 import Link from 'next/link';
 
@@ -11,8 +12,8 @@ export default function AuthLayout({
       <div className="absolute inset-0 opacity-5"
            style={{
              backgroundImage: "radial-gradient(hsl(var(--primary)) 0.5px, transparent 0.5px), radial-gradient(hsl(var(--accent)) 0.5px, transparent 0.5px)",
-             backgroundSize: "20px 20px, 20px 20px",
-             backgroundPosition: "0 0, 10px 10px",
+             backgroundSize: "30px 30px, 30px 30px", // Increased size for subtlety
+             backgroundPosition: "0 0, 15px 15px",    // Adjusted position
            }}
       />
       <div className="w-full max-w-md space-y-8 z-10">

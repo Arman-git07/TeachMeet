@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useRouter } from 'next/navigation';
-import { AppHeader } from '@/components/common/AppHeader'; // Import AppHeader
+import { AppHeader } from '@/components/common/AppHeader'; 
 
 interface OngoingMeeting {
   id: string;
@@ -40,7 +40,6 @@ export default function HomePage() {
   const [isMicMutedInDialog, setIsMicMutedInDialog] = useState(false);
   const [isCameraOffInDialog, setIsCameraOffInDialog] = useState(true); // Default camera to off in dialog
   
-  // State for logo animation
   const [logoTextContent, setLogoTextContent] = useState('TeachMeet');
   const [animationLock, setAnimationLock] = useState(false);
   const [animateChars, setAnimateChars] = useState(false);
@@ -48,7 +47,6 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Load dismissed meetings from localStorage and filter the initial list
     const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
     const dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
     
@@ -89,30 +87,30 @@ export default function HomePage() {
     }
   };
 
-  const tmVisibleDuration = 350; // Duration "TM" is visible in ms
-  const characterAnimationTotalDuration = 1000; // Max duration for all characters to animate in
+  const tmVisibleDuration = 350; 
+  const characterAnimationTotalDuration = 1000; 
 
   const handleComplexLogoAnimation = () => {
     if (animationLock) return;
 
     setAnimationLock(true);
-    setAnimateChars(false); // Ensure char animation class is removed
+    setAnimateChars(false); 
     setLogoTextContent('TM');
 
     setTimeout(() => {
       setLogoTextContent('TeachMeet');
-      setAnimateChars(true); // Trigger character animation
+      setAnimateChars(true); 
       setTimeout(() => {
-        setAnimateChars(false); // Reset for next click, if needed after anim
+        setAnimateChars(false); 
         setAnimationLock(false);
-      }, characterAnimationTotalDuration); // Wait for character animation to complete
+      }, characterAnimationTotalDuration); 
     }, tmVisibleDuration);
   };
 
 
   return (
     <div className="flex flex-col min-h-screen">
-      <AppHeader showLogo={true} /> {/* Added AppHeader here */}
+      <AppHeader showLogo={true} /> 
       <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-10"
@@ -128,8 +126,8 @@ export default function HomePage() {
             text={logoTextContent}
             size="large"
             className={cn(
-              'text-center cursor-pointer',
-              animateChars && logoTextContent === 'TeachMeet' && 'logo-animate-chars'
+              'text-center cursor-pointer mb-8', // mb-8 moved here from a wrapping div
+              animateChars && logoTextContent === 'TeachMeet' && 'logo-animate-complex' // Changed to logo-animate-complex
             )}
             onClick={handleComplexLogoAnimation}
             animateChars={animateChars && logoTextContent === 'TeachMeet'}
@@ -163,7 +161,7 @@ export default function HomePage() {
                         </Button>
                       </DialogTrigger>
                       {selectedMeetingForDialog && ( 
-                        <DialogContent className="sm:max-w-md rounded-lg">
+                        <DialogContent className="sm:max-w-md rounded-xl"> {/* Changed to rounded-xl */}
                           <DialogHeader>
                             <DialogTitle className="text-xl">Rejoin: {selectedMeetingForDialog?.title}</DialogTitle>
                             <DialogDescription>
@@ -195,10 +193,10 @@ export default function HomePage() {
                             </div>
                           </div>
                           <DialogFooter className="gap-2 sm:gap-0">
-                            <Button type="button" variant="outline" className="rounded-md" onClick={handleDismissMeeting}>
+                            <Button type="button" variant="outline" className="rounded-lg" onClick={handleDismissMeeting}> {/* Changed to rounded-lg */}
                                 <X className="mr-2 h-4 w-4" /> Dismiss
                             </Button>
-                            <Button type="button" onClick={handleJoinMeetingFromDialog} className="btn-gel rounded-md">
+                            <Button type="button" onClick={handleJoinMeetingFromDialog} className="btn-gel rounded-lg"> {/* Changed to rounded-lg */}
                               <LogIn className="mr-2 h-4 w-4" /> Join Meeting
                             </Button>
                           </DialogFooter>

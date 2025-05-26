@@ -18,11 +18,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Import the new dialog content
+import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; 
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
-  const [meetingCodeDialogInput, setMeetingCodeDialogInput] = useState(''); // Renamed to avoid conflict
+  const [meetingCodeDialogInput, setMeetingCodeDialogInput] = useState(''); 
   const { toast } = useToast();
   const { isAuthenticated, loading: authLoading } = useAuth(); 
 
@@ -37,7 +37,7 @@ export function SlideUpPanel() {
         title: "Joining Meeting (Dialog)",
         description: `Attempting to join with code: ${meetingCodeDialogInput}`,
       });
-      // In a real app, navigate: router.push(`/dashboard/join/${meetingCodeDialogInput}`);
+      // In a real app, navigate: router.push(`/dashboard/join-meeting?code=${meetingCodeDialogInput}`);
       setMeetingCodeDialogInput('');
     } else {
       toast({
@@ -48,7 +48,7 @@ export function SlideUpPanel() {
     }
   };
 
-  // For "Join Meeting" button, direct link changes based on auth state
+  const startMeetingHref = isAuthenticated ? "#" : "/auth/signin?action=start"; // Dialog trigger, so href can be # if auth
   const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
 
   if (authLoading) {
@@ -76,7 +76,7 @@ export function SlideUpPanel() {
                 Start New Meeting
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-lg rounded-xl"> {/* Changed to rounded-xl */}
               <StartMeetingDialogContent />
             </DialogContent>
           </Dialog>
@@ -100,13 +100,13 @@ export function SlideUpPanel() {
             <Dialog>
               <DialogTrigger asChild>
                 <Button
-                  className="absolute top-0 right-0 h-full bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0 rounded-md shadow-lg z-10 px-3 py-1.5 text-sm flex items-center"
+                  className="absolute top-0 right-0 h-full bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0 rounded-lg shadow-lg z-10 px-3 py-1.5 text-sm flex items-center" /* Changed to rounded-lg */
                   aria-label="Enter Meeting Code"
                 >
                   <Code className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px] rounded-lg">
+              <DialogContent className="sm:max-w-[425px] rounded-xl"> {/* Changed to rounded-xl */}
                 <DialogHeader>
                   <DialogTitle>Enter Meeting Code</DialogTitle>
                   <DialogDescription>
@@ -123,18 +123,19 @@ export function SlideUpPanel() {
                       value={meetingCodeDialogInput}
                       onChange={(e) => setMeetingCodeDialogInput(e.target.value)}
                       placeholder="e.g., abc-xyz-123"
-                      className="col-span-3 rounded-md"
+                      className="col-span-3 rounded-lg" /* Changed to rounded-lg */
                     />
                   </div>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
-                    <Button type="button" variant="outline" className="rounded-md">
+                    <Button type="button" variant="outline" className="rounded-lg"> {/* Changed to rounded-lg */}
                       Cancel
                     </Button>
                   </DialogClose>
+                  {/* Ensure the link works correctly with DialogClose for navigation */}
                   <DialogClose asChild>
-                    <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-md">
+                    <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-lg"> {/* Changed to rounded-lg */}
                       Join
                     </Button>
                   </DialogClose>

@@ -27,8 +27,7 @@ export function StartMeetingDialogContent() {
     const newMeetingId = randomString(8);
     setMeetingId(newMeetingId);
 
-    // Ensure meetingLink is a full URL for sharing purposes, adjust domain as needed
-    setMeetingLink(`${window.location.origin}/dashboard/join-meeting?code=${newMeetingId}`); // Adjusted to use join-meeting page with code
+    setMeetingLink(`${window.location.origin}/dashboard/join-meeting?code=${newMeetingId}`); 
     
     const codePart1 = randomString(3);
     const codePart2 = randomString(3);
@@ -103,7 +102,7 @@ export function StartMeetingDialogContent() {
                 className="pl-10 rounded-lg"
                 />
             </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink} className="rounded-md">
+            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink} className="rounded-lg"> {/* Changed to rounded-lg */}
               <Copy className="h-5 w-5" />
             </Button>
           </div>
@@ -124,7 +123,7 @@ export function StartMeetingDialogContent() {
                 className="pl-10 rounded-lg"
               />
             </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode} className="rounded-md">
+            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode} className="rounded-lg"> {/* Changed to rounded-lg */}
               <Copy className="h-5 w-5" />
             </Button>
           </div>
@@ -137,13 +136,13 @@ export function StartMeetingDialogContent() {
       </div>
       <DialogFooter className="gap-2 sm:gap-0">
         <DialogClose asChild>
-          <Button type="button" variant="outline" className="rounded-md">
+          <Button type="button" variant="outline" className="rounded-lg"> {/* Changed to rounded-lg */}
             Cancel
           </Button>
         </DialogClose>
         <DialogClose asChild>
            <Link href={joinMeetingHref} passHref legacyBehavior>
-             <Button asChild className="btn-gel rounded-md" disabled={!meetingId || !meetingTitle}>
+             <Button asChild className="btn-gel rounded-lg" disabled={!meetingId || !meetingTitle}> {/* Ensure btn-gel also gets rounded-lg or var(--radius) */}
                 <a>{meetingId ? "Join Meeting Now" : "Generating ID..."}</a>
              </Button>
            </Link>

@@ -1,5 +1,5 @@
 
-'use client'; // Add this directive
+'use client'; 
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ export default function MyMeetingsPage() {
                     data-ai-hint="meeting abstract"
                  />
                  <div className="absolute top-2 right-2">
-                    <Badge variant={meeting.status === "Upcoming" ? "default" : "secondary"} className="bg-primary/80 text-primary-foreground backdrop-blur-sm">
+                    <Badge variant={meeting.status === "Upcoming" ? "default" : "secondary"} className="bg-primary/80 text-primary-foreground backdrop-blur-sm rounded-full"> {/* Ensure badge is also rounded */}
                         {meeting.status}
                     </Badge>
                  </div>
@@ -87,21 +87,21 @@ export default function MyMeetingsPage() {
               </CardContent>
               <CardFooter className="border-t pt-4 grid grid-cols-2 gap-2">
                 {meeting.status === "Upcoming" ? (
-                  <Button variant="default" className="w-full btn-gel rounded-md">
+                  <Button variant="default" className="w-full btn-gel rounded-lg"> {/* Changed to rounded-lg */}
                     <Video className="mr-2 h-4 w-4" /> Join
                   </Button>
                 ) : (
-                  <Button variant="outline" className="w-full rounded-md" disabled>
+                  <Button variant="outline" className="w-full rounded-lg" disabled> {/* Changed to rounded-lg */}
                     Completed
                   </Button>
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full rounded-md">More Options</Button>
+                    <Button variant="ghost" size="sm" className="w-full rounded-lg">More Options</Button> {/* Changed to rounded-lg */}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="rounded-lg">
-                    <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> Edit Details</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                    <DropdownMenuItem className="rounded-md"><Edit className="mr-2 h-4 w-4" /> Edit Details</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive rounded-md">
                       <Trash2 className="mr-2 h-4 w-4" /> Cancel Meeting
                     </DropdownMenuItem>
                   </DropdownMenuContent>

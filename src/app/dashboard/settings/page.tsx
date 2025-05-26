@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, Image as ImageIcon } from "lucide-react"; // Renamed Users to UsersIconLucide
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -143,19 +143,19 @@ export default function SettingsPage() {
               <SelectTrigger id="cameraFilterSelect" className="w-full mt-1 rounded-lg">
                 <SelectValue placeholder="Select a filter" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No Filter</SelectItem>
-                <SelectItem value="vintage">Vintage</SelectItem>
-                <SelectItem value="luminous">Luminous</SelectItem>
-                <SelectItem value="dramatic">Dramatic</SelectItem>
-                <SelectItem value="goldenhour">Golden Hour</SelectItem>
-                <SelectItem value="grayscale">Grayscale</SelectItem>
-                <SelectItem value="sepia">Sepia</SelectItem>
-                <SelectItem value="softfocus">Soft Focus</SelectItem>
-                <SelectItem value="brightclear">Bright & Clear</SelectItem>
-                <SelectItem value="naturalglow">Natural Glow</SelectItem>
-                <SelectItem value="radiantskin">Radiant Skin</SelectItem>
-                <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
+              <SelectContent className="rounded-lg"> {/* Added rounded-lg */}
+                <SelectItem value="none" className="rounded-md">No Filter</SelectItem>
+                <SelectItem value="vintage" className="rounded-md">Vintage</SelectItem>
+                <SelectItem value="luminous" className="rounded-md">Luminous</SelectItem>
+                <SelectItem value="dramatic" className="rounded-md">Dramatic</SelectItem>
+                <SelectItem value="goldenhour" className="rounded-md">Golden Hour</SelectItem>
+                <SelectItem value="grayscale" className="rounded-md">Grayscale</SelectItem>
+                <SelectItem value="sepia" className="rounded-md">Sepia</SelectItem>
+                <SelectItem value="softfocus" className="rounded-md">Soft Focus</SelectItem>
+                <SelectItem value="brightclear" className="rounded-md">Bright & Clear</SelectItem>
+                <SelectItem value="naturalglow" className="rounded-md">Natural Glow</SelectItem>
+                <SelectItem value="radiantskin" className="rounded-md">Radiant Skin</SelectItem>
+                <SelectItem value="smoothbright" className="rounded-md">Smooth & Bright</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -174,7 +174,7 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Cloud Storage Used: <span className="font-semibold text-foreground">0 GB / 5 GB</span></span>
-            <Button variant="outline" size="sm" className="rounded-md">Manage Storage</Button>
+            <Button variant="outline" size="sm" className="rounded-lg">Manage Storage</Button> {/* Changed to rounded-lg */}
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="autoRecord" className="flex-grow">Auto-record new meetings</Label>
@@ -245,7 +245,7 @@ export default function SettingsPage() {
              </Link>
              <Link href="/community-guidelines" passHref legacyBehavior>
                 <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
-                    <a><Users className="mr-2 h-4 w-4"/> View Community Guidelines</a>
+                    <a><UsersIconLucide className="mr-2 h-4 w-4"/> View Community Guidelines</a>
                 </Button>
              </Link>
           </div>

@@ -40,9 +40,9 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
-import { auth, storage } from '@/lib/firebase'; // Import storage
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage'; // Firebase storage functions
-import { updateProfile } from 'firebase/auth'; // Firebase auth function
+import { auth, storage } from '@/lib/firebase'; 
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage'; 
+import { updateProfile } from 'firebase/auth'; 
 
 const MAX_AVATAR_SIZE_MB = 5;
 const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;
@@ -90,14 +90,22 @@ export function UserProfileDropdown() {
           title: "File Too Large",
           description: `Please select an image smaller than ${MAX_AVATAR_SIZE_MB}MB.`,
         });
-        if (event.target) event.target.value = ""; // Reset file input
+        if (event.target) event.target.value = ""; 
         return;
       }
 
       setIsUploading(true);
-      const toastInstance = toast({ 
+      const toastId = `upload-avatar-${Date.now()}`;
+      toast({ 
+        id: toastId,
         title: "Uploading Avatar...",
-        description: `Starting upload of ${file.name}. Please wait. (0%)`,
+        description: (
+          <div className="flex items-center">
+            <ImageIcon className="mr-2 h-4 w-4 animate-pulse" />
+            <span>Starting upload of {file.name}. (0%)</span>
+          </div>
+        ),
+        duration: Infinity,
       });
 
       const filePath = `avatars/${auth.currentUser.uid}/${file.name}`;
@@ -107,18 +115,26 @@ export function UserProfileDropdown() {
       uploadTask.on('state_changed',
         (snapshot: UploadTaskSnapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          toastInstance.update({ 
-            id: toastInstance.id, 
-            description: `Uploading ${file.name}. Please wait. (${Math.round(progress)}%)`,
+          toast({
+            id: toastId,
+            title: "Uploading Avatar...",
+            description: (
+              <div className="flex items-center">
+                <ImageIcon className="mr-2 h-4 w-4 animate-pulse" />
+                <span>Uploading {file.name}. Please wait. ({Math.round(progress)}%)</span>
+              </div>
+            ),
+            duration: Infinity,
           });
         },
         (error) => {
           console.error("Avatar Upload Error:", error);
-          toastInstance.update({
-            id: toastInstance.id,
+          toast({
+            id: toastId,
             variant: "destructive",
             title: "Upload Failed",
             description: "Could not upload your avatar. Please try again.",
+            duration: 5000,
           });
           setIsUploading(false);
         },
@@ -126,18 +142,21 @@ export function UserProfileDropdown() {
           try {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             await updateProfile(auth.currentUser!, { photoURL: downloadURL });
-            toastInstance.update({
-              id: toastInstance.id,
+            toast({
+              id: toastId,
               title: "Avatar Uploaded!",
               description: "Your new avatar has been set.",
+              duration: 5000,
             });
+            setIsAvatarDialogOpen(false); // Close dialog on successful upload
           } catch (error) {
             console.error("Error setting avatar URL:", error);
-            toastInstance.update({
-              id: toastInstance.id,
+            toast({
+              id: toastId,
               variant: "destructive",
               title: "Update Failed",
               description: "Could not update your profile with the new avatar.",
+              duration: 5000,
             });
           } finally {
             setIsUploading(false);
@@ -182,7 +201,7 @@ export function UserProfileDropdown() {
                 rel="noopener noreferrer"
                 className={cn(
                   buttonVariants({ variant: 'outline', size: 'sm' }),
-                  "w-full flex items-center justify-start text-sm"
+                  "w-full flex items-center justify-start text-sm rounded-lg" // ensure rounded-lg
                 )}
               >
                 <ExternalLink className="mr-2 h-4 w-4" />
@@ -193,7 +212,7 @@ export function UserProfileDropdown() {
             <DialogTrigger asChild>
               <DropdownMenuItem 
                 onSelect={(e) => { e.preventDefault(); setIsAvatarDialogOpen(true); }} 
-                className="cursor-pointer px-3 py-2"
+                className="cursor-pointer px-3 py-2 rounded-md" // ensure rounded-md for item
               >
                 <ImageIcon className="mr-2.5 h-4 w-4" />
                 <span>Change Avatar</span>
@@ -204,7 +223,7 @@ export function UserProfileDropdown() {
             <SignOutAlertDialogTrigger asChild>
               <DropdownMenuItem
                 onSelect={(event) => event.preventDefault()} 
-                className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer px-3 py-2"
+                className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer px-3 py-2 rounded-md" // ensure rounded-md for item
               >
                 <LogOut className="mr-2.5 h-4 w-4" />
                 <span>Sign Out</span>
@@ -213,7 +232,7 @@ export function UserProfileDropdown() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <DialogContent className="sm:max-w-md rounded-lg">
+        <DialogContent className="sm:max-w-md rounded-xl"> {/* Changed to rounded-xl */}
           <DialogHeader>
             <DialogTitle>Change Your Avatar</DialogTitle>
             <DialogDescription>
@@ -229,20 +248,21 @@ export function UserProfileDropdown() {
               className="hidden"
               disabled={isUploading}
             />
-            <Button variant="outline" className="w-full rounded-md" onClick={handleUploadCustomAvatar} disabled={isUploading}>
+            <Button variant="outline" className="w-full rounded-lg" onClick={handleUploadCustomAvatar} disabled={isUploading}> {/* Changed to rounded-lg */}
               <ImageIcon className="mr-2 h-4 w-4" />
               {isUploading ? "Uploading..." : "Upload Custom Avatar"}
             </Button>
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="outline" className="rounded-md" disabled={isUploading}>
+              <Button type="button" variant="outline" className="rounded-lg" disabled={isUploading}> {/* Changed to rounded-lg */}
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="button" className="btn-gel rounded-md" disabled={true} > 
+            {/* "Save Changes" button is less relevant if custom uploads auto-save */}
+            {/* <Button type="button" className="btn-gel rounded-lg" disabled={isUploading}> 
               Save Changes
-            </Button>
+            </Button> */}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -255,10 +275,10 @@ export function UserProfileDropdown() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="rounded-md">Cancel</AlertDialogCancel>
+          <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel> {/* Changed to rounded-lg */}
           <AlertDialogAction 
             onClick={signOut} 
-            className={cn(buttonVariants({variant: "destructive", className: "rounded-md"}))}
+            className={cn(buttonVariants({variant: "destructive", className: "rounded-lg"}))} /* ensure rounded-lg */
           >
             Sign Out
           </AlertDialogAction>
