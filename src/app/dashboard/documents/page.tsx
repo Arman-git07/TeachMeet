@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useRef } from "react"; // Added useRef
-import { useToast } from "@/hooks/use-toast"; // Added useToast
+import { useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { auth, storage } from '@/lib/firebase'; // Import auth and storage
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage'; // Firebase storage functions
 
 const mockPrivateDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [
   // { id: "doc_priv_1", name: "Project Proposal Q3.docx", lastModified: "2024-08-15", size: "1.2MB" },
@@ -78,17 +80,70 @@ export default function DocumentsPage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      // Here you would typically handle the file upload process
-      console.log("Selected file:", file.name, file.size, file.type);
-      toast({
-        title: "File Selected (Mock)",
-        description: `You selected: ${file.name}. Actual upload is not implemented yet.`,
+
+      if (!auth.currentUser) {
+        toast({
+          variant: "destructive",
+          title: "Authentication Required",
+          description: "Please sign in to upload documents.",
+        });
+        if (event.target) event.target.value = ""; // Reset file input
+        return;
+      }
+      
+      const userId = auth.currentUser.uid;
+      const filePath = `documents/${userId}/${file.name}`;
+      const fileRef = storageRef(storage, filePath);
+      const uploadTask = uploadBytesResumable(fileRef, file);
+
+      const toastInstance = toast({ 
+        title: "Uploading Document...",
+        description: `Starting upload of ${file.name}. (0%)`,
       });
-      // Reset file input to allow selecting the same file again if needed
+
+      uploadTask.on('state_changed',
+        (snapshot: UploadTaskSnapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          toastInstance.update({ 
+            id: toastInstance.id, 
+            description: `Uploading ${file.name}. Please wait. (${Math.round(progress)}%)`,
+          });
+        },
+        (error) => {
+          console.error("Document Upload Error:", error);
+          toastInstance.update({
+            id: toastInstance.id,
+            variant: "destructive",
+            title: "Upload Failed",
+            description: "Could not upload your document. Please try again.",
+          });
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            toastInstance.update({
+              id: toastInstance.id,
+              title: "Document Uploaded!",
+              description: `${file.name} has been uploaded successfully. URL: ${downloadURL}`, // For dev, can remove URL later
+            });
+            // Here you would typically save the downloadURL and file metadata to Firestore
+            // and update the local state to show the new document in the list.
+          } catch (error) {
+            console.error("Error getting download URL:", error);
+            toastInstance.update({
+              id: toastInstance.id,
+              variant: "destructive",
+              title: "Upload Succeeded, but...",
+              description: "Could not get the download URL for the uploaded file.",
+            });
+          }
+        }
+      );
+
       if (event.target) {
         event.target.value = "";
       }
