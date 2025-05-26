@@ -3,10 +3,11 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, ChevronDown, ChevronUp } from "lucide-react";
+import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useState } from "react";
+// Removed useState as activeView is no longer needed
+// import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const mockPrivateDocuments = [
@@ -41,20 +42,22 @@ interface DocumentSectionProps {
   documents: Array<{ id: string; name: string; lastModified: string; size: string; }>;
   icon: React.ElementType;
   iconColor: string;
-  onHeaderClick: () => void;
-  isFocusedView: boolean; 
-  isInSplitView: boolean; 
+  // Removed props related to focused view
+  // onHeaderClick: () => void;
+  // isFocusedView: boolean; 
+  // isInSplitView: boolean; 
 }
 
-const DocumentSection = ({ title, description, documents, icon: Icon, iconColor, onHeaderClick, isFocusedView, isInSplitView }: DocumentSectionProps) => (
+const DocumentSection = ({ title, description, documents, icon: Icon, iconColor }: DocumentSectionProps) => ( // Removed unused props
   <Card className={cn("shadow-lg rounded-xl border-border/50 flex flex-col h-full")}>
-    <CardHeader onClick={onHeaderClick} className="cursor-pointer hover:bg-muted/30 rounded-t-xl transition-colors">
+    <CardHeader /* onClick={onHeaderClick} className="cursor-pointer hover:bg-muted/30 rounded-t-xl transition-colors" */ className="rounded-t-xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-6 w-6 ${iconColor}`} />
           <CardTitle className="text-xl">{title}</CardTitle>
         </div>
-        { isInSplitView ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : (isFocusedView ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : null ) }
+        {/* Removed Chevron icons */}
+        {/* { isInSplitView ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : (isFocusedView ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : null ) } */}
       </div>
       <CardDescription>{description}</CardDescription>
     </CardHeader>
@@ -74,23 +77,18 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor,
 
 
 export default function DocumentsPage() {
-  const [activeView, setActiveView] = useState<'both' | 'private' | 'public'>('both');
+  // Removed activeView state
+  // const [activeView, setActiveView] = useState<'both' | 'private' | 'public'>('both');
 
-  const handlePublicHeaderClick = () => {
-    if (activeView === 'public') { // If public is focused
-      setActiveView('both');      // Unfocus it
-    } else if (activeView === 'private') { // If private is focused
-      setActiveView('both');             // Switch to both (showing public beside private)
-    }
-    // If activeView is 'both', do nothing, keeping it side-by-side.
-  };
+  // Removed handlePublicHeaderClick
+  // const handlePublicHeaderClick = () => { ... };
 
   return (
     <div className="space-y-8 flex flex-col h-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">My Documents</h1>
-          <p className="text-muted-foreground">Manage your private and public documents. Click on a section to expand.</p>
+          <p className="text-muted-foreground">Manage your private and public documents.</p>
         </div>
         <div className="flex items-center gap-2">
             <div className="relative w-full md:w-auto md:max-w-xs">
@@ -108,33 +106,34 @@ export default function DocumentsPage() {
       </div>
 
       <div className={cn(
-        "mt-8 flex-1", 
-        activeView === 'both' ? "grid grid-cols-1 md:grid-cols-2 gap-8" : "w-full flex" 
+        "mt-8 flex-1 grid grid-cols-1 md:grid-cols-2 gap-8" 
+        // Removed conditional class based on activeView
+        // activeView === 'both' ? "grid grid-cols-1 md:grid-cols-2 gap-8" : "w-full flex" 
       )}>
-        {(activeView === 'both' || activeView === 'private') && (
-          <DocumentSection
+        {/* Always render Private Documents */}
+        <DocumentSection
             title="Private Documents"
             description="Only visible to you."
             documents={mockPrivateDocuments}
             icon={Lock}
             iconColor="text-primary"
-            onHeaderClick={() => setActiveView(activeView === 'private' ? 'both' : 'private')}
-            isFocusedView={activeView === 'private'}
-            isInSplitView={activeView === 'both'}
+            // Removed props related to focused view
+            // onHeaderClick={() => setActiveView(activeView === 'private' ? 'both' : 'private')}
+            // isFocusedView={activeView === 'private'}
+            // isInSplitView={activeView === 'both'}
           />
-        )}
-        {(activeView === 'both' || activeView === 'public') && (
-          <DocumentSection
+        {/* Always render Public Documents */}
+        <DocumentSection
             title="Public Documents"
             description="Visible to others you share with."
             documents={mockPublicDocuments}
             icon={Globe}
             iconColor="text-accent"
-            onHeaderClick={handlePublicHeaderClick}
-            isFocusedView={activeView === 'public'}
-            isInSplitView={activeView === 'both'}
+            // Removed props related to focused view
+            // onHeaderClick={handlePublicHeaderClick}
+            // isFocusedView={activeView === 'public'}
+            // isInSplitView={activeView === 'both'}
           />
-        )}
       </div>
     </div>
   );
