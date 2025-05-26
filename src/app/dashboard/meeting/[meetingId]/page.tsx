@@ -168,8 +168,8 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   const participants = [
     { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff, videoRef: localVideoRef, hasCameraPermissionForView: hasCameraPermission },
-    { id: "guestUserA", name: "User A", isMicMuted: false, isCameraOff: true },
-    { id: "guestUserB", name: "User B", isMicMuted: true, isCameraOff: false },
+    // { id: "guestUserA", name: "User A", isMicMuted: false, isCameraOff: true },
+    // { id: "guestUserB", name: "User B", isMicMuted: true, isCameraOff: false },
   ];
 
 
