@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Video as VideoIcon, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, FilterX, PlayCircle, Download } from "lucide-react";
+import { Video as VideoIcon, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, FilterX, PlayCircle, Download, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTaskSnap
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
+import Link from "next/link";
 
 interface Recording {
   id: string;
@@ -286,6 +287,11 @@ export default function RecordingsPage() {
               <Button className="btn-gel rounded-lg" onClick={handleUploadClick}>
                   <UploadCloud className="mr-2 h-5 w-5" /> Upload
               </Button>
+               <Link href="/dashboard/settings?highlight=recordingSettings" passHref legacyBehavior>
+                <Button variant="outline" className="rounded-lg">
+                  <Settings className="mr-2 h-5 w-5" /> Settings
+                </Button>
+              </Link>
               <input 
                 type="file" 
                 ref={fileInputRef} 
