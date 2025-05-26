@@ -5,7 +5,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
-import { UserProfileDropdown } from './UserProfileDropdown'; 
+import { UserProfileDropdown } from './UserProfileDropdown';
 
 type AppHeaderProps = {
   showLogo?: boolean;
@@ -16,11 +16,10 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
     if ('contacts' in navigator && 'select' in (navigator as any).contacts) {
       try {
         const properties = ['name', 'email', 'tel'];
-        const opts = { multiple: false }; // Set to true to allow multiple contact selection
-        
-        // navigator.contacts is not yet in standard TS lib, hence 'as any'
+        const opts = { multiple: false };
+
         const contacts = await (navigator as any).contacts.select(properties, opts);
-        
+
         if (contacts && contacts.length > 0) {
           const contact = contacts[0];
           let contactInfo = 'Selected contact:';
@@ -35,8 +34,6 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
           }
           alert(contactInfo);
           console.log('Selected contacts:', contacts);
-          // In a real app, you would use this contact information.
-          // For example, to start a call, pre-fill a form, etc.
         } else {
           alert('No contact selected.');
         }
@@ -82,9 +79,9 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
             </button>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <UserProfileDropdown /> 
+          <UserProfileDropdown />
           <ThemeToggle />
         </div>
       </div>
