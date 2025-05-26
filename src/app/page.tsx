@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useRouter } from 'next/navigation';
+import { AppHeader } from '@/components/common/AppHeader'; // Import AppHeader
 
 interface OngoingMeeting {
   id: string;
@@ -111,9 +112,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* AppSidebar is rendered by the layout, not directly here if using DashboardLayout pattern */}
-      {/* SidebarInset is also part of layout patterns */}
-      {/* AppHeader is rendered by the layout, not directly here if using DashboardLayout pattern */}
+      <AppHeader showLogo={true} /> {/* Added AppHeader here */}
       <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-10"
@@ -128,7 +127,10 @@ export default function HomePage() {
           <Logo
             text={logoTextContent}
             size="large"
-            className="mb-8 text-center cursor-pointer"
+            className={cn(
+              'text-center cursor-pointer',
+              animateChars && logoTextContent === 'TeachMeet' && 'logo-animate-chars'
+            )}
             onClick={handleComplexLogoAnimation}
             animateChars={animateChars && logoTextContent === 'TeachMeet'}
           />
@@ -213,7 +215,6 @@ export default function HomePage() {
         </div>
       </main>
       <SlideUpPanel />
-      {/* Removed <style jsx global> block that defined fadeIn animation */}
     </div>
   );
 }
