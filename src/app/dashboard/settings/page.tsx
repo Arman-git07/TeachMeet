@@ -2,14 +2,14 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from "react";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -38,10 +38,13 @@ SettingsSection.displayName = "SettingsSection";
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
+  
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
+  const recordingSettingsRef = useRef<HTMLDivElement>(null); // Ref for Recording Settings
 
+  const { toast } = useToast();
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
 
   useEffect(() => {
@@ -61,7 +64,6 @@ export default function SettingsPage() {
     });
   };
   
-
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
     if (highlightParam) {
@@ -69,7 +71,7 @@ export default function SettingsPage() {
       
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
-        // Add other section refs here if needed
+        recordingSettings: recordingSettingsRef, // Add recording settings ref to map
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -79,10 +81,16 @@ export default function SettingsPage() {
       
       const timer = setTimeout(() => {
         setHighlightedSectionId(null);
+        // Optionally remove the query param from URL without reloading
+        // router.replace('/dashboard/settings', { scroll: false }); 
       }, 2000); 
       return () => clearTimeout(timer);
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
+
+  const handleNavigateToSection = (sectionId: string) => {
+    router.push(`/dashboard/settings?highlight=${sectionId}`, { scroll: false });
+  };
 
   return (
     <div className="container mx-auto py-8 space-y-10">
@@ -90,6 +98,27 @@ export default function SettingsPage() {
         <h1 className="text-4xl font-bold tracking-tight text-foreground">Settings</h1>
         <p className="text-lg text-muted-foreground mt-2">Customize your TeachMeet experience.</p>
       </div>
+
+      <SettingsSection title="Quick Navigation" description="Jump to specific settings sections." icon={ArrowRightCircle}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Button 
+            variant="outline" 
+            className="rounded-lg justify-start text-left py-3" 
+            onClick={() => handleNavigateToSection('advancedMeetingSettings')}
+          >
+            <VideoIcon className="mr-2 h-5 w-5" />
+            Go to Advanced Meeting Settings
+          </Button>
+          <Button 
+            variant="outline" 
+            className="rounded-lg justify-start text-left py-3" 
+            onClick={() => handleNavigateToSection('recordingSettings')}
+          >
+            <Clapperboard className="mr-2 h-5 w-5" />
+            Go to Recording Settings
+          </Button>
+        </div>
+      </SettingsSection>
 
       <SettingsSection title="General Settings" description="Manage your profile and basic preferences." icon={UserCircle}>
         <div className="space-y-4">
@@ -136,7 +165,14 @@ export default function SettingsPage() {
         <Button className="mt-6 btn-gel rounded-lg">Save Meeting Visuals</Button>
       </SettingsSection>
 
-      <SettingsSection title="Recording Settings" description="Manage cloud storage and auto-recording preferences." icon={Clapperboard} id="recordingSettings">
+      <SettingsSection 
+        id="recordingSettings" // Ensure this ID matches the highlightParam
+        ref={recordingSettingsRef} // Assign the ref
+        title="Recording Settings" 
+        description="Manage cloud storage and auto-recording preferences." 
+        icon={Clapperboard} 
+        className={highlightedSectionId === 'recordingSettings' ? 'highlight-blink' : ''}
+      >
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Cloud Storage Used: <span className="font-semibold text-foreground">0 GB / 5 GB</span></span>
