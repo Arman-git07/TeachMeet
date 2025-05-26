@@ -165,17 +165,29 @@ export default function DocumentsPage() {
         },
         (error) => {
           console.error("Document Upload Error:", error);
+          let errorTitle = "Upload Failed";
+          let errorMessage = `Could not upload ${file.name}. Please try again.`;
+
+          if (error.code === 'storage/unauthorized') {
+            errorMessage = `You are not authorized to upload ${file.name}. Please check storage rules in Firebase.`;
+          } else if (error.code === 'storage/canceled') {
+            errorMessage = `Upload of ${file.name} was canceled.`;
+          } else if (error.code === 'storage/retry-limit-exceeded') {
+            errorTitle = "Upload Timed Out";
+            errorMessage = `The upload of ${file.name} took too long and timed out. This could be due to a slow or unstable network connection. Please check your internet connection and try again. If the problem persists, check the Firebase status page.`;
+          }
+
           toast({
             id: toastId,
             variant: "destructive",
-            title: "Upload Failed",
+            title: errorTitle,
             description: (
               <div className="flex items-center">
                 <AlertCircle className="mr-2 h-4 w-4" />
-                <span>Could not upload {file.name}. Please try again.</span>
+                <span>{errorMessage}</span>
               </div>
             ),
-            duration: 5000,
+            duration: 10000, // Increased duration for timeout message
           });
         },
         async () => {
@@ -223,7 +235,7 @@ export default function DocumentsPage() {
 
   return (
     <>
-      <div className="space-y-4 flex flex-col h-full"> {/* Changed space-y-8 to space-y-4 */}
+      <div className="space-y-4 flex flex-col h-full">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">My Documents</h1>
@@ -248,7 +260,7 @@ export default function DocumentsPage() {
                 ref={fileInputRef} 
                 onChange={handleFileChange}
                 className="hidden"
-                multiple={false} // Ensure single file upload
+                multiple={false}
               />
           </div>
         </div>
@@ -260,7 +272,6 @@ export default function DocumentsPage() {
           </TabsList>
           
           <div className="relative flex-1 overflow-hidden">
-            {/* Private Documents Section */}
             <div className={cn(
               "absolute inset-0 transition-all duration-300 ease-in-out",
               activeTab === 'private' 
@@ -278,7 +289,6 @@ export default function DocumentsPage() {
               />
             </div>
 
-            {/* Public Documents Section */}
             <div className={cn(
               "absolute inset-0 transition-all duration-300 ease-in-out",
               activeTab === 'public' 
