@@ -8,11 +8,7 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 
 // Mock data for recordings - replace with actual data fetching
-const recordings = [
-  { id: "rec1", title: "Project Alpha - Sprint Review", date: "2024-08-20", duration: "45:12", size: "120MB" },
-  { id: "rec2", title: "Client Onboarding Session", date: "2024-08-18", duration: "01:12:30", size: "250MB" },
-  { id: "rec3", title: "Team Brainstorming - Q4 Goals", date: "2024-08-15", duration: "30:55", size: "85MB" },
-];
+const recordings: Array<{ id: string; title: string; date: string; duration: string; size: string; }> = [];
 
 export default function RecordingsPage() {
   return (
