@@ -103,7 +103,7 @@ const NavItem = ({
               {buttonContent}
             </SidebarMenuButton>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg rounded-xl">
             <StartMeetingDialogContent />
           </DialogContent>
         </Dialog>
@@ -117,7 +117,7 @@ const NavItem = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
-              onClick={handleClick} 
+              onClick={handleClick}
               className={buttonClassName}
               isActive={isActive}
             >
@@ -129,13 +129,13 @@ const NavItem = ({
               const isSubItemActive = currentPath.startsWith(item.href);
               return (
                 <Link key={item.label} href={item.href} passHref legacyBehavior>
-                  <DropdownMenuItem 
-                    asChild 
+                  <DropdownMenuItem
+                    asChild
                     className={cn(
                       "cursor-pointer p-3 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md",
                       isSubItemActive && "bg-sidebar-primary text-sidebar-primary-foreground"
                     )}
-                    onSelect={() => { if (isMobile) setOpenMobile(false); }} 
+                    onSelect={() => { if (isMobile) setOpenMobile(false); }}
                   >
                     <a>
                       <item.icon className="mr-2 h-4 w-4" />
@@ -188,8 +188,8 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter(); // Added to fix previous error, though not used in NavItem directly
-  const { isMobile, setOpenMobile } = useSidebar(); // Added to fix previous error
+  const router = useRouter();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
