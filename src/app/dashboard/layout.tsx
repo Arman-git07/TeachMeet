@@ -70,9 +70,7 @@ export default function DashboardLayout({
               <SidebarTrigger className="md:hidden">
                 <PanelLeftOpen className="h-6 w-6" />
               </SidebarTrigger>
-              <SidebarTrigger className="hidden md:flex"> {/* Button for desktop sidebar toggle */}
-                <PanelLeftOpen className="h-6 w-6" />
-              </SidebarTrigger>
+              <SidebarTrigger className="hidden md:flex" onClick={toggleSidebar} /> {/* Button for desktop sidebar toggle, uses default icon */}
               {/* Other header elements (search, profile, theme) are removed for dashboard */}
             </div>
           </header>
