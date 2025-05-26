@@ -10,15 +10,15 @@ import Link from "next/link";
 // import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const mockPrivateDocuments = [
-  { id: "doc_priv_1", name: "Project Proposal Q3.docx", lastModified: "2024-08-15", size: "1.2MB" },
-  { id: "doc_priv_2", name: "Personal Notes.txt", lastModified: "2024-08-10", size: "5KB" },
-  { id: "doc_priv_3", name: "Financial Report Draft.pdf", lastModified: "2024-08-01", size: "3.5MB" },
+const mockPrivateDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [
+  // { id: "doc_priv_1", name: "Project Proposal Q3.docx", lastModified: "2024-08-15", size: "1.2MB" },
+  // { id: "doc_priv_2", name: "Personal Notes.txt", lastModified: "2024-08-10", size: "5KB" },
+  // { id: "doc_priv_3", name: "Financial Report Draft.pdf", lastModified: "2024-08-01", size: "3.5MB" },
 ];
 
-const mockPublicDocuments = [
-  { id: "doc_pub_1", name: "Company Brochure.pdf", lastModified: "2024-07-20", size: "5.0MB" },
-  { id: "doc_pub_2", name: "Product Roadmap.pptx", lastModified: "2024-07-15", size: "2.1MB" },
+const mockPublicDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [
+  // { id: "doc_pub_1", name: "Company Brochure.pdf", lastModified: "2024-07-20", size: "5.0MB" },
+  // { id: "doc_pub_2", name: "Product Roadmap.pptx", lastModified: "2024-07-15", size: "2.1MB" },
 ];
 
 const DocumentItem = ({ name, lastModified, size }: { name: string, lastModified: string, size: string }) => (
@@ -106,7 +106,7 @@ export default function DocumentsPage() {
       </div>
 
       <div className={cn(
-        "mt-8 flex-1 grid grid-cols-1 md:grid-cols-2 gap-8" 
+        "mt-8 flex-1 grid grid-cols-2 gap-8" 
         // Removed conditional class based on activeView
         // activeView === 'both' ? "grid grid-cols-1 md:grid-cols-2 gap-8" : "w-full flex" 
       )}>
