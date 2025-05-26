@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-// Removed useState as activeView is no longer needed
-// import { useState } from "react";
+import { useRef } from "react"; // Added useRef
+import { useToast } from "@/hooks/use-toast"; // Added useToast
 import { cn } from "@/lib/utils";
 
 const mockPrivateDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [
@@ -42,22 +42,16 @@ interface DocumentSectionProps {
   documents: Array<{ id: string; name: string; lastModified: string; size: string; }>;
   icon: React.ElementType;
   iconColor: string;
-  // Removed props related to focused view
-  // onHeaderClick: () => void;
-  // isFocusedView: boolean; 
-  // isInSplitView: boolean; 
 }
 
-const DocumentSection = ({ title, description, documents, icon: Icon, iconColor }: DocumentSectionProps) => ( // Removed unused props
+const DocumentSection = ({ title, description, documents, icon: Icon, iconColor }: DocumentSectionProps) => (
   <Card className={cn("shadow-lg rounded-xl border-border/50 flex flex-col h-full")}>
-    <CardHeader /* onClick={onHeaderClick} className="cursor-pointer hover:bg-muted/30 rounded-t-xl transition-colors" */ className="rounded-t-xl">
+    <CardHeader className="rounded-t-xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-6 w-6 ${iconColor}`} />
           <CardTitle className="text-xl">{title}</CardTitle>
         </div>
-        {/* Removed Chevron icons */}
-        {/* { isInSplitView ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : (isFocusedView ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : null ) } */}
       </div>
       <CardDescription>{description}</CardDescription>
     </CardHeader>
@@ -77,11 +71,29 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor 
 
 
 export default function DocumentsPage() {
-  // Removed activeView state
-  // const [activeView, setActiveView] = useState<'both' | 'private' | 'public'>('both');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
-  // Removed handlePublicHeaderClick
-  // const handlePublicHeaderClick = () => { ... };
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      // Here you would typically handle the file upload process
+      console.log("Selected file:", file.name, file.size, file.type);
+      toast({
+        title: "File Selected (Mock)",
+        description: `You selected: ${file.name}. Actual upload is not implemented yet.`,
+      });
+      // Reset file input to allow selecting the same file again if needed
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
+  };
 
   return (
     <div className="space-y-8 flex flex-col h-full">
@@ -99,40 +111,36 @@ export default function DocumentsPage() {
                 className="pl-10 rounded-lg w-full" 
             />
             </div>
-             <Button className="btn-gel rounded-lg">
+             <Button className="btn-gel rounded-lg" onClick={handleUploadClick}>
                 <UploadCloud className="mr-2 h-5 w-5" /> Upload
             </Button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange}
+              className="hidden"
+              // To allow multiple files: multiple
+              // To specify accepted file types: accept=".pdf,.doc,.docx,image/*"
+            />
         </div>
       </div>
 
       <div className={cn(
         "mt-8 flex-1 grid grid-cols-2 gap-8" 
-        // Removed conditional class based on activeView
-        // activeView === 'both' ? "grid grid-cols-1 md:grid-cols-2 gap-8" : "w-full flex" 
       )}>
-        {/* Always render Private Documents */}
         <DocumentSection
             title="Private Documents"
             description="Only visible to you."
             documents={mockPrivateDocuments}
             icon={Lock}
             iconColor="text-primary"
-            // Removed props related to focused view
-            // onHeaderClick={() => setActiveView(activeView === 'private' ? 'both' : 'private')}
-            // isFocusedView={activeView === 'private'}
-            // isInSplitView={activeView === 'both'}
           />
-        {/* Always render Public Documents */}
         <DocumentSection
             title="Public Documents"
             description="Visible to others you share with."
             documents={mockPublicDocuments}
             icon={Globe}
             iconColor="text-accent"
-            // Removed props related to focused view
-            // onHeaderClick={handlePublicHeaderClick}
-            // isFocusedView={activeView === 'public'}
-            // isInSplitView={activeView === 'both'}
           />
       </div>
     </div>
