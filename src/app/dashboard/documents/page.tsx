@@ -3,26 +3,19 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, ChevronDown, ChevronUp, FilterX } from "lucide-react";
+import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, FilterX } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { auth, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const mockPrivateDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [
-  // { id: "doc_priv_1", name: "Project Proposal Q3.docx", lastModified: "2024-08-15", size: "1.2MB" },
-  // { id: "doc_priv_2", name: "Personal Notes.txt", lastModified: "2024-08-10", size: "5KB" },
-  // { id: "doc_priv_3", name: "Financial Report Draft.pdf", lastModified: "2024-08-01", size: "3.5MB" },
-];
+const mockPrivateDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [];
 
-const mockPublicDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [
-  // { id: "doc_pub_1", name: "Company Brochure.pdf", lastModified: "2024-07-20", size: "5.0MB" },
-  // { id: "doc_pub_2", name: "Product Roadmap.pptx", lastModified: "2024-07-15", size: "2.1MB" },
-];
+const mockPublicDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [];
 
 const DocumentItem = ({ name, lastModified, size }: { name: string, lastModified: string, size: string }) => (
   <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
@@ -46,15 +39,16 @@ interface DocumentSectionProps {
   icon: React.ElementType;
   iconColor: string;
   searchQuery: string;
+  className?: string;
 }
 
-const DocumentSection = ({ title, description, documents, icon: Icon, iconColor, searchQuery }: DocumentSectionProps) => {
+const DocumentSection = ({ title, description, documents, icon: Icon, iconColor, searchQuery, className }: DocumentSectionProps) => {
   const filteredDocuments = documents.filter(doc =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <Card className={cn("shadow-lg rounded-xl border-border/50 flex flex-col h-full")}>
+    <Card className={cn("shadow-lg rounded-xl border-border/50 flex flex-col h-full", className)}>
       <CardHeader className="rounded-t-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -65,7 +59,7 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor,
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col space-y-2 overflow-y-auto p-4">
-        {documents.length === 0 ? (
+        {documents.length === 0 && searchQuery === '' ? (
           <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center">
             <FolderOpen className="mx-auto h-12 w-12 mb-2" />
             {title === "Private Documents" ? (
@@ -100,6 +94,7 @@ export default function DocumentsPage() {
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
   const [uploadDestination, setUploadDestination] = useState<'private' | 'public' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'private' | 'public'>('private');
 
   const handleUploadClick = () => {
     if (!auth.currentUser) {
@@ -228,7 +223,7 @@ export default function DocumentsPage() {
 
   return (
     <>
-      <div className="space-y-8 flex flex-col h-full">
+      <div className="space-y-4 flex flex-col h-full"> {/* Changed space-y-8 to space-y-4 */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">My Documents</h1>
@@ -253,30 +248,55 @@ export default function DocumentsPage() {
                 ref={fileInputRef} 
                 onChange={handleFileChange}
                 className="hidden"
+                multiple={false} // Ensure single file upload
               />
           </div>
         </div>
 
-        <div className={cn(
-          "mt-8 flex-1 grid grid-cols-2 gap-8" 
-        )}>
-          <DocumentSection
-              title="Private Documents"
-              description="Only visible to you."
-              documents={mockPrivateDocuments}
-              icon={Lock}
-              iconColor="text-primary"
-              searchQuery={searchQuery}
-            />
-          <DocumentSection
-              title="Public Documents"
-              description="Visible to others you share with."
-              documents={mockPublicDocuments}
-              icon={Globe}
-              iconColor="text-accent"
-              searchQuery={searchQuery}
-            />
-        </div>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'private' | 'public')} className="flex flex-col flex-grow">
+          <TabsList className="mb-4 self-start rounded-lg">
+            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger>
+            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger>
+          </TabsList>
+          
+          <div className="relative flex-1 overflow-hidden">
+            {/* Private Documents Section */}
+            <div className={cn(
+              "absolute inset-0 transition-all duration-300 ease-in-out",
+              activeTab === 'private' 
+                ? 'opacity-100 translate-x-0 z-10' 
+                : 'opacity-0 -translate-x-full pointer-events-none'
+            )}>
+              <DocumentSection
+                title="Private Documents"
+                description="Only visible to you."
+                documents={mockPrivateDocuments}
+                icon={Lock}
+                iconColor="text-primary"
+                searchQuery={searchQuery}
+                className="h-full"
+              />
+            </div>
+
+            {/* Public Documents Section */}
+            <div className={cn(
+              "absolute inset-0 transition-all duration-300 ease-in-out",
+              activeTab === 'public' 
+                ? 'opacity-100 translate-x-0 z-10' 
+                : 'opacity-0 translate-x-full pointer-events-none'
+            )}>
+              <DocumentSection
+                title="Public Documents"
+                description="Visible to others you share with."
+                documents={mockPublicDocuments}
+                icon={Globe}
+                iconColor="text-accent"
+                searchQuery={searchQuery}
+                className="h-full"
+              />
+            </div>
+          </div>
+        </Tabs>
       </div>
 
       <Dialog open={isUploadChoiceDialogOpen} onOpenChange={setIsUploadChoiceDialogOpen}>
