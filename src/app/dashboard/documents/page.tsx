@@ -65,7 +65,7 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor 
         <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center">
           <FolderOpen className="mx-auto h-12 w-12 mb-2" />
           {title === "Private Documents" ? (
-            <p className="text-sm">The private uploaded documents will show here and can be accessed by users device only.</p>
+            <p className="text-sm">The private uploaded documents will show here and can be accessed and seen by users device only</p>
           ) : (
             <>
               <p>No documents yet.</p>
