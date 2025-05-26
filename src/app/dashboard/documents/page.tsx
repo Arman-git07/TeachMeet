@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, ChevronDown, ChevronUp, FilterX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
@@ -45,40 +45,53 @@ interface DocumentSectionProps {
   documents: Array<{ id: string; name: string; lastModified: string; size: string; }>;
   icon: React.ElementType;
   iconColor: string;
+  searchQuery: string;
 }
 
-const DocumentSection = ({ title, description, documents, icon: Icon, iconColor }: DocumentSectionProps) => (
-  <Card className={cn("shadow-lg rounded-xl border-border/50 flex flex-col h-full")}>
-    <CardHeader className="rounded-t-xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon className={`h-6 w-6 ${iconColor}`} />
-          <CardTitle className="text-xl">{title}</CardTitle>
+const DocumentSection = ({ title, description, documents, icon: Icon, iconColor, searchQuery }: DocumentSectionProps) => {
+  const filteredDocuments = documents.filter(doc =>
+    doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <Card className={cn("shadow-lg rounded-xl border-border/50 flex flex-col h-full")}>
+      <CardHeader className="rounded-t-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Icon className={`h-6 w-6 ${iconColor}`} />
+            <CardTitle className="text-xl">{title}</CardTitle>
+          </div>
         </div>
-      </div>
-      <CardDescription>{description}</CardDescription>
-    </CardHeader>
-    <CardContent className="flex-grow flex flex-col space-y-2 overflow-y-auto p-4">
-      {documents.length > 0 ? (
-        documents.map(doc => <DocumentItem key={doc.id} {...doc} />)
-      ) : (
-        <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center">
-          <FolderOpen className="mx-auto h-12 w-12 mb-2" />
-          {title === "Private Documents" ? (
-            <p className="text-sm">The private uploaded documents will show here and can be accessed and seen by users device only</p>
-          ) : title === "Public Documents" ? (
-            <p className="text-sm">The public uploaded documents will show here and can be accessed and seen by any device</p>
-          ) : (
-            <>
-              <p>No documents yet.</p>
-              <p className="text-xs">Upload and share files.</p>
-            </>
-          )}
-        </div>
-      )}
-    </CardContent>
-  </Card>
-);
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex-grow flex flex-col space-y-2 overflow-y-auto p-4">
+        {documents.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center">
+            <FolderOpen className="mx-auto h-12 w-12 mb-2" />
+            {title === "Private Documents" ? (
+              <p className="text-sm">The private uploaded documents will show here and can be accessed and seen by users device only</p>
+            ) : title === "Public Documents" ? (
+              <p className="text-sm">The public uploaded documents will show here and can be accessed and seen by any device</p>
+            ) : (
+              <>
+                <p>No documents yet.</p>
+                <p className="text-xs">Upload and share files.</p>
+              </>
+            )}
+          </div>
+        ) : filteredDocuments.length > 0 ? (
+          filteredDocuments.map(doc => <DocumentItem key={doc.id} {...doc} />)
+        ) : (
+          <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center">
+            <FilterX className="mx-auto h-12 w-12 mb-2" />
+            <p className="text-sm">No documents match your search &quot;{searchQuery}&quot;.</p>
+            <p className="text-xs">Try a different search term.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 
 export default function DocumentsPage() {
@@ -86,6 +99,7 @@ export default function DocumentsPage() {
   const { toast } = useToast();
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
   const [uploadDestination, setUploadDestination] = useState<'private' | 'public' | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleUploadClick = () => {
     if (!auth.currentUser) {
@@ -110,7 +124,7 @@ export default function DocumentsPage() {
     if (files && files.length > 0 && uploadDestination) {
       const file = files[0];
 
-      if (!auth.currentUser) { // Redundant check, but good for safety
+      if (!auth.currentUser) { 
         toast({
           variant: "destructive",
           title: "Authentication Required",
@@ -122,7 +136,6 @@ export default function DocumentsPage() {
       }
       
       const userId = auth.currentUser.uid;
-      // Path includes the destination (private/public)
       const filePath = `user_documents/${userId}/${uploadDestination}/${file.name}`;
       const fileRef = storageRef(storage, filePath);
       const uploadTask = uploadBytesResumable(fileRef, file);
@@ -137,7 +150,7 @@ export default function DocumentsPage() {
             <span>Starting upload of {file.name} to {uploadDestination}. (0%)</span>
           </div>
         ),
-        duration: Infinity, // Keep toast until manually dismissed or updated
+        duration: Infinity, 
       });
 
       uploadTask.on('state_changed',
@@ -175,7 +188,7 @@ export default function DocumentsPage() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast({
               id: toastId,
-              variant: "default", // Using default for success look
+              variant: "default", 
               title: "Document Uploaded!",
               description: (
                 <div className="flex items-center">
@@ -186,8 +199,8 @@ export default function DocumentsPage() {
               duration: 5000, 
             });
             console.log("Download URL:", downloadURL);
-            // Here you would typically save the downloadURL and file metadata to Firestore
-            // and update the local state to show the new document in the list.
+            // TODO: Save downloadURL and file metadata to Firestore
+            // TODO: Update local state to show the new document in the list.
           } catch (error) {
             console.error("Error getting download URL:", error);
             toast({
@@ -207,9 +220,9 @@ export default function DocumentsPage() {
       );
 
       if (event.target) {
-        event.target.value = ""; // Reset file input
+        event.target.value = ""; 
       }
-      setUploadDestination(null); // Reset destination after processing
+      setUploadDestination(null); 
     }
   };
 
@@ -228,6 +241,8 @@ export default function DocumentsPage() {
                   type="search" 
                   placeholder="Search documents..." 
                   className="pl-10 rounded-lg w-full" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
               />
               </div>
               <Button className="btn-gel rounded-lg" onClick={handleUploadClick}>
@@ -251,6 +266,7 @@ export default function DocumentsPage() {
               documents={mockPrivateDocuments}
               icon={Lock}
               iconColor="text-primary"
+              searchQuery={searchQuery}
             />
           <DocumentSection
               title="Public Documents"
@@ -258,6 +274,7 @@ export default function DocumentsPage() {
               documents={mockPublicDocuments}
               icon={Globe}
               iconColor="text-accent"
+              searchQuery={searchQuery}
             />
         </div>
       </div>
@@ -298,6 +315,3 @@ export default function DocumentsPage() {
     </>
   );
 }
-
-
-    
