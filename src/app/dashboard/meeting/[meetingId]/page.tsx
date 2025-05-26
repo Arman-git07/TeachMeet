@@ -77,17 +77,29 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const { meetingId } = use(paramsPromise);
   const { toast } = useToast();
 
-  const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isCameraOff, setIsCameraOff] = useState(false); 
+  const [isMicMuted, setIsMicMuted] = useState(false); // Mock mic state for now
+  const [isCameraOff, setIsCameraOff] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
+      // Clean up immediately after reading so it doesn't affect next meeting join
+      localStorage.removeItem('teachmeet-desired-camera-state'); 
+      // If 'on', camera is NOT off. If 'off' or null, camera IS off.
+      return desiredState !== 'on'; 
+    }
+    return true; // Default to camera OFF if localStorage not available or no value
+  });
+  
   const [isHandRaised, setIsHandRaised] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const currentLocalStreamRef = useRef<MediaStream | null>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null); // null: not determined, true: granted, false: denied
 
   useEffect(() => {
-    const initCamera = async () => {
-      if (!isCameraOff) { 
+    // This effect attempts to initialize the camera based on the initial isCameraOff state
+    // and also handles permission checking.
+    const initializeCameraAndPermissions = async () => {
+      if (!isCameraOff) { // If camera is intended to be ON initially
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
@@ -95,64 +107,78 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             localVideoRef.current.srcObject = stream;
           }
           setHasCameraPermission(true);
+          // setIsCameraOff(false); // No need to set it here, it's already false based on initial state
         } catch (err) {
           console.error("Failed to get camera on mount:", err);
           setHasCameraPermission(false);
-          setIsCameraOff(true); 
+          setIsCameraOff(true); // Force camera off if permission denied/error
           toast({
             variant: 'destructive',
             title: 'Camera Access Denied',
             description: 'Please enable camera permissions in your browser settings.',
           });
         }
-      } else {
+      } else { // If camera is intended to be OFF initially, still check permissions passively
          navigator.mediaDevices.getUserMedia({ video: true })
           .then(stream => {
             setHasCameraPermission(true);
-            stream.getTracks().forEach(track => track.stop()); 
+            stream.getTracks().forEach(track => track.stop()); // Stop immediately if we got it
           })
-          .catch(() => setHasCameraPermission(false));
+          .catch(() => {
+            setHasCameraPermission(false); // If this passive check fails, permission is likely denied
+          });
       }
     };
-    initCamera();
+
+    initializeCameraAndPermissions();
 
     return () => {
+      // Cleanup: stop any active stream when the component unmounts
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, []); 
+    // This useEffect should run once on mount to set up based on localStorage.
+  }, []); // Empty dependency array ensures this runs once on mount
 
 
-  const toggleMic = () => setIsMicMuted(prev => !prev);
+  const toggleMic = () => setIsMicMuted(prev => !prev); // Mock toggle for now
 
   const toggleCamera = async () => {
     const newCameraStateIsOff = !isCameraOff; 
 
-    if (!newCameraStateIsOff) { 
-      if (hasCameraPermission === false) {
+    if (!newCameraStateIsOff) { // Trying to turn camera ON
+      if (hasCameraPermission === false) { // If permission was explicitly denied
         toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
         return;
       }
-      if (!currentLocalStreamRef.current?.active) { 
+      // If stream doesn't exist or is inactive, try to get it
+      if (!currentLocalStreamRef.current || !currentLocalStreamRef.current.active) { 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
-          setHasCameraPermission(true); 
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+          setHasCameraPermission(true); // Update permission status
+          setIsCameraOff(false);
         } catch (err) {
           console.error("Failed to get camera on toggle:", err);
-          setHasCameraPermission(false);
+          setHasCameraPermission(false); // Explicitly set permission to false on error
+          setIsCameraOff(true); // Ensure it's marked as off if failed
           toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
           return; 
         }
+      } else { // Stream exists and is active, just ensure video element is connected and state is updated
+        if (localVideoRef.current && currentLocalStreamRef.current) {
+            localVideoRef.current.srcObject = currentLocalStreamRef.current;
+        }
+        setIsCameraOff(false);
       }
-      if (localVideoRef.current && currentLocalStreamRef.current) {
-        localVideoRef.current.srcObject = currentLocalStreamRef.current;
-      }
-      setIsCameraOff(false);
-    } else { 
+    } else { // Trying to turn camera OFF
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
       }
+      // currentLocalStreamRef.current = null; // Not strictly needed to null out here, stopping tracks is key
       setIsCameraOff(true);
     }
   };
@@ -208,7 +234,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       </header>
 
       <main className="flex-1 p-4 overflow-y-auto flex flex-col">
-        {hasCameraPermission === false && (
+        {hasCameraPermission === false && ( // Show this only if permission is known to be false
            <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Camera Permission Required</AlertTitle>
@@ -225,13 +251,14 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 name={participants[0].name}
                 isMe={participants[0].isMe}
                 isMicMuted={participants[0].isMicMuted}
-                isCameraOff={participants[0].isCameraOff}
+                isCameraOff={participants[0].isCameraOff} // This is the state variable
                 videoRef={localVideoRef}
                 hasCameraPermissionForView={hasCameraPermission}
               />
             </div>
           </div>
         ) : (
+          // This part of the grid won't be used if you've removed mock participants
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {participants.map(p => (
               <ParticipantView 

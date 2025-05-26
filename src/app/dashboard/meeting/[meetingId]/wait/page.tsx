@@ -11,17 +11,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth"; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch"; // Import Switch
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(props.params);
   const { meetingId } = resolvedParams;
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic");
+  const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
 
@@ -144,9 +145,19 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const userFallback = userName.charAt(0).toUpperCase();
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
-  const joinNowLinkPath = topic 
-    ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-    : `/dashboard/meeting/${meetingId}`;
+  
+  const handleJoinNow = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
+      // Optionally persist mic state too if needed:
+      // localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
+    }
+    const joinNowLinkPath = topic 
+      ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+      : `/dashboard/meeting/${meetingId}`;
+    router.push(joinNowLinkPath);
+  };
+
 
   const videoClassNames = cn(
     "w-full h-full object-cover",
@@ -181,7 +192,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
             {(!isCameraActive || hasCameraPermission === false) && (
-              <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                  {authLoading ? (
                       <p>Loading user info...</p>
                     ) : (
@@ -283,12 +294,9 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             </Label>
           </div>
 
-
-          <Link href={joinNowLinkPath} passHref legacyBehavior>
-            <Button asChild className="w-full btn-gel text-lg py-3 rounded-lg" disabled={!agreedToTerms}>
-              <a>Join Now</a>
-            </Button>
-          </Link>
+          <Button onClick={handleJoinNow} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={!agreedToTerms}>
+            Join Now
+          </Button>
           {!agreedToTerms && (
             <p className="text-xs text-destructive text-center">
               You must agree to the terms and guidelines to join the meeting.
