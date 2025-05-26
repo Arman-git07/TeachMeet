@@ -2,12 +2,12 @@
 'use client'; // Required for using hooks like useAuth, useRouter, and useSidebar
 
 import { AppSidebar } from '@/components/common/AppSidebar';
-import { SidebarInset, useSidebar } from '@/components/ui/sidebar';
+import { SidebarInset, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'; // Added SidebarTrigger
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AppHeader } from '@/components/common/AppHeader'; // Import AppHeader
+import { PanelLeftOpen } from 'lucide-react'; // Added PanelLeftOpen
 
 export default function DashboardLayout({
   children,
@@ -16,7 +16,7 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const { state: sidebarState, isMobile: sidebarIsMobile } = useSidebar(); // Get sidebar context
+  const { state: sidebarState, isMobile: sidebarIsMobile, toggleSidebar } = useSidebar();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -44,13 +44,10 @@ export default function DashboardLayout({
           </div>
         )}
         <div className="flex flex-1 flex-col">
+          {/* Minimal skeleton for the new header */}
           <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
-              {/* Minimal skeleton for header elements */}
-              <Skeleton className="h-8 w-8 rounded-md mr-4" /> 
-              <Skeleton className="h-8 w-full max-w-md rounded-full" />
-              <Skeleton className="h-8 w-8 rounded-full ml-auto mr-2" />
-              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-8 w-8 rounded-md" /> {/* Sidebar trigger skeleton */}
             </div>
           </header>
           <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
@@ -67,7 +64,18 @@ export default function DashboardLayout({
       <AppSidebar />
       <SidebarInset>
         <div className="flex flex-1 flex-col">
-          <AppHeader /> {/* Restore the AppHeader here */}
+          {/* New minimal header for DashboardLayout */}
+          <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
+            <div className="container mx-auto flex h-16 items-center justify-start gap-4 px-4 sm:px-6 lg:px-8">
+              <SidebarTrigger className="md:hidden">
+                <PanelLeftOpen className="h-6 w-6" />
+              </SidebarTrigger>
+              <SidebarTrigger className="hidden md:flex"> {/* Button for desktop sidebar toggle */}
+                <PanelLeftOpen className="h-6 w-6" />
+              </SidebarTrigger>
+              {/* Other header elements (search, profile, theme) are removed for dashboard */}
+            </div>
+          </header>
           <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
             {children}
           </main>
