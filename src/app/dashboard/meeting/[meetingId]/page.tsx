@@ -76,11 +76,11 @@ const ParticipantView = ({
 
 export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
   const { meetingId } = use(paramsPromise);
-  const searchParams = useSearchParams(); // Get search params
-  const topic = searchParams.get('topic'); // Get topic from query
+  const searchParams = useSearchParams(); 
+  const topic = searchParams.get('topic'); 
   const { toast } = useToast();
 
-  const [isMicMuted, setIsMicMuted] = useState(false); // Mock mic state for now
+  const [isMicMuted, setIsMicMuted] = useState(false); 
   const [isCameraOff, setIsCameraOff] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
@@ -177,9 +177,19 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
   };
   
-  const toggleHandRaise = () => setIsHandRaised(prev => !prev);
+  const toggleHandRaise = () => {
+    const newHandState = !isHandRaised;
+    setIsHandRaised(newHandState);
+    if (newHandState) {
+      toast({ title: "Hand Raised!", description: "You raised your hand." });
+    } else {
+      toast({ title: "Hand Lowered", description: "You lowered your hand." });
+    }
+  };
+
   const leaveMeeting = () => {
     toast({ title: "Leaving Meeting", description: "You have left the meeting (mock action)." });
+    // In a real app, you would navigate away, e.g., router.push('/dashboard');
   };
 
   const handleReportIssue = () => {
