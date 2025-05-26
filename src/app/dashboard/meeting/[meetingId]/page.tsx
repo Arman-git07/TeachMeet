@@ -19,7 +19,7 @@ const ParticipantView = ({
   isCameraOff = false, 
   videoRef,
   hasCameraPermissionForView,
-  isHandRaisedForView // New prop
+  isHandRaisedForView
 }: { 
   name: string, 
   isMe?: boolean, 
@@ -27,7 +27,7 @@ const ParticipantView = ({
   isCameraOff?: boolean,
   videoRef?: React.RefObject<HTMLVideoElement>,
   hasCameraPermissionForView?: boolean | null,
-  isHandRaisedForView?: boolean // New prop
+  isHandRaisedForView?: boolean
 }) => {
   const showAvatar = (isMe && isCameraOff) || (isMe && hasCameraPermissionForView === false) || (!isMe && isCameraOff);
 
@@ -197,7 +197,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   const leaveMeeting = () => {
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
-    // In a real app, you would navigate away, e.g., router.push('/dashboard');
     router.push('/');
   };
 
@@ -211,8 +210,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   const participants = [
     { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff, videoRef: localVideoRef, hasCameraPermissionForView: hasCameraPermission, isHandRaisedForView: isHandRaised },
-    // { id: "userA", name: "User A", isMicMuted: false, isCameraOff: false, isHandRaisedForView: false },
-    // { id: "userB", name: "User B", isMicMuted: true, isCameraOff: true, isHandRaisedForView: true },
   ];
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
@@ -299,7 +296,18 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           <Button variant={isCameraOff ? "destructive" : "secondary"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleCamera} aria-label={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}>
             {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
-          <Button variant={isHandRaised ? "primary" : "secondary"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleHandRaise} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}>
+          <Button
+            variant={isHandRaised ? "default" : "secondary"}
+            size="lg"
+            className={cn(
+              "rounded-full p-4",
+              isHandRaised 
+                ? "btn-gel ring-2 ring-offset-2 ring-offset-background ring-primary-foreground/80 shadow-lg" 
+                : "shadow-md"
+            )}
+            onClick={toggleHandRaise}
+            aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
+          >
             <Hand className="h-6 w-6" />
           </Button>
           <Button variant="destructive" size="lg" className="rounded-full p-4" onClick={leaveMeeting} aria-label="Leave Meeting">
