@@ -160,6 +160,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     return () => {
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
 
@@ -272,7 +273,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             <DropdownMenuItem><MessageSquare className="mr-2 h-4 w-4" /> Chat</DropdownMenuItem>
             <DropdownMenuItem><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem><Maximize className="mr-2 h-4 w-4" /> Full Screen</DropdownMenuItem>
             <DropdownMenuItem><Columns className="mr-2 h-4 w-4" /> Change Layout</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleReportIssue} className="text-destructive focus:text-destructive">
@@ -357,3 +357,4 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
+
