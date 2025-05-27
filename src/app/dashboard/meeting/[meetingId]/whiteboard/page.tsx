@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle as CircleIcon, Square as SquareIcon, MinusSquare } from "lucide-react"; // Added CircleIcon, SquareIcon
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle as CircleIcon, Square as SquareIcon, Edit3 } from "lucide-react"; // Added Edit3
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -64,8 +64,8 @@ export default function WhiteboardPage() {
 
   const brushSizes = [
     { name: 'small', icon: CircleIcon, label: 'Small Brush', lineWidth: 2 },
-    { name: 'medium', icon: MinusSquare, label: 'Medium Brush', lineWidth: 5 },
-    { name: 'large', icon: SquareIcon, label: 'Large Brush', lineWidth: 10 },
+    { name: 'medium', icon: SquareIcon, label: 'Medium Brush', lineWidth: 5 }, // Changed icon
+    { name: 'large', icon: SquareIcon, label: 'Large Brush', lineWidth: 10 }, // Changed icon, kept Square for large
   ];
 
   const getLineWidth = useCallback(() => {
@@ -77,8 +77,12 @@ export default function WhiteboardPage() {
     if (canvas && canvas.parentElement) {
       const imageData = contextRef.current?.getImageData(0, 0, canvas.width, canvas.height);
       
+      // Calculate available height considering sticky toolbars
+      let availableHeight = canvas.parentElement.clientHeight;
+      
       canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = canvas.parentElement.clientHeight;
+      canvas.height = availableHeight;
+
 
       if (contextRef.current) {
         contextRef.current.lineCap = "round";
@@ -86,6 +90,8 @@ export default function WhiteboardPage() {
         contextRef.current.strokeStyle = selectedColor;
         contextRef.current.lineWidth = getLineWidth();
         if (imageData) {
+          // Before putImageData, clear the canvas to avoid compounding old content
+          contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
           contextRef.current.putImageData(imageData, 0, 0);
         }
       }
@@ -117,10 +123,10 @@ export default function WhiteboardPage() {
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
-    if (event.nativeEvent instanceof MouseEvent) {
+    if ('clientX' in event.nativeEvent) { // MouseEvent
         clientX = event.nativeEvent.clientX;
         clientY = event.nativeEvent.clientY;
-    } else if (event.nativeEvent instanceof TouchEvent && event.nativeEvent.touches.length > 0) {
+    } else if ('touches' in event.nativeEvent && event.nativeEvent.touches.length > 0) { // TouchEvent
         clientX = event.nativeEvent.touches[0].clientX;
         clientY = event.nativeEvent.touches[0].clientY;
     } else {
@@ -158,7 +164,6 @@ export default function WhiteboardPage() {
       contextRef.current.stroke();
       setLastPosition(pos);
     }
-    // For shapes, drawing happens on mouseUp for simplicity
   };
 
   const stopDrawing = (event: React.MouseEvent | React.TouchEvent) => {
@@ -182,7 +187,7 @@ export default function WhiteboardPage() {
         const radius = Math.sqrt(dx * dx + dy * dy) / 2;
         const centerX = start.x + dx / 2;
         const centerY = start.y + dy / 2;
-        contextRef.current.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        contextRef.current.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
       }
       contextRef.current.stroke();
       contextRef.current.closePath();
@@ -198,20 +203,17 @@ export default function WhiteboardPage() {
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
     
-    // If clicking the same drawing tool that's already active, toggle options.
-    // Otherwise, set the new tool and manage options visibility.
     if (activeTool === toolId && drawingTools.includes(toolId)) {
         setShowDrawingToolOptions(prev => !prev);
     } else {
         setActiveTool(toolId);
-        setIsDrawing(false); // Stop any ongoing drawing
+        setIsDrawing(false); 
         if (drawingTools.includes(toolId)) {
-            setShowDrawingToolOptions(true); // Show options for any drawing tool
+            setShowDrawingToolOptions(true); 
         } else {
-            setShowDrawingToolOptions(false); // Hide for non-drawing tools
+            setShowDrawingToolOptions(false); 
         }
 
-        // Toast for non-drawing tools or tools under development
         if (!drawingTools.includes(toolId) && toolId !== 'text' && toolId !== 'select' && toolId !== 'erase' && toolId !== 'clear') {
             toast({
             title: `${toolName} Selected`,
@@ -280,7 +282,7 @@ export default function WhiteboardPage() {
       <div className="flex-none p-2 border-b bg-background shadow-md sticky top-[65px] z-10">
         <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
           <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
-          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={activeTool === "draw"} />
+          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={drawingTools.includes(activeTool || "")} />
           <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
           <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
           <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
@@ -288,7 +290,7 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      {showDrawingToolOptions && (
+      {showDrawingToolOptions && (drawingTools.includes(activeTool || "")) && (
         <div className="flex-none p-2 border-b bg-muted/50 shadow-sm sticky top-[calc(65px+58px)] z-10">
           <div className="container mx-auto">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center justify-center">
@@ -323,6 +325,7 @@ export default function WhiteboardPage() {
                 </div>
                 <div className="flex items-center justify-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground mr-1">Shape:</span>
+                    <ToolButton icon={Edit3} label="Freehand" onClick={() => handleToolClick("Draw")} isActive={activeTool === "draw"} />
                     <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick("Line")} isActive={activeTool === "line"} />
                     <ToolButton icon={CircleIcon} label="Circle" onClick={() => handleToolClick("Circle")} isActive={activeTool === "circle"} />
                     <ToolButton icon={SquareIcon} label="Square" onClick={() => handleToolClick("Square")} isActive={activeTool === "square"} />
@@ -357,11 +360,11 @@ export default function WhiteboardPage() {
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing} // Stop drawing if mouse leaves canvas
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={stopDrawing}
-              className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair"
+              onMouseLeave={stopDrawing} 
+              onTouchStart={(e) => { e.preventDefault(); startDrawing(e);}}
+              onTouchMove={(e) => { e.preventDefault(); draw(e);}}
+              onTouchEnd={(e) => { e.preventDefault(); stopDrawing(e);}}
+              className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair touch-none" // Added touch-none
             />
             {activeTool === 'text' && (
               <Textarea
@@ -388,3 +391,4 @@ export default function WhiteboardPage() {
     </div>
   );
 }
+
