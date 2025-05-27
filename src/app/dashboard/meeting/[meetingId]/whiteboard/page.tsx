@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle as CircleIcon, Square as SquareIcon, Edit3 } from "lucide-react"; // Added Edit3
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle as CircleIcon, Square as SquareIcon, Edit3 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -64,8 +64,8 @@ export default function WhiteboardPage() {
 
   const brushSizes = [
     { name: 'small', icon: CircleIcon, label: 'Small Brush', lineWidth: 2 },
-    { name: 'medium', icon: SquareIcon, label: 'Medium Brush', lineWidth: 5 }, // Changed icon
-    { name: 'large', icon: SquareIcon, label: 'Large Brush', lineWidth: 10 }, // Changed icon, kept Square for large
+    { name: 'medium', icon: SquareIcon, label: 'Medium Brush', lineWidth: 5 },
+    { name: 'large', icon: SquareIcon, label: 'Large Brush', lineWidth: 10 },
   ];
 
   const getLineWidth = useCallback(() => {
@@ -77,12 +77,10 @@ export default function WhiteboardPage() {
     if (canvas && canvas.parentElement) {
       const imageData = contextRef.current?.getImageData(0, 0, canvas.width, canvas.height);
       
-      // Calculate available height considering sticky toolbars
       let availableHeight = canvas.parentElement.clientHeight;
       
       canvas.width = canvas.parentElement.clientWidth;
       canvas.height = availableHeight;
-
 
       if (contextRef.current) {
         contextRef.current.lineCap = "round";
@@ -90,7 +88,6 @@ export default function WhiteboardPage() {
         contextRef.current.strokeStyle = selectedColor;
         contextRef.current.lineWidth = getLineWidth();
         if (imageData) {
-          // Before putImageData, clear the canvas to avoid compounding old content
           contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
           contextRef.current.putImageData(imageData, 0, 0);
         }
@@ -115,8 +112,12 @@ export default function WhiteboardPage() {
     if (contextRef.current) {
       contextRef.current.strokeStyle = selectedColor;
       contextRef.current.lineWidth = getLineWidth();
+      // Reset composite operation if tool changes away from eraser
+      if (activeTool !== 'erase') {
+        contextRef.current.globalCompositeOperation = 'source-over';
+      }
     }
-  }, [selectedColor, selectedBrushSize, getLineWidth]);
+  }, [selectedColor, selectedBrushSize, getLineWidth, activeTool]);
 
   const getMousePosition = (event: React.MouseEvent | React.TouchEvent): { x: number, y: number } | null => {
     const canvas = canvasRef.current;
@@ -146,10 +147,20 @@ export default function WhiteboardPage() {
     setIsDrawing(true);
     setLastPosition(pos); 
     
-    if (activeTool === 'draw') {
-      contextRef.current.beginPath();
-      contextRef.current.moveTo(pos.x, pos.y);
-    } else if (['line', 'circle', 'square'].includes(activeTool)) {
+    contextRef.current.beginPath();
+    contextRef.current.moveTo(pos.x, pos.y);
+
+    if (activeTool === 'erase') {
+      contextRef.current.globalCompositeOperation = 'destination-out';
+      // Eraser uses current brush size for width
+      contextRef.current.lineWidth = getLineWidth();
+    } else {
+      contextRef.current.globalCompositeOperation = 'source-over';
+      contextRef.current.strokeStyle = selectedColor;
+      contextRef.current.lineWidth = getLineWidth();
+    }
+    
+    if (['line', 'circle', 'square'].includes(activeTool)) {
       setShapeStartPoint(pos);
     }
   };
@@ -159,7 +170,7 @@ export default function WhiteboardPage() {
     const pos = getMousePosition(event);
     if (!pos) return;
     
-    if (activeTool === 'draw') {
+    if (activeTool === 'draw' || activeTool === 'erase') {
       contextRef.current.lineTo(pos.x, pos.y);
       contextRef.current.stroke();
       setLastPosition(pos);
@@ -170,9 +181,12 @@ export default function WhiteboardPage() {
     if (!contextRef.current || !isDrawing || !activeTool) return;
     const pos = getMousePosition(event); 
     
-    if (activeTool === 'draw') {
-      contextRef.current.closePath();
-    } else if (shapeStartPoint && pos && contextRef.current && ['line', 'circle', 'square'].includes(activeTool)) {
+    contextRef.current.closePath();
+    
+    if (shapeStartPoint && pos && contextRef.current && ['line', 'circle', 'square'].includes(activeTool)) {
+      contextRef.current.globalCompositeOperation = 'source-over'; // Ensure shapes draw normally
+      contextRef.current.strokeStyle = selectedColor;
+      contextRef.current.lineWidth = getLineWidth();
       const start = shapeStartPoint;
       const end = pos;
       contextRef.current.beginPath();
@@ -193,34 +207,43 @@ export default function WhiteboardPage() {
       contextRef.current.closePath();
     }
 
+    // Reset globalCompositeOperation if eraser was active
+    if (activeTool === 'erase') {
+      contextRef.current.globalCompositeOperation = 'source-over';
+    }
+
     setIsDrawing(false);
     setLastPosition(null);
     setShapeStartPoint(null);
   };
 
-  const drawingTools = ['draw', 'line', 'circle', 'square'];
+  const drawingTools = ['draw', 'line', 'circle', 'square', 'erase'];
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
     
-    if (activeTool === toolId && drawingTools.includes(toolId)) {
+    if (activeTool === toolId && (drawingTools.includes(toolId) || toolId === 'draw')) { // 'draw' is freehand
         setShowDrawingToolOptions(prev => !prev);
     } else {
         setActiveTool(toolId);
         setIsDrawing(false); 
-        if (drawingTools.includes(toolId)) {
+        if (drawingTools.includes(toolId) || toolId === 'draw') {
             setShowDrawingToolOptions(true); 
         } else {
             setShowDrawingToolOptions(false); 
         }
 
-        if (!drawingTools.includes(toolId) && toolId !== 'text' && toolId !== 'select' && toolId !== 'erase' && toolId !== 'clear') {
+        if (!drawingTools.includes(toolId) && toolId !== 'text' && toolId !== 'select' && toolId !== 'clear') {
             toast({
             title: `${toolName} Selected`,
             description: `The ${toolName.toLowerCase()} feature is currently under development.`,
             duration: 3000,
             });
         }
+    }
+     // Ensure composite operation is reset if switching away from eraser
+     if (toolId !== 'erase' && contextRef.current) {
+        contextRef.current.globalCompositeOperation = 'source-over';
     }
   };
 
@@ -242,6 +265,8 @@ export default function WhiteboardPage() {
 
   const handleClearAll = () => {
     if (contextRef.current && canvasRef.current) {
+      // Ensure composite operation is default before clearing
+      contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
     setTextToolInput("");
@@ -257,6 +282,7 @@ export default function WhiteboardPage() {
   const drawingOptionsToolbarOffset = showDrawingToolOptions ? 106 : 0; 
   const totalOffset = topToolbarOffset + mainToolsToolbarOffset + drawingOptionsToolbarOffset;
 
+  const currentActiveToolIsDrawingTool = activeTool && (drawingTools.includes(activeTool) || activeTool === 'draw');
 
   return (
     <div className="flex flex-col h-screen bg-muted/30">
@@ -282,7 +308,7 @@ export default function WhiteboardPage() {
       <div className="flex-none p-2 border-b bg-background shadow-md sticky top-[65px] z-10">
         <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
           <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
-          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={drawingTools.includes(activeTool || "")} />
+          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={currentActiveToolIsDrawingTool && activeTool !== 'erase'} />
           <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
           <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
           <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
@@ -290,11 +316,10 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      {showDrawingToolOptions && (drawingTools.includes(activeTool || "")) && (
+      {showDrawingToolOptions && currentActiveToolIsDrawingTool && (
         <div className="flex-none p-2 border-b bg-muted/50 shadow-sm sticky top-[calc(65px+58px)] z-10">
           <div className="container mx-auto">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center justify-center">
-              {/* Colors */}
               <div className="flex flex-wrap justify-center sm:justify-start gap-2 items-center col-span-1 sm:col-span-2">
                 <span className="text-xs font-medium text-muted-foreground mr-2 sm:hidden md:inline">Color:</span>
                 {availableColors.map(color => (
@@ -306,7 +331,6 @@ export default function WhiteboardPage() {
                   />
                 ))}
               </div>
-              {/* Brush Sizes & Shapes */}
               <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end gap-4">
                 <div className="flex items-center justify-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground mr-1">Size:</span>
@@ -341,15 +365,17 @@ export default function WhiteboardPage() {
       )} style={{ paddingTop: `${totalOffset}px` }}>
         <Card className="w-full h-full max-w-full text-center shadow-xl rounded-xl border-border/50 overflow-hidden flex flex-col">
           <CardHeader className="flex-none">
-            <CardTitle className="text-xl">Whiteboard Canvas</CardTitle>
+            <CardTitle className="text-xl">TeachMeet Whiteboard</CardTitle>
             <CardDescription>
               Meeting ID: {meetingId || "N/A"} - Draw, write, and collaborate!
-              {activeTool && drawingTools.includes(activeTool) && (
+              {currentActiveToolIsDrawingTool && (
                 <span className="block text-xs mt-1">
-                  Tool: {activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} | Color: <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> | Size: {selectedBrushSize}
+                  Tool: {activeTool?.charAt(0).toUpperCase() + activeTool?.slice(1)} | 
+                  {activeTool !== 'erase' && <>Color: <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> |</>}
+                  Size: {selectedBrushSize}
                 </span>
               )}
-               {(!activeTool || (!drawingTools.includes(activeTool) && activeTool !== 'text')) &&  (
+               {(!activeTool || (!currentActiveToolIsDrawingTool && activeTool !== 'text')) &&  (
                 <span className="block text-xs mt-1 text-muted-foreground">Select a tool to begin.</span>
               )}
             </CardDescription>
@@ -364,7 +390,7 @@ export default function WhiteboardPage() {
               onTouchStart={(e) => { e.preventDefault(); startDrawing(e);}}
               onTouchMove={(e) => { e.preventDefault(); draw(e);}}
               onTouchEnd={(e) => { e.preventDefault(); stopDrawing(e);}}
-              className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair touch-none" // Added touch-none
+              className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair touch-none w-full h-full block"
             />
             {activeTool === 'text' && (
               <Textarea
@@ -375,7 +401,7 @@ export default function WhiteboardPage() {
                 className="absolute inset-0 w-full h-full z-10 rounded-lg shadow-xl border-primary resize-none p-4 text-base"
               />
             )}
-             {(!activeTool || (!drawingTools.includes(activeTool) && activeTool !== 'text')) && !isDrawing && (
+             {(!activeTool || (!currentActiveToolIsDrawingTool && activeTool !== 'text')) && !isDrawing && (
                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <p className="text-muted-foreground text-lg p-4 bg-background/50 rounded-md">
                         Interactive canvas area - Select a tool to begin.
@@ -391,4 +417,3 @@ export default function WhiteboardPage() {
     </div>
   );
 }
-
