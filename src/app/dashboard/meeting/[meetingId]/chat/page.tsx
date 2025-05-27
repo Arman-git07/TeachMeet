@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, Users, MessageSquare, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, use, useRef } from "react"; // Added useRef
+import { useState, useEffect, use, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -23,36 +23,23 @@ interface ChatMessage {
   isMe: boolean;
 }
 
-// Mock participants for private chat selection
-const mockMeetingParticipants = [
-  { id: 'user1', name: 'Alice', avatar: 'https://placehold.co/40x40/FFC0CB/000000.png?text=A' },
-  { id: 'user2', name: 'Bob', avatar: 'https://placehold.co/40x40/ADD8E6/000000.png?text=B' },
-  { id: 'user3', name: 'Charlie', avatar: 'https://placehold.co/40x40/90EE90/000000.png?text=C' },
-];
-
+// Mock participants removed
 
 export default function MeetingChatPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(paramsPromise);
   const { meetingId } = resolvedParams;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const topic = searchParams.get('topic') || "Meeting Chat"; // Get topic from URL or default
+  const topic = searchParams.get('topic') || "Meeting Chat";
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [activeTab, setActiveTab] = useState<string>("public"); // 'public' or participantId for private
+  const [activeTab, setActiveTab] = useState<string>("public");
   const [privateChatTarget, setPrivateChatTarget] = useState<{id: string, name: string} | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Mock initial messages
-    setMessages([
-      { id: '1', senderName: 'System', text: `Welcome to the chat for ${topic}!`, timestamp: new Date(), isMe: false },
-      { id: '2', senderName: 'Alice', text: 'Hello everyone!', timestamp: new Date(), isMe: false, senderAvatar: mockMeetingParticipants[0].avatar },
-      { id: '3', senderName: 'You', text: 'Hi Alice!', timestamp: new Date(), isMe: true },
-    ]);
-  }, [topic]);
+  // Removed useEffect that set initial mock messages
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -64,13 +51,13 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
     if (!inputValue.trim()) return;
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
-      senderName: 'You',
+      senderName: 'You', // In a real app, get from auth
       text: inputValue,
       timestamp: new Date(),
       isMe: true,
     };
     // In a real app, you'd send this message to a backend/P2P service
-    // and differentiate between public and private messages
+    // and differentiate between public and private messages based on activeTab
     setMessages(prev => [...prev, newMessage]);
     setInputValue("");
   };
@@ -79,15 +66,17 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
     setActiveTab(value);
     if (value === 'public') {
       setPrivateChatTarget(null);
-      // Load public messages
-      setMessages([ { id: 'pub1', senderName: 'System', text: `Switched to Public Chat for ${topic}.`, timestamp: new Date(), isMe: false } ]);
+      // TODO: In a real app, load/filter public messages
+      // For now, we can clear messages or show a system message
+      setMessages([ { id: 'sys_public_switch', senderName: 'System', text: `Switched to Public Chat for ${topic}.`, timestamp: new Date(), isMe: false } ]);
     } else {
-      const targetUser = mockMeetingParticipants.find(p => p.id === value);
-      if (targetUser) {
-        setPrivateChatTarget({id: targetUser.id, name: targetUser.name});
-        // Load private messages with targetUser
-        setMessages([ { id: 'priv1', senderName: 'System', text: `Private chat with ${targetUser.name} for ${topic}.`, timestamp: new Date(), isMe: false } ]);
-      }
+      // This part will not be reachable with current UI as mock participants are removed
+      // Kept for potential future use if participants are loaded dynamically
+      // const targetUser = mockMeetingParticipants.find(p => p.id === value);
+      // if (targetUser) {
+      //   setPrivateChatTarget({id: targetUser.id, name: targetUser.name});
+      //   setMessages([ { id: 'sys_private_switch', senderName: 'System', text: `Private chat with ${targetUser.name} for ${topic}.`, timestamp: new Date(), isMe: false } ]);
+      // }
     }
   };
 
@@ -120,48 +109,52 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
           <TabsTrigger value="public" className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
             <Users className="mr-2 h-5 w-5" /> Public Chat
           </TabsTrigger>
-          {mockMeetingParticipants.map(p => (
-            <TabsTrigger key={p.id} value={p.id} className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
-               <UserCheck className="mr-2 h-5 w-5" /> {p.name}
-            </TabsTrigger>
-          ))}
+          {/* Private chat tabs generation removed as mockMeetingParticipants is removed */}
         </TabsList>
       </Tabs>
       
-      <main className="flex-grow flex flex-col overflow-hidden" style={{ paddingTop: '113px' /* Header + TabsList height */ }}>
+      <main className="flex-grow flex flex-col overflow-hidden" style={{ paddingTop: '113px' /* Consider if this static padding is still ideal or should adjust if tabs height changes */ }}>
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
-              <div className="space-y-4">
-                {messages.map((msg) => (
-                  <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
-                    {!msg.isMe && (
-                      <Avatar className="h-8 w-8 self-start">
-                        <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
-                        <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div
-                      className={cn(
-                        "max-w-[70%] p-3 rounded-xl shadow",
-                        msg.isMe
-                          ? "bg-primary text-primary-foreground rounded-br-none"
-                          : "bg-card text-card-foreground rounded-bl-none"
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <MessageSquare className="w-16 h-16 mb-4" />
+                  <p className="text-lg">No messages yet.</p>
+                  <p>Be the first to send a message!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
+                      {!msg.isMe && (
+                        <Avatar className="h-8 w-8 self-start">
+                          <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                          <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                        </Avatar>
                       )}
-                    >
-                      {!msg.isMe && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
-                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                      <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      <div
+                        className={cn(
+                          "max-w-[70%] p-3 rounded-xl shadow",
+                          msg.isMe
+                            ? "bg-primary text-primary-foreground rounded-br-none"
+                            : "bg-card text-card-foreground rounded-bl-none"
+                        )}
+                      >
+                        {!msg.isMe && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                      {msg.isMe && (
+                        <Avatar className="h-8 w-8 self-start">
+                           <AvatarImage src={`https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
+                          <AvatarFallback>Y</AvatarFallback>
+                        </Avatar>
+                      )}
                     </div>
-                    {msg.isMe && (
-                      <Avatar className="h-8 w-8 self-start">
-                         <AvatarImage src={`https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
-                        <AvatarFallback>Y</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </ScrollArea>
           </CardContent>
           <CardFooter className="p-4 border-t bg-background">
@@ -194,7 +187,7 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
         </Card>
       </main>
        <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-        TeachMeet Chat - Real-time features are illustrative.
+        TeachMeet Chat - Real-time features require backend integration.
       </footer>
     </div>
   );
