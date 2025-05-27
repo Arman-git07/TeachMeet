@@ -3,10 +3,12 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea
 import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Palette, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect, useRef } from "react"; // Import useState, useEffect, useRef
 
 const ToolButton = ({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType, label: string, onClick: () => void, isActive?: boolean }) => (
   <Button
@@ -25,16 +27,48 @@ export default function WhiteboardPage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
   const { toast } = useToast();
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [textToolInput, setTextToolInput] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleToolClick = (toolName: string) => {
-    toast({
-      title: `${toolName} Selected`,
-      description: `The ${toolName.toLowerCase()} feature is currently under development.`,
-      duration: 3000,
-    });
+    if (toolName === "Text") {
+      if (activeTool === "text") {
+        setActiveTool(null); // Deactivate if already active
+        toast({
+          title: `Text Tool Deactivated`,
+          duration: 2000,
+        });
+      } else {
+        setActiveTool("text");
+        toast({
+          title: `${toolName} Selected`,
+          description: `The ${toolName.toLowerCase()} tool is now active. Click on the canvas or type in the area.`,
+          duration: 3000,
+        });
+      }
+    } else {
+      setActiveTool(toolName.toLowerCase().replace(/\s+/g, '')); // For other tools
+      toast({
+        title: `${toolName} Selected`,
+        description: `The ${toolName.toLowerCase()} feature is currently under development.`,
+        duration: 3000,
+      });
+      if (toolName !== "Text" && activeTool === "text") {
+         // If switching from text tool to another, consider how to handle text input area
+      }
+    }
   };
 
+  useEffect(() => {
+    if (activeTool === "text" && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [activeTool]);
+
   const handleClearAll = () => {
+    setActiveTool(null);
+    setTextToolInput("");
     toast({
       title: "Clear All",
       description: "Whiteboard cleared (mock action).",
@@ -65,13 +99,13 @@ export default function WhiteboardPage() {
 
       <div className="flex-none p-2 border-b bg-background shadow-md sticky top-[65px] z-10"> {/* Adjusted sticky position */}
         <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-          <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select Tool")} />
-          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Freehand Draw Tool")} />
-          <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick("Straight Line Tool")} />
-          <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} />
-          <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text Tool")} />
-          <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Eraser Tool")} />
-          <ToolButton icon={Palette} label="Color" onClick={() => handleToolClick("Color Picker")} />
+          <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
+          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={activeTool === "draw"} />
+          <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick("Line")} isActive={activeTool === "line"} />
+          <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
+          <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
+          <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
+          <ToolButton icon={Palette} label="Color" onClick={() => handleToolClick("Color Picker")} isActive={activeTool === "colorpicker"} />
           <ToolButton icon={Trash2} label="Clear" onClick={handleClearAll} />
         </div>
       </div>
@@ -86,10 +120,21 @@ export default function WhiteboardPage() {
           </CardHeader>
           <CardContent className="flex-grow bg-card flex items-center justify-center relative">
             {/* This div represents the canvas area */}
-            <div className="w-full h-full bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 flex items-center justify-center">
-              <p className="text-muted-foreground text-lg">
-                Interactive canvas area - Feature under development.
-              </p>
+            <div className="w-full h-full bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 flex items-center justify-center p-4">
+              {activeTool === 'text' ? (
+                <Textarea
+                  ref={textareaRef}
+                  value={textToolInput}
+                  onChange={(e) => setTextToolInput(e.target.value)}
+                  placeholder="Type here..."
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-1/2 z-10 rounded-lg shadow-xl border-primary resize-none p-4 text-base"
+                  // Add onBlur or an "Add Text" button to "commit" the text if needed for more advanced features
+                />
+              ) : (
+                <p className="text-muted-foreground text-lg">
+                  Interactive canvas area - Select a tool to begin.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
