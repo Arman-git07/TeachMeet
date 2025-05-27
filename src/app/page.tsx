@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle } from 'lucide-react'; // Added XCircle for dismiss
+import { Video, Users as UsersIcon, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
@@ -24,9 +24,10 @@ const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
 export default function HomePage() {
   const [ongoingMeetings, setOngoingMeetings] = useState<OngoingMeeting[]>([]);
-  const [logoTextContent, setLogoTextContent] = useState('TeachMeet');
-  const [animationLock, setAnimationLock] = useState(false);
+  const [logoText, setLogoText] = useState('TeachMeet');
   const [animateChars, setAnimateChars] = useState(false);
+  const [animationLock, setAnimationLock] = useState(false);
+
   const { toast } = useToast();
 
   const router = useRouter();
@@ -94,10 +95,10 @@ export default function HomePage() {
 
     setAnimationLock(true);
     setAnimateChars(false); 
-    setLogoTextContent('TM');
+    setLogoText('TM');
 
     setTimeout(() => {
-      setLogoTextContent('TeachMeet');
+      setLogoText('TeachMeet');
       setAnimateChars(true); 
       setTimeout(() => {
         setAnimateChars(false); 
@@ -133,7 +134,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <AppHeader showLogo={true} />
+      <AppHeader showLogo={false} />
       <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-10"
@@ -146,14 +147,14 @@ export default function HomePage() {
         />
         <div className="relative z-10 flex flex-col items-center text-center">
           <Logo
-            text={logoTextContent}
+            text={logoText}
             size="large"
             className={cn(
               'mb-8 text-center cursor-pointer',
-              animateChars && logoTextContent === 'TeachMeet' && 'logo-animate-complex'
+              animateChars && logoText === 'TeachMeet' && 'logo-animate-complex'
             )}
             onClick={handleComplexLogoAnimation}
-            animateChars={animateChars && logoTextContent === 'TeachMeet'}
+            animateChars={animateChars && logoText === 'TeachMeet'}
           />
           <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
             <h2 className="text-2xl font-semibold text-primary mb-4">Ongoing Meetings</h2>
@@ -205,4 +206,3 @@ export default function HomePage() {
     </div>
   );
 }
-
