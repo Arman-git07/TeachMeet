@@ -12,6 +12,16 @@ import { useState, useEffect } from "react";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import Link from "next/link";
 
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+
+interface OngoingMeeting {
+  id: string;
+  title: string;
+  participants?: number;
+  startedAt?: number;
+}
+
+
 export function StartMeetingDialogContent() {
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
@@ -27,12 +37,10 @@ export function StartMeetingDialogContent() {
     const newMeetingId = randomString(8);
     setMeetingId(newMeetingId);
 
-    // Ensure window is defined (for server-side rendering or build phase)
     if (typeof window !== "undefined") {
-        setMeetingLink(`${window.location.origin}/dashboard/join-meeting?code=${newMeetingId}`);
+        setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
     } else {
-        // Fallback or placeholder if window is not defined
-        setMeetingLink(`/dashboard/join-meeting?code=${newMeetingId}`);
+        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`);
     }
     
     const codePart1 = randomString(3);
@@ -63,19 +71,53 @@ export function StartMeetingDialogContent() {
     }
     setIsSharePanelOpen(true);
   };
-
-  const joinMeetingHref = meetingId && meetingTitle 
-    ? `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle)}` 
-    : "#";
-
+  
   const handleJoinMeetingNow = () => {
-    if (joinMeetingHref && joinMeetingHref !== "#") {
-      router.push(joinMeetingHref);
+    const newMeeting: OngoingMeeting = { 
+      id: meetingId, 
+      title: meetingTitle || "Untitled Meeting", 
+      startedAt: Date.now() 
+    };
+    try {
+      const existingStartedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+      let existingStartedMeetings: OngoingMeeting[] = [];
+      if (existingStartedMeetingsRaw) {
+        try {
+          existingStartedMeetings = JSON.parse(existingStartedMeetingsRaw);
+        } catch (e) {
+          console.error("Error parsing started meetings from localStorage:", e);
+          localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear corrupted data
+        }
+      }
+      
+      if (!Array.isArray(existingStartedMeetings)) { // Ensure it's an array
+          existingStartedMeetings = [];
+      }
+
+      if (!existingStartedMeetings.find(m => m.id === newMeeting.id)) {
+        const updatedStartedMeetings = [...existingStartedMeetings, newMeeting];
+        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedStartedMeetings));
+      }
+    } catch (error) {
+      console.error("Error saving started meeting to localStorage:", error);
+      toast({
+        variant: "destructive",
+        title: "Could Not Save Meeting",
+        description: "There was an issue saving this meeting to your local list.",
+      });
+    }
+
+    const joinNowLinkPath = (meetingId && (meetingTitle || "Untitled Meeting"))
+      ? `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle || "Untitled Meeting")}`
+      : "#";
+
+    if (joinNowLinkPath && joinNowLinkPath !== "#") {
+      router.push(joinNowLinkPath);
     } else {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Meeting details not fully generated yet.",
+        description: "Meeting details not fully generated yet to join.",
       });
     }
   };
@@ -158,7 +200,6 @@ export function StartMeetingDialogContent() {
             Cancel
           </Button>
         </DialogClose>
-        <DialogClose asChild>
           <Button 
             type="button" 
             onClick={handleJoinMeetingNow} 
@@ -167,7 +208,6 @@ export function StartMeetingDialogContent() {
           >
             {meetingId ? "Join Meeting Now" : "Generating ID..."}
           </Button>
-        </DialogClose>
       </DialogFooter>
       <ShareOptionsPanel
         isOpen={isSharePanelOpen}
