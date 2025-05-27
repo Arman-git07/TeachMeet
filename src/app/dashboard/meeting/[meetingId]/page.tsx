@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSearchParams, useRouter } from 'next/navigation';
 
+const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
+
 const ParticipantView = ({ 
   name, 
   isMe = false, 
@@ -73,7 +75,7 @@ const ParticipantView = ({
         {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </div>
       {isHandRaisedForView && (
-        <div className="absolute top-2 left-2 bg-primary/80 text-primary-foreground p-1.5 rounded-full backdrop-blur-sm shadow-md animate-pulse">
+        <div className="absolute top-2 left-2 bg-accent/80 text-accent-foreground p-1.5 rounded-full backdrop-blur-sm shadow-md animate-pulse">
           <Hand className="h-4 w-4" />
         </div>
       )}
@@ -197,6 +199,27 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   const leaveMeeting = () => {
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
+
+    // Add current meetingId to dismissed list in localStorage
+    if (typeof window !== 'undefined' && meetingId) {
+      const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
+      let dismissedIds: string[] = [];
+      try {
+        dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
+      } catch (e) {
+        console.error("Error parsing dismissed meetings from localStorage on leave:", e);
+        localStorage.removeItem(DISMISSED_MEETINGS_KEY); // Clear corrupted data
+      }
+
+      if (!Array.isArray(dismissedIds)) { // Ensure it's an array
+          dismissedIds = [];
+      }
+
+      if (!dismissedIds.includes(meetingId)) {
+        dismissedIds.push(meetingId);
+        localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
+      }
+    }
     router.push('/');
   };
 
@@ -297,13 +320,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-            variant={"default"} // Base variant for consistent structure
+            variant={"default"} 
             size="lg"
             className={cn(
               "rounded-full p-4",
               isHandRaised 
-                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" // Active: Accent color (cyan)
-                : "btn-gel shadow-md" // Inactive: Primary color (green) with gel
+                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
+                : "btn-gel shadow-md" 
             )}
             onClick={toggleHandRaise}
             aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
