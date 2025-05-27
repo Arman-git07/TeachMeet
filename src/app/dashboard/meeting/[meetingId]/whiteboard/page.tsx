@@ -4,11 +4,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle, Square, MinusSquare } from "lucide-react"; // Added Circle, Square, MinusSquare
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle, Square, MinusSquare } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 const ToolButton = ({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType, label: string, onClick: () => void, isActive?: boolean }) => (
@@ -46,9 +46,14 @@ export default function WhiteboardPage() {
   const [textToolInput, setTextToolInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [selectedColor, setSelectedColor] = useState<string>("#000000"); // Default to black
-  const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium"); // 'small', 'medium', 'large'
+  const [selectedColor, setSelectedColor] = useState<string>("#000000");
+  const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawOptions, setShowDrawOptions] = useState<boolean>(false);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPosition, setLastPosition] = useState<{ x: number, y: number } | null>(null);
 
   const availableColors = [
     "#000000", "#EF4444", "#F97316", "#EAB308", "#22C55E", "#0EA5E9", "#6366F1", "#EC4899",
@@ -56,40 +61,122 @@ export default function WhiteboardPage() {
   ];
 
   const brushSizes = [
-    { name: 'small', icon: Circle, label: 'Small Brush' },
-    { name: 'medium', icon: MinusSquare, label: 'Medium Brush' }, // Using MinusSquare for a medium circle representation
-    { name: 'large', icon: Square, label: 'Large Brush' }, // Using Square for a large circle representation
+    { name: 'small', icon: Circle, label: 'Small Brush', lineWidth: 2 },
+    { name: 'medium', icon: MinusSquare, label: 'Medium Brush', lineWidth: 5 },
+    { name: 'large', icon: Square, label: 'Large Brush', lineWidth: 10 },
   ];
 
+  const getLineWidth = useCallback(() => {
+    return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 5;
+  }, [selectedBrushSize, brushSizes]);
+
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (canvas && canvas.parentElement) {
+      // Save current canvas content
+      const imageData = contextRef.current?.getImageData(0, 0, canvas.width, canvas.height);
+      
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+
+      if (contextRef.current) {
+        contextRef.current.lineCap = "round";
+        contextRef.current.lineJoin = "round";
+        contextRef.current.strokeStyle = selectedColor;
+        contextRef.current.lineWidth = getLineWidth();
+        // Restore canvas content
+        if (imageData) {
+          contextRef.current.putImageData(imageData, 0, 0);
+        }
+      }
+    }
+  }, [selectedColor, getLineWidth]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const context = canvas.getContext("2d");
+      if (context) {
+        contextRef.current = context;
+        resizeCanvas(); // Initial resize
+      }
+    }
+    window.addEventListener("resize", resizeCanvas);
+    return () => window.removeEventListener("resize", resizeCanvas);
+  }, [resizeCanvas]);
+
+  useEffect(() => {
+    if (contextRef.current) {
+      contextRef.current.strokeStyle = selectedColor;
+      contextRef.current.lineWidth = getLineWidth();
+    }
+  }, [selectedColor, selectedBrushSize, getLineWidth]);
+
+  const getMousePosition = (event: React.MouseEvent | React.TouchEvent): { x: number, y: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (event.nativeEvent instanceof MouseEvent) {
+        clientX = event.nativeEvent.clientX;
+        clientY = event.nativeEvent.clientY;
+    } else if (event.nativeEvent instanceof TouchEvent && event.nativeEvent.touches.length > 0) {
+        clientX = event.nativeEvent.touches[0].clientX;
+        clientY = event.nativeEvent.touches[0].clientY;
+    } else {
+        return null;
+    }
+    return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+    };
+  };
+
+  const startDrawing = (event: React.MouseEvent | React.TouchEvent) => {
+    if (activeTool !== 'draw' || !contextRef.current) return;
+    const pos = getMousePosition(event);
+    if (!pos) return;
+
+    setIsDrawing(true);
+    setLastPosition(pos);
+    contextRef.current.beginPath();
+    contextRef.current.moveTo(pos.x, pos.y);
+  };
+
+  const draw = (event: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing || activeTool !== 'draw' || !contextRef.current || !lastPosition) return;
+    const pos = getMousePosition(event);
+    if (!pos) return;
+    
+    contextRef.current.lineTo(pos.x, pos.y);
+    contextRef.current.stroke();
+    setLastPosition(pos);
+  };
+
+  const stopDrawing = () => {
+    if (!contextRef.current) return;
+    setIsDrawing(false);
+    contextRef.current.closePath();
+    setLastPosition(null);
+  };
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-
     if (activeTool === toolId) {
-      // If the same tool is clicked again
-      if (toolId === 'draw') {
-        setShowDrawOptions(prev => !prev); // Toggle draw options
-      } else {
-        // For other tools, clicking again might deactivate them or do nothing
-        // For simplicity, let's allow deactivation for now.
-        // setActiveTool(null);
-        // toast({ title: `${toolName} Tool Deactivated`, duration: 2000 });
-      }
+      if (toolId === 'draw') setShowDrawOptions(prev => !prev);
     } else {
-      // Switching to a new tool
       setActiveTool(toolId);
-      if (toolId === 'draw') {
-        setShowDrawOptions(true); // Show draw options when draw tool is first activated
-      } else {
-        setShowDrawOptions(false); // Hide draw options for other tools
+      setIsDrawing(false); // Stop drawing if tool changes
+      if (toolId === 'draw') setShowDrawOptions(true);
+      else setShowDrawOptions(false);
+
+      if (toolId !== 'draw' && toolId !== 'text' && toolId !== 'select' && toolId !== 'erase') {
+        toast({
+          title: `${toolName} Selected`,
+          description: `The ${toolName.toLowerCase()} feature is currently under development.`,
+          duration: 3000,
+        });
       }
-      toast({
-        title: `${toolName} Selected`,
-        description: toolId === 'text'
-          ? `The ${toolName.toLowerCase()} tool is now active. Click on the canvas or type in the area.`
-          : `The ${toolName.toLowerCase()} feature is currently under development.`,
-        duration: 3000,
-      });
     }
   };
 
@@ -110,12 +197,15 @@ export default function WhiteboardPage() {
   }, [activeTool]);
 
   const handleClearAll = () => {
-    setActiveTool(null);
+    if (contextRef.current && canvasRef.current) {
+      contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    // setActiveTool(null); // Optionally reset active tool
     setTextToolInput("");
-    setShowDrawOptions(false);
+    // setShowDrawOptions(false); // Optionally hide draw options
     toast({
-      title: "Clear All",
-      description: "Whiteboard cleared (mock action).",
+      title: "Whiteboard Cleared",
+      description: "The canvas has been cleared.",
       duration: 3000,
     });
   }
@@ -141,7 +231,7 @@ export default function WhiteboardPage() {
         </div>
       </header>
 
-      <div className="flex-none p-2 border-b bg-background shadow-md sticky top-[65px] z-10"> {/* Main Toolbar */}
+      <div className="flex-none p-2 border-b bg-background shadow-md sticky top-[65px] z-10">
         <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
           <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
           <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={activeTool === "draw"} />
@@ -153,7 +243,7 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      {activeTool === 'draw' && showDrawOptions && ( /* Sub-toolbar for Draw Options */
+      {activeTool === 'draw' && showDrawOptions && (
         <div className="flex-none p-2 border-b bg-muted/50 shadow-sm sticky top-[calc(65px+58px)] z-10">
           <div className="container mx-auto">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -189,7 +279,7 @@ export default function WhiteboardPage() {
       )}
 
       <main className={cn(
-        "flex-grow flex items-center justify-center", // Removed p-4
+        "flex-grow flex items-center justify-center",
         (activeTool === 'draw' && showDrawOptions) ? "pt-[calc(65px+58px+66px)]" : "pt-[calc(65px+58px)]"
       )}>
         <Card className="w-full h-full max-w-full text-center shadow-xl rounded-xl border-border/50 overflow-hidden flex flex-col">
@@ -202,31 +292,47 @@ export default function WhiteboardPage() {
                   Color: <span style={{ color: selectedColor, display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> | Size: {selectedBrushSize}
                 </span>
               )}
+               {activeTool !== 'draw' && activeTool !== 'text' &&  (
+                <span className="block text-xs mt-1 text-muted-foreground">Select the draw tool to start drawing or text tool to type.</span>
+              )}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-grow bg-card flex items-center justify-center relative">
-            <div className="w-full h-full bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 flex items-center justify-center"> {/* Removed p-4 */}
-              {activeTool === 'text' ? (
-                <Textarea
-                  ref={textareaRef}
-                  value={textToolInput}
-                  onChange={(e) => setTextToolInput(e.target.value)}
-                  placeholder="Type here..."
-                  className="absolute inset-0 w-full h-full z-10 rounded-lg shadow-xl border-primary resize-none p-4 text-base"
-                />
-              ) : (
-                <p className="text-muted-foreground text-lg">
-                  Interactive canvas area - Select a tool to begin.
-                  {activeTool === 'draw' && " Click and drag to draw (mock)."}
-                </p>
-              )}
-            </div>
+          <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0"> {/* p-0 to let canvas fill */}
+            <canvas
+              ref={canvasRef}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+              className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair"
+              // Width and height will be set by resizeCanvas
+            />
+            {activeTool === 'text' && (
+              <Textarea
+                ref={textareaRef}
+                value={textToolInput}
+                onChange={(e) => setTextToolInput(e.target.value)}
+                placeholder="Type here..."
+                className="absolute inset-0 w-full h-full z-10 rounded-lg shadow-xl border-primary resize-none p-4 text-base"
+              />
+            )}
+             {activeTool !== 'draw' && activeTool !== 'text' && !isDrawing && (
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <p className="text-muted-foreground text-lg p-4 bg-background/50 rounded-md">
+                        Interactive canvas area - Select a tool to begin.
+                    </p>
+                 </div>
+             )}
           </CardContent>
         </Card>
       </main>
       <footer className="flex-none p-3 text-center text-xs text-muted-foreground border-t bg-background">
-        TeachMeet Whiteboard - Features under development.
+        TeachMeet Whiteboard - Basic drawing enabled. Other features under development.
       </footer>
     </div>
   );
 }
+
