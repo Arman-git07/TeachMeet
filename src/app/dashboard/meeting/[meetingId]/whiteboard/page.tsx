@@ -189,7 +189,7 @@ export default function WhiteboardPage() {
       )}
 
       <main className={cn(
-        "flex-grow flex items-center justify-center p-4 md:pt-4",
+        "flex-grow flex items-center justify-center", // Removed p-4
         (activeTool === 'draw' && showDrawOptions) ? "pt-[calc(65px+58px+66px)]" : "pt-[calc(65px+58px)]"
       )}>
         <Card className="w-full h-full max-w-full text-center shadow-xl rounded-xl border-border/50 overflow-hidden flex flex-col">
@@ -205,7 +205,7 @@ export default function WhiteboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-grow bg-card flex items-center justify-center relative">
-            <div className="w-full h-full bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 flex items-center justify-center p-4">
+            <div className="w-full h-full bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 flex items-center justify-center"> {/* Removed p-4 */}
               {activeTool === 'text' ? (
                 <Textarea
                   ref={textareaRef}
