@@ -7,6 +7,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/hooks/useAuth'; // Import AuthProvider
+import { AppSidebar } from '@/components/common/AppSidebar'; // Import AppSidebar
+import { SidebarInset } from '@/components/ui/sidebar'; // Import SidebarInset
 
 const geistSans = GeistSans;
 const geistMono = GeistMono;
@@ -30,9 +32,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider> {/* Wrap with AuthProvider */}
+          <AuthProvider>
             <SidebarProvider defaultOpen={false}>
-              {children}
+              <div className="flex h-screen bg-background"> {/* Ensure full height flex container */}
+                <AppSidebar /> {/* Render AppSidebar globally */}
+                <SidebarInset> {/* Wrap children in SidebarInset */}
+                  {children}
+                </SidebarInset>
+              </div>
             </SidebarProvider>
           </AuthProvider>
           <Toaster />
