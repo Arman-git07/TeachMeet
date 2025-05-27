@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
@@ -34,6 +35,7 @@ const ParticipantView = ({
   isHandRaisedForView?: boolean,
   isScreenSharing?: boolean // New prop
 }) => {
+  const { toast } = useToast(); // Added toast for fullscreen error
 
   const showVideoElement = isMe && videoRef?.current?.srcObject;
   const showAvatar =
@@ -44,7 +46,10 @@ const ParticipantView = ({
   const handleFullScreenClick = () => {
     if (videoRef?.current && videoRef.current.srcObject) {
       if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen().catch(err => console.error("Error entering fullscreen:", err));
+        videoRef.current.requestFullscreen().catch(err => {
+          console.error("Error entering fullscreen:", err);
+          toast({ variant: 'destructive', title: 'Fullscreen Error', description: 'Could not enter fullscreen mode.' });
+        });
       } else {
         toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
       }
@@ -63,7 +68,7 @@ const ParticipantView = ({
             muted
             autoPlay
             playsInline
-            className={cn("w-full h-full object-contain", { 'hidden': !videoRef?.current?.srcObject })} // Object-contain for screen share
+            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject })} // Object-contain for screen share, added bg-muted
           />
           {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || !videoRef?.current?.srcObject) && !isScreenSharing && (
             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
@@ -93,7 +98,9 @@ const ParticipantView = ({
           <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
         </div>
       ) : (
-        <Image src={`https://placehold.co/800x450.png`} alt={`${name}'s video`} layout="fill" objectFit="cover" data-ai-hint="participant video" />
+        <div className="w-full h-full bg-muted flex items-center justify-center"> {/* Added wrapper for placeholder */}
+          <Image src={`https://placehold.co/800x450.png`} alt={`${name}'s video`} width={800} height={450} objectFit="contain" data-ai-hint="participant video" />
+        </div>
       )}
       <div className="absolute bottom-2 left-2 bg-gradient-to-r from-black/70 to-transparent px-3 py-1.5 rounded-md backdrop-blur-sm">
         <p className="text-sm font-medium text-white shadow-sm">{name} {isMe && <span className="text-xs opacity-80">(You)</span>}</p>
@@ -389,7 +396,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               {isScreenSharingActive ? <StopCircle className="mr-2 h-4 w-4 text-destructive" /> : <ScreenShare className="mr-2 h-4 w-4" />}
               {isScreenSharingActive ? "Stop Sharing Screen" : "Share Screen"}
             </DropdownMenuItem>
-            <DropdownMenuItem><Edit3 className="mr-2 h-4 w-4" /> Open Whiteboard</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/meeting/${meetingId}/whiteboard`} legacyBehavior>
+                <a>
+                  <Edit3 className="mr-2 h-4 w-4" /> Open Whiteboard
+                </a>
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem><MessageSquare className="mr-2 h-4 w-4" /> Chat</DropdownMenuItem>
             <DropdownMenuItem><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -432,19 +445,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {participants.map(p => (
-              <ParticipantView
-                key={p.id}
-                name={p.name}
-                isMe={p.isMe}
-                isMicMuted={p.isMicMuted}
-                isCameraOff={p.isMe ? (isScreenSharingActive ? true : isCameraOff) : p.isCameraOff}
-                videoRef={p.isMe ? localVideoRef : undefined}
-                hasCameraPermissionForView={p.isMe ? hasCameraPermission : undefined}
-                isHandRaisedForView={p.isHandRaisedForView}
-                isScreenSharing={p.isMe ? isScreenSharingActive : false}
-              />
-            ))}
+            {/* This part is effectively removed by previous changes as participants.length is now always 1 */}
           </div>
         )}
       </main>
@@ -505,4 +506,3 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
-
