@@ -156,7 +156,7 @@ export default function HomePage() {
             animateChars={animateChars && logoTextContent === 'TeachMeet'}
           />
           <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
-            <h2 className="text-2xl font-semibold text-primary mb-4">Latest Activity</h2>
+            <h2 className="text-2xl font-semibold text-primary mb-4">Ongoing Meetings</h2>
             {ongoingMeetings.length > 0 ? (
               <ul className="space-y-3 text-left">
                 {ongoingMeetings.map((meeting) => (
