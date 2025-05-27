@@ -362,10 +362,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const handleOpenWhiteboard = () => {
-    toast({
-      title: "Whiteboard Feature",
-      description: "The whiteboard feature is currently under development.",
-    });
+    router.push(`/dashboard/meeting/${meetingId}/whiteboard`);
   };
 
 
