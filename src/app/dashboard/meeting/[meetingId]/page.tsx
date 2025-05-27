@@ -297,13 +297,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-            variant={isHandRaised ? "default" : "secondary"}
+            variant={isHandRaised ? "secondary" : "default"} // If hand raised, variant is secondary (cyan). If not raised, variant is default (green).
             size="lg"
             className={cn(
-              "rounded-full p-4",
+              "rounded-full p-4 btn-gel", // btn-gel is always applied for the 3D shape
               isHandRaised 
-                ? "btn-gel ring-2 ring-offset-2 ring-offset-background ring-primary-foreground/80 shadow-lg" 
-                : "shadow-md"
+                ? "ring-2 ring-offset-2 ring-offset-background ring-secondary-foreground/80 shadow-lg" // Active state: ring around secondary button
+                : "shadow-md" // Normal state: default button (green) with standard shadow
             )}
             onClick={toggleHandRaise}
             aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
