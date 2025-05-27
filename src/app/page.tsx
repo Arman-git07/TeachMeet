@@ -6,18 +6,9 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Mic, MicOff, VideoOff, X, LogIn, Users as UsersIcon } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Video, Users as UsersIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { AppHeader } from '@/components/common/AppHeader'; 
+import { AppHeader } from '@/components/common/AppHeader';
 
 interface OngoingMeeting {
   id: string;
@@ -35,11 +26,6 @@ const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
 export default function HomePage() {
   const [ongoingMeetings, setOngoingMeetings] = useState<OngoingMeeting[]>([]);
-  const [isMeetingDialogVisible, setIsMeetingDialogVisible] = useState(false);
-  const [selectedMeetingForDialog, setSelectedMeetingForDialog] = useState<OngoingMeeting | null>(null);
-  const [isMicMutedInDialog, setIsMicMutedInDialog] = useState(false);
-  const [isCameraOffInDialog, setIsCameraOffInDialog] = useState(true); // Default camera to off in dialog
-  
   const [logoTextContent, setLogoTextContent] = useState('TeachMeet');
   const [animationLock, setAnimationLock] = useState(false);
   const [animateChars, setAnimateChars] = useState(false);
@@ -49,68 +35,38 @@ export default function HomePage() {
   useEffect(() => {
     const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
     const dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
-    
+
     const activeMeetings = initialMockOngoingMeetings.filter(
       meeting => !dismissedIds.includes(meeting.id)
     );
     setOngoingMeetings(activeMeetings);
   }, []);
 
-  const openMeetingDialog = (meeting: OngoingMeeting) => {
-    setSelectedMeetingForDialog(meeting);
-    setIsMicMutedInDialog(false); 
-    setIsCameraOffInDialog(true);
-    setIsMeetingDialogVisible(true);
-  };
 
-  const handleJoinMeetingFromDialog = () => {
-    if (selectedMeetingForDialog) {
-      const topicQueryParam = selectedMeetingForDialog.title ? `?topic=${encodeURIComponent(selectedMeetingForDialog.title)}` : '';
-      router.push(`/dashboard/meeting/${selectedMeetingForDialog.id}/wait${topicQueryParam}`);
-      setIsMeetingDialogVisible(false); 
-    }
-  };
-
-  const handleDismissMeeting = () => {
-    if (selectedMeetingForDialog) {
-      setOngoingMeetings(prevMeetings => prevMeetings.filter(m => m.id !== selectedMeetingForDialog!.id));
-      
-      const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
-      const dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
-      if (!dismissedIds.includes(selectedMeetingForDialog.id)) {
-        dismissedIds.push(selectedMeetingForDialog.id);
-        localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
-      }
-
-      setIsMeetingDialogVisible(false);
-      setSelectedMeetingForDialog(null);
-    }
-  };
-
-  const tmVisibleDuration = 350; 
-  const characterAnimationTotalDuration = 1000; 
+  const tmVisibleDuration = 350;
+  const characterAnimationTotalDuration = 1000;
 
   const handleComplexLogoAnimation = () => {
     if (animationLock) return;
 
     setAnimationLock(true);
-    setAnimateChars(false); 
+    setAnimateChars(false);
     setLogoTextContent('TM');
 
     setTimeout(() => {
       setLogoTextContent('TeachMeet');
-      setAnimateChars(true); 
+      setAnimateChars(true);
       setTimeout(() => {
-        setAnimateChars(false); 
+        setAnimateChars(false);
         setAnimationLock(false);
-      }, characterAnimationTotalDuration); 
+      }, characterAnimationTotalDuration);
     }, tmVisibleDuration);
   };
 
 
   return (
     <div className="flex flex-col min-h-screen">
-      <AppHeader showLogo={true} /> 
+      <AppHeader showLogo={true} />
       <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-10"
@@ -126,8 +82,8 @@ export default function HomePage() {
             text={logoTextContent}
             size="large"
             className={cn(
-              'text-center cursor-pointer mb-8', // mb-8 moved here from a wrapping div
-              animateChars && logoTextContent === 'TeachMeet' && 'logo-animate-complex' // Changed to logo-animate-complex
+              'text-center cursor-pointer mb-8',
+              animateChars && logoTextContent === 'TeachMeet' && 'logo-animate-complex'
             )}
             onClick={handleComplexLogoAnimation}
             animateChars={animateChars && logoTextContent === 'TeachMeet'}
@@ -138,71 +94,27 @@ export default function HomePage() {
               <ul className="space-y-3 text-left">
                 {ongoingMeetings.map((meeting) => (
                   <li key={meeting.id}>
-                    <Dialog open={isMeetingDialogVisible && selectedMeetingForDialog?.id === meeting.id} onOpenChange={(isOpen) => {
-                      if (!isOpen) {
-                        setSelectedMeetingForDialog(null); 
-                      }
-                      setIsMeetingDialogVisible(isOpen);
-                    }}>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-base py-3 px-4 rounded-lg hover:bg-primary/10 hover:border-primary"
-                          onClick={() => openMeetingDialog(meeting)}
-                        >
-                          <Video className="mr-3 h-5 w-5 text-primary/80" />
-                          <span className="truncate flex-grow text-foreground">{meeting.title}</span>
-                          {meeting.participants && (
-                            <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
-                              <UsersIcon className="h-3 w-3 mr-1"/>
-                              {meeting.participants}
-                            </span>
-                          )}
-                        </Button>
-                      </DialogTrigger>
-                      {selectedMeetingForDialog && ( 
-                        <DialogContent className="sm:max-w-md rounded-xl"> {/* Changed to rounded-xl */}
-                          <DialogHeader>
-                            <DialogTitle className="text-xl">Rejoin: {selectedMeetingForDialog?.title}</DialogTitle>
-                            <DialogDescription>
-                              Configure your audio/video before rejoining.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="py-4 space-y-4">
-                            <div className="flex justify-around">
-                              <Button
-                                variant={isCameraOffInDialog ? "destructive" : "secondary"}
-                                size="lg"
-                                className="rounded-full p-3 btn-gel flex flex-col h-auto items-center gap-1"
-                                onClick={() => setIsCameraOffInDialog(!isCameraOffInDialog)}
-                                aria-label={isCameraOffInDialog ? "Turn Camera On" : "Turn Camera Off"}
-                              >
-                                {isCameraOffInDialog ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
-                                <span className="text-xs mt-1">{isCameraOffInDialog ? "Cam Off" : "Cam On"}</span>
-                              </Button>
-                              <Button
-                                variant={isMicMutedInDialog ? "destructive" : "secondary"}
-                                size="lg"
-                                className="rounded-full p-3 btn-gel flex flex-col h-auto items-center gap-1"
-                                onClick={() => setIsMicMutedInDialog(!isMicMutedInDialog)}
-                                aria-label={isMicMutedInDialog ? "Unmute Mic" : "Mute Mic"}
-                              >
-                                {isMicMutedInDialog ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-                                <span className="text-xs mt-1">{isMicMutedInDialog ? "Mic Off" : "Mic On"}</span>
-                              </Button>
-                            </div>
-                          </div>
-                          <DialogFooter className="gap-2 sm:gap-0">
-                            <Button type="button" variant="outline" className="rounded-lg" onClick={handleDismissMeeting}> {/* Changed to rounded-lg */}
-                                <X className="mr-2 h-4 w-4" /> Dismiss
-                            </Button>
-                            <Button type="button" onClick={handleJoinMeetingFromDialog} className="btn-gel rounded-lg"> {/* Changed to rounded-lg */}
-                              <LogIn className="mr-2 h-4 w-4" /> Join Meeting
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      )}
-                    </Dialog>
+                    <Link
+                      href={`/dashboard/meeting/${meeting.id}/wait?topic=${encodeURIComponent(meeting.title)}`}
+                      passHref
+                      legacyBehavior
+                    >
+                      <a
+                        className={cn(
+                          "w-full justify-start text-base py-3 px-4 rounded-lg hover:bg-primary/10 hover:border-primary flex items-center",
+                          "border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none" // Button-like appearance
+                        )}
+                      >
+                        <Video className="mr-3 h-5 w-5 text-primary/80" />
+                        <span className="truncate flex-grow text-foreground">{meeting.title}</span>
+                        {meeting.participants && (
+                          <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
+                            <UsersIcon className="h-3 w-3 mr-1" />
+                            {meeting.participants}
+                          </span>
+                        )}
+                      </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
