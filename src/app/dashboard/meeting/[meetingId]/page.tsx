@@ -29,7 +29,7 @@ const ParticipantView = ({
   hasCameraPermissionForView?: boolean | null,
   isHandRaisedForView?: boolean
 }) => {
-  const showAvatar = (isMe && isCameraOff) || (isMe && hasCameraPermissionForView === false) || (!isMe && isCameraOff);
+  const showAvatar = (isMe && isCameraOff) || (isMe && hasCameraPermissionForView === false);
 
   return (
     <Card className="aspect-video rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
@@ -297,13 +297,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-            variant={isHandRaised ? "secondary" : "default"}
+            variant={"default"} // Base variant for consistent structure
             size="lg"
             className={cn(
               "rounded-full p-4",
               isHandRaised 
-                ? "ring-2 ring-offset-2 ring-offset-background ring-secondary-foreground/80 shadow-lg" // No btn-gel for secondary (blue)
-                : "btn-gel shadow-md" // btn-gel for default (green)
+                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" // Active: Accent color (cyan)
+                : "btn-gel shadow-md" // Inactive: Primary color (green) with gel
             )}
             onClick={toggleHandRaise}
             aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
