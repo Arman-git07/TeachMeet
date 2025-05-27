@@ -361,6 +361,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
   };
 
+  const handleOpenWhiteboard = () => {
+    toast({
+      title: "Whiteboard Feature",
+      description: "The whiteboard feature is currently under development.",
+    });
+  };
+
 
   const participants = [
     {
@@ -396,12 +403,8 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               {isScreenSharingActive ? <StopCircle className="mr-2 h-4 w-4 text-destructive" /> : <ScreenShare className="mr-2 h-4 w-4" />}
               {isScreenSharingActive ? "Stop Sharing Screen" : "Share Screen"}
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/dashboard/meeting/${meetingId}/whiteboard`} legacyBehavior>
-                <a>
-                  <Edit3 className="mr-2 h-4 w-4" /> Open Whiteboard
-                </a>
-              </Link>
+            <DropdownMenuItem onClick={handleOpenWhiteboard}>
+              <Edit3 className="mr-2 h-4 w-4" /> Open Whiteboard
             </DropdownMenuItem>
             <DropdownMenuItem><MessageSquare className="mr-2 h-4 w-4" /> Chat</DropdownMenuItem>
             <DropdownMenuItem><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
@@ -469,16 +472,16 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-            variant={isHandRaised ? "default" : "default"}
-            size="lg"
-            className={cn(
-              "rounded-full p-4",
-              isHandRaised
-                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg"
-                : "btn-gel shadow-md"
-            )}
-            onClick={toggleHandRaise}
-            aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
+             variant={isHandRaised ? "default" : "default"}
+             size="lg"
+             className={cn(
+               "rounded-full p-4",
+               isHandRaised
+                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg"
+                 : "btn-gel shadow-md"
+             )}
+             onClick={toggleHandRaise}
+             aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
           >
             <Hand className="h-6 w-6" />
           </Button>
