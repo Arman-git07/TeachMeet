@@ -10,14 +10,14 @@ import {
   PlusCircle,
   LogOut,
   Clapperboard,
-  Home as HomeIcon, // Renamed Home to HomeIcon
+  Home as HomeIcon,
   FileText,
   Lock,
   Globe,
-  BookOpen, 
-  ShieldQuestion, 
-  Users, 
-  ShieldAlert, 
+  BookOpen,
+  ShieldQuestion,
+  Users,
+  ShieldAlert,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -48,7 +48,7 @@ type NavItemProps = {
   asDialogTrigger?: boolean;
   isDropdown?: boolean;
   dropdownItems?: { href: string; label: string; icon: React.ElementType, target?: string }[];
-  target?: string; 
+  target?: string;
 };
 
 const NavItem = ({
@@ -63,10 +63,12 @@ const NavItem = ({
   dropdownItems = [],
   target,
 }: NavItemProps) => {
-  const isActive = href ? currentPath.startsWith(href) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
+  const isActive = href ? currentPath === href || (href !== '/' && currentPath.startsWith(href)) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
+  const isStrictlyHomeActive = href === '/' && currentPath === '/';
+
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
   const { isMobile, setOpenMobile } = useSidebar();
-  const router = useRouter(); 
+  const router = useRouter();
 
   const handleClick = () => {
     if (onClickProp && !asDialogTrigger && !isDropdown) {
@@ -86,12 +88,15 @@ const NavItem = ({
 
   const buttonClassName = cn(
     commonClasses,
-    isActive
-      ? "bg-primary text-primary-foreground"
-      : isGreenTheme
-        ? "text-primary hover:bg-primary hover:text-primary-foreground"
-        : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+    isStrictlyHomeActive
+      ? "bg-secondary text-secondary-foreground" // Blue active state for Home
+      : isActive // For other active items
+      ? "bg-primary text-primary-foreground" // Green active state for others
+      : isGreenTheme // Special green theme for some inactive items
+      ? "text-primary hover:bg-primary hover:text-primary-foreground"
+      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" // Default hover
   );
+
 
   if (asDialogTrigger) {
     return (
@@ -121,7 +126,7 @@ const NavItem = ({
             <SidebarMenuButton
               onClick={handleClick}
               className={buttonClassName}
-              isActive={isActive}
+              isActive={isActive} // isActive here might determine trigger's appearance if it's also a link
             >
               {buttonContent}
             </SidebarMenuButton>
@@ -160,7 +165,7 @@ const NavItem = ({
           <SidebarMenuButton
             as="a"
             onClick={handleClick}
-            isActive={isActive}
+            isActive={isActive} // This isActive is for the generic active state handling
             className={buttonClassName}
             target={target}
           >
@@ -171,13 +176,14 @@ const NavItem = ({
     );
   }
 
+  // Fallback for items without href (like Sign Out)
   return (
      <SidebarMenuItem>
          <SidebarMenuButton
          onClick={handleClick}
          className={cn(
              commonClasses,
-             "hover:bg-destructive hover:text-destructive-foreground"
+             "hover:bg-destructive hover:text-destructive-foreground" // Example style for non-nav, action button
          )}
          >
          {buttonContent}
@@ -190,7 +196,7 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter();
+  const router = useRouter(); // Added missing import
   const { isMobile, setOpenMobile } = useSidebar();
 
   const legalAndInfoItems = [
