@@ -61,8 +61,10 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
             <PanelLeftOpen className="h-6 w-6" />
           </SidebarTrigger>
           {showLogo && (
-            <Link href="/" className="hidden md:block">
-              <Logo size="small" />
+            <Link href="/" legacyBehavior>
+              <a>
+                <Logo size="small" />
+              </a>
             </Link>
           )}
         </div>
