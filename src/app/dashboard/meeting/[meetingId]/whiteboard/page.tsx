@@ -32,31 +32,22 @@ export default function WhiteboardPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleToolClick = (toolName: string) => {
-    if (toolName === "Text") {
-      if (activeTool === "text") {
-        setActiveTool(null); // Deactivate if already active
-        toast({
-          title: `Text Tool Deactivated`,
-          duration: 2000,
-        });
-      } else {
-        setActiveTool("text");
-        toast({
-          title: `${toolName} Selected`,
-          description: `The ${toolName.toLowerCase()} tool is now active. Click on the canvas or type in the area.`,
-          duration: 3000,
-        });
-      }
+    const toolId = toolName.toLowerCase().replace(/\s+/g, '');
+    if (activeTool === toolId) {
+      setActiveTool(null); // Deactivate if already active
+      toast({
+        title: `${toolName} Tool Deactivated`,
+        duration: 2000,
+      });
     } else {
-      setActiveTool(toolName.toLowerCase().replace(/\s+/g, '')); // For other tools
+      setActiveTool(toolId);
       toast({
         title: `${toolName} Selected`,
-        description: `The ${toolName.toLowerCase()} feature is currently under development.`,
+        description: toolId === 'text' 
+          ? `The ${toolName.toLowerCase()} tool is now active. Click on the canvas or type in the area.`
+          : `The ${toolName.toLowerCase()} feature is currently under development.`,
         duration: 3000,
       });
-      if (toolName !== "Text" && activeTool === "text") {
-         // If switching from text tool to another, consider how to handle text input area
-      }
     }
   };
 
@@ -127,8 +118,7 @@ export default function WhiteboardPage() {
                   value={textToolInput}
                   onChange={(e) => setTextToolInput(e.target.value)}
                   placeholder="Type here..."
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-1/2 z-10 rounded-lg shadow-xl border-primary resize-none p-4 text-base"
-                  // Add onBlur or an "Add Text" button to "commit" the text if needed for more advanced features
+                  className="absolute inset-0 w-full h-full z-10 rounded-lg shadow-xl border-primary resize-none p-4 text-base"
                 />
               ) : (
                 <p className="text-muted-foreground text-lg">
