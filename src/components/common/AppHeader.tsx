@@ -1,5 +1,5 @@
 
-'use client';
+'use client'; // Explicitly mark as client component
 import { PanelLeftOpen, Search } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';

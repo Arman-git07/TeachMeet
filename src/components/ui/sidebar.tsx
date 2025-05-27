@@ -4,7 +4,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft, PanelLeftOpen } from "lucide-react" // Added PanelLeftOpen for consistency
+import { PanelLeft, PanelLeftOpen } from "lucide-react" 
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -200,7 +200,7 @@ const Sidebar = React.forwardRef<
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
               } as React.CSSProperties
             }
-            side={side} // Ensures side prop is passed to SheetContent
+            side={side} 
           >
             <RadixSheetTitle className="sr-only">Sidebar Menu</RadixSheetTitle>
             <div className="flex h-full w-full flex-col">{children}</div>

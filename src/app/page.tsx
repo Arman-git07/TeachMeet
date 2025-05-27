@@ -36,9 +36,11 @@ export default function HomePage() {
     let activeMeetings: OngoingMeeting[] = [];
     try {
       activeMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+      if (!Array.isArray(activeMeetings)) activeMeetings = []; // Ensure it's an array
     } catch (e) {
       console.error("Error parsing started meetings from localStorage", e);
       localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear corrupted data
+      activeMeetings = [];
     }
     
     // Load dismissed meetings
@@ -46,9 +48,11 @@ export default function HomePage() {
     let dismissedIds: string[] = [];
     try {
       dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
+      if (!Array.isArray(dismissedIds)) dismissedIds = []; // Ensure it's an array
     } catch (e) {
       console.error("Error parsing dismissed meetings from localStorage", e);
       localStorage.removeItem(DISMISSED_MEETINGS_KEY); // Clear corrupted data
+      dismissedIds = [];
     }
 
     // Filter out dismissed meetings from the started meetings
@@ -64,20 +68,20 @@ export default function HomePage() {
 
 
   const tmVisibleDuration = 350;
-  const characterAnimationTotalDuration = 1000; // Matches CSS animation duration
+  const characterAnimationTotalDuration = 1000; 
 
   const handleComplexLogoAnimation = () => {
     if (animationLock) return;
 
     setAnimationLock(true);
-    setAnimateChars(false); // Reset for TM state
+    setAnimateChars(false); 
     setLogoTextContent('TM');
 
     setTimeout(() => {
       setLogoTextContent('TeachMeet');
-      setAnimateChars(true); // Trigger full text animation
+      setAnimateChars(true); 
       setTimeout(() => {
-        setAnimateChars(false); // Reset animation class after it finishes
+        setAnimateChars(false); 
         setAnimationLock(false);
       }, characterAnimationTotalDuration);
     }, tmVisibleDuration);
@@ -88,10 +92,11 @@ export default function HomePage() {
     let dismissedIds: string[] = [];
      try {
       dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
+      if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
       console.error("Error parsing dismissed meetings from localStorage", e);
-      // Potentially clear or reset the dismissed list if parsing fails
       localStorage.removeItem(DISMISSED_MEETINGS_KEY);
+      dismissedIds = [];
     }
 
     if (!dismissedIds.includes(meetingIdToDismiss)) {
@@ -141,12 +146,11 @@ export default function HomePage() {
                       href={`/dashboard/meeting/${meeting.id}/wait?topic=${encodeURIComponent(meeting.title)}`}
                       passHref
                       legacyBehavior
-                      className="flex-grow"
                     >
                       <a
                         className={cn(
-                          "w-full justify-start text-base py-3 px-4 rounded-lg hover:bg-primary/10 hover:border-primary flex items-center",
-                          "border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none" 
+                          "w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center",
+                          "border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow" 
                         )}
                       >
                         <Video className="mr-3 h-5 w-5 text-primary/80" />

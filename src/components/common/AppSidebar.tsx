@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import {
@@ -9,14 +10,14 @@ import {
   PlusCircle,
   LogOut,
   Clapperboard,
-  Home,
+  Home as HomeIcon, // Renamed Home to HomeIcon
   FileText,
   Lock,
   Globe,
-  BookOpen, // For Terms of Service
-  ShieldQuestion, // For Privacy Policy
-  Users, // For Community Guidelines
-  ShieldAlert, // For new Legal & Info dropdown
+  BookOpen, 
+  ShieldQuestion, 
+  Users, 
+  ShieldAlert, 
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -47,7 +48,7 @@ type NavItemProps = {
   asDialogTrigger?: boolean;
   isDropdown?: boolean;
   dropdownItems?: { href: string; label: string; icon: React.ElementType, target?: string }[];
-  target?: string; // for opening in new tab
+  target?: string; 
 };
 
 const NavItem = ({
@@ -65,7 +66,7 @@ const NavItem = ({
   const isActive = href ? currentPath.startsWith(href) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
   const { isMobile, setOpenMobile } = useSidebar();
-  const router = useRouter(); // Added router for programmatic navigation if needed
+  const router = useRouter(); 
 
   const handleClick = () => {
     if (onClickProp && !asDialogTrigger && !isDropdown) {
@@ -220,7 +221,7 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
-              <NavItem href="/" icon={Home} currentPath={pathname}>Home</NavItem>
+              <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem>
               <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme asDialogTrigger>Start New Meeting</NavItem>
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
