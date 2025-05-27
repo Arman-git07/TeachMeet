@@ -33,6 +33,12 @@ const ParticipantView = ({
 }) => {
   const showAvatar = (isMe && isCameraOff) || (isMe && hasCameraPermissionForView === false);
 
+  const handleFullScreenClick = () => {
+    // Placeholder: In a real app, use browser Fullscreen API
+    console.log(`Full screen requested for ${name}`);
+    // Example: if (videoRef?.current) { videoRef.current.requestFullscreen(); }
+  };
+
   return (
     <Card className="aspect-video rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
       {isMe ? (
@@ -79,6 +85,17 @@ const ParticipantView = ({
           <Hand className="h-4 w-4" />
         </div>
       )}
+      <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-sm shadow-md"
+          onClick={handleFullScreenClick}
+          aria-label="Toggle full screen"
+        >
+          <Maximize className="h-4 w-4" />
+        </Button>
+      </div>
     </Card>
   );
 };
@@ -200,7 +217,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const leaveMeeting = () => {
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
 
-    // Add current meetingId to dismissed list in localStorage
     if (typeof window !== 'undefined' && meetingId) {
       const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
       let dismissedIds: string[] = [];
@@ -208,10 +224,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
       } catch (e) {
         console.error("Error parsing dismissed meetings from localStorage on leave:", e);
-        localStorage.removeItem(DISMISSED_MEETINGS_KEY); // Clear corrupted data
+        localStorage.removeItem(DISMISSED_MEETINGS_KEY);
       }
 
-      if (!Array.isArray(dismissedIds)) { // Ensure it's an array
+      if (!Array.isArray(dismissedIds)) {
           dismissedIds = [];
       }
 
@@ -320,7 +336,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-            variant={"default"} 
+            variant={isHandRaised ? "default" : "default"} 
             size="lg"
             className={cn(
               "rounded-full p-4",
