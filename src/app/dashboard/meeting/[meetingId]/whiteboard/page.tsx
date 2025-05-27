@@ -198,15 +198,17 @@ export default function WhiteboardPage() {
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
     
-    if (activeTool === toolId && toolId === 'draw') { // Only toggle options for main 'draw' tool
+    // If clicking the same drawing tool that's already active, toggle options.
+    // Otherwise, set the new tool and manage options visibility.
+    if (activeTool === toolId && drawingTools.includes(toolId)) {
         setShowDrawingToolOptions(prev => !prev);
     } else {
         setActiveTool(toolId);
-        setIsDrawing(false);
+        setIsDrawing(false); // Stop any ongoing drawing
         if (drawingTools.includes(toolId)) {
-            setShowDrawingToolOptions(true);
+            setShowDrawingToolOptions(true); // Show options for any drawing tool
         } else {
-            setShowDrawingToolOptions(false);
+            setShowDrawingToolOptions(false); // Hide for non-drawing tools
         }
 
         // Toast for non-drawing tools or tools under development
@@ -248,15 +250,15 @@ export default function WhiteboardPage() {
     });
   }
   
-  const topToolbarOffset = 65; // Height of header
-  const mainToolsToolbarOffset = 58; // Height of main tools toolbar
-  const drawingOptionsToolbarOffset = showDrawingToolOptions ? 106 : 0; // Approximate height of drawing options toolbar
+  const topToolbarOffset = 65; 
+  const mainToolsToolbarOffset = 58; 
+  const drawingOptionsToolbarOffset = showDrawingToolOptions ? 106 : 0; 
   const totalOffset = topToolbarOffset + mainToolsToolbarOffset + drawingOptionsToolbarOffset;
 
 
   return (
     <div className="flex flex-col h-screen bg-muted/30">
-      <header className="p-3 border-b bg-background shadow-sm sticky top-0 z-20">
+      <header className="flex-none p-3 border-b bg-background shadow-sm sticky top-0 z-20">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Wand2 className="h-7 w-7 text-primary" />
@@ -341,7 +343,7 @@ export default function WhiteboardPage() {
               Meeting ID: {meetingId || "N/A"} - Draw, write, and collaborate!
               {activeTool && drawingTools.includes(activeTool) && (
                 <span className="block text-xs mt-1">
-                  Tool: {activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} | Color: <span style={{ color: selectedColor, display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> | Size: {selectedBrushSize}
+                  Tool: {activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} | Color: <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> | Size: {selectedBrushSize}
                 </span>
               )}
                {(!activeTool || (!drawingTools.includes(activeTool) && activeTool !== 'text')) &&  (
@@ -355,7 +357,7 @@ export default function WhiteboardPage() {
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
+              onMouseLeave={stopDrawing} // Stop drawing if mouse leaves canvas
               onTouchStart={startDrawing}
               onTouchMove={draw}
               onTouchEnd={stopDrawing}
@@ -386,4 +388,3 @@ export default function WhiteboardPage() {
     </div>
   );
 }
-
