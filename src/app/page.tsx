@@ -20,6 +20,7 @@ interface OngoingMeeting {
 const initialMockOngoingMeetings: OngoingMeeting[] = [
   { id: 'alpha-beta-gamma', title: 'Project Sync: Q3 Roadmap', participants: 5 },
   { id: 'delta-echo-foxtrot', title: 'Weekly Team Huddle', participants: 8 },
+  { id: 'zeta-eta-theta', title: 'New Brainstorm Session', participants: 3 }, // New meeting added
 ];
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
