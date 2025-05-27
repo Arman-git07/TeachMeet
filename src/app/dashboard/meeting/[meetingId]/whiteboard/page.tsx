@@ -133,23 +133,23 @@ export default function WhiteboardPage() {
   };
 
   const startDrawing = (event: React.MouseEvent | React.TouchEvent) => {
-    if (!contextRef.current) return;
+    if (!contextRef.current || !activeTool) return;
     const pos = getMousePosition(event);
     if (!pos) return;
 
     setIsDrawing(true);
-    setLastPosition(pos); // For freehand
+    setLastPosition(pos); 
     
     if (activeTool === 'draw') {
       contextRef.current.beginPath();
       contextRef.current.moveTo(pos.x, pos.y);
-    } else if (['line', 'circle', 'square'].includes(activeTool || '')) {
+    } else if (['line', 'circle', 'square'].includes(activeTool)) {
       setShapeStartPoint(pos);
     }
   };
 
   const draw = (event: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || !contextRef.current || !lastPosition) return;
+    if (!isDrawing || !contextRef.current || !lastPosition || !activeTool) return;
     const pos = getMousePosition(event);
     if (!pos) return;
     
@@ -158,16 +158,16 @@ export default function WhiteboardPage() {
       contextRef.current.stroke();
       setLastPosition(pos);
     }
-    // For shapes, drawing happens on mouseUp for simplicity (no live preview for now)
+    // For shapes, drawing happens on mouseUp for simplicity
   };
 
   const stopDrawing = (event: React.MouseEvent | React.TouchEvent) => {
-    if (!contextRef.current || !isDrawing) return;
-    const pos = getMousePosition(event); // get final position for shape tools
+    if (!contextRef.current || !isDrawing || !activeTool) return;
+    const pos = getMousePosition(event); 
     
     if (activeTool === 'draw') {
       contextRef.current.closePath();
-    } else if (shapeStartPoint && pos && contextRef.current) {
+    } else if (shapeStartPoint && pos && contextRef.current && ['line', 'circle', 'square'].includes(activeTool)) {
       const start = shapeStartPoint;
       const end = pos;
       contextRef.current.beginPath();
@@ -197,21 +197,26 @@ export default function WhiteboardPage() {
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-    if (activeTool === toolId) {
-      if (drawingTools.includes(toolId)) setShowDrawingToolOptions(prev => !prev);
+    
+    if (activeTool === toolId && toolId === 'draw') { // Only toggle options for main 'draw' tool
+        setShowDrawingToolOptions(prev => !prev);
     } else {
-      setActiveTool(toolId);
-      setIsDrawing(false); 
-      if (drawingTools.includes(toolId)) setShowDrawingToolOptions(true);
-      else setShowDrawingToolOptions(false);
+        setActiveTool(toolId);
+        setIsDrawing(false);
+        if (drawingTools.includes(toolId)) {
+            setShowDrawingToolOptions(true);
+        } else {
+            setShowDrawingToolOptions(false);
+        }
 
-      if (!drawingTools.includes(toolId) && toolId !== 'text' && toolId !== 'select' && toolId !== 'erase' && toolId !== 'clear') {
-        toast({
-          title: `${toolName} Selected`,
-          description: `The ${toolName.toLowerCase()} feature is currently under development.`,
-          duration: 3000,
-        });
-      }
+        // Toast for non-drawing tools or tools under development
+        if (!drawingTools.includes(toolId) && toolId !== 'text' && toolId !== 'select' && toolId !== 'erase' && toolId !== 'clear') {
+            toast({
+            title: `${toolName} Selected`,
+            description: `The ${toolName.toLowerCase()} feature is currently under development.`,
+            duration: 3000,
+            });
+        }
     }
   };
 
@@ -242,6 +247,12 @@ export default function WhiteboardPage() {
       duration: 3000,
     });
   }
+  
+  const topToolbarOffset = 65; // Height of header
+  const mainToolsToolbarOffset = 58; // Height of main tools toolbar
+  const drawingOptionsToolbarOffset = showDrawingToolOptions ? 106 : 0; // Approximate height of drawing options toolbar
+  const totalOffset = topToolbarOffset + mainToolsToolbarOffset + drawingOptionsToolbarOffset;
+
 
   return (
     <div className="flex flex-col h-screen bg-muted/30">
@@ -268,9 +279,6 @@ export default function WhiteboardPage() {
         <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
           <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
           <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={activeTool === "draw"} />
-          <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick("Line")} isActive={activeTool === "line"} />
-          <ToolButton icon={CircleIcon} label="Circle" onClick={() => handleToolClick("Circle")} isActive={activeTool === "circle"} />
-          <ToolButton icon={SquareIcon} label="Square" onClick={() => handleToolClick("Square")} isActive={activeTool === "square"} />
           <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
           <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
           <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
@@ -278,12 +286,13 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      {activeTool && drawingTools.includes(activeTool) && showDrawingToolOptions && (
+      {showDrawingToolOptions && (
         <div className="flex-none p-2 border-b bg-muted/50 shadow-sm sticky top-[calc(65px+58px)] z-10">
           <div className="container mx-auto">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <div className="flex flex-wrap justify-center gap-2 items-center">
-                <span className="text-xs font-medium text-muted-foreground mr-2">Color:</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center justify-center">
+              {/* Colors */}
+              <div className="flex flex-wrap justify-center sm:justify-start gap-2 items-center col-span-1 sm:col-span-2">
+                <span className="text-xs font-medium text-muted-foreground mr-2 sm:hidden md:inline">Color:</span>
                 {availableColors.map(color => (
                   <ColorSwatch
                     key={color}
@@ -293,20 +302,29 @@ export default function WhiteboardPage() {
                   />
                 ))}
               </div>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground mr-2">Size:</span>
-                {brushSizes.map(brush => (
-                  <Button
-                    key={brush.name}
-                    variant={selectedBrushSize === brush.name ? "default" : "outline"}
-                    size="icon"
-                    className="rounded-lg w-10 h-10"
-                    onClick={() => handleBrushSizeSelect(brush.name)}
-                    aria-label={brush.label}
-                  >
-                    <brush.icon className={cn("h-5 w-5", brush.name === 'small' && 'h-3 w-3', brush.name === 'large' && 'h-6 w-6')} />
-                  </Button>
-                ))}
+              {/* Brush Sizes & Shapes */}
+              <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end gap-4">
+                <div className="flex items-center justify-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground mr-1">Size:</span>
+                    {brushSizes.map(brush => (
+                    <Button
+                        key={brush.name}
+                        variant={selectedBrushSize === brush.name ? "default" : "outline"}
+                        size="icon"
+                        className="rounded-lg w-10 h-10"
+                        onClick={() => handleBrushSizeSelect(brush.name)}
+                        aria-label={brush.label}
+                    >
+                        <brush.icon className={cn("h-5 w-5", brush.name === 'small' && 'h-3 w-3', brush.name === 'large' && 'h-6 w-6')} />
+                    </Button>
+                    ))}
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground mr-1">Shape:</span>
+                    <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick("Line")} isActive={activeTool === "line"} />
+                    <ToolButton icon={CircleIcon} label="Circle" onClick={() => handleToolClick("Circle")} isActive={activeTool === "circle"} />
+                    <ToolButton icon={SquareIcon} label="Square" onClick={() => handleToolClick("Square")} isActive={activeTool === "square"} />
+                </div>
               </div>
             </div>
           </div>
@@ -315,8 +333,7 @@ export default function WhiteboardPage() {
 
       <main className={cn(
         "flex-grow flex items-center justify-center",
-        (activeTool && drawingTools.includes(activeTool) && showDrawingToolOptions) ? "pt-[calc(65px+58px+66px)]" : "pt-[calc(65px+58px)]"
-      )}>
+      )} style={{ paddingTop: `${totalOffset}px` }}>
         <Card className="w-full h-full max-w-full text-center shadow-xl rounded-xl border-border/50 overflow-hidden flex flex-col">
           <CardHeader className="flex-none">
             <CardTitle className="text-xl">Whiteboard Canvas</CardTitle>
