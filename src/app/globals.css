@@ -24,7 +24,7 @@
     --primary: 120 55% 45%; /* Softer Green */
     --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 180 75% 42%; /* Slightly softer cyan */
+    --secondary: 220 70% 50%; /* Standard Blue */
     --secondary-foreground: 0 0% 100%; /* White */
     
     --accent: 180 70% 48%; /* Softer Cyan */
@@ -77,7 +77,7 @@
     --primary: 120 60% 55%; /* Brighter, less saturated Green for Dark Mode */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 180 75% 50%; /* Brighter, less saturated Cyan for Dark Mode */
+    --secondary: 220 75% 60%; /* Brighter Standard Blue for Dark Mode */
     --secondary-foreground: 0 0% 100%;
     
     --accent: 180 80% 55%; /* Brighter, less saturated Cyan for Dark Mode */
@@ -284,3 +284,6 @@ html, body, #__next {
   from { transform: translateX(-5px) scale(0.5); opacity: 0; }
   to { transform: translateX(0) scale(1); opacity: 1; }
 }
+
+
+    
