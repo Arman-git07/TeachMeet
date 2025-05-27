@@ -20,6 +20,7 @@ interface OngoingMeeting {
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
 export default function HomePage() {
   const [ongoingMeetings, setOngoingMeetings] = useState<OngoingMeeting[]>([]);
@@ -36,10 +37,10 @@ export default function HomePage() {
     let activeMeetings: OngoingMeeting[] = [];
     try {
       activeMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
-      if (!Array.isArray(activeMeetings)) activeMeetings = []; // Ensure it's an array
+      if (!Array.isArray(activeMeetings)) activeMeetings = [];
     } catch (e) {
       console.error("Error parsing started meetings from localStorage", e);
-      localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear corrupted data
+      localStorage.removeItem(STARTED_MEETINGS_KEY);
       activeMeetings = [];
     }
     
@@ -48,22 +49,40 @@ export default function HomePage() {
     let dismissedIds: string[] = [];
     try {
       dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
-      if (!Array.isArray(dismissedIds)) dismissedIds = []; // Ensure it's an array
+      if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
       console.error("Error parsing dismissed meetings from localStorage", e);
-      localStorage.removeItem(DISMISSED_MEETINGS_KEY); // Clear corrupted data
+      localStorage.removeItem(DISMISSED_MEETINGS_KEY);
       dismissedIds = [];
     }
 
+    const now = Date.now();
+    let newDismissalsMade = false;
+
+    // Auto-dismiss old meetings from started list
+    activeMeetings.forEach(meeting => {
+      if (meeting.startedAt && (now - meeting.startedAt > TWO_HOURS_IN_MS)) {
+        if (!dismissedIds.includes(meeting.id)) {
+          dismissedIds.push(meeting.id);
+          newDismissalsMade = true;
+          console.log(`Auto-dismissing meeting "${meeting.title}" (ID: ${meeting.id}) as it started over 2 hours ago.`);
+        }
+      }
+    });
+
+    if (newDismissalsMade) {
+      localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
+    }
+
     // Filter out dismissed meetings from the started meetings
-    activeMeetings = activeMeetings.filter(
+    const meetingsToDisplay = activeMeetings.filter(
       meeting => !dismissedIds.includes(meeting.id)
     );
     
     // Optionally sort by startedAt if we want newest first, for example
-    activeMeetings.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+    meetingsToDisplay.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 
-    setOngoingMeetings(activeMeetings);
+    setOngoingMeetings(meetingsToDisplay);
   }, []);
 
 
@@ -186,3 +205,4 @@ export default function HomePage() {
     </div>
   );
 }
+
