@@ -88,8 +88,12 @@ export default function WhiteboardPage() {
         contextRef.current.strokeStyle = selectedColor;
         contextRef.current.lineWidth = getLineWidth();
         if (imageData) {
+          // Temporarily set to source-over for clearing and redrawing
+          const currentComposite = contextRef.current.globalCompositeOperation;
+          contextRef.current.globalCompositeOperation = 'source-over';
           contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
           contextRef.current.putImageData(imageData, 0, 0);
+          contextRef.current.globalCompositeOperation = currentComposite; // Restore
         }
       }
     }
@@ -152,8 +156,7 @@ export default function WhiteboardPage() {
 
     if (activeTool === 'erase') {
       contextRef.current.globalCompositeOperation = 'destination-out';
-      // Eraser uses current brush size for width
-      contextRef.current.lineWidth = getLineWidth();
+      contextRef.current.lineWidth = getLineWidth(); // Eraser uses current brush size
     } else {
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.strokeStyle = selectedColor;
@@ -181,10 +184,12 @@ export default function WhiteboardPage() {
     if (!contextRef.current || !isDrawing || !activeTool) return;
     const pos = getMousePosition(event); 
     
-    contextRef.current.closePath();
+    if (contextRef.current) { // Ensure context is still valid
+        contextRef.current.closePath();
+    }
     
     if (shapeStartPoint && pos && contextRef.current && ['line', 'circle', 'square'].includes(activeTool)) {
-      contextRef.current.globalCompositeOperation = 'source-over'; // Ensure shapes draw normally
+      contextRef.current.globalCompositeOperation = 'source-over'; 
       contextRef.current.strokeStyle = selectedColor;
       contextRef.current.lineWidth = getLineWidth();
       const start = shapeStartPoint;
@@ -207,8 +212,7 @@ export default function WhiteboardPage() {
       contextRef.current.closePath();
     }
 
-    // Reset globalCompositeOperation if eraser was active
-    if (activeTool === 'erase') {
+    if (activeTool === 'erase' && contextRef.current) {
       contextRef.current.globalCompositeOperation = 'source-over';
     }
 
@@ -217,23 +221,23 @@ export default function WhiteboardPage() {
     setShapeStartPoint(null);
   };
 
-  const drawingTools = ['draw', 'line', 'circle', 'square', 'erase'];
+  const drawingTools = ['draw', 'line', 'circle', 'square'];
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
     
-    if (activeTool === toolId && (drawingTools.includes(toolId) || toolId === 'draw')) { // 'draw' is freehand
+    if (activeTool === toolId && (drawingTools.includes(toolId) || toolId === 'draw' || toolId === 'erase')) {
         setShowDrawingToolOptions(prev => !prev);
     } else {
         setActiveTool(toolId);
         setIsDrawing(false); 
-        if (drawingTools.includes(toolId) || toolId === 'draw') {
+        if (drawingTools.includes(toolId) || toolId === 'draw' || toolId === 'erase') {
             setShowDrawingToolOptions(true); 
         } else {
             setShowDrawingToolOptions(false); 
         }
 
-        if (!drawingTools.includes(toolId) && toolId !== 'text' && toolId !== 'select' && toolId !== 'clear') {
+        if (!drawingTools.includes(toolId) && toolId !== 'text' && toolId !== 'select' && toolId !== 'clear' && toolId !== 'erase') {
             toast({
             title: `${toolName} Selected`,
             description: `The ${toolName.toLowerCase()} feature is currently under development.`,
@@ -241,7 +245,6 @@ export default function WhiteboardPage() {
             });
         }
     }
-     // Ensure composite operation is reset if switching away from eraser
      if (toolId !== 'erase' && contextRef.current) {
         contextRef.current.globalCompositeOperation = 'source-over';
     }
@@ -265,7 +268,6 @@ export default function WhiteboardPage() {
 
   const handleClearAll = () => {
     if (contextRef.current && canvasRef.current) {
-      // Ensure composite operation is default before clearing
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
@@ -282,7 +284,7 @@ export default function WhiteboardPage() {
   const drawingOptionsToolbarOffset = showDrawingToolOptions ? 106 : 0; 
   const totalOffset = topToolbarOffset + mainToolsToolbarOffset + drawingOptionsToolbarOffset;
 
-  const currentActiveToolIsDrawingTool = activeTool && (drawingTools.includes(activeTool) || activeTool === 'draw');
+  const currentActiveToolIsDrawingTool = activeTool && (drawingTools.includes(activeTool) || activeTool === 'draw' || activeTool === 'erase');
 
   return (
     <div className="flex flex-col h-screen bg-muted/30">
@@ -308,7 +310,7 @@ export default function WhiteboardPage() {
       <div className="flex-none p-2 border-b bg-background shadow-md sticky top-[65px] z-10">
         <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
           <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
-          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={currentActiveToolIsDrawingTool && activeTool !== 'erase'} />
+          <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("Draw")} isActive={activeTool !== 'erase' && currentActiveToolIsDrawingTool} />
           <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
           <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
           <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
@@ -417,3 +419,4 @@ export default function WhiteboardPage() {
     </div>
   );
 }
+
