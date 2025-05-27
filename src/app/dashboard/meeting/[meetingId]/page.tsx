@@ -132,8 +132,8 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const resolvedParams = use(paramsPromise);
   const { meetingId } = resolvedParams;
 
-  const searchParams = useSearchParams();
-  const topic = searchParams.get('topic');
+  const searchParamsHook = useSearchParams(); // Renamed to avoid conflict
+  const topic = searchParamsHook.get('topic');
   const { toast } = useToast();
   const router = useRouter();
 
@@ -379,7 +379,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const handleOpenChat = () => {
-    router.push(`/dashboard/meeting/${meetingId}/chat`);
+    router.push(`/dashboard/meeting/${meetingId}/chat${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
+  };
+
+  const handleOpenParticipants = () => {
+    router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
   };
 
 
@@ -423,7 +427,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             <DropdownMenuItem onClick={handleOpenChat}>
               <MessageSquare className="mr-2 h-4 w-4" /> Chat
             </DropdownMenuItem>
-            <DropdownMenuItem><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpenParticipants}><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem><Columns className="mr-2 h-4 w-4" /> Change Layout</DropdownMenuItem>
             <DropdownMenuSeparator />
