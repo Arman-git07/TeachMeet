@@ -3,13 +3,14 @@
 import { useState, useEffect, use, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
@@ -21,7 +22,8 @@ const ParticipantView = ({
   isCameraOff = false, 
   videoRef,
   hasCameraPermissionForView,
-  isHandRaisedForView
+  isHandRaisedForView,
+  isScreenSharing // New prop
 }: { 
   name: string, 
   isMe?: boolean, 
@@ -29,14 +31,23 @@ const ParticipantView = ({
   isCameraOff?: boolean,
   videoRef?: React.RefObject<HTMLVideoElement>,
   hasCameraPermissionForView?: boolean | null,
-  isHandRaisedForView?: boolean
+  isHandRaisedForView?: boolean,
+  isScreenSharing?: boolean // New prop
 }) => {
-  const showAvatar = (isMe && isCameraOff) || (isMe && hasCameraPermissionForView === false);
+  
+  const showVideoElement = isMe && videoRef?.current?.srcObject;
+  const showAvatar = 
+    (isMe && !videoRef?.current?.srcObject && (isCameraOff || hasCameraPermissionForView === false) && !isScreenSharing) || // Show avatar if camera is off/no permission AND not screen sharing
+    (isMe && !videoRef?.current?.srcObject && isScreenSharing && hasCameraPermissionForView === false); // Or if screen sharing but video object not ready and camera permission denied.
+
 
   const handleFullScreenClick = () => {
     // Placeholder: In a real app, use browser Fullscreen API
-    console.log(`Full screen requested for ${name}`);
-    // Example: if (videoRef?.current) { videoRef.current.requestFullscreen(); }
+    if (videoRef?.current && videoRef.current.srcObject) {
+      videoRef.current.requestFullscreen().catch(err => console.error("Error entering fullscreen:", err));
+    } else {
+      console.log(`Full screen requested for ${name}, but no video stream available.`);
+    }
   };
 
   return (
@@ -48,9 +59,9 @@ const ParticipantView = ({
             muted 
             autoPlay 
             playsInline 
-            className={cn("w-full h-full object-cover", { 'hidden': isCameraOff || hasCameraPermissionForView === false })} 
+            className={cn("w-full h-full object-contain", { 'hidden': !videoRef?.current?.srcObject })} // Object-contain for screen share
           />
-          {showAvatar && (
+          {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || !videoRef?.current?.srcObject) && !isScreenSharing && (
             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
               <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
                 <AvatarImage src={`https://placehold.co/128x128.png?text=${name.charAt(0).toUpperCase()}`} alt={name} data-ai-hint="avatar user" />
@@ -61,6 +72,12 @@ const ParticipantView = ({
               {hasCameraPermissionForView === false && <p className="text-xs text-muted-foreground">Camera permission denied</p>}
             </div>
           )}
+           {isScreenSharing && !videoRef?.current?.srcObject && ( // Placeholder if screen share source object not ready
+             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
+                <ScreenShare className="w-16 h-16 text-muted-foreground mb-2"/>
+                <p className="text-base font-medium text-foreground">Sharing Screen...</p>
+             </div>
+           )}
         </>
       ) : isCameraOff ? (
         <div className="w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
@@ -120,8 +137,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const [isHandRaised, setIsHandRaised] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const currentLocalStreamRef = useRef<MediaStream | null>(null);
+  const currentLocalStreamRef = useRef<MediaStream | null>(null); // For camera
+  const screenShareStreamRef = useRef<MediaStream | null>(null); // For screen share
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null); 
+  const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
+  const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
 
   useEffect(() => {
     const initializeCameraAndPermissions = async () => {
@@ -129,7 +149,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
-          if (localVideoRef.current) {
+          if (localVideoRef.current && !isScreenSharingActive) { // Only set if not screen sharing
             localVideoRef.current.srcObject = stream;
           }
           setHasCameraPermission(true);
@@ -159,6 +179,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
     return () => {
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+      screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
@@ -166,7 +187,47 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   const toggleMic = () => setIsMicMuted(prev => !prev); 
 
+  const stopScreenShare = (showToast = true) => {
+    if (screenShareStreamRef.current) {
+      screenShareStreamRef.current.getTracks().forEach(track => track.stop());
+      screenShareStreamRef.current = null;
+    }
+    setIsScreenSharingActive(false);
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null; // Clear video, user can turn camera on
+    }
+    if (showToast) {
+        toast({ title: "Screen Sharing Stopped" });
+    }
+    // If camera was intended to be on, try to restart it.
+    // For simplicity, we'll let the user manually turn camera back on.
+    // setIsCameraOff(false); // This would trigger camera logic if permission is there
+  };
+
   const toggleCamera = async () => {
+    if (isScreenSharingActive) {
+      stopScreenShare();
+      // After stopping screen share, the camera is 'off'.
+      // The next click on toggleCamera (if desired state is 'on') will try to start it.
+      // To immediately try to turn on camera:
+      // setIsCameraOff(false); // Set desired state
+      // // Then proceed with camera turning on logic (simplified here)
+      // if (hasCameraPermission === false) {
+      //   toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable permissions.' });
+      //   return;
+      // }
+      // try {
+      //   const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      //   currentLocalStreamRef.current = stream;
+      //   if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      //   setIsCameraOff(false); // Actual state
+      // } catch (err) {
+      //   setIsCameraOff(true);
+      //   toast({ variant: 'destructive', title: 'Camera Access Failed' });
+      // }
+      return; 
+    }
+
     const newCameraStateIsOff = !isCameraOff; 
 
     if (!newCameraStateIsOff) { 
@@ -198,6 +259,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       }
     } else { 
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+      currentLocalStreamRef.current = null; // Explicitly clear the ref
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
       }
@@ -216,6 +278,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const leaveMeeting = () => {
+    stopScreenShare(false); // Stop screen share without toast if active
+    currentLocalStreamRef.current?.getTracks().forEach(track => track.stop()); // Stop camera
+    
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
 
     if (typeof window !== 'undefined' && meetingId) {
@@ -248,8 +313,63 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     });
   };
 
+  const handleToggleShareScreen = () => {
+    if (isScreenSharingActive) {
+      stopScreenShare();
+    } else {
+      setIsShareScreenDialogVisible(true);
+    }
+  };
+
+  const handleConfirmShareScreen = async () => {
+    setIsShareScreenDialogVisible(false);
+    if (isScreenSharingActive) return; // Should not happen if UI is correct
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      
+      // Stop camera stream if it's active
+      if (currentLocalStreamRef.current) {
+        currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
+        currentLocalStreamRef.current = null;
+      }
+
+      screenShareStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      setIsScreenSharingActive(true);
+      setIsCameraOff(true); // Set camera to 'off' state as screen is shared
+      toast({ title: "Screen Sharing Started", description: "Your screen is now being shared locally." });
+
+      // Listen for when the user stops sharing via browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+
+    } catch (err) {
+      console.error("Error starting screen share:", err);
+      if ((err as DOMException).name === 'NotAllowedError') {
+        toast({ variant: "destructive", title: "Screen Share Cancelled", description: "You cancelled screen selection or denied permission." });
+      } else {
+        toast({ variant: "destructive", title: "Screen Share Failed", description: "Could not start screen sharing." });
+      }
+    }
+  };
+
+
   const participants = [
-    { id: "currentUser", name: "You", isMe: true, isMicMuted, isCameraOff, videoRef: localVideoRef, hasCameraPermissionForView: hasCameraPermission, isHandRaisedForView: isHandRaised },
+    { 
+      id: "currentUser", 
+      name: "You", 
+      isMe: true, 
+      isMicMuted, 
+      isCameraOff: isScreenSharingActive ? true : isCameraOff, // Camera is "off" if screen sharing
+      videoRef: localVideoRef, 
+      hasCameraPermissionForView: hasCameraPermission, 
+      isHandRaisedForView: isHandRaised,
+      isScreenSharing: isScreenSharingActive 
+    },
   ];
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
@@ -268,7 +388,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 rounded-lg shadow-lg">
-            <DropdownMenuItem><Upload className="mr-2 h-4 w-4" /> Share Screen</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleToggleShareScreen}>
+              {isScreenSharingActive ? <StopCircle className="mr-2 h-4 w-4 text-destructive" /> : <ScreenShare className="mr-2 h-4 w-4" />}
+              {isScreenSharingActive ? "Stop Sharing Screen" : "Share Screen"}
+            </DropdownMenuItem>
             <DropdownMenuItem><Edit3 className="mr-2 h-4 w-4" /> Open Whiteboard</DropdownMenuItem>
             <DropdownMenuItem><MessageSquare className="mr-2 h-4 w-4" /> Chat</DropdownMenuItem>
             <DropdownMenuItem><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
@@ -285,7 +408,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       </header>
 
       <main className="flex-1 p-4 overflow-y-auto flex flex-col">
-        {hasCameraPermission === false && ( 
+        {hasCameraPermission === false && !isScreenSharingActive && ( 
            <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Camera Permission Required</AlertTitle>
@@ -306,6 +429,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 videoRef={localVideoRef}
                 hasCameraPermissionForView={hasCameraPermission}
                 isHandRaisedForView={participants[0].isHandRaisedForView}
+                isScreenSharing={participants[0].isScreenSharing}
               />
             </div>
           </div>
@@ -317,10 +441,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 name={p.name} 
                 isMe={p.isMe} 
                 isMicMuted={p.isMicMuted} 
-                isCameraOff={p.isMe ? isCameraOff : p.isCameraOff} 
+                isCameraOff={p.isMe ? (isScreenSharingActive ? true : isCameraOff) : p.isCameraOff} 
                 videoRef={p.isMe ? localVideoRef : undefined}
                 hasCameraPermissionForView={p.isMe ? hasCameraPermission : undefined}
                 isHandRaisedForView={p.isHandRaisedForView}
+                isScreenSharing={p.isMe ? isScreenSharingActive : false}
               />
             ))}
           </div>
@@ -332,11 +457,18 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           <Button variant={isMicMuted ? "destructive" : "secondary"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleMic} aria-label={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}>
             {isMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
           </Button>
-          <Button variant={isCameraOff ? "destructive" : "secondary"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleCamera} aria-label={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}>
-            {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+          <Button 
+             variant={(isCameraOff && !isScreenSharingActive) ? "destructive" : "secondary"} 
+             size="lg" 
+             className="rounded-full p-4 btn-gel" 
+             onClick={toggleCamera} 
+             aria-label={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
+             disabled={isScreenSharingActive && isCameraOff} // Disable if screen sharing and camera is "off" (meaning screen is on)
+          >
+            {isCameraOff && !isScreenSharingActive ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-            variant={isHandRaised ? "default" : "default"} 
+            variant={isHandRaised ? "default" : "default"}
             size="lg"
             className={cn(
               "rounded-full p-4",
@@ -354,7 +486,22 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           </Button>
         </div>
       </footer>
+
+      <AlertDialog open={isShareScreenDialogVisible} onOpenChange={setIsShareScreenDialogVisible}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Share Your Screen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to share your screen. Ensure no sensitive information is visible.
+              Your camera will be turned off while sharing your screen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmShareScreen}>Share Screen</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
-
