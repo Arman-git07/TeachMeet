@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, Users, MessageSquare, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react"; // Added useRef
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -199,4 +199,3 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
     </div>
   );
 }
-
