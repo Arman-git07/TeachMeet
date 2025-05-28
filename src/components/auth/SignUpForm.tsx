@@ -15,9 +15,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Mail, Lock, User, CalendarIcon } from 'lucide-react'; // Added User and CalendarIcon
+import { Mail, Lock, User, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // Added updateProfile
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
@@ -73,7 +73,18 @@ export function SignUpForm() {
       });
       router.push('/auth/signin');
     } catch (error: any) {
-      console.error("Sign Up Error:", error);
+      const knownErrorCodes = [
+        'auth/email-already-in-use',
+        'auth/invalid-email',
+        'auth/weak-password'
+      ];
+
+      if (knownErrorCodes.includes(error.code)) {
+        console.info(`Handled Sign Up Error: ${error.code}`);
+      } else {
+        console.error("Unexpected Sign Up Error:", error);
+      }
+      
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = "This email address is already in use. Please try another.";
@@ -187,7 +198,7 @@ export function SignUpForm() {
           control={form.control}
           name="agreeToTerms"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-background/50">
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 shadow-sm bg-background/50">
               <FormControl>
                 <Checkbox
                   checked={field.value}
