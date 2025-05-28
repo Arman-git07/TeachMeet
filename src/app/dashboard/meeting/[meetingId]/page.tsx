@@ -505,13 +505,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-             variant={isHandRaised ? "default" : "default"}
+             variant={isHandRaised ? "default" : "secondary"} // Primary when raised, secondary when not
              size="lg"
              className={cn(
                "rounded-full p-4",
                isHandRaised
-                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg"
-                 : "btn-gel shadow-md"
+                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" // Accent when raised
+                 : "btn-gel shadow-md" // Default (green) when not raised
              )}
              onClick={toggleHandRaise}
              aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
@@ -542,3 +542,4 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
+
