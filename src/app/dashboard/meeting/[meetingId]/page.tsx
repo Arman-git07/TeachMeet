@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge'; // Added Badge import
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
@@ -35,16 +36,10 @@ const ParticipantView = ({
   isHandRaisedForView?: boolean,
   isScreenSharing?: boolean // New prop
 }) => {
-  const { toast } = useToast(); // Added toast for fullscreen error
-
-  const showVideoElement = isMe && videoRef?.current?.srcObject;
-  const showAvatar =
-    (isMe && !videoRef?.current?.srcObject && (isCameraOff || hasCameraPermissionForView === false) && !isScreenSharing) || // Show avatar if camera is off/no permission AND not screen sharing
-    (isMe && !videoRef?.current?.srcObject && isScreenSharing && hasCameraPermissionForView === false); // Or if screen sharing but video object not ready and camera permission denied.
-
+  const { toast } = useToast();
 
   const handleFullScreenClick = () => {
-    if (videoRef?.current && videoRef.current.srcObject) {
+    if (videoRef?.current && videoRef.current.srcObject) { // Works for camera or screen share if srcObject is set
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen().catch(err => {
           console.error("Error entering fullscreen:", err);
@@ -53,19 +48,8 @@ const ParticipantView = ({
       } else {
         toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
       }
-    } else if (isMe && isScreenSharingActive && videoRef?.current && videoRef.current.srcObject) { // Check if screen sharing is active for the current user
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen().catch(err => {
-          console.error("Error entering fullscreen for screen share:", err);
-          toast({ variant: 'destructive', title: 'Fullscreen Error', description: 'Could not enter fullscreen mode for screen share.' });
-        });
-      } else {
-        toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
-      }
-    }
-     else {
-      console.log(`Full screen requested for ${name}, but no video stream available.`);
-      toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream or active screen share.' });
+    } else {
+      toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream or screen share.' });
     }
   };
   
@@ -109,7 +93,7 @@ const ParticipantView = ({
           <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
         </div>
       ) : (
-        <div className="w-full h-full bg-muted flex items-center justify-center"> {/* Added wrapper for placeholder */}
+        <div className="w-full h-full bg-muted flex items-center justify-center">
           <Image src={`https://placehold.co/800x450.png`} alt={`${name}'s video`} width={800} height={450} objectFit="contain" data-ai-hint="participant video" />
         </div>
       )}
@@ -139,14 +123,12 @@ const ParticipantView = ({
   );
 };
 
-// isScreenSharingActive needs to be accessible by ParticipantView
-let isScreenSharingActive = false;
 
 export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(paramsPromise);
   const { meetingId } = resolvedParams;
 
-  const searchParamsHook = useSearchParams(); // Renamed to avoid conflict
+  const searchParamsHook = useSearchParams();
   const topic = searchParamsHook.get('topic');
   const { toast } = useToast();
   const router = useRouter();
@@ -155,32 +137,19 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const [isCameraOff, setIsCameraOff] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
-      localStorage.removeItem('teachmeet-desired-camera-state'); // Clean up after reading
-      return desiredState !== 'on'; // Default to off if not set or set to 'off'
+      localStorage.removeItem('teachmeet-desired-camera-state'); 
+      return desiredState !== 'on'; 
     }
-    return true; // Default to off if window is not available (SSR, etc.)
+    return true; 
   });
 
   const [isHandRaised, setIsHandRaised] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const currentLocalStreamRef = useRef<MediaStream | null>(null); // For camera
-  const screenShareStreamRef = useRef<MediaStream | null>(null); // For screen share
+  const currentLocalStreamRef = useRef<MediaStream | null>(null); 
+  const screenShareStreamRef = useRef<MediaStream | null>(null); 
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  // const [isScreenSharingActive, setIsScreenSharingActive] = useState(false); // Moved to outer scope
-  const [_isScreenSharingActive, _setIsScreenSharingActive] = useState(false);
-  isScreenSharingActive = _isScreenSharingActive; // Sync with outer scope variable
-  const setIsScreenSharingActive = (value: boolean | ((prevState: boolean) => boolean)) => {
-    if (typeof value === 'function') {
-      _setIsScreenSharingActive(prev => {
-        isScreenSharingActive = value(prev);
-        return isScreenSharingActive;
-      });
-    } else {
-      isScreenSharingActive = value;
-      _setIsScreenSharingActive(value);
-    }
-  };
+  const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
 
 
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
@@ -189,18 +158,18 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   useEffect(() => {
     const initializeCameraAndPermissions = async () => {
-      if (!isCameraOff) { // Only attempt if camera is desired to be on
+      if (!isCameraOff) { 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
-          if (localVideoRef.current && !isScreenSharingActive) { // Only set if not screen sharing
+          if (localVideoRef.current && !isScreenSharingActive) { 
             localVideoRef.current.srcObject = stream;
           }
           setHasCameraPermission(true);
         } catch (err) {
           console.error("Failed to get camera on mount:", err);
           setHasCameraPermission(false);
-          setIsCameraOff(true); // Force camera off if permission fails
+          setIsCameraOff(true); 
           toast({
             variant: 'destructive',
             title: 'Camera Access Denied',
@@ -208,11 +177,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           });
         }
       } else {
-        // Check permission status even if camera is off by default
          navigator.mediaDevices.getUserMedia({ video: true })
           .then(stream => {
             setHasCameraPermission(true);
-            // Immediately stop tracks if camera is off
             stream.getTracks().forEach(track => track.stop());
           })
           .catch(() => {
@@ -223,13 +190,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
     initializeCameraAndPermissions();
 
-    // Cleanup function
     return () => {
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // isCameraOff should not be in dependencies to avoid re-running camera init logic on toggle
+  }, []); 
 
 
   const toggleMic = () => setIsMicMuted(prev => !prev);
@@ -241,32 +207,26 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
     setIsScreenSharingActive(false);
     if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null; // Clear video, user can turn camera on
+      localVideoRef.current.srcObject = null; 
     }
     if (showToast) {
         toast({ title: "Screen Sharing Stopped" });
     }
-    // If camera was intended to be on, try to restart it.
-    // For simplicity, we'll let the user manually turn camera back on.
   };
 
   const toggleCamera = async () => {
     if (isScreenSharingActive) {
-      // If screen sharing, clicking camera button should stop screen share
       stopScreenShare();
-      // After stopping screen share, the camera is 'off'.
-      // The next click on toggleCamera (if desired state is 'on') will try to start it.
       return;
     }
 
-    const newCameraStateIsOff = !isCameraOff; // This is the desired new state
+    const newCameraStateIsOff = !isCameraOff; 
 
-    if (!newCameraStateIsOff) { // User wants to turn camera ON
+    if (!newCameraStateIsOff) { 
       if (hasCameraPermission === false) {
         toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
         return;
       }
-      // If stream doesn't exist or isn't active, try to get it
       if (!currentLocalStreamRef.current || !currentLocalStreamRef.current.active) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -274,25 +234,24 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
-          setHasCameraPermission(true); // Update permission status
+          setHasCameraPermission(true); 
           setIsCameraOff(false);
         } catch (err) {
           console.error("Failed to get camera on toggle:", err);
-          setHasCameraPermission(false); // Update permission status
-          setIsCameraOff(true); // Keep camera off if failed
+          setHasCameraPermission(false); 
+          setIsCameraOff(true); 
           toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
           return;
         }
       } else {
-        // Stream exists and is active, ensure it's set to video element
         if (localVideoRef.current && currentLocalStreamRef.current) {
             localVideoRef.current.srcObject = currentLocalStreamRef.current;
         }
         setIsCameraOff(false);
       }
-    } else { // User wants to turn camera OFF
+    } else { 
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
-      currentLocalStreamRef.current = null; // Explicitly clear the ref
+      currentLocalStreamRef.current = null; 
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
       }
@@ -311,12 +270,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const leaveMeeting = () => {
-    stopScreenShare(false); // Stop screen share without toast if active
-    currentLocalStreamRef.current?.getTracks().forEach(track => track.stop()); // Stop camera
+    stopScreenShare(false); 
+    currentLocalStreamRef.current?.getTracks().forEach(track => track.stop()); 
 
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
 
-    // Add to dismissed list in localStorage
     if (typeof window !== 'undefined' && meetingId) {
       const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
       let dismissedIds: string[] = [];
@@ -324,11 +282,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
       } catch (e) {
         console.error("Error parsing dismissed meetings from localStorage on leave:", e);
-        // If parsing fails, it's safer to just remove the potentially corrupted item
         localStorage.removeItem(DISMISSED_MEETINGS_KEY);
       }
 
-      if (!Array.isArray(dismissedIds)) { // Ensure it's an array
+      if (!Array.isArray(dismissedIds)) { 
           dismissedIds = [];
       }
 
@@ -361,7 +318,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     setIsShareScreenDialogVisible(false);
     if (isScreenSharingActive) return;
 
-    // Check if getDisplayMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
       toast({
         variant: "destructive",
@@ -376,7 +332,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
 
-      // Stop camera stream if it's active
       if (currentLocalStreamRef.current) {
         currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
         currentLocalStreamRef.current = null;
@@ -387,10 +342,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         localVideoRef.current.srcObject = stream;
       }
       setIsScreenSharingActive(true);
-      setIsCameraOff(true); // Set camera to 'off' state as screen is shared
+      setIsCameraOff(true); 
       toast({ title: "Screen Sharing Started", description: "Your screen is now being shared locally." });
 
-      // Listen for when the user stops sharing via browser UI
       stream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
       };
@@ -420,7 +374,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const handleSetLayout = (layout: string) => {
     setCurrentLayout(layout);
     toast({ title: "Layout Changed", description: `Switched to ${layout.replace('-', ' ')} view.` });
-    // Actual layout change logic would go here in a more complex app
   };
 
 
@@ -430,7 +383,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       name: "You",
       isMe: true,
       isMicMuted,
-      isCameraOff: isScreenSharingActive ? true : isCameraOff, // Camera is "off" if screen sharing
+      isCameraOff: isScreenSharingActive ? true : isCameraOff, 
       videoRef: localVideoRef,
       hasCameraPermissionForView: hasCameraPermission,
       isHandRaisedForView: isHandRaised,
@@ -472,13 +425,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 <span>Change Layout</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="rounded-lg">
-                <DropdownMenuItem onClick={() => handleSetLayout('grid-view')} className="rounded-md">
+                <DropdownMenuItem onClick={() => handleSetLayout('grid')} className="rounded-md">
                   Grid View
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSetLayout('speaker-view')} className="rounded-md">
+                <DropdownMenuItem onClick={() => handleSetLayout('speaker')} className="rounded-md">
                   Speaker View
                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => handleSetLayout('gallery-view')} className="rounded-md">
+                 <DropdownMenuItem onClick={() => handleSetLayout('gallery')} className="rounded-md">
                   Gallery View
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -494,7 +447,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       </header>
 
       <main className="flex-1 p-4 overflow-y-auto flex flex-col">
-        {hasCameraPermission === false && !isScreenSharingActive && ( // Only show if camera permission is false AND not screen sharing
+        {hasCameraPermission === false && !isScreenSharingActive && ( 
            <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Camera Permission Required</AlertTitle>
@@ -504,24 +457,23 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               </AlertDescription>
             </Alert>
         )}
+        {/* Main participant display area */}
         {participants.length === 1 && participants[0].isMe ? (
-          <div className="flex-grow flex items-center justify-center">
+          <div className={cn(
+            "flex-grow flex items-center justify-center",
+            currentLayout === 'speaker' ? "p-1 bg-muted/5 rounded-lg" : "p-0" // Subtle visual difference for speaker view
+          )}>
             <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
+              {currentLayout === 'speaker' && (
+                <Badge variant="outline" className="absolute top-2 left-2 z-20 bg-background/70 backdrop-blur-sm">Speaker View Active</Badge>
+              )}
               <ParticipantView
-                name={participants[0].name}
-                isMe={participants[0].isMe}
-                isMicMuted={participants[0].isMicMuted}
-                isCameraOff={participants[0].isCameraOff}
-                videoRef={localVideoRef}
-                hasCameraPermissionForView={hasCameraPermission}
-                isHandRaisedForView={participants[0].isHandRaisedForView}
-                isScreenSharing={participants[0].isScreenSharing}
+                {...participants[0]} // Pass all props from the participant object
               />
             </div>
           </div>
         ) : (
-          // This section is effectively removed if only "You" is in participants
-          // Kept for potential future use if multiple participants are re-introduced
+          // Placeholder for multi-participant grid, adapt later if needed
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {/* {participants.map(participant => (
               <ParticipantView key={participant.id} {...participant} />
@@ -536,30 +488,26 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {isMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
           </Button>
           <Button
-             variant={(isCameraOff && !isScreenSharingActive) ? "destructive" : "default"} // Destructive if camera is off AND not screen sharing
+             variant={(isCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
              size="lg"
              className={cn(
-                "rounded-full p-4 btn-gel",
-                // Button is disabled if screen sharing is active AND camera is off (which it will be during screen share)
-                // This implies you cannot turn camera on directly if screen sharing. You must stop screen share first.
-                {"opacity-50 cursor-not-allowed": isScreenSharingActive && isCameraOff} 
+                "rounded-full p-4",
+                isScreenSharingActive ? "opacity-50 cursor-not-allowed" : "btn-gel" 
              )}
              onClick={toggleCamera}
              aria-label={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
-             // Disabled if screen sharing and camera is off (which is the case during screen share)
              disabled={isScreenSharingActive && isCameraOff}
           >
-            {/* Show VideoOff if camera is off AND not screen sharing. Otherwise show Video (on) icon */}
             {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-             variant={"default"} 
+             variant={isHandRaised ? "default" : "default"} // Both use default, color change via className
              size="lg"
              className={cn(
                "rounded-full p-4",
                isHandRaised
-                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" // Accent color when hand raised
-                 : "btn-gel shadow-md" // Default green gel button
+                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg"
+                 : "btn-gel shadow-md"
              )}
              onClick={toggleHandRaise}
              aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
