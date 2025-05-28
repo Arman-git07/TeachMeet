@@ -441,7 +441,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem><Settings className="mr-2 h-4 w-4" /> Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+              <Settings className="mr-2 h-4 w-4" /> Settings
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
@@ -459,10 +461,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         )}
         {participants.length === 1 && participants[0].isMe ? (
           <div className={cn(
-            "flex-grow flex items-center justify-center rounded-lg", // Added rounded-lg for container
-            currentLayout === 'speaker' && "p-4 bg-muted", // Speaker view styling with more padding
-            currentLayout === 'gallery' && "p-4 bg-accent/20", // Gallery view styling with more padding
-            currentLayout === 'grid' && "p-0" // Grid view styling (default)
+            "flex-grow flex items-center justify-center",
+            currentLayout === 'speaker' && "p-4 bg-muted rounded-lg",
+            currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg", 
+            currentLayout === 'grid' && "p-0"
           )}>
             <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
               {currentLayout === 'speaker' && (
@@ -505,13 +507,14 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-             variant={isHandRaised ? "default" : "default"} 
+             variant={isHandRaised ? "default" : "secondary"} 
              size="lg"
              className={cn(
                "rounded-full p-4",
                isHandRaised
                  ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
-                 : "btn-gel shadow-md" 
+                 : "btn-gel shadow-md",
+                !isHandRaised && "bg-primary text-primary-foreground"
              )}
              onClick={toggleHandRaise}
              aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
@@ -542,4 +545,3 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
-
