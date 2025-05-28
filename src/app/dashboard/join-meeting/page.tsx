@@ -4,11 +4,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LinkIcon, Hash, LogIn, XCircle } from "lucide-react";
+import { LinkIcon, Hash, LogIn, XCircle, X, ClipboardPaste } from "lucide-react"; // Added X and ClipboardPaste
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react"; // Added useEffect, useRef
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+
+const LONG_PRESS_DURATION = 750; // milliseconds
 
 export default function JoinMeetingPage() {
   const [meetingLinkInput, setMeetingLinkInput] = useState('');
@@ -16,6 +18,66 @@ export default function JoinMeetingPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const [showPasteButton, setShowPasteButton] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startLongPressTimer = () => {
+    clearLongPressTimer(); // Clear any existing timer
+    longPressTimerRef.current = setTimeout(() => {
+      setShowPasteButton(true);
+    }, LONG_PRESS_DURATION);
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      clearLongPressTimer();
+    };
+  }, []);
+
+  const handleAttemptPaste = async () => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        toast({
+          variant: "destructive",
+          title: "Paste Not Supported",
+          description: "Your browser does not support pasting from the clipboard directly or permission was denied.",
+        });
+        setShowPasteButton(false);
+        return;
+      }
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setMeetingLinkInput(text);
+        toast({
+          title: "Pasted from Clipboard",
+          description: "Link pasted successfully.",
+        });
+      } else {
+        toast({
+          title: "Clipboard Empty",
+          description: "Nothing to paste from the clipboard.",
+        });
+      }
+    } catch (err) {
+      console.error('Failed to read clipboard contents: ', err);
+      toast({
+        variant: "destructive",
+        title: "Paste Failed",
+        description: "Could not paste from clipboard. Ensure you've granted permission if prompted.",
+      });
+    } finally {
+      setShowPasteButton(false); // Hide button after attempt
+    }
+  };
+  
   const handleJoinMeeting = () => {
     let meetingId: string | null = null;
     let topic: string | null = null;
@@ -24,7 +86,6 @@ export default function JoinMeetingPage() {
       try {
         const url = new URL(meetingLinkInput);
         const pathParts = url.pathname.split('/');
-        // Expected: /dashboard/meeting/MEETING_ID/wait or /dashboard/meeting/MEETING_ID
         const meetingIdIndex = pathParts.indexOf('meeting') + 1;
 
         if (meetingIdIndex > 0 && meetingIdIndex < pathParts.length) {
@@ -75,6 +136,17 @@ export default function JoinMeetingPage() {
     }
   };
 
+  const handleInputBlur = () => {
+    // Delay hiding paste button to allow its click to register
+    setTimeout(() => {
+      if (!document.activeElement || !document.activeElement.closest('[data-paste-button-area]')) {
+        setShowPasteButton(false);
+      }
+    }, 150);
+    clearLongPressTimer();
+  };
+
+
   return (
     <div className="container mx-auto py-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-lg shadow-xl rounded-xl border-border/50">
@@ -115,15 +187,48 @@ export default function JoinMeetingPage() {
             <label htmlFor="meetingLink" className="block text-sm font-medium text-muted-foreground mb-1">
               Meeting Link
             </label>
-            <div className="relative">
+            <div className="relative group/meeting-link-input"> {/* Added relative and group */}
               <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <Input 
                 id="meetingLink" 
                 placeholder="https://teachmeet.example.com/join/..." 
-                className="pl-10 rounded-lg text-base"
+                className="pl-10 rounded-lg text-base pr-16" // Added pr-16 for paste button space
                 value={meetingLinkInput}
                 onChange={(e) => setMeetingLinkInput(e.target.value)}
+                onMouseDown={startLongPressTimer}
+                onMouseUp={clearLongPressTimer}
+                onMouseLeave={clearLongPressTimer}
+                onTouchStart={startLongPressTimer}
+                onTouchEnd={clearLongPressTimer}
+                onBlur={handleInputBlur}
               />
+              {showPasteButton && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10" data-paste-button-area>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-md px-2 py-1 text-xs h-7 bg-background hover:bg-muted"
+                    onClick={handleAttemptPaste}
+                    title="Paste from clipboard"
+                  >
+                    <ClipboardPaste className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full h-6 w-6 hover:bg-muted"
+                    onClick={() => {
+                      setShowPasteButton(false);
+                      clearLongPressTimer();
+                    }}
+                    title="Close paste option"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
           
