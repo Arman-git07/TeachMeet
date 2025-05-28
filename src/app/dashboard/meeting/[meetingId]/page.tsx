@@ -4,7 +4,7 @@ import { useState, useEffect, use, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -53,11 +53,22 @@ const ParticipantView = ({
       } else {
         toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
       }
-    } else {
+    } else if (isMe && isScreenSharingActive && videoRef?.current && videoRef.current.srcObject) { // Check if screen sharing is active for the current user
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen().catch(err => {
+          console.error("Error entering fullscreen for screen share:", err);
+          toast({ variant: 'destructive', title: 'Fullscreen Error', description: 'Could not enter fullscreen mode for screen share.' });
+        });
+      } else {
+        toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
+      }
+    }
+     else {
       console.log(`Full screen requested for ${name}, but no video stream available.`);
-      toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream.' });
+      toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream or active screen share.' });
     }
   };
+  
 
   return (
     <Card className="aspect-video rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
@@ -128,6 +139,9 @@ const ParticipantView = ({
   );
 };
 
+// isScreenSharingActive needs to be accessible by ParticipantView
+let isScreenSharingActive = false;
+
 export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(paramsPromise);
   const { meetingId } = resolvedParams;
@@ -153,8 +167,25 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const currentLocalStreamRef = useRef<MediaStream | null>(null); // For camera
   const screenShareStreamRef = useRef<MediaStream | null>(null); // For screen share
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
+  // const [isScreenSharingActive, setIsScreenSharingActive] = useState(false); // Moved to outer scope
+  const [_isScreenSharingActive, _setIsScreenSharingActive] = useState(false);
+  isScreenSharingActive = _isScreenSharingActive; // Sync with outer scope variable
+  const setIsScreenSharingActive = (value: boolean | ((prevState: boolean) => boolean)) => {
+    if (typeof value === 'function') {
+      _setIsScreenSharingActive(prev => {
+        isScreenSharingActive = value(prev);
+        return isScreenSharingActive;
+      });
+    } else {
+      isScreenSharingActive = value;
+      _setIsScreenSharingActive(value);
+    }
+  };
+
+
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
+  const [currentLayout, setCurrentLayout] = useState('grid');
+
 
   useEffect(() => {
     const initializeCameraAndPermissions = async () => {
@@ -386,6 +417,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
   };
 
+  const handleSetLayout = (layout: string) => {
+    setCurrentLayout(layout);
+    toast({ title: "Layout Changed", description: `Switched to ${layout.replace('-', ' ')} view.` });
+    // Actual layout change logic would go here in a more complex app
+  };
+
 
   const participants = [
     {
@@ -429,7 +466,23 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleOpenParticipants}><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem><Columns className="mr-2 h-4 w-4" /> Change Layout</DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Columns className="mr-2 h-4 w-4" />
+                <span>Change Layout</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="rounded-lg">
+                <DropdownMenuItem onClick={() => handleSetLayout('grid-view')} className="rounded-md">
+                  Grid View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSetLayout('speaker-view')} className="rounded-md">
+                  Speaker View
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => handleSetLayout('gallery-view')} className="rounded-md">
+                  Gallery View
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleReportIssue} className="text-destructive focus:text-destructive">
               <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
@@ -500,7 +553,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-             variant={isHandRaised ? "default" : "default"} // Default variant is primary green
+             variant={"default"} 
              size="lg"
              className={cn(
                "rounded-full p-4",
@@ -537,5 +590,3 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
-
-    
