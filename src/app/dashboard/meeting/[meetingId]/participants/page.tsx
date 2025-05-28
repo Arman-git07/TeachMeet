@@ -20,6 +20,7 @@ import {
   Pin,
   AlertCircle,
   Maximize,
+  UserX, // Added UserX icon
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -40,19 +41,19 @@ interface Participant {
   isMe?: boolean;
   isMicMuted?: boolean;
   isCameraOff?: boolean;
-  isHost?: boolean;
+  isHost?: boolean; // Added isHost property
 }
 
 // Mock participants - in a real app, this would come from a backend or WebRTC state
 const mockMeetingParticipants: Participant[] = [
-  { id: 'user1', name: 'You', avatar: 'https://placehold.co/40x40/00FFFF/000000.png?text=Y', isMe: true, isMicMuted: false, isCameraOff: false, isHost: true },
-  { id: 'user2', name: 'Alice Wonderland', avatar: 'https://placehold.co/40x40/FFC0CB/000000.png?text=A', isMicMuted: true, isCameraOff: false },
-  { id: 'user3', name: 'Bob The Builder', avatar: 'https://placehold.co/40x40/ADD8E6/000000.png?text=B', isMicMuted: false, isCameraOff: true },
-  { id: 'user4', name: 'Charlie Brown', avatar: 'https://placehold.co/40x40/FFFF00/000000.png?text=C', isMicMuted: true, isCameraOff: true },
+  { id: 'user1', name: 'You', avatar: 'https://placehold.co/40x40/00FFFF/000000.png?text=Y', isMe: true, isMicMuted: false, isCameraOff: false, isHost: true }, // Marked as host
+  { id: 'user2', name: 'Alice Wonderland', avatar: 'https://placehold.co/40x40/FFC0CB/000000.png?text=A', isMicMuted: true, isCameraOff: false, isHost: false },
+  { id: 'user3', name: 'Bob The Builder', avatar: 'https://placehold.co/40x40/ADD8E6/000000.png?text=B', isMicMuted: false, isCameraOff: true, isHost: false },
+  { id: 'user4', name: 'Charlie Brown', avatar: 'https://placehold.co/40x40/FFFF00/000000.png?text=C', isMicMuted: true, isCameraOff: true, isHost: false },
 ];
 
 
-const ParticipantItem = ({ participant }: { participant: Participant }) => {
+const ParticipantItem = ({ participant, isCurrentUserHost }: { participant: Participant, isCurrentUserHost: boolean }) => {
   const { toast } = useToast();
 
   const handleActionClick = (action: string, participantName: string) => {
@@ -108,6 +109,15 @@ const ParticipantItem = ({ participant }: { participant: Participant }) => {
                 <span>Full Screen</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {isCurrentUserHost && !participant.isHost && ( // Show remove option if current user is host AND target is not host
+                <DropdownMenuItem 
+                  onSelect={() => handleActionClick('Remove', participant.name)} 
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <UserX className="mr-2 h-4 w-4" />
+                  <span>Remove Participant</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onSelect={() => handleActionClick('Report', participant.name)} className="text-destructive focus:text-destructive cursor-pointer">
                 <AlertCircle className="mr-2 h-4 w-4" />
                 <span>Report User</span>
@@ -130,6 +140,9 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
   const backToMeetingLink = topic 
     ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
     : `/dashboard/meeting/${meetingId}`;
+  
+  // Assuming the current user's host status is known (e.g., from auth context or if the first participant is always the host in mock data)
+  const isCurrentUserHost = mockMeetingParticipants.find(p => p.isMe)?.isHost || false;
 
   return (
     <div className="flex flex-col h-screen bg-muted/30">
@@ -168,7 +181,7 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
               ) : (
                 <div className="space-y-1">
                   {mockMeetingParticipants.map((participant) => (
-                    <ParticipantItem key={participant.id} participant={participant} />
+                    <ParticipantItem key={participant.id} participant={participant} isCurrentUserHost={isCurrentUserHost} />
                   ))}
                 </div>
               )}
