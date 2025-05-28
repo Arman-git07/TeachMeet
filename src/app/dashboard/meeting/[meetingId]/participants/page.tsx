@@ -171,9 +171,10 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
             <ScrollArea className="h-full p-2 md:p-4">
               {mockMeetingParticipants.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <User className="w-16 h-16 mb-4" />
-                  <p className="text-lg">No participants yet.</p>
-                  <p>You're the first one here!</p>
+                  <ShieldCheck className="w-16 h-16 mb-4 text-primary" />
+                  <p className="text-lg">You are the host.</p>
+                  <p className="text-sm">Meeting ID: {meetingId}</p>
+                  <p className="text-sm mt-2">Waiting for others to join...</p>
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -192,3 +193,4 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
     </div>
   );
 }
+
