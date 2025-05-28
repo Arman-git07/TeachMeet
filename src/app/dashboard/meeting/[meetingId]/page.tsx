@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Upload, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle, PanelLeftOpen } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge'; // Added Badge import
+import { Badge } from '@/components/ui/badge';
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
@@ -25,7 +25,7 @@ const ParticipantView = ({
   videoRef,
   hasCameraPermissionForView,
   isHandRaisedForView,
-  isScreenSharing // New prop
+  isScreenSharing
 }: {
   name: string,
   isMe?: boolean,
@@ -34,12 +34,12 @@ const ParticipantView = ({
   videoRef?: React.RefObject<HTMLVideoElement>,
   hasCameraPermissionForView?: boolean | null,
   isHandRaisedForView?: boolean,
-  isScreenSharing?: boolean // New prop
+  isScreenSharing?: boolean
 }) => {
   const { toast } = useToast();
 
   const handleFullScreenClick = () => {
-    if (videoRef?.current && videoRef.current.srcObject) { // Works for camera or screen share if srcObject is set
+    if (videoRef?.current && videoRef.current.srcObject) {
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen().catch(err => {
           console.error("Error entering fullscreen:", err);
@@ -63,7 +63,7 @@ const ParticipantView = ({
             muted
             autoPlay
             playsInline
-            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject })} // Object-contain for screen share, added bg-muted
+            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject })}
           />
           {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || !videoRef?.current?.srcObject) && !isScreenSharing && (
             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
@@ -76,7 +76,7 @@ const ParticipantView = ({
               {hasCameraPermissionForView === false && <p className="text-xs text-muted-foreground">Camera permission denied</p>}
             </div>
           )}
-           {isScreenSharing && !videoRef?.current?.srcObject && ( // Placeholder if screen share source object not ready
+           {isScreenSharing && !videoRef?.current?.srcObject && (
              <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
                 <ScreenShare className="w-16 h-16 text-muted-foreground mb-2"/>
                 <p className="text-base font-medium text-foreground">Sharing Screen...</p>
@@ -457,24 +457,28 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               </AlertDescription>
             </Alert>
         )}
-        {/* Main participant display area */}
         {participants.length === 1 && participants[0].isMe ? (
           <div className={cn(
             "flex-grow flex items-center justify-center",
-            currentLayout === 'speaker' ? "p-1 bg-muted/5 rounded-lg" : "p-0" // Subtle visual difference for speaker view
+            currentLayout === 'speaker' && "p-1 bg-muted/5 rounded-lg",
+            currentLayout === 'gallery' && "p-1 bg-accent/5 rounded-lg", 
+            currentLayout === 'grid' && "p-0" 
           )}>
             <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
               {currentLayout === 'speaker' && (
                 <Badge variant="outline" className="absolute top-2 left-2 z-20 bg-background/70 backdrop-blur-sm">Speaker View Active</Badge>
               )}
+              {currentLayout === 'gallery' && (
+                <Badge variant="outline" className="absolute top-2 left-2 z-20 bg-background/70 backdrop-blur-sm">Gallery View Active</Badge>
+              )}
               <ParticipantView
-                {...participants[0]} // Pass all props from the participant object
+                {...participants[0]}
               />
             </div>
           </div>
         ) : (
-          // Placeholder for multi-participant grid, adapt later if needed
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {/* Placeholder for multi-participant grid, adapt later if needed */}
             {/* {participants.map(participant => (
               <ParticipantView key={participant.id} {...participant} />
             ))} */}
@@ -501,7 +505,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-             variant={isHandRaised ? "default" : "default"} // Both use default, color change via className
+             variant={isHandRaised ? "default" : "default"}
              size="lg"
              className={cn(
                "rounded-full p-4",
