@@ -10,12 +10,28 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { auth, db } from '@/lib/firebase'; // Import auth and db
+import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query } from 'firebase/firestore'; // Import Firestore functions
+import type { User as FirebaseUser } from 'firebase/auth';
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
+
+interface Participant {
+  id: string;
+  name: string;
+  isMe?: boolean;
+  isMicMuted?: boolean;
+  isCameraOff?: boolean;
+  videoRef?: React.RefObject<HTMLVideoElement>;
+  hasCameraPermissionForView?: boolean | null;
+  isHandRaisedForView?: boolean;
+  isScreenSharing?: boolean;
+  photoURL?: string | null;
+}
 
 const ParticipantView = ({
   name,
@@ -25,17 +41,9 @@ const ParticipantView = ({
   videoRef,
   hasCameraPermissionForView,
   isHandRaisedForView,
-  isScreenSharing
-}: {
-  name: string,
-  isMe?: boolean,
-  isMicMuted?: boolean,
-  isCameraOff?: boolean,
-  videoRef?: React.RefObject<HTMLVideoElement>,
-  hasCameraPermissionForView?: boolean | null,
-  isHandRaisedForView?: boolean,
-  isScreenSharing?: boolean
-}) => {
+  isScreenSharing,
+  photoURL
+}: Participant) => {
   const { toast } = useToast();
 
   const handleFullScreenClick = () => {
@@ -52,7 +60,8 @@ const ParticipantView = ({
       toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream or screen share.' });
     }
   };
-  
+
+  const avatarFallbackName = name.charAt(0).toUpperCase() || 'U';
 
   return (
     <Card className="aspect-video rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
@@ -63,13 +72,13 @@ const ParticipantView = ({
             muted
             autoPlay
             playsInline
-            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject })}
+            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject && !isScreenSharing}, { 'block': isScreenSharing && videoRef?.current?.srcObject})}
           />
-          {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || !videoRef?.current?.srcObject) && !isScreenSharing && (
+          {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || (!videoRef?.current?.srcObject && !isScreenSharing)) && (
             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
               <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
-                <AvatarImage src={`https://placehold.co/128x128.png?text=${name.charAt(0).toUpperCase()}`} alt={name} data-ai-hint="avatar user" />
-                <AvatarFallback className="text-3xl md:text-4xl">{name.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarImage src={photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`} alt={name} data-ai-hint="avatar user" />
+                <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
               </Avatar>
               {hasCameraPermissionForView === false && <VideoOff className="w-7 h-7 text-muted-foreground mb-1" />}
               <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
@@ -86,15 +95,21 @@ const ParticipantView = ({
       ) : isCameraOff ? (
         <div className="w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
           <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
-            <AvatarImage src={`https://placehold.co/128x128.png?text=${name.charAt(0).toUpperCase()}`} alt={name} data-ai-hint="avatar user"/>
-            <AvatarFallback className="text-3xl md:text-4xl">{name.charAt(0).toUpperCase()}</AvatarFallback>
+             <AvatarImage src={photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`} alt={name} data-ai-hint="avatar user"/>
+             <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
           </Avatar>
           <VideoOff className="w-7 h-7 text-muted-foreground mb-1" />
           <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
         </div>
       ) : (
         <div className="w-full h-full bg-muted flex items-center justify-center">
-          <Image src={`https://placehold.co/800x450.png`} alt={`${name}'s video`} width={800} height={450} objectFit="contain" data-ai-hint="participant video" />
+          {/* This part is for remote participants - for now, a placeholder */}
+          <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
+             <AvatarImage src={photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`} alt={name} data-ai-hint="avatar user"/>
+             <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
+          </Avatar>
+          {/* Replace with actual remote video stream when WebRTC is implemented */}
+          {/* <Image src={`https://placehold.co/800x450.png`} alt={`${name}'s video`} width={800} height={450} objectFit="contain" data-ai-hint="participant video" /> */}
         </div>
       )}
       <div className="absolute bottom-2 left-2 bg-gradient-to-r from-black/70 to-transparent px-3 py-1.5 rounded-md backdrop-blur-sm">
@@ -132,44 +147,104 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const topic = searchParamsHook.get('topic');
   const { toast } = useToast();
   const router = useRouter();
+  const currentUser = auth.currentUser;
 
-  const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isCameraOff, setIsCameraOff] = useState(() => {
+  const [localMicMuted, setLocalMicMuted] = useState(false);
+  const [localCameraOff, setLocalCameraOff] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
-      localStorage.removeItem('teachmeet-desired-camera-state'); 
-      return desiredState !== 'on'; 
+      localStorage.removeItem('teachmeet-desired-camera-state');
+      return desiredState !== 'on';
     }
-    return true; 
+    return true;
   });
-
-  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [localHandRaised, setLocalHandRaised] = useState(false);
+  const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const currentLocalStreamRef = useRef<MediaStream | null>(null); 
-  const screenShareStreamRef = useRef<MediaStream | null>(null); 
+  const currentLocalStreamRef = useRef<MediaStream | null>(null);
+  const screenShareStreamRef = useRef<MediaStream | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
-
-
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
+
+  // Firestore: Join meeting and listen for participants
+  useEffect(() => {
+    if (!currentUser || !meetingId || !db) return;
+
+    const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+
+    // Add/Update user in participants list
+    setDoc(userDocRef, {
+      userId: currentUser.uid,
+      name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
+      photoURL: currentUser.photoURL,
+      isMicMuted: localMicMuted,
+      isCameraOff: localCameraOff,
+      isHandRaised: localHandRaised,
+      isScreenSharing: isScreenSharingActive, // Add screen sharing status
+      joinedAt: serverTimestamp(),
+    }, { merge: true }).catch(error => console.error("Error setting user document:", error));
+
+    // Listen for participant changes
+    const participantsColRef = collection(db, "meetings", meetingId, "participants");
+    const q = query(participantsColRef);
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedParticipants: Participant[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedParticipants.push({
+          id: doc.id,
+          name: data.name || "Guest",
+          isMicMuted: data.isMicMuted,
+          isCameraOff: data.isCameraOff,
+          isHandRaisedForView: data.isHandRaised,
+          isScreenSharing: data.isScreenSharing,
+          photoURL: data.photoURL,
+          // videoRef and hasCameraPermissionForView are only for local user
+        });
+      });
+      setRealtimeParticipants(fetchedParticipants);
+    }, (error) => {
+        console.error("Error fetching participants:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load participant list." });
+    });
+
+    // Cleanup: remove user from participants on unmount or before window closes
+    const handleBeforeUnload = async () => {
+        if (auth.currentUser) { // ensure user is still signed in
+            await deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid));
+        }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Try to remove user if they navigate away or close tab (best effort)
+      if (auth.currentUser) {
+          deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid))
+            .catch(err => console.error("Error deleting user on unmount:", err));
+      }
+    };
+  }, [currentUser, meetingId, db, localMicMuted, localCameraOff, localHandRaised, isScreenSharingActive]);
 
 
   useEffect(() => {
     const initializeCameraAndPermissions = async () => {
-      if (!isCameraOff) { 
+      if (!localCameraOff) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
-          if (localVideoRef.current && !isScreenSharingActive) { 
+          if (localVideoRef.current && !isScreenSharingActive) {
             localVideoRef.current.srcObject = stream;
           }
           setHasCameraPermission(true);
         } catch (err) {
           console.error("Failed to get camera on mount:", err);
           setHasCameraPermission(false);
-          setIsCameraOff(true); 
+          setLocalCameraOff(true);
           toast({
             variant: 'destructive',
             title: 'Camera Access Denied',
@@ -194,35 +269,60 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []);
 
 
-  const toggleMic = () => setIsMicMuted(prev => !prev);
+  const updateUserStatusInFirestore = async (updates: Partial<Participant>) => {
+    if (!currentUser || !meetingId || !db) return;
+    const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+    try {
+      await updateDoc(userDocRef, updates);
+    } catch (error) {
+      console.error("Error updating user status in Firestore:", error);
+      toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
+    }
+  };
 
-  const stopScreenShare = (showToast = true) => {
+  const toggleMic = () => {
+    const newMicState = !localMicMuted;
+    setLocalMicMuted(newMicState);
+    updateUserStatusInFirestore({ isMicMuted: newMicState });
+  };
+
+  const stopScreenShare = async (showToast = true) => {
     if (screenShareStreamRef.current) {
       screenShareStreamRef.current.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current = null;
     }
     setIsScreenSharingActive(false);
+    await updateUserStatusInFirestore({ isScreenSharing: false });
+
     if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null; 
+      localVideoRef.current.srcObject = null;
     }
     if (showToast) {
         toast({ title: "Screen Sharing Stopped" });
+    }
+    // Attempt to restore camera if it was on before screen share
+    if (!localCameraOff && currentLocalStreamRef.current && currentLocalStreamRef.current.active) {
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = currentLocalStreamRef.current;
+        }
+    } else if (!localCameraOff) { // If camera should be on but stream is lost, try to re-acquire
+        toggleCamera(); // This will attempt to re-enable the camera
     }
   };
 
   const toggleCamera = async () => {
     if (isScreenSharingActive) {
-      stopScreenShare();
-      return;
+      await stopScreenShare();
+      // After stopping screen share, proceed to toggle camera based on its desired new state
+      // Fall through to camera toggling logic
     }
 
-    const newCameraStateIsOff = !isCameraOff; 
+    const newCameraStateIsOff = !localCameraOff;
 
-    if (!newCameraStateIsOff) { 
+    if (!newCameraStateIsOff) {
       if (hasCameraPermission === false) {
         toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
         return;
@@ -234,12 +334,14 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
-          setHasCameraPermission(true); 
-          setIsCameraOff(false);
+          setHasCameraPermission(true);
+          setLocalCameraOff(false);
+          await updateUserStatusInFirestore({ isCameraOff: false });
         } catch (err) {
           console.error("Failed to get camera on toggle:", err);
-          setHasCameraPermission(false); 
-          setIsCameraOff(true); 
+          setHasCameraPermission(false);
+          setLocalCameraOff(true);
+          await updateUserStatusInFirestore({ isCameraOff: true });
           toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
           return;
         }
@@ -247,21 +349,24 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         if (localVideoRef.current && currentLocalStreamRef.current) {
             localVideoRef.current.srcObject = currentLocalStreamRef.current;
         }
-        setIsCameraOff(false);
+        setLocalCameraOff(false);
+        await updateUserStatusInFirestore({ isCameraOff: false });
       }
-    } else { 
+    } else {
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
-      currentLocalStreamRef.current = null; 
+      // currentLocalStreamRef.current = null; // Keep the stream reference if user just turned off via UI, might turn back on.
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
       }
-      setIsCameraOff(true);
+      setLocalCameraOff(true);
+      await updateUserStatusInFirestore({ isCameraOff: true });
     }
   };
 
   const toggleHandRaise = () => {
-    const newHandState = !isHandRaised;
-    setIsHandRaised(newHandState);
+    const newHandState = !localHandRaised;
+    setLocalHandRaised(newHandState);
+    updateUserStatusInFirestore({ isHandRaised: newHandState });
     if (newHandState) {
       toast({ title: "Hand Raised!", description: "You raised your hand." });
     } else {
@@ -269,9 +374,18 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
   };
 
-  const leaveMeeting = () => {
-    stopScreenShare(false); 
-    currentLocalStreamRef.current?.getTracks().forEach(track => track.stop()); 
+  const leaveMeeting = async () => {
+    stopScreenShare(false);
+    currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+
+    if (currentUser && meetingId && db) {
+      const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+      try {
+        await deleteDoc(userDocRef);
+      } catch (error) {
+        console.error("Error removing participant from Firestore on leave:", error);
+      }
+    }
 
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
 
@@ -285,7 +399,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         localStorage.removeItem(DISMISSED_MEETINGS_KEY);
       }
 
-      if (!Array.isArray(dismissedIds)) { 
+      if (!Array.isArray(dismissedIds)) {
           dismissedIds = [];
       }
 
@@ -328,13 +442,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       return;
     }
 
-
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
 
       if (currentLocalStreamRef.current) {
         currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
-        currentLocalStreamRef.current = null;
+        // currentLocalStreamRef.current = null; // Don't nullify if camera was just temporarily stopped for screen share
       }
 
       screenShareStreamRef.current = stream;
@@ -342,7 +455,8 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         localVideoRef.current.srcObject = stream;
       }
       setIsScreenSharingActive(true);
-      setIsCameraOff(true); 
+      setLocalCameraOff(true); // Assume camera turns off visually during screen share
+      await updateUserStatusInFirestore({ isScreenSharing: true, isCameraOff: true });
       toast({ title: "Screen Sharing Started", description: "Your screen is now being shared locally." });
 
       stream.getVideoTracks()[0].onended = () => {
@@ -376,20 +490,24 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     toast({ title: "Layout Changed", description: `Switched to ${layout.replace('-', ' ')} view.` });
   };
 
+  const combinedParticipants = currentUser
+    ? [
+        {
+          id: currentUser.uid,
+          name: currentUser.displayName || currentUser.email?.split('@')[0] || "You",
+          isMe: true,
+          isMicMuted: localMicMuted,
+          isCameraOff: isScreenSharingActive ? true : localCameraOff,
+          videoRef: localVideoRef,
+          hasCameraPermissionForView: hasCameraPermission,
+          isHandRaisedForView: localHandRaised,
+          isScreenSharing: isScreenSharingActive,
+          photoURL: currentUser.photoURL
+        },
+        ...realtimeParticipants.filter(p => p.id !== currentUser.uid)
+      ]
+    : realtimeParticipants;
 
-  const participants = [
-    {
-      id: "currentUser",
-      name: "You",
-      isMe: true,
-      isMicMuted,
-      isCameraOff: isScreenSharingActive ? true : isCameraOff, 
-      videoRef: localVideoRef,
-      hasCameraPermissionForView: hasCameraPermission,
-      isHandRaisedForView: isHandRaised,
-      isScreenSharing: isScreenSharingActive
-    },
-  ];
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
 
@@ -398,7 +516,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       <header className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <div>
           <h2 className="text-xl font-semibold text-foreground" title={displayTitle}>{displayTitle}</h2>
-          <span className="text-sm text-muted-foreground">{participants.length} Participant{participants.length === 1 ? '' : 's'}</span>
+          <span className="text-sm text-muted-foreground">{combinedParticipants.length} Participant{combinedParticipants.length === 1 ? '' : 's'}</span>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -449,7 +567,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       </header>
 
       <main className="flex-1 p-4 overflow-y-auto flex flex-col">
-        {hasCameraPermission === false && !isScreenSharingActive && ( 
+        {hasCameraPermission === false && !isScreenSharingActive && (
            <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Camera Permission Required</AlertTitle>
@@ -459,11 +577,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               </AlertDescription>
             </Alert>
         )}
-        {participants.length === 1 && participants[0].isMe ? (
+        {combinedParticipants.length === 1 && combinedParticipants[0].isMe ? (
           <div className={cn(
             "flex-grow flex items-center justify-center",
             currentLayout === 'speaker' && "p-4 bg-muted rounded-lg",
-            currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg", 
+            currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg",
             currentLayout === 'grid' && "p-0"
           )}>
             <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
@@ -474,50 +592,55 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
                 <Badge variant="default" className="absolute top-2 left-2 z-20 bg-accent/80 text-accent-foreground backdrop-blur-sm">Gallery View Active</Badge>
               )}
               <ParticipantView
-                {...participants[0]}
+                {...combinedParticipants[0]}
               />
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {/* Placeholder for multi-participant grid, adapt later if needed */}
-            {/* {participants.map(participant => (
+           <div className={cn(
+            "grid gap-4 flex-1",
+            combinedParticipants.length === 2 ? "grid-cols-1 md:grid-cols-2" :
+            combinedParticipants.length === 3 ? "grid-cols-1 md:grid-cols-3" :
+            combinedParticipants.length >= 4 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3" :
+            "grid-cols-1" // Fallback for 0 or 1 (though 1 is handled above)
+          )}>
+            {combinedParticipants.map(participant => (
               <ParticipantView key={participant.id} {...participant} />
-            ))} */}
+            ))}
           </div>
         )}
       </main>
 
       <footer className="p-4 border-t border-border bg-background/80 backdrop-blur-md sticky bottom-0">
         <div className="max-w-2xl mx-auto flex justify-around items-center">
-          <Button variant={isMicMuted ? "destructive" : "default"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleMic} aria-label={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}>
-            {isMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+          <Button variant={localMicMuted ? "destructive" : "default"} size="lg" className="rounded-full p-4 btn-gel" onClick={toggleMic} aria-label={localMicMuted ? "Unmute Microphone" : "Mute Microphone"}>
+            {localMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
           </Button>
           <Button
-             variant={(isCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
+             variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
              size="lg"
              className={cn(
                 "rounded-full p-4",
-                isScreenSharingActive && isCameraOff ? "opacity-50 cursor-not-allowed" : "btn-gel" 
+                isScreenSharingActive && localCameraOff ? "opacity-50 cursor-not-allowed" : "btn-gel"
              )}
              onClick={toggleCamera}
-             aria-label={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
-             disabled={isScreenSharingActive && isCameraOff}
+             aria-label={localCameraOff ? "Turn Camera On" : "Turn Camera Off"}
+             disabled={isScreenSharingActive && localCameraOff}
           >
-            {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+            {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-             variant={isHandRaised ? "default" : "secondary"} 
+             variant={localHandRaised ? "default" : "secondary"}
              size="lg"
              className={cn(
                "rounded-full p-4",
-               isHandRaised
-                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
+               localHandRaised
+                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg"
                  : "btn-gel shadow-md",
-                !isHandRaised && "bg-primary text-primary-foreground"
+                !localHandRaised && "bg-primary text-primary-foreground"
              )}
              onClick={toggleHandRaise}
-             aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
+             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
           >
             <Hand className="h-6 w-6" />
           </Button>
