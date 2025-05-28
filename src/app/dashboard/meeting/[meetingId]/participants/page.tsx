@@ -46,10 +46,7 @@ interface Participant {
 
 // Mock participants - in a real app, this would come from a backend or WebRTC state
 const mockMeetingParticipants: Participant[] = [
-  { id: 'user1', name: 'You', avatar: 'https://placehold.co/40x40/00FFFF/000000.png?text=Y', isMe: true, isMicMuted: false, isCameraOff: false, isHost: true }, // Marked as host
-  { id: 'user2', name: 'Alice Wonderland', avatar: 'https://placehold.co/40x40/FFC0CB/000000.png?text=A', isMicMuted: true, isCameraOff: false, isHost: false },
-  { id: 'user3', name: 'Bob The Builder', avatar: 'https://placehold.co/40x40/ADD8E6/000000.png?text=B', isMicMuted: false, isCameraOff: true, isHost: false },
-  { id: 'user4', name: 'Charlie Brown', avatar: 'https://placehold.co/40x40/FFFF00/000000.png?text=C', isMicMuted: true, isCameraOff: true, isHost: false },
+  // Example: { id: 'user1', name: 'You', avatar: 'https://placehold.co/40x40/00FFFF/000000.png?text=Y', isMe: true, isMicMuted: false, isCameraOff: false, isHost: true },
 ];
 
 
