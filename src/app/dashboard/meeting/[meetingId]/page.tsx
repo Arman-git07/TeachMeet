@@ -459,17 +459,17 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         )}
         {participants.length === 1 && participants[0].isMe ? (
           <div className={cn(
-            "flex-grow flex items-center justify-center",
-            currentLayout === 'speaker' && "p-1 bg-muted/5 rounded-lg",
-            currentLayout === 'gallery' && "p-1 bg-accent/5 rounded-lg", 
-            currentLayout === 'grid' && "p-0" 
+            "flex-grow flex items-center justify-center rounded-lg", // Added rounded-lg for container
+            currentLayout === 'speaker' && "p-4 bg-muted", // Speaker view styling with more padding
+            currentLayout === 'gallery' && "p-4 bg-accent/20", // Gallery view styling with more padding
+            currentLayout === 'grid' && "p-0" // Grid view styling (default)
           )}>
             <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
               {currentLayout === 'speaker' && (
-                <Badge variant="outline" className="absolute top-2 left-2 z-20 bg-background/70 backdrop-blur-sm">Speaker View Active</Badge>
+                <Badge variant="default" className="absolute top-2 left-2 z-20 bg-primary/80 text-primary-foreground backdrop-blur-sm">Speaker View Active</Badge>
               )}
               {currentLayout === 'gallery' && (
-                <Badge variant="outline" className="absolute top-2 left-2 z-20 bg-background/70 backdrop-blur-sm">Gallery View Active</Badge>
+                <Badge variant="default" className="absolute top-2 left-2 z-20 bg-accent/80 text-accent-foreground backdrop-blur-sm">Gallery View Active</Badge>
               )}
               <ParticipantView
                 {...participants[0]}
@@ -496,7 +496,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
              size="lg"
              className={cn(
                 "rounded-full p-4",
-                isScreenSharingActive ? "opacity-50 cursor-not-allowed" : "btn-gel" 
+                isScreenSharingActive && isCameraOff ? "opacity-50 cursor-not-allowed" : "btn-gel" 
              )}
              onClick={toggleCamera}
              aria-label={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
@@ -505,13 +505,13 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             {(isCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
           <Button
-             variant={isHandRaised ? "default" : "secondary"} // Primary when raised, secondary when not
+             variant={isHandRaised ? "default" : "default"} 
              size="lg"
              className={cn(
                "rounded-full p-4",
                isHandRaised
-                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" // Accent when raised
-                 : "btn-gel shadow-md" // Default (green) when not raised
+                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
+                 : "btn-gel shadow-md" 
              )}
              onClick={toggleHandRaise}
              aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
