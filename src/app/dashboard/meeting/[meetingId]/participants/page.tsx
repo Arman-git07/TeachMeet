@@ -6,10 +6,32 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Mic, MicOff, MoreVertical, ShieldCheck, User, Video, VideoOff, Users as UsersIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  Mic,
+  MicOff,
+  MoreVertical,
+  ShieldCheck,
+  User,
+  Video,
+  VideoOff,
+  Users as UsersIcon,
+  MessageSquare,
+  Pin,
+  AlertCircle,
+  Maximize,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { use } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
 interface Participant {
   id: string;
@@ -31,6 +53,16 @@ const mockMeetingParticipants: Participant[] = [
 
 
 const ParticipantItem = ({ participant }: { participant: Participant }) => {
+  const { toast } = useToast();
+
+  const handleActionClick = (action: string, participantName: string) => {
+    toast({
+      title: `${action} ${participantName}`,
+      description: `The "${action.toLowerCase()}" feature is under development.`,
+      duration: 3000,
+    });
+  };
+
   return (
     <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
       <div className="flex items-center gap-3">
@@ -56,9 +88,32 @@ const ParticipantItem = ({ participant }: { participant: Participant }) => {
           {participant.isCameraOff ? <VideoOff className="h-4 w-4 text-muted-foreground" /> : <Video className="h-4 w-4 text-foreground" />}
         </Button>
         {!participant.isMe && (
-          <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
-            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg">
+              <DropdownMenuItem onSelect={() => handleActionClick('Chat Privately with', participant.name)} className="cursor-pointer">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                <span>Chat Privately</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleActionClick('Pin', participant.name)} className="cursor-pointer">
+                <Pin className="mr-2 h-4 w-4" />
+                <span>Pin User</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleActionClick('Full Screen for', participant.name)} className="cursor-pointer">
+                <Maximize className="mr-2 h-4 w-4" />
+                <span>Full Screen</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => handleActionClick('Report', participant.name)} className="text-destructive focus:text-destructive cursor-pointer">
+                <AlertCircle className="mr-2 h-4 w-4" />
+                <span>Report User</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </div>
