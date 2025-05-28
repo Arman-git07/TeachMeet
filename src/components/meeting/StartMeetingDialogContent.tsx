@@ -10,7 +10,10 @@ import { Copy, Hash, Link as LinkIcon, Share2, Video } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import Link from "next/link";
+import Link from "next/link"; // Keep this if used elsewhere, or remove if only for the old button
+import { useAuth } from '@/hooks/useAuth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Ensure db is correctly exported from your firebase setup
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
@@ -27,9 +30,11 @@ export function StartMeetingDialogContent() {
   const [meetingCode, setMeetingCode] = useState("");
   const [meetingId, setMeetingId] = useState("");
   const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
-  const { toast } = useToast();
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const { toast } = useToast();
   const router = useRouter();
+  const { user } = useAuth(); // Get current authenticated user
+  const [isJoining, setIsJoining] = useState(false); // Loading state for the button
 
   useEffect(() => {
     const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
@@ -40,7 +45,7 @@ export function StartMeetingDialogContent() {
     if (typeof window !== "undefined") {
         setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
     } else {
-        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`);
+        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); // Fallback for SSR or testing
     }
     
     const codePart1 = randomString(3);
@@ -72,53 +77,69 @@ export function StartMeetingDialogContent() {
     setIsSharePanelOpen(true);
   };
   
-  const handleJoinMeetingNow = () => {
-    const newMeeting: OngoingMeeting = { 
-      id: meetingId, 
-      title: meetingTitle || "Untitled Meeting", 
-      startedAt: Date.now() 
-    };
+  const handleStartAndJoinMeeting = async () => {
+    if (!meetingId || !meetingTitle) {
+      toast({ variant: "destructive", title: "Missing Details", description: "Please ensure a meeting topic is set." });
+      return;
+    }
+    if (!user) {
+      toast({ variant: "destructive", title: "Authentication Error", description: "You must be signed in to start a meeting." });
+      // Optionally, redirect to sign-in or disable the button if user is null
+      return;
+    }
+
+    setIsJoining(true);
+
     try {
+      // Step 1: Create the main meeting document in Firestore
+      const meetingDocRef = doc(db, 'meetings', meetingId);
+      const meetingData = {
+        creatorId: user.uid,
+        topic: meetingTitle,
+        createdAt: serverTimestamp(),
+      };
+      await setDoc(meetingDocRef, meetingData);
+      toast({ title: "Meeting Created", description: "Meeting room registered in the database."});
+
+      // Step 2: Save to localStorage (as previously implemented)
+      const newMeetingEntry: OngoingMeeting = { 
+        id: meetingId, 
+        title: meetingTitle, 
+        startedAt: Date.now() 
+      };
       const existingStartedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
       let existingStartedMeetings: OngoingMeeting[] = [];
       if (existingStartedMeetingsRaw) {
         try {
           existingStartedMeetings = JSON.parse(existingStartedMeetingsRaw);
+          if (!Array.isArray(existingStartedMeetings)) existingStartedMeetings = [];
         } catch (e) {
           console.error("Error parsing started meetings from localStorage:", e);
           localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear corrupted data
         }
       }
-      
-      if (!Array.isArray(existingStartedMeetings)) { // Ensure it's an array
-          existingStartedMeetings = [];
-      }
-
-      if (!existingStartedMeetings.find(m => m.id === newMeeting.id)) {
-        const updatedStartedMeetings = [...existingStartedMeetings, newMeeting];
+      if (!existingStartedMeetings.find(m => m.id === newMeetingEntry.id)) {
+        const updatedStartedMeetings = [...existingStartedMeetings, newMeetingEntry];
         localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedStartedMeetings));
       }
-    } catch (error) {
-      console.error("Error saving started meeting to localStorage:", error);
-      toast({
-        variant: "destructive",
-        title: "Could Not Save Meeting",
-        description: "There was an issue saving this meeting to your local list.",
-      });
-    }
 
-    const joinNowLinkPath = (meetingId && (meetingTitle || "Untitled Meeting"))
-      ? `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle || "Untitled Meeting")}`
-      : "#";
-
-    if (joinNowLinkPath && joinNowLinkPath !== "#") {
+      // Step 3: Navigate to the meeting waiting page
+      const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle)}`;
       router.push(joinNowLinkPath);
-    } else {
+
+      // The DialogClose wrapping the button will handle closing the dialog.
+      // If programmatic close was needed and this component controlled Dialog open state:
+      // props.onCloseDialog(); // Assuming a prop like onCloseDialog was passed down
+
+    } catch (error) {
+      console.error("Error starting meeting:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Meeting details not fully generated yet to join.",
+        title: "Failed to Start Meeting",
+        description: "Could not create the meeting in the database. Please ensure you are connected and try again.",
       });
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -144,6 +165,7 @@ export function StartMeetingDialogContent() {
             value={meetingTitle}
             onChange={(e) => setMeetingTitle(e.target.value)}
             className="rounded-lg text-base"
+            disabled={isJoining}
           />
         </div>
 
@@ -162,7 +184,7 @@ export function StartMeetingDialogContent() {
                 className="pl-10 rounded-lg"
                 />
             </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink} className="rounded-lg">
+            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink || isJoining} className="rounded-lg">
               <Copy className="h-5 w-5" />
             </Button>
           </div>
@@ -183,30 +205,31 @@ export function StartMeetingDialogContent() {
                 className="pl-10 rounded-lg"
               />
             </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode} className="rounded-lg">
+            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode || isJoining} className="rounded-lg">
               <Copy className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
-        <Button variant="outline" className="w-full rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode}>
+        <Button variant="outline" className="w-full rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode || isJoining}>
           <Share2 className="mr-2 h-5 w-5" />
           Share Invite
         </Button>
       </div>
       <DialogFooter className="gap-2 sm:gap-0">
         <DialogClose asChild>
-          <Button type="button" variant="outline" className="rounded-lg">
+          <Button type="button" variant="outline" className="rounded-lg" disabled={isJoining}>
             Cancel
           </Button>
         </DialogClose>
+          {/* The onClick now calls the new comprehensive handler */}
           <Button 
             type="button" 
-            onClick={handleJoinMeetingNow} 
+            onClick={handleStartAndJoinMeeting} 
             className="btn-gel rounded-lg" 
-            disabled={!meetingId || !meetingTitle}
+            disabled={!meetingId || !meetingTitle || isJoining || !user}
           >
-            {meetingId ? "Join Meeting Now" : "Generating ID..."}
+            {isJoining ? "Starting..." : (meetingId ? "Join Meeting Now" : "Generating ID...")}
           </Button>
       </DialogFooter>
       <ShareOptionsPanel
