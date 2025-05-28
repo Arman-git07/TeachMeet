@@ -6,8 +6,75 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LinkIcon, Hash, LogIn, XCircle } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 export default function JoinMeetingPage() {
+  const [meetingLinkInput, setMeetingLinkInput] = useState('');
+  const [meetingCodeInput, setMeetingCodeInput] = useState('');
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleJoinMeeting = () => {
+    let meetingId: string | null = null;
+    let topic: string | null = null;
+
+    if (meetingLinkInput.trim()) {
+      try {
+        const url = new URL(meetingLinkInput);
+        const pathParts = url.pathname.split('/');
+        // Expected: /dashboard/meeting/MEETING_ID/wait or /dashboard/meeting/MEETING_ID
+        const meetingIdIndex = pathParts.indexOf('meeting') + 1;
+
+        if (meetingIdIndex > 0 && meetingIdIndex < pathParts.length) {
+          meetingId = pathParts[meetingIdIndex];
+        }
+        
+        if (url.searchParams.has('topic')) {
+          topic = url.searchParams.get('topic');
+        }
+
+        if (!meetingId) {
+          toast({
+            variant: "destructive",
+            title: "Invalid Link",
+            description: "Could not extract meeting ID from the link. Please check the format.",
+          });
+          return;
+        }
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Link",
+          description: "The provided link is not a valid URL.",
+        });
+        return;
+      }
+    } else if (meetingCodeInput.trim()) {
+      meetingId = meetingCodeInput.trim();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Input Required",
+        description: "Please enter a meeting link or code.",
+      });
+      return;
+    }
+
+    if (meetingId) {
+      let navigationPath = `/dashboard/meeting/${meetingId}/wait`;
+      if (topic) {
+        navigationPath += `?topic=${encodeURIComponent(topic)}`;
+      }
+      toast({
+        title: "Joining Meeting...",
+        description: `Attempting to join meeting ID: ${meetingId}${topic ? ' with topic: ' + topic : ''}`,
+      });
+      router.push(navigationPath);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-lg shadow-xl rounded-xl border-border/50">
@@ -23,7 +90,13 @@ export default function JoinMeetingPage() {
             </label>
             <div className="relative">
               <Hash className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <Input id="meetingCode" placeholder="e.g., abc-def-ghi" className="pl-10 rounded-lg text-base"/>
+              <Input 
+                id="meetingCode" 
+                placeholder="e.g., abc-def-ghi" 
+                className="pl-10 rounded-lg text-base"
+                value={meetingCodeInput}
+                onChange={(e) => setMeetingCodeInput(e.target.value)}
+              />
             </div>
           </div>
 
@@ -44,15 +117,19 @@ export default function JoinMeetingPage() {
             </label>
             <div className="relative">
               <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <Input id="meetingLink" placeholder="https://teachmeet.example.com/join/..." className="pl-10 rounded-lg text-base"/>
+              <Input 
+                id="meetingLink" 
+                placeholder="https://teachmeet.example.com/join/..." 
+                className="pl-10 rounded-lg text-base"
+                value={meetingLinkInput}
+                onChange={(e) => setMeetingLinkInput(e.target.value)}
+              />
             </div>
           </div>
           
-          <Link href="/dashboard/meeting/joined-meeting-id/wait" passHref legacyBehavior>
-            <Button type="submit" className="w-full btn-gel text-lg py-3 rounded-lg">
-              Join Meeting
-            </Button>
-          </Link>
+          <Button onClick={handleJoinMeeting} className="w-full btn-gel text-lg py-3 rounded-lg">
+            Join Meeting
+          </Button>
         </CardContent>
          <CardFooter className="flex justify-between border-t pt-4">
             <Link href="/dashboard" passHref legacyBehavior>
