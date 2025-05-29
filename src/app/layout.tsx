@@ -10,13 +10,14 @@ import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/hooks/useAuth';
 import { AppSidebar } from '@/components/common/AppSidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils'; // Import cn
 
-const geistSans = GeistSans;
-const geistMono = GeistMono;
+const geistSansFont = GeistSans;
+const geistMonoFont = GeistMono;
 
 export const metadata: Metadata = {
   title: 'TeachMeet',
-  description: 'A study meeting app with a 3D interface.',
+  description: 'A study meeting app.',
 };
 
 export default function RootLayout({
@@ -26,7 +27,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen`}>
+      <body className={cn(
+        geistSansFont.variable,
+        geistMonoFont.variable,
+        'font-sans antialiased flex flex-col min-h-screen'
+      )}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -35,10 +40,10 @@ export default function RootLayout({
         >
           <AuthProvider>
             <SidebarProvider defaultOpen={false}>
-              <React.Fragment> {/* Added Fragment */}
-                <div className="flex h-screen bg-background"> {/* Ensure full height flex container */}
-                  <AppSidebar /> {/* Render AppSidebar globally */}
-                  <SidebarInset> {/* Wrap children in SidebarInset */}
+              <React.Fragment>
+                <div className="flex h-screen bg-background">
+                  <AppSidebar />
+                  <SidebarInset>
                     {children}
                   </SidebarInset>
                 </div>
