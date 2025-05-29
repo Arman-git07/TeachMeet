@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Hash, Link as LinkIcon, Share2, Video } from "lucide-react";
+import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -19,7 +19,6 @@ const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 interface OngoingMeeting {
   id: string;
   title: string;
-  participants?: number;
   startedAt?: number;
 }
 
@@ -44,8 +43,7 @@ export function StartMeetingDialogContent() {
     if (typeof window !== "undefined") {
         setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
     } else {
-        // Fallback for server-side or environments where window is not defined
-        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); // Simplified for clarity
+        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); 
     }
     
     const codePart1 = randomString(3);
@@ -78,7 +76,7 @@ export function StartMeetingDialogContent() {
   };
   
   const handleStartAndJoinMeeting = async () => {
-    if (!meetingId || !meetingTitle) {
+    if (!meetingId || !meetingTitle.trim()) {
       toast({ variant: "destructive", title: "Missing Details", description: "Please ensure a meeting topic is set." });
       return;
     }
@@ -88,13 +86,14 @@ export function StartMeetingDialogContent() {
     }
 
     setIsJoining(true);
-    console.log(`[StartMeetingDialog] Attempting to create meeting: ID=${meetingId}, Topic=${meetingTitle}, Creator=${user.uid}`);
+    const trimmedMeetingTitle = meetingTitle.trim();
+    console.log(`[StartMeetingDialog] Attempting to create meeting: ID=${meetingId}, Topic=${trimmedMeetingTitle}, Creator=${user.uid}`);
 
     try {
       const meetingDocRef = doc(db, 'meetings', meetingId);
       const meetingData = {
         creatorId: user.uid,
-        topic: meetingTitle,
+        topic: trimmedMeetingTitle,
         createdAt: serverTimestamp(),
       };
       
@@ -106,7 +105,7 @@ export function StartMeetingDialogContent() {
 
       const newMeetingEntry: OngoingMeeting = { 
         id: meetingId, 
-        title: meetingTitle, 
+        title: trimmedMeetingTitle, 
         startedAt: Date.now() 
       };
       const existingStartedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
@@ -124,9 +123,11 @@ export function StartMeetingDialogContent() {
         const updatedStartedMeetings = [...existingStartedMeetings, newMeetingEntry];
         localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedStartedMeetings));
         console.log("[StartMeetingDialog] Meeting added to localStorage 'started-meetings'.");
+        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started')); // Dispatch event
       }
 
-      const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle)}`;
+      const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
+      // No need for DialogClose here if navigation unmounts the dialog
       router.push(joinNowLinkPath);
 
     } catch (error: any) {
@@ -137,10 +138,9 @@ export function StartMeetingDialogContent() {
         description: `Could not create the meeting in the database: ${error.message}. Check console & Firestore rules.`,
         duration: 10000,
       });
-      setIsJoining(false);
-      return; 
+    } finally {
+        setIsJoining(false); 
     }
-    // setIsJoining(false); // Removed, as navigation will unmount the component
   };
 
   return (
@@ -226,9 +226,10 @@ export function StartMeetingDialogContent() {
           type="button" 
           onClick={handleStartAndJoinMeeting} 
           className="btn-gel rounded-lg" 
-          disabled={!meetingId || !meetingTitle || isJoining || !user}
+          disabled={!meetingId || !meetingTitle.trim() || isJoining || !user}
         >
-          {isJoining ? "Starting..." : (meetingId ? "Join Meeting Now" : "Generating ID...")}
+          {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+          {isJoining ? "Starting..." : (meetingId ? "Start and Join Meeting" : "Generating ID...")}
         </Button>
       </DialogFooter>
       <ShareOptionsPanel
@@ -236,7 +237,7 @@ export function StartMeetingDialogContent() {
         onClose={() => setIsSharePanelOpen(false)}
         meetingLink={meetingLink}
         meetingCode={meetingCode}
-        meetingTitle={meetingTitle} 
+        meetingTitle={meetingTitle.trim()} 
       />
     </>
   );

@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Video, Users as UsersIcon, XCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,32 +29,35 @@ export default function HomePage() {
 
   const { toast } = useToast();
 
-  const router = useRouter();
-
-  useEffect(() => {
+  const loadMeetings = () => {
+    console.log('[HomePage] loadMeetings: Attempting to load meetings from localStorage.');
     // Load started meetings
     const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+    console.log('[HomePage] loadMeetings: Raw started meetings from localStorage:', startedMeetingsRaw);
     let activeMeetings: OngoingMeeting[] = [];
     try {
       activeMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
       if (!Array.isArray(activeMeetings)) activeMeetings = [];
     } catch (e) {
-      console.error("Error parsing started meetings from localStorage", e);
-      localStorage.removeItem(STARTED_MEETINGS_KEY);
+      console.error("[HomePage] loadMeetings: Error parsing started meetings from localStorage", e);
+      localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear if malformed
       activeMeetings = [];
     }
+    console.log('[HomePage] loadMeetings: Parsed activeMeetings:', activeMeetings);
     
     // Load dismissed meetings
     const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
+    console.log('[HomePage] loadMeetings: Raw dismissed IDs from localStorage:', dismissedIdsString);
     let dismissedIds: string[] = [];
     try {
       dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
       if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
-      console.error("Error parsing dismissed meetings from localStorage", e);
-      localStorage.removeItem(DISMISSED_MEETINGS_KEY);
+      console.error("[HomePage] loadMeetings: Error parsing dismissed meetings from localStorage", e);
+      localStorage.removeItem(DISMISSED_MEETINGS_KEY); // Clear if malformed
       dismissedIds = [];
     }
+    console.log('[HomePage] loadMeetings: Parsed dismissedIds:', dismissedIds);
 
     const now = Date.now();
     let newDismissalsMade = false;
@@ -66,13 +68,14 @@ export default function HomePage() {
         if (!dismissedIds.includes(meeting.id)) {
           dismissedIds.push(meeting.id);
           newDismissalsMade = true;
-          console.log(`Auto-dismissing meeting "${meeting.title}" (ID: ${meeting.id}) as it started over 2 hours ago.`);
+          console.log(`[HomePage] loadMeetings: Auto-dismissing meeting "${meeting.title}" (ID: ${meeting.id}) as it started over 2 hours ago.`);
         }
       }
     });
 
     if (newDismissalsMade) {
       localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
+      console.log('[HomePage] loadMeetings: Updated dismissedIds in localStorage due to auto-dismissal:', dismissedIds);
     }
 
     // Filter out dismissed meetings from the started meetings
@@ -83,7 +86,23 @@ export default function HomePage() {
     // Optionally sort by startedAt if we want newest first, for example
     meetingsToDisplay.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 
+    console.log('[HomePage] loadMeetings: Final meetingsToDisplay:', meetingsToDisplay);
     setOngoingMeetings(meetingsToDisplay);
+  };
+
+  useEffect(() => {
+    loadMeetings(); // Initial load
+
+    const handleMeetingStarted = () => {
+      console.log('[HomePage] Received teachmeet_meeting_started event. Reloading meetings.');
+      loadMeetings();
+    };
+
+    window.addEventListener('teachmeet_meeting_started', handleMeetingStarted);
+
+    return () => {
+      window.removeEventListener('teachmeet_meeting_started', handleMeetingStarted);
+    };
   }, []);
 
 
@@ -114,7 +133,7 @@ export default function HomePage() {
       dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
       if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
-      console.error("Error parsing dismissed meetings from localStorage", e);
+      console.error("[HomePage] handleDismissMeeting: Error parsing dismissed meetings from localStorage", e);
       localStorage.removeItem(DISMISSED_MEETINGS_KEY);
       dismissedIds = [];
     }
@@ -175,8 +194,7 @@ export default function HomePage() {
                       >
                         <Video className="mr-3 h-5 w-5 text-primary/80" />
                         <span className="truncate flex-grow text-foreground">{meeting.title}</span>
-                        {/* Participant count can be omitted for locally started meetings or shown if available */}
-                        {meeting.participants && (
+                        {meeting.participants && ( // This won't show for localStorage meetings as participants count isn't stored
                           <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
                             <UsersIcon className="h-3 w-3 mr-1" />
                             {meeting.participants}
