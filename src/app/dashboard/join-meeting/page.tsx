@@ -4,9 +4,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LinkIcon, Hash, LogIn, XCircle, X, ClipboardPaste } from "lucide-react"; // Added X and ClipboardPaste
+import { LinkIcon, Hash, LogIn, XCircle, X, ClipboardPaste } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react"; // Added useEffect, useRef
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,7 +22,7 @@ export default function JoinMeetingPage() {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startLongPressTimer = () => {
-    clearLongPressTimer(); // Clear any existing timer
+    clearLongPressTimer();
     longPressTimerRef.current = setTimeout(() => {
       setShowPasteButton(true);
     }, LONG_PRESS_DURATION);
@@ -35,7 +35,6 @@ export default function JoinMeetingPage() {
     }
   };
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       clearLongPressTimer();
@@ -74,22 +73,29 @@ export default function JoinMeetingPage() {
         description: "Could not paste from clipboard. Ensure you've granted permission if prompted.",
       });
     } finally {
-      setShowPasteButton(false); // Hide button after attempt
+      setShowPasteButton(false);
     }
   };
   
   const handleJoinMeeting = () => {
     let meetingId: string | null = null;
     let topic: string | null = null;
+    let derivedFromLink = false;
 
     if (meetingLinkInput.trim()) {
+      derivedFromLink = true;
       try {
-        const url = new URL(meetingLinkInput);
+        const url = new URL(meetingLinkInput.trim());
         const pathParts = url.pathname.split('/');
-        const meetingIdIndex = pathParts.indexOf('meeting') + 1;
+        // Expecting path like /dashboard/meeting/{meetingId}/wait or /dashboard/meeting/{meetingId}
+        const meetingSegmentIndex = pathParts.indexOf('meeting');
 
-        if (meetingIdIndex > 0 && meetingIdIndex < pathParts.length) {
-          meetingId = pathParts[meetingIdIndex];
+        if (meetingSegmentIndex !== -1 && meetingSegmentIndex + 1 < pathParts.length) {
+          const potentialId = pathParts[meetingSegmentIndex + 1];
+          // Ensure potentialId is not a sub-route keyword of a meeting page
+          if (potentialId && potentialId !== 'wait' && potentialId !== 'chat' && potentialId !== 'participants' && potentialId !== 'whiteboard') {
+            meetingId = potentialId;
+          }
         }
         
         if (url.searchParams.has('topic')) {
@@ -99,21 +105,30 @@ export default function JoinMeetingPage() {
         if (!meetingId) {
           toast({
             variant: "destructive",
-            title: "Invalid Link",
-            description: "Could not extract meeting ID from the link. Please check the format.",
+            title: "Invalid Link Format",
+            description: "Could not extract a valid meeting ID from the link. Please ensure the link is correct.",
           });
           return;
         }
       } catch (error) {
+        // This catches if new URL() fails
         toast({
           variant: "destructive",
-          title: "Invalid Link",
-          description: "The provided link is not a valid URL.",
+          title: "Invalid URL",
+          description: "The meeting link provided is not a valid URL.",
         });
         return;
       }
     } else if (meetingCodeInput.trim()) {
       meetingId = meetingCodeInput.trim();
+      if (!meetingId) { // If trim results in empty string
+        toast({
+          variant: "destructive",
+          title: "Invalid Code",
+          description: "Meeting code cannot be empty.",
+        });
+        return;
+      }
     } else {
       toast({
         variant: "destructive",
@@ -123,21 +138,31 @@ export default function JoinMeetingPage() {
       return;
     }
 
-    if (meetingId) {
-      let navigationPath = `/dashboard/meeting/${meetingId}/wait`;
+    // Final check: ensure meetingId is a non-empty string
+    if (meetingId && meetingId.trim()) {
+      const finalMeetingId = meetingId.trim();
+      let navigationPath = `/dashboard/meeting/${finalMeetingId}/wait`;
       if (topic) {
         navigationPath += `?topic=${encodeURIComponent(topic)}`;
       }
+      
+      console.log(`[JoinMeetingPage] Navigating to: ${navigationPath}`); // For debugging
       toast({
         title: "Joining Meeting...",
-        description: `Attempting to join meeting ID: ${meetingId}${topic ? ' with topic: ' + topic : ''}`,
+        description: `Attempting to join meeting ID: ${finalMeetingId}${topic ? ' with topic: ' + topic : ''}`,
       });
       router.push(navigationPath);
+    } else {
+      // This case should ideally be caught by earlier checks, but as a fallback:
+      toast({
+        variant: "destructive",
+        title: derivedFromLink ? "Invalid Link" : "Invalid Code",
+        description: "Could not determine a valid meeting ID from your input.",
+      });
     }
   };
 
   const handleInputBlur = () => {
-    // Delay hiding paste button to allow its click to register
     setTimeout(() => {
       if (!document.activeElement || !document.activeElement.closest('[data-paste-button-area]')) {
         setShowPasteButton(false);
@@ -187,12 +212,12 @@ export default function JoinMeetingPage() {
             <label htmlFor="meetingLink" className="block text-sm font-medium text-muted-foreground mb-1">
               Meeting Link
             </label>
-            <div className="relative group/meeting-link-input"> {/* Added relative and group */}
+            <div className="relative group/meeting-link-input">
               <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <Input 
                 id="meetingLink" 
                 placeholder="https://teachmeet.example.com/join/..." 
-                className="pl-10 rounded-lg text-base pr-16" // Added pr-16 for paste button space
+                className="pl-10 rounded-lg text-base pr-16"
                 value={meetingLinkInput}
                 onChange={(e) => setMeetingLinkInput(e.target.value)}
                 onMouseDown={startLongPressTimer}
