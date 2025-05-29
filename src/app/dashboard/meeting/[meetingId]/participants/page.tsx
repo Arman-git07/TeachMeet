@@ -20,11 +20,12 @@ import {
   Pin,
   AlertCircle,
   Maximize,
-  UserX, // Added UserX icon
+  UserX,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import React, { use } from "react";
+import React, { use, useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,25 +34,29 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { auth, db } from '@/lib/firebase';
+import { collection, query, onSnapshot, doc, getDoc, DocumentData } from 'firebase/firestore';
 
 interface Participant {
-  id: string;
+  id: string; // This will be the userId
   name: string;
-  avatar?: string;
-  isMe?: boolean;
+  photoURL?: string;
   isMicMuted?: boolean;
   isCameraOff?: boolean;
-  isHost?: boolean; // Added isHost property
+  // isHost property will be determined by comparing id with meetingCreatorId
 }
 
-// Mock participants - in a real app, this would come from a backend or WebRTC state
-const mockMeetingParticipants: Participant[] = [
-  // Example: { id: 'user1', name: 'You', avatar: 'https://placehold.co/40x40/00FFFF/000000.png?text=Y', isMe: true, isMicMuted: false, isCameraOff: false, isHost: true },
-];
-
-
-const ParticipantItem = ({ participant, isCurrentUserHost }: { participant: Participant, isCurrentUserHost: boolean }) => {
+const ParticipantItem = ({ 
+  participant, 
+  isCurrentUserHost, 
+  isThisParticipantTheHost 
+}: { 
+  participant: Participant, 
+  isCurrentUserHost: boolean,
+  isThisParticipantTheHost: boolean
+}) => {
   const { toast } = useToast();
+  const isMe = auth.currentUser?.uid === participant.id;
 
   const handleActionClick = (action: string, participantName: string) => {
     toast({
@@ -65,13 +70,13 @@ const ParticipantItem = ({ participant, isCurrentUserHost }: { participant: Part
     <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
       <div className="flex items-center gap-3">
         <Avatar className="h-10 w-10">
-          <AvatarImage src={participant.avatar || `https://placehold.co/40x40.png?text=${participant.name.charAt(0)}`} alt={participant.name} data-ai-hint="avatar user"/>
+          <AvatarImage src={participant.photoURL || `https://placehold.co/40x40.png?text=${participant.name.charAt(0)}`} alt={participant.name} data-ai-hint="avatar user"/>
           <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
         </Avatar>
         <div>
           <p className="text-sm font-medium text-foreground">
-            {participant.name} {participant.isMe && "(You)"}
-            {participant.isHost && <ShieldCheck className="inline-block ml-1.5 h-4 w-4 text-primary" title="Host" />}
+            {participant.name} {isMe && "(You)"}
+            {isThisParticipantTheHost && <ShieldCheck className="inline-block ml-1.5 h-4 w-4 text-primary" title="Host" />}
           </p>
           <p className="text-xs text-muted-foreground">
             {participant.isMicMuted ? "Muted" : "Unmuted"} | {participant.isCameraOff ? "Camera Off" : "Camera On"}
@@ -85,7 +90,7 @@ const ParticipantItem = ({ participant, isCurrentUserHost }: { participant: Part
         <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
           {participant.isCameraOff ? <VideoOff className="h-4 w-4 text-muted-foreground" /> : <Video className="h-4 w-4 text-foreground" />}
         </Button>
-        {!participant.isMe && (
+        {!isMe && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
@@ -106,7 +111,7 @@ const ParticipantItem = ({ participant, isCurrentUserHost }: { participant: Part
                 <span>Full Screen</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {isCurrentUserHost && !participant.isHost && ( // Show remove option if current user is host AND target is not host
+              {isCurrentUserHost && !isThisParticipantTheHost && ( 
                 <DropdownMenuItem 
                   onSelect={() => handleActionClick('Remove', participant.name)} 
                   className="text-destructive focus:text-destructive cursor-pointer"
@@ -132,14 +137,66 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
   const { meetingId } = resolvedParams;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const topic = searchParams.get('topic') || "Meeting Participants";
+  const topic = searchParams.get('topic') || `Meeting Participants`;
+  const { toast } = useToast();
 
-  const backToMeetingLink = topic 
+  const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
+  const currentUserId = auth.currentUser?.uid;
+
+  useEffect(() => {
+    if (!meetingId || !db) return;
+    setIsLoading(true);
+
+    const meetingDocRef = doc(db, "meetings", meetingId);
+    getDoc(meetingDocRef).then(docSnap => {
+      if (docSnap.exists()) {
+        setMeetingCreatorId(docSnap.data().creatorId);
+      } else {
+        toast({ variant: "destructive", title: "Meeting Not Found", description: "Could not load meeting details." });
+        console.error("Meeting document not found for ID:", meetingId);
+      }
+    }).catch(error => {
+      toast({ variant: "destructive", title: "Error Fetching Meeting", description: "Could not load meeting details." });
+      console.error("Error fetching meeting document:", error);
+    });
+
+    const participantsColRef = collection(db, "meetings", meetingId, "participants");
+    const q = query(participantsColRef);
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedParticipants: Participant[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data() as DocumentData;
+        fetchedParticipants.push({
+          id: docSnap.id, // userId
+          name: data.displayName || data.name || "Guest", // Prefer displayName from Auth, then name
+          photoURL: data.photoURL,
+          isMicMuted: data.isMicMuted,
+          isCameraOff: data.isCameraOff,
+        });
+      });
+      setRealtimeParticipants(fetchedParticipants);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching participants from Firestore:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Participant List Error", 
+        description: "Could not load participant list. Error: " + error.message,
+        duration: 7000,
+      });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [meetingId, db, toast]);
+
+  const backToMeetingLink = topic && topic !== "Meeting Participants" 
     ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
     : `/dashboard/meeting/${meetingId}`;
   
-  // Assuming the current user's host status is known (e.g., from auth context or if the first participant is always the host in mock data)
-  const isCurrentUserHost = mockMeetingParticipants.find(p => p.isMe)?.isHost || false;
+  const isCurrentUserTheHost = currentUserId === meetingCreatorId;
 
   return (
     <div className="flex flex-col h-screen bg-muted/30">
@@ -164,22 +221,41 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
       <main className="flex-grow flex flex-col overflow-hidden pt-[65px]"> {/* Adjust pt if header height changes */}
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardHeader className="border-b">
-            <CardTitle className="text-lg">Participants ({mockMeetingParticipants.length})</CardTitle>
+            <CardTitle className="text-lg">Participants ({realtimeParticipants.length})</CardTitle>
             <CardDescription>Manage participants and their settings.</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full p-2 md:p-4">
-              {mockMeetingParticipants.length === 0 ? (
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
+                  <p className="text-lg">Loading participants...</p>
+                </div>
+              ) : realtimeParticipants.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <ShieldCheck className="w-16 h-16 mb-4 text-primary" />
-                  <p className="text-lg">You are the host.</p>
-                  <p className="text-sm">Meeting ID: {meetingId}</p>
-                  <p className="text-sm mt-2">Waiting for others to join...</p>
+                   {isCurrentUserTheHost ? (
+                    <>
+                      <p className="text-lg">You are the host.</p>
+                      <p className="text-sm">Meeting ID: {meetingId}</p>
+                      <p className="text-sm mt-2">Waiting for others to join...</p>
+                    </>
+                   ) : (
+                    <>
+                      <p className="text-lg">No participants yet.</p>
+                      <p className="text-sm mt-2">You might be the first one here, or waiting for others to join.</p>
+                    </>
+                   )}
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {mockMeetingParticipants.map((participant) => (
-                    <ParticipantItem key={participant.id} participant={participant} isCurrentUserHost={isCurrentUserHost} />
+                  {realtimeParticipants.map((participant) => (
+                    <ParticipantItem 
+                      key={participant.id} 
+                      participant={participant} 
+                      isCurrentUserHost={isCurrentUserTheHost}
+                      isThisParticipantTheHost={participant.id === meetingCreatorId}
+                    />
                   ))}
                 </div>
               )}
@@ -188,9 +264,8 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
         </Card>
       </main>
        <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-        TeachMeet Participants List - Real-time updates require backend integration.
+        TeachMeet Participants List - Real-time updates from Firestore.
       </footer>
     </div>
   );
 }
-
