@@ -44,7 +44,8 @@ export function StartMeetingDialogContent() {
     if (typeof window !== "undefined") {
         setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
     } else {
-        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`);
+        // Fallback for server-side or environments where window is not defined
+        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); // Simplified for clarity
     }
     
     const codePart1 = randomString(3);
@@ -87,6 +88,7 @@ export function StartMeetingDialogContent() {
     }
 
     setIsJoining(true);
+    console.log(`[StartMeetingDialog] Attempting to create meeting: ID=${meetingId}, Topic=${meetingTitle}, Creator=${user.uid}`);
 
     try {
       const meetingDocRef = doc(db, 'meetings', meetingId);
@@ -95,7 +97,11 @@ export function StartMeetingDialogContent() {
         topic: meetingTitle,
         createdAt: serverTimestamp(),
       };
+      
+      console.log("[StartMeetingDialog] Data to write for main meeting document:", meetingData);
       await setDoc(meetingDocRef, meetingData);
+      console.log("[StartMeetingDialog] Successfully created main meeting document in Firestore.");
+
       toast({ title: "Meeting Room Created", description: "Successfully registered the meeting room."});
 
       const newMeetingEntry: OngoingMeeting = { 
@@ -110,31 +116,31 @@ export function StartMeetingDialogContent() {
           existingStartedMeetings = JSON.parse(existingStartedMeetingsRaw);
           if (!Array.isArray(existingStartedMeetings)) existingStartedMeetings = [];
         } catch (e) {
-          console.error("Error parsing started meetings from localStorage:", e);
+          console.error("[StartMeetingDialog] Error parsing started meetings from localStorage:", e);
           localStorage.removeItem(STARTED_MEETINGS_KEY);
         }
       }
       if (!existingStartedMeetings.find(m => m.id === newMeetingEntry.id)) {
         const updatedStartedMeetings = [...existingStartedMeetings, newMeetingEntry];
         localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedStartedMeetings));
+        console.log("[StartMeetingDialog] Meeting added to localStorage 'started-meetings'.");
       }
 
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle)}`;
       router.push(joinNowLinkPath);
-      // The DialogClose will handle closing the dialog as the button is its child
 
     } catch (error: any) {
-      console.error("Error starting meeting and creating meeting document:", error);
+      console.error("[StartMeetingDialog] CRITICAL: Error creating meeting document in Firestore:", error);
       toast({
         variant: "destructive",
         title: "Failed to Start Meeting",
-        description: `Could not create the meeting in the database: ${error.message}. Please ensure you are connected and try again.`,
-        duration: 7000,
+        description: `Could not create the meeting in the database: ${error.message}. Check console & Firestore rules.`,
+        duration: 10000,
       });
-      setIsJoining(false); // Reset loading state if Firestore operation failed
-      return; // Prevent navigation if meeting document creation failed
+      setIsJoining(false);
+      return; 
     }
-    // setIsJoining(false); // This will be handled by the navigation or if an error occurs
+    // setIsJoining(false); // Removed, as navigation will unmount the component
   };
 
   return (
@@ -216,17 +222,14 @@ export function StartMeetingDialogContent() {
             Cancel
           </Button>
         </DialogClose>
-        {/* This button being inside DialogClose is correct; its onClick handles navigation after actions */}
-        <DialogClose asChild>
-          <Button 
-            type="button" 
-            onClick={handleStartAndJoinMeeting} 
-            className="btn-gel rounded-lg" 
-            disabled={!meetingId || !meetingTitle || isJoining || !user}
-          >
-            {isJoining ? "Starting..." : (meetingId ? "Join Meeting Now" : "Generating ID...")}
-          </Button>
-        </DialogClose>
+        <Button 
+          type="button" 
+          onClick={handleStartAndJoinMeeting} 
+          className="btn-gel rounded-lg" 
+          disabled={!meetingId || !meetingTitle || isJoining || !user}
+        >
+          {isJoining ? "Starting..." : (meetingId ? "Join Meeting Now" : "Generating ID...")}
+        </Button>
       </DialogFooter>
       <ShareOptionsPanel
         isOpen={isSharePanelOpen}

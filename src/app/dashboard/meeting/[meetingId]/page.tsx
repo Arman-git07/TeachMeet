@@ -177,18 +177,19 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
   useEffect(() => {
     if (!currentUser || !meetingId || !db) {
-      if(!currentUser) console.warn("MeetingPage: Current user not available for Firestore join.");
-      if(!meetingId) console.warn("MeetingPage: MeetingId not available for Firestore join.");
-      if(!db) console.warn("MeetingPage: DB not available for Firestore join.");
+      if(!currentUser) console.warn("[MeetingPage] Firestore join: Current user not available.");
+      if(!meetingId) console.warn("[MeetingPage] Firestore join: MeetingId not available.");
+      if(!db) console.warn("[MeetingPage] Firestore join: DB not available.");
       if(joinStatus === 'pending') setJoinStatus('failed'); 
       return;
     }
 
     if (joinStatus === 'pending') {
       setJoinStatus('joining');
-      const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+      console.log(`[MeetingPage] User ${currentUser.uid} attempting to join meeting ${meetingId}. Current joinStatus: ${joinStatus}`);
       
       const initialCameraOffFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
+      console.log(`[MeetingPage] Initial camera off from storage: ${initialCameraOffFromStorage}`);
 
       const participantData = {
         userId: currentUser.uid,
@@ -200,14 +201,17 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         isScreenSharing: false, 
         joinedAt: serverTimestamp(),
       };
+      
+      const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+      console.log("[MeetingPage] Participant data to write to Firestore:", participantData);
 
       setDoc(userDocRef, participantData, { merge: true })
         .then(() => {
+          console.log("[MeetingPage] Successfully added/updated self in participant list in Firestore.");
           setJoinStatus('joined');
-          console.log("Successfully added/updated self in participant list in Firestore.");
         })
         .catch(error => {
-          console.error("CRITICAL: Failed to add self to participant list:", error);
+          console.error("[MeetingPage] CRITICAL: Failed to add self to participant list in Firestore:", error);
           toast({
             variant: "destructive",
             title: "Failed to Register in Meeting Room",
@@ -222,6 +226,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   useEffect(() => {
     if (joinStatus !== 'joined' || !meetingId || !db) return; 
 
+    console.log(`[MeetingPage] Setting up Firestore listener for participants in meeting ${meetingId}`);
     const participantsColRef = collection(db, "meetings", meetingId, "participants");
     const q = query(participantsColRef);
     const unsubscribeParticipants = onSnapshot(q, (querySnapshot) => {
@@ -238,9 +243,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           photoURL: data.photoURL,
         });
       });
+      console.log("[MeetingPage] Fetched participants from Firestore:", fetchedParticipants);
       setRealtimeParticipants(fetchedParticipants);
     }, (error) => {
-        console.error("Error fetching participants from Firestore:", error);
+        console.error("[MeetingPage] Error fetching participants from Firestore:", error);
         toast({ 
           variant: "destructive", 
           title: "Participant List Error", 
@@ -250,6 +256,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     });
 
     return () => {
+      console.log(`[MeetingPage] Cleaning up Firestore listener for participants in meeting ${meetingId}`);
       unsubscribeParticipants();
     };
   }, [meetingId, db, toast, joinStatus]); 
@@ -257,6 +264,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   useEffect(() => {
     const initializeCameraAndPermissions = async () => {
       if (!localCameraOff) { 
+        console.log("[MeetingPage] Attempting to initialize camera (localCameraOff is false).");
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
@@ -264,11 +272,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             localVideoRef.current.srcObject = stream;
           }
           setHasCameraPermission(true);
+          console.log("[MeetingPage] Camera initialized successfully.");
         } catch (err) {
-          console.error("Failed to get camera on mount:", err);
+          console.error("[MeetingPage] Failed to get camera on mount:", err);
           setHasCameraPermission(false);
           setLocalCameraOff(true); 
-          updateUserStatusInFirestore({ isCameraOff: true });
+          await updateUserStatusInFirestore({ isCameraOff: true });
           toast({
             variant: 'destructive',
             title: 'Camera Access Denied',
@@ -276,11 +285,16 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           });
         }
       } else { 
+        console.log("[MeetingPage] Camera is set to off, checking permissions silently.");
         try {
-          await navigator.mediaDevices.getUserMedia({ video: true }).then(s => s.getTracks().forEach(t=>t.stop()));
+          // Try to get stream just to check permission, then stop it
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          stream.getTracks().forEach(track => track.stop());
           setHasCameraPermission(true);
+          console.log("[MeetingPage] Camera permission exists (checked silently).");
         } catch {
           setHasCameraPermission(false);
+          console.log("[MeetingPage] Camera permission denied (checked silently).");
         }
          if (currentLocalStreamRef.current) {
             currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
@@ -295,15 +309,17 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
 
     return () => {
+      console.log("[MeetingPage] Cleaning up local media streams.");
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]);
+  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]); // Removed updateUserStatusInFirestore from deps as it may cause loops
 
 
    useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
       if (auth.currentUser && meetingId && db) {
+        console.log(`[MeetingPage] beforeunload: Removing user ${auth.currentUser.uid} from meeting ${meetingId}`);
         await deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid));
       }
     };
@@ -315,12 +331,17 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
 
   const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'videoRef' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
-    if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
+    if (!currentUser || !meetingId || !db || joinStatus !== 'joined') {
+      console.warn("[MeetingPage] Skipping Firestore update: User not ready or not joined.", {currentUser, meetingId, db, joinStatus});
+      return;
+    }
     const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
     try {
+      console.log(`[MeetingPage] Updating user ${currentUser.uid} status in Firestore:`, updates);
       await updateDoc(userDocRef, updates);
+      console.log(`[MeetingPage] Successfully updated user ${currentUser.uid} status.`);
     } catch (error) {
-      console.error("Error updating user status in Firestore:", error);
+      console.error("[MeetingPage] Error updating user status in Firestore:", error);
       toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
     }
   };
@@ -332,6 +353,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const stopScreenShare = async (showToast = true) => {
+    console.log("[MeetingPage] Attempting to stop screen share.");
     if (screenShareStreamRef.current) {
       screenShareStreamRef.current.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current = null;
@@ -349,26 +371,31 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     if (!localCameraOff && currentLocalStreamRef.current && currentLocalStreamRef.current.active) {
         if (localVideoRef.current) {
             localVideoRef.current.srcObject = currentLocalStreamRef.current;
+            console.log("[MeetingPage] Restored active camera stream after stopping screen share.");
         }
     } else if (!localCameraOff && hasCameraPermission) { 
+        console.log("[MeetingPage] Re-initializing camera after screen share stop (camera was set to on).");
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
+          console.log("[MeetingPage] Camera re-initialized after screen share.");
         } catch (err) {
-          console.error("Failed to re-initialize camera after screen share stop:", err);
+          console.error("[MeetingPage] Failed to re-initialize camera after screen share stop:", err);
           setLocalCameraOff(true); 
-          updateUserStatusInFirestore({ isCameraOff: true });
+          await updateUserStatusInFirestore({ isCameraOff: true });
         }
     }
   };
 
   const toggleCamera = async () => {
     const newCameraStateIsOff = !localCameraOff;
+    console.log(`[MeetingPage] Toggling camera. New state is off: ${newCameraStateIsOff}`);
 
     if (isScreenSharingActive) {
+      console.log("[MeetingPage] Screen sharing is active, stopping it before toggling camera.");
       await stopScreenShare(false); 
     }
     
@@ -381,6 +408,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         return;
       }
       try {
+        console.log("[MeetingPage] Turning camera ON.");
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         currentLocalStreamRef.current = stream;
         if (localVideoRef.current) {
@@ -388,8 +416,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         }
         setHasCameraPermission(true); 
         await updateUserStatusInFirestore({ isCameraOff: false });
+        console.log("[MeetingPage] Camera turned ON successfully.");
       } catch (err) {
-        console.error("Failed to get camera on toggle:", err);
+        console.error("[MeetingPage] Failed to get camera on toggle:", err);
         setHasCameraPermission(false);
         setLocalCameraOff(true); 
         await updateUserStatusInFirestore({ isCameraOff: true });
@@ -397,12 +426,14 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         return;
       }
     } else { 
+      console.log("[MeetingPage] Turning camera OFF.");
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       currentLocalStreamRef.current = null;
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
       }
       await updateUserStatusInFirestore({ isCameraOff: true });
+      console.log("[MeetingPage] Camera turned OFF successfully.");
     }
   };
 
@@ -418,10 +449,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   };
 
   const leaveMeeting = async () => {
+    console.log("[MeetingPage] User leaving meeting.");
     try {
       await stopScreenShare(false); 
     } catch (e) {
-      console.error("Error stopping screen share on leave:", e);
+      console.error("[MeetingPage] Error stopping screen share on leave:", e);
     }
 
     currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
@@ -429,9 +461,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     if (currentUser && meetingId && db) {
       const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
       try {
+        console.log(`[MeetingPage] Deleting participant ${currentUser.uid} from Firestore for meeting ${meetingId}.`);
         await deleteDoc(userDocRef);
+        console.log(`[MeetingPage] Successfully deleted participant ${currentUser.uid}.`);
       } catch (error) {
-        console.error("Error removing participant from Firestore on leave:", error);
+        console.error("[MeetingPage] Error removing participant from Firestore on leave:", error);
       }
     }
 
@@ -444,7 +478,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         try {
           dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
         } catch (e) {
-          console.error("Error parsing dismissed meetings from localStorage on leave:", e);
+          console.error("[MeetingPage] Error parsing dismissed meetings from localStorage on leave:", e);
           localStorage.removeItem(DISMISSED_MEETINGS_KEY); 
         }
 
@@ -455,10 +489,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         if (!dismissedIds.includes(meetingId)) {
           dismissedIds.push(meetingId);
           localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
+          console.log(`[MeetingPage] Added meeting ${meetingId} to dismissed list in localStorage.`);
         }
       }
     } catch (e) {
-      console.error("Error updating localStorage on leave:", e);
+      console.error("[MeetingPage] Error updating localStorage on leave:", e);
     }
     router.push('/');
   };
@@ -494,7 +529,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     if (isScreenSharingActive) return;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      // This check is redundant if done in handleToggleShareScreen, but good for safety
       toast({
         variant: "destructive",
         title: "Screen Share Not Supported",
@@ -505,9 +539,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
 
     try {
+      console.log("[MeetingPage] Requesting screen share stream.");
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      console.log("[MeetingPage] Screen share stream acquired.");
 
       if (currentLocalStreamRef.current) { 
+        console.log("[MeetingPage] Stopping existing camera stream before starting screen share.");
         currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
         currentLocalStreamRef.current = null; 
         if (localVideoRef.current) localVideoRef.current.srcObject = null; 
@@ -523,11 +560,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       toast({ title: "Screen Sharing Started" });
 
       stream.getVideoTracks()[0].onended = () => { 
+        console.log("[MeetingPage] Screen share stream ended (e.g., user clicked 'Stop sharing' in browser UI).");
         stopScreenShare();
       };
 
     } catch (err) {
-      console.error("Error starting screen share:", err);
+      console.error("[MeetingPage] Error starting screen share:", err);
       if ((err as DOMException).name === 'NotAllowedError') {
         toast({ variant: "destructive", title: "Screen Share Cancelled", description: "You cancelled screen selection or denied permission." });
       } else {
@@ -601,7 +639,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           Failed to Join Meeting
         </h2>
         <p className="text-muted-foreground mb-6">
-          We couldn't register your presence in the meeting. This might be due to a network issue or a problem with the meeting setup or Firestore rules.
+          We couldn't register your presence in the meeting. This might be due to a network issue or a problem with the meeting setup or Firestore rules. Please check the browser console for more details and ensure your Firestore security rules allow participants to join.
         </p>
         <Button onClick={() => router.push('/')} className="rounded-lg">
           Go to Homepage
