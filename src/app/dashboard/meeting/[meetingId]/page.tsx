@@ -103,12 +103,14 @@ const ParticipantView = ({
           <VideoOff className="w-7 h-7 text-muted-foreground mb-1" />
           <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
         </div>
-      ) : (
-        <div className="w-full h-full bg-muted flex items-center justify-center">
+      ) : ( // Remote participant with camera on (placeholder for actual stream)
+        <div className="w-full h-full bg-muted flex flex-col items-center justify-center p-4 text-center">
           <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
              <AvatarImage src={photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`} alt={name} data-ai-hint="avatar user"/>
              <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
           </Avatar>
+           <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
+           {isScreenSharing ? <ScreenShare className="w-7 h-7 text-muted-foreground mt-1" /> : <Video className="w-7 h-7 text-muted-foreground mt-1" />}
         </div>
       )}
       <div className="absolute bottom-2 left-2 bg-gradient-to-r from-black/70 to-transparent px-3 py-1.5 rounded-md backdrop-blur-sm">
@@ -152,8 +154,8 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const [localCameraOff, setLocalCameraOff] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
-      localStorage.removeItem('teachmeet-desired-camera-state'); 
-      return desiredState !== 'on';
+      // localStorage.removeItem('teachmeet-desired-camera-state'); // Keep for re-entry if needed, clear on full leave
+      return desiredState === 'off'; // if 'on' or null, camera is NOT off
     }
     return true; 
   });
@@ -169,48 +171,63 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
 
+  // Effect for joining meeting in Firestore
   useEffect(() => {
-    if (joinStatus === 'pending' && currentUser && meetingId && db) {
+    if (!currentUser || !meetingId || !db) {
+      if(!currentUser) console.warn("MeetingPage: Current user not available for Firestore join.");
+      if(!meetingId) console.warn("MeetingPage: MeetingId not available for Firestore join.");
+      if(!db) console.warn("MeetingPage: DB not available for Firestore join.");
+      if(joinStatus === 'pending') setJoinStatus('failed'); // Fail early if critical info missing
+      return;
+    }
+
+    if (joinStatus === 'pending') {
       setJoinStatus('joining');
       const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+      
+      const initialCameraOffFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
+
       const participantData = {
         userId: currentUser.uid,
         name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
         photoURL: currentUser.photoURL,
-        isMicMuted: localMicMuted,
-        isCameraOff: localCameraOff,
-        isHandRaised: localHandRaised,
-        isScreenSharing: isScreenSharingActive,
+        isMicMuted: false, // Default mic state on join
+        isCameraOff: initialCameraOffFromStorage, // Use state from waiting room
+        isHandRaised: false, // Default hand state on join
+        isScreenSharing: false, // Default screen share state on join
         joinedAt: serverTimestamp(),
       };
 
       setDoc(userDocRef, participantData, { merge: true })
         .then(() => {
           setJoinStatus('joined');
-          console.log("Successfully added/updated self in participant list.");
+          console.log("Successfully added/updated self in participant list in Firestore.");
         })
         .catch(error => {
           console.error("CRITICAL: Failed to add self to participant list:", error);
           toast({
             variant: "destructive",
             title: "Failed to Register in Meeting Room",
-            description: `Could not register your presence in the meeting: ${error.message}. You may not see others or be seen. Try refreshing.`,
+            description: `Could not register your presence: ${error.message}. Check console & Firestore rules.`,
             duration: 10000,
           });
           setJoinStatus('failed');
         });
     }
+  }, [currentUser, meetingId, db, toast, joinStatus]); // Removed joinStatus from here to prevent loop, it's set inside.
 
-    if (joinStatus !== 'joined') return; // Only proceed if successfully joined
+  // Effect for listening to participants from Firestore
+  useEffect(() => {
+    if (joinStatus !== 'joined' || !meetingId || !db) return; 
 
     const participantsColRef = collection(db, "meetings", meetingId, "participants");
     const q = query(participantsColRef);
     const unsubscribeParticipants = onSnapshot(q, (querySnapshot) => {
       const fetchedParticipants: Participant[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      querySnapshot.forEach((docSnap) => { // Renamed to docSnap to avoid conflict with 'doc' function
+        const data = docSnap.data();
         fetchedParticipants.push({
-          id: doc.id,
+          id: docSnap.id,
           name: data.name || "Guest",
           isMicMuted: data.isMicMuted,
           isCameraOff: data.isCameraOff,
@@ -221,7 +238,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       });
       setRealtimeParticipants(fetchedParticipants);
     }, (error) => {
-        console.error("Error fetching participants:", error);
+        console.error("Error fetching participants from Firestore:", error);
         toast({ 
           variant: "destructive", 
           title: "Participant List Error", 
@@ -230,24 +247,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         });
     });
 
-    const handleBeforeUnload = async () => {
-        if (auth.currentUser && meetingId && db) { // Added meetingId and db check
-            await deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid));
-        }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
     return () => {
       unsubscribeParticipants();
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (auth.currentUser && meetingId && db) { // Added meetingId and db check
-          deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid))
-            .catch(err => console.error("Error deleting user on unmount:", err));
-      }
     };
-  }, [currentUser, meetingId, db, joinStatus, localMicMuted, localCameraOff, localHandRaised, isScreenSharingActive, toast]);
+  }, [meetingId, db, toast, joinStatus]); // Re-subscribe if joinStatus becomes 'joined'
 
-
+  // Effect for camera initialization & cleanup
   useEffect(() => {
     const initializeCameraAndPermissions = async () => {
       if (!localCameraOff) { 
@@ -262,34 +267,59 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           console.error("Failed to get camera on mount:", err);
           setHasCameraPermission(false);
           setLocalCameraOff(true); 
+          updateUserStatusInFirestore({ isCameraOff: true });
           toast({
             variant: 'destructive',
             title: 'Camera Access Denied',
             description: 'Please enable camera permissions in your browser settings.',
           });
         }
-      } else {
+      } else { // Camera is intended to be off
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            setHasCameraPermission(true);
-            stream.getTracks().forEach(track => track.stop()); 
+          // Check permission silently if possible, or assume if no stream needed
+          await navigator.mediaDevices.getUserMedia({ video: true }).then(s => s.getTracks().forEach(t=>t.stop()));
+          setHasCameraPermission(true);
         } catch {
-            setHasCameraPermission(false);
+          setHasCameraPermission(false);
+        }
+         if (currentLocalStreamRef.current) {
+            currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
+            currentLocalStreamRef.current = null;
+            if(localVideoRef.current) localVideoRef.current.srcObject = null;
         }
       }
     };
 
-    initializeCameraAndPermissions();
+    if (joinStatus === 'joined') { // Only initialize camera once successfully joined the room data-wise
+        initializeCameraAndPermissions();
+    }
 
     return () => {
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, [localCameraOff, toast]); // isScreenSharingActive removed as per original logic
+  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]);
+
+
+  // Effect for handling user leaving the page
+   useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      if (auth.currentUser && meetingId && db) {
+        // Note: deleteDoc here is best-effort and might not complete if the browser closes too quickly.
+        // Consider Cloud Functions with onDisconnect for more reliable cleanup in Realtime Database,
+        // or a heartbeat mechanism for Firestore.
+        await deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid));
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [meetingId, db]);
 
 
   const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'videoRef' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
-    if (!currentUser || !meetingId || !db) return;
+    if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
     const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
     try {
       await updateDoc(userDocRef, updates);
@@ -324,54 +354,62 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         if (localVideoRef.current) {
             localVideoRef.current.srcObject = currentLocalStreamRef.current;
         }
-    } else if (!localCameraOff) { 
-        toggleCamera(); 
-    }
-  };
-
-  const toggleCamera = async () => {
-    if (isScreenSharingActive) {
-      await stopScreenShare();
-    }
-
-    const newCameraStateIsOff = !localCameraOff;
-
-    if (!newCameraStateIsOff) { 
-      if (hasCameraPermission === false) {
-        toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
-        return;
-      }
-      if (!currentLocalStreamRef.current || !currentLocalStreamRef.current.active) {
+    } else if (!localCameraOff && hasCameraPermission) { // If camera was meant to be on, and permission exists
+        // Re-initialize camera
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           currentLocalStreamRef.current = stream;
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
-          setHasCameraPermission(true); 
-          setLocalCameraOff(false);
-          await updateUserStatusInFirestore({ isCameraOff: false });
+          // No need to update isCameraOff in Firestore here as it should already be false
         } catch (err) {
-          console.error("Failed to get camera on toggle:", err);
-          setHasCameraPermission(false);
-          setLocalCameraOff(true); 
-          await updateUserStatusInFirestore({ isCameraOff: true });
-          toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
-          return;
+          console.error("Failed to re-initialize camera after screen share stop:", err);
+          setLocalCameraOff(true); // Force camera off if re-init fails
+          updateUserStatusInFirestore({ isCameraOff: true });
         }
-      } else { 
-        if (localVideoRef.current && currentLocalStreamRef.current) {
-            localVideoRef.current.srcObject = currentLocalStreamRef.current;
-        }
-        setLocalCameraOff(false);
-        await updateUserStatusInFirestore({ isCameraOff: false });
+    }
+  };
+
+  const toggleCamera = async () => {
+    const newCameraStateIsOff = !localCameraOff;
+
+    if (isScreenSharingActive) {
+      await stopScreenShare(false); // Stop screen share first, don't show its toast
+       // After stopping screen share, the camera might try to re-initialize based on localCameraOff
+       // We need to ensure the NEW desired state (newCameraStateIsOff) is respected.
+    }
+    
+    setLocalCameraOff(newCameraStateIsOff); // Set local state immediately for UI feedback
+
+    if (!newCameraStateIsOff) { // Trying to turn camera ON
+      if (hasCameraPermission === false) {
+        toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
+        setLocalCameraOff(true); // Revert UI if permission denied
+        return;
       }
-    } else { 
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        currentLocalStreamRef.current = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        setHasCameraPermission(true); 
+        await updateUserStatusInFirestore({ isCameraOff: false });
+      } catch (err) {
+        console.error("Failed to get camera on toggle:", err);
+        setHasCameraPermission(false);
+        setLocalCameraOff(true); // Revert local state
+        await updateUserStatusInFirestore({ isCameraOff: true });
+        toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
+        return;
+      }
+    } else { // Trying to turn camera OFF
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+      currentLocalStreamRef.current = null;
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null;
       }
-      setLocalCameraOff(true);
       await updateUserStatusInFirestore({ isCameraOff: true });
     }
   };
@@ -469,17 +507,18 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
       if (currentLocalStreamRef.current) { 
         currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
-        if (localVideoRef.current) localVideoRef.current.srcObject = null; // Clear camera from local view
+        currentLocalStreamRef.current = null; // Important: clear the camera stream ref
+        if (localVideoRef.current) localVideoRef.current.srcObject = null; 
       }
 
       screenShareStreamRef.current = stream;
       if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream; // Show screen share in local view
+        localVideoRef.current.srcObject = stream; 
       }
       setIsScreenSharingActive(true);
-      setLocalCameraOff(true); 
+      setLocalCameraOff(true); // Camera is effectively off during screen share
       await updateUserStatusInFirestore({ isScreenSharing: true, isCameraOff: true });
-      toast({ title: "Screen Sharing Started", description: "Your screen is now being shared locally." });
+      toast({ title: "Screen Sharing Started" });
 
       stream.getVideoTracks()[0].onended = () => { 
         stopScreenShare();
@@ -553,7 +592,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           Failed to Join Meeting
         </h2>
         <p className="text-muted-foreground mb-6">
-          We couldn't register your presence in the meeting. This might be due to a network issue or a problem with the meeting setup.
+          We couldn't register your presence in the meeting. This might be due to a network issue or a problem with the meeting setup or Firestore rules.
         </p>
         <Button onClick={() => router.push('/')} className="rounded-lg">
           Go to Homepage
@@ -629,40 +668,40 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               </AlertDescription>
             </Alert>
         )}
-        {combinedParticipants.length === 1 && combinedParticipants[0].isMe ? (
-          <div className={cn(
-            "flex-grow flex items-center justify-center",
-            currentLayout === 'speaker' && "p-4 bg-muted rounded-lg",
-            currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg",
-            currentLayout === 'grid' && "p-0"
-          )}>
-            <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
-              {currentLayout === 'speaker' && (
-                <Badge variant="default" className="absolute top-2 left-2 z-20 bg-primary/80 text-primary-foreground backdrop-blur-sm">Speaker View Active</Badge>
-              )}
-              {currentLayout === 'gallery' && (
-                <Badge variant="default" className="absolute top-2 left-2 z-20 bg-accent/80 text-accent-foreground backdrop-blur-sm">Gallery View Active</Badge>
-              )}
-              <ParticipantView
-                {...combinedParticipants[0]}
-              />
+         {combinedParticipants.length === 1 && combinedParticipants[0].isMe ? (
+            <div className={cn(
+                "flex-grow flex items-center justify-center",
+                currentLayout === 'speaker' && "p-4 bg-muted rounded-lg",
+                currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg",
+                currentLayout === 'grid' && "p-0" 
+            )}>
+                <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
+                 {currentLayout === 'speaker' && (
+                    <Badge variant="default" className="absolute top-2 left-2 z-20 bg-primary/80 text-primary-foreground backdrop-blur-sm">Speaker View Active</Badge>
+                )}
+                {currentLayout === 'gallery' && (
+                    <Badge variant="default" className="absolute top-2 left-2 z-20 bg-accent/80 text-accent-foreground backdrop-blur-sm">Gallery View Active</Badge>
+                )}
+                <ParticipantView
+                    {...combinedParticipants[0]}
+                />
+                </div>
             </div>
-          </div>
-        ) : (
-           <div className={cn(
-            "grid gap-4 flex-1",
-            combinedParticipants.length === 0 ? "grid-cols-1" : // Handle case for 0 participants gracefully
-            combinedParticipants.length === 1 ? "grid-cols-1" : // Should be handled by above block, but defensive
-            combinedParticipants.length === 2 ? "grid-cols-1 md:grid-cols-2" :
-            combinedParticipants.length === 3 ? "grid-cols-1 md:grid-cols-3" :
-            combinedParticipants.length >= 4 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3" :
-            "grid-cols-1" // Default fallback
-          )}>
-            {combinedParticipants.map(participant => (
-              <ParticipantView key={participant.id} {...participant} />
-            ))}
-          </div>
-        )}
+            ) : (
+            <div className={cn(
+                "grid gap-4 flex-1",
+                combinedParticipants.length === 0 ? "grid-cols-1" : 
+                combinedParticipants.length === 1 ? "grid-cols-1" : 
+                combinedParticipants.length === 2 ? "grid-cols-1 md:grid-cols-2" :
+                combinedParticipants.length === 3 ? "grid-cols-1 md:grid-cols-3" :
+                combinedParticipants.length >= 4 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3" :
+                "grid-cols-1" 
+            )}>
+                {combinedParticipants.map(participant => (
+                <ParticipantView key={participant.id} {...participant} />
+                ))}
+            </div>
+            )}
       </main>
 
       <footer className="p-4 border-t border-border bg-background/80 backdrop-blur-md sticky bottom-0">
@@ -681,16 +720,15 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
              size="lg"
              className={cn(
                 "rounded-full p-4",
-                isScreenSharingActive && localCameraOff ? "opacity-50 cursor-not-allowed" : "btn-gel"
+                isScreenSharingActive ? "opacity-50 cursor-not-allowed" : "btn-gel" // Simplified: if sharing, it's not gel style and disabled
              )}
              onClick={toggleCamera}
-             aria-label={localCameraOff ? "Turn Camera On" : "Turn Camera Off"}
-             disabled={isScreenSharingActive && localCameraOff} 
+             aria-label={(localCameraOff && !isScreenSharingActive) ? "Turn Camera On" : "Turn Camera Off"}
+             disabled={isScreenSharingActive} // Disabled if screen sharing active
           >
             {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
-          <Button
-            variant={localHandRaised ? "default" : "default"} 
+           <Button
             size="lg"
             className={cn(
               "rounded-full p-4",
