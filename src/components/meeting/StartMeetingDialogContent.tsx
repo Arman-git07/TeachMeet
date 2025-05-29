@@ -10,10 +10,9 @@ import { Copy, Hash, Link as LinkIcon, Share2, Video } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import Link from "next/link"; // Keep this if used elsewhere, or remove if only for the old button
 import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Ensure db is correctly exported from your firebase setup
+import { db } from '@/lib/firebase';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
@@ -33,8 +32,8 @@ export function StartMeetingDialogContent() {
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { user } = useAuth(); // Get current authenticated user
-  const [isJoining, setIsJoining] = useState(false); // Loading state for the button
+  const { user } = useAuth();
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
@@ -45,7 +44,7 @@ export function StartMeetingDialogContent() {
     if (typeof window !== "undefined") {
         setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
     } else {
-        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); // Fallback for SSR or testing
+        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`);
     }
     
     const codePart1 = randomString(3);
@@ -84,14 +83,12 @@ export function StartMeetingDialogContent() {
     }
     if (!user) {
       toast({ variant: "destructive", title: "Authentication Error", description: "You must be signed in to start a meeting." });
-      // Optionally, redirect to sign-in or disable the button if user is null
       return;
     }
 
     setIsJoining(true);
 
     try {
-      // Step 1: Create the main meeting document in Firestore
       const meetingDocRef = doc(db, 'meetings', meetingId);
       const meetingData = {
         creatorId: user.uid,
@@ -99,9 +96,8 @@ export function StartMeetingDialogContent() {
         createdAt: serverTimestamp(),
       };
       await setDoc(meetingDocRef, meetingData);
-      toast({ title: "Meeting Created", description: "Meeting room registered in the database."});
+      toast({ title: "Meeting Room Created", description: "Successfully registered the meeting room."});
 
-      // Step 2: Save to localStorage (as previously implemented)
       const newMeetingEntry: OngoingMeeting = { 
         id: meetingId, 
         title: meetingTitle, 
@@ -115,7 +111,7 @@ export function StartMeetingDialogContent() {
           if (!Array.isArray(existingStartedMeetings)) existingStartedMeetings = [];
         } catch (e) {
           console.error("Error parsing started meetings from localStorage:", e);
-          localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear corrupted data
+          localStorage.removeItem(STARTED_MEETINGS_KEY);
         }
       }
       if (!existingStartedMeetings.find(m => m.id === newMeetingEntry.id)) {
@@ -123,24 +119,22 @@ export function StartMeetingDialogContent() {
         localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedStartedMeetings));
       }
 
-      // Step 3: Navigate to the meeting waiting page
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(meetingTitle)}`;
       router.push(joinNowLinkPath);
+      // The DialogClose will handle closing the dialog as the button is its child
 
-      // The DialogClose wrapping the button will handle closing the dialog.
-      // If programmatic close was needed and this component controlled Dialog open state:
-      // props.onCloseDialog(); // Assuming a prop like onCloseDialog was passed down
-
-    } catch (error) {
-      console.error("Error starting meeting:", error);
+    } catch (error: any) {
+      console.error("Error starting meeting and creating meeting document:", error);
       toast({
         variant: "destructive",
         title: "Failed to Start Meeting",
-        description: "Could not create the meeting in the database. Please ensure you are connected and try again.",
+        description: `Could not create the meeting in the database: ${error.message}. Please ensure you are connected and try again.`,
+        duration: 7000,
       });
-    } finally {
-      setIsJoining(false);
+      setIsJoining(false); // Reset loading state if Firestore operation failed
+      return; // Prevent navigation if meeting document creation failed
     }
+    // setIsJoining(false); // This will be handled by the navigation or if an error occurs
   };
 
   return (
@@ -222,7 +216,8 @@ export function StartMeetingDialogContent() {
             Cancel
           </Button>
         </DialogClose>
-          {/* The onClick now calls the new comprehensive handler */}
+        {/* This button being inside DialogClose is correct; its onClick handles navigation after actions */}
+        <DialogClose asChild>
           <Button 
             type="button" 
             onClick={handleStartAndJoinMeeting} 
@@ -231,6 +226,7 @@ export function StartMeetingDialogContent() {
           >
             {isJoining ? "Starting..." : (meetingId ? "Join Meeting Now" : "Generating ID...")}
           </Button>
+        </DialogClose>
       </DialogFooter>
       <ShareOptionsPanel
         isOpen={isSharePanelOpen}
