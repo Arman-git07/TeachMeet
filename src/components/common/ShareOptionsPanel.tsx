@@ -11,7 +11,7 @@ interface ShareOptionsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   meetingLink: string;
-  meetingCode: string; // Added meetingCode
+  meetingCode?: string; // Made meetingCode optional
   meetingTitle: string;
 }
 
@@ -28,14 +28,18 @@ const ShareButton = ({ icon: Icon, label, onClick, className }: { icon: React.El
 
 export function ShareOptionsPanel({ isOpen, onClose, meetingLink, meetingCode, meetingTitle }: ShareOptionsPanelProps) {
   const { toast } = useToast();
-  const fullTextToShare = `You're invited to join my TeachMeet meeting: ${meetingTitle}.\nLink: ${meetingLink}\nOr use Code: ${meetingCode}`;
-  const linkAndCodeText = `Link: ${meetingLink}\nCode: ${meetingCode}`;
+  
+  const inviteDetails = meetingCode 
+    ? `Link: ${meetingLink}\nOr use Code: ${meetingCode}`
+    : `Link: ${meetingLink}`;
+  
+  const fullTextToShare = `You're invited to join my TeachMeet meeting: ${meetingTitle}.\n${inviteDetails}`;
 
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(fullTextToShare)
       .then(() => {
-        toast({ title: "Invite Copied!", description: "Meeting link and code copied to clipboard." });
+        toast({ title: "Invite Copied!", description: "Meeting invite details copied to clipboard." });
         onClose();
       })
       .catch(err => {
