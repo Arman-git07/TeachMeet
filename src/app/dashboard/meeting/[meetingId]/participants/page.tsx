@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import React, { use, useState, useEffect } from "react";
+import React, { use, useState, useEffect } from "react"; // Added React import
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +46,7 @@ interface Participant {
   // isHost property will be determined by comparing id with meetingCreatorId
 }
 
-const ParticipantItem = ({ 
+const ParticipantItem = React.memo(function ParticipantItem({ // Wrapped with React.memo
   participant, 
   isCurrentUserHost, 
   isThisParticipantTheHost 
@@ -54,7 +54,7 @@ const ParticipantItem = ({
   participant: Participant, 
   isCurrentUserHost: boolean,
   isThisParticipantTheHost: boolean
-}) => {
+}) {
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
 
@@ -130,14 +130,17 @@ const ParticipantItem = ({
       </div>
     </div>
   );
-};
+});
+ParticipantItem.displayName = 'ParticipantItem'; // Added display name for memoized component
+
 
 export default function MeetingParticipantsPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
   const resolvedParams = use(paramsPromise);
   const { meetingId } = resolvedParams;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const topic = searchParams.get('topic') || `Meeting Participants`;
+  const topicFromParams = searchParams.get('topic'); // Renamed to avoid conflict
+  const displayTopic = topicFromParams || `Meeting Participants`; // Use a different variable for display
   const { toast } = useToast();
 
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
@@ -148,20 +151,24 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
   useEffect(() => {
     if (!meetingId || !db) return;
     setIsLoading(true);
+    console.log(`[ParticipantsPage] Fetching meeting details for ${meetingId}`);
 
     const meetingDocRef = doc(db, "meetings", meetingId);
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
-        setMeetingCreatorId(docSnap.data().creatorId);
+        const creator = docSnap.data().creatorId;
+        console.log(`[ParticipantsPage] Meeting creator ID: ${creator}`);
+        setMeetingCreatorId(creator);
       } else {
         toast({ variant: "destructive", title: "Meeting Not Found", description: "Could not load meeting details." });
-        console.error("Meeting document not found for ID:", meetingId);
+        console.error("[ParticipantsPage] Meeting document not found for ID:", meetingId);
       }
     }).catch(error => {
       toast({ variant: "destructive", title: "Error Fetching Meeting", description: "Could not load meeting details." });
-      console.error("Error fetching meeting document:", error);
+      console.error("[ParticipantsPage] Error fetching meeting document:", error);
     });
 
+    console.log(`[ParticipantsPage] Setting up Firestore listener for participants in meeting ${meetingId}`);
     const participantsColRef = collection(db, "meetings", meetingId, "participants");
     const q = query(participantsColRef);
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -169,17 +176,18 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
       querySnapshot.forEach((docSnap) => {
         const data = docSnap.data() as DocumentData;
         fetchedParticipants.push({
-          id: docSnap.id, // userId
-          name: data.displayName || data.name || "Guest", // Prefer displayName from Auth, then name
+          id: docSnap.id, 
+          name: data.name || "Guest", 
           photoURL: data.photoURL,
           isMicMuted: data.isMicMuted,
           isCameraOff: data.isCameraOff,
         });
       });
+      console.log("[ParticipantsPage] Fetched participants from Firestore:", fetchedParticipants);
       setRealtimeParticipants(fetchedParticipants);
       setIsLoading(false);
     }, (error) => {
-      console.error("Error fetching participants from Firestore:", error);
+      console.error("[ParticipantsPage] Error fetching participants from Firestore:", error);
       toast({ 
         variant: "destructive", 
         title: "Participant List Error", 
@@ -189,11 +197,14 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log(`[ParticipantsPage] Cleaning up Firestore listener for meeting ${meetingId}`);
+      unsubscribe();
+    };
   }, [meetingId, db, toast]);
 
-  const backToMeetingLink = topic && topic !== "Meeting Participants" 
-    ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
+  const backToMeetingLink = topicFromParams 
+    ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topicFromParams)}`
     : `/dashboard/meeting/${meetingId}`;
   
   const isCurrentUserTheHost = currentUserId === meetingCreatorId;
@@ -204,8 +215,8 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <UsersIcon className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-              {topic}
+            <h1 className="text-xl font-semibold text-foreground truncate" title={displayTopic}>
+              {displayTopic}
             </h1>
             <span className="text-sm text-muted-foreground"> (Meeting ID: {meetingId})</span>
           </div>

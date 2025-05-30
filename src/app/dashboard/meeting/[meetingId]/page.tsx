@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, use, useRef } from 'react';
+import React, { useState, useEffect, use, useRef } from 'react'; // Added React import
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mic, MicOff, Video, VideoOff, PhoneOff, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle, PanelLeftOpen, Loader2, Share2 } from "lucide-react";
@@ -33,7 +33,7 @@ interface Participant {
   photoURL?: string | null;
 }
 
-const ParticipantView = ({
+const ParticipantView = React.memo(function ParticipantView({ // Wrapped with React.memo
   name,
   isMe = false,
   isMicMuted = false,
@@ -43,7 +43,7 @@ const ParticipantView = ({
   isHandRaisedForView,
   isScreenSharing,
   photoURL
-}: Participant) => {
+}: Participant) {
   const { toast } = useToast();
 
   const handleFullScreenClick = () => {
@@ -140,7 +140,8 @@ const ParticipantView = ({
       </div>
     </Card>
   );
-};
+});
+ParticipantView.displayName = 'ParticipantView'; // Added display name for memoized component
 
 
 export default function MeetingPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
@@ -176,6 +177,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
 
   useEffect(() => {
+    console.log("[MeetingPage] Effect for Firestore join triggered. Current status:", joinStatus);
     if (!currentUser || !meetingId || !db) {
       if(!currentUser) console.warn("[MeetingPage] Firestore join: Current user not available.");
       if(!meetingId) console.warn("[MeetingPage] Firestore join: MeetingId not available.");
@@ -236,11 +238,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         fetchedParticipants.push({
           id: docSnap.id,
           name: data.name || "Guest",
+          photoURL: data.photoURL,
           isMicMuted: data.isMicMuted,
           isCameraOff: data.isCameraOff,
           isHandRaisedForView: data.isHandRaised,
           isScreenSharing: data.isScreenSharing,
-          photoURL: data.photoURL,
         });
       });
       console.log("[MeetingPage] Fetched participants from Firestore:", fetchedParticipants);
@@ -287,7 +289,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       } else { 
         console.log("[MeetingPage] Camera is set to off, checking permissions silently.");
         try {
-          // Try to get stream just to check permission, then stop it
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           stream.getTracks().forEach(track => track.stop());
           setHasCameraPermission(true);
@@ -313,7 +314,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]); // Removed updateUserStatusInFirestore from deps as it may cause loops
+  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]);
 
 
    useEffect(() => {
@@ -532,7 +533,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       toast({
         variant: "destructive",
         title: "Screen Share Not Supported",
-        description: "Screen sharing is not available in your browser or current environment.",
+        description: "Screen sharing is not available in your browser or current environment. Please ensure you are on a secure (HTTPS) connection.",
         duration: 7000
       });
       return;
