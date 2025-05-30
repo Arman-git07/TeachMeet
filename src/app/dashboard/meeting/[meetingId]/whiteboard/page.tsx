@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle as CircleIcon, Square as SquareIconShape, Edit3 } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Palette, Circle as CircleIcon, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +42,7 @@ export default function WhiteboardPage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
   const { toast } = useToast();
+  
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [textToolInput, setTextToolInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -65,8 +66,8 @@ export default function WhiteboardPage() {
 
   const brushSizes = [
     { name: 'small', icon: CircleIcon, label: 'Small Brush', lineWidth: 2 },
-    { name: 'medium', icon: SquareIconShape, label: 'Medium Brush', lineWidth: 5 }, // Changed icon for variety
-    { name: 'large', icon: SquareIconShape, label: 'Large Brush', lineWidth: 10 }, // Changed icon
+    { name: 'medium', icon: SquareIconShape, label: 'Medium Brush', lineWidth: 5 },
+    { name: 'large', icon: SquareIconShape, label: 'Large Brush', lineWidth: 10 },
   ];
 
   const getLineWidth = useCallback(() => {
@@ -83,9 +84,6 @@ export default function WhiteboardPage() {
             imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         } catch (e) {
             console.error("Error getting imageData (possibly due to tainted canvas):", e);
-            // If canvas is tainted (e.g. by drawing an image from another origin without CORS),
-            // getImageData will fail. In this case, we can't preserve the content.
-            // For a drawing app, this is less likely unless images are being imported.
         }
       }
       
@@ -108,7 +106,7 @@ export default function WhiteboardPage() {
         }
       }
     }
-  }, [selectedColor, getLineWidth, activeTool]); // Added activeTool
+  }, [selectedColor, getLineWidth, activeTool]); 
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -144,7 +142,7 @@ export default function WhiteboardPage() {
     if ('touches' in event && (event as TouchEvent).touches.length > 0) {
         clientX = (event as TouchEvent).touches[0].clientX;
         clientY = (event as TouchEvent).touches[0].clientY;
-    } else if ('changedTouches' in event && (event as TouchEvent).changedTouches.length > 0) { // For touchend
+    } else if ('changedTouches' in event && (event as TouchEvent).changedTouches.length > 0) { 
         clientX = (event as TouchEvent).changedTouches[0].clientX;
         clientY = (event as TouchEvent).changedTouches[0].clientY;
     } else if ('clientX' in event) {
@@ -156,7 +154,7 @@ export default function WhiteboardPage() {
     } else if ('nativeEvent' in event && 'touches' in (event as React.TouchEvent).nativeEvent && (event as React.TouchEvent).nativeEvent.touches.length > 0 ) {
         clientX = (event as React.TouchEvent).nativeEvent.touches[0].clientX;
         clientY = (event as React.TouchEvent).nativeEvent.touches[0].clientY;
-    } else if ('nativeEvent' in event && 'changedTouches' in (event as React.TouchEvent).nativeEvent && (event as React.TouchEvent).nativeEvent.changedTouches.length > 0 ) { // For React touchend
+    } else if ('nativeEvent' in event && 'changedTouches' in (event as React.TouchEvent).nativeEvent && (event as React.TouchEvent).nativeEvent.changedTouches.length > 0 ) { 
         clientX = (event as React.TouchEvent).nativeEvent.changedTouches[0].clientX;
         clientY = (event as React.TouchEvent).nativeEvent.changedTouches[0].clientY;
     }
@@ -174,7 +172,7 @@ export default function WhiteboardPage() {
     if (!contextRef.current || !activeTool) return;
     
     lastPositionRef.current = pos;
-    shapeStartPointRef.current = pos; // For shape tools
+    shapeStartPointRef.current = pos; 
 
     contextRef.current.beginPath();
     contextRef.current.moveTo(pos.x, pos.y);
@@ -197,7 +195,6 @@ export default function WhiteboardPage() {
       contextRef.current.stroke();
       lastPositionRef.current = pos;
     }
-    // For live shape preview (more complex), you'd draw temporary shape here
   }, [activeTool]);
 
   const stopDrawingInternal = useCallback((pos?: {x: number, y: number}) => {
@@ -205,15 +202,14 @@ export default function WhiteboardPage() {
     
     const finalPos = pos || lastPositionRef.current;
 
-    if (shapeStartPointRef.current && finalPos && activeTool && ['line', 'circle', 'square'].includes(activeTool)) {
-      // Ensure drawing settings are for shapes, not eraser
+    if (shapeStartPointRef.current && finalPos && activeTool && ['line', 'circle', 'square', 'arrow', 'triangle'].includes(activeTool)) {
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.strokeStyle = selectedColor;
       contextRef.current.lineWidth = getLineWidth();
 
       const start = shapeStartPointRef.current;
       const end = finalPos;
-      contextRef.current.beginPath(); // Start new path for the shape
+      contextRef.current.beginPath(); 
       if (activeTool === 'line') {
         contextRef.current.moveTo(start.x, start.y);
         contextRef.current.lineTo(end.x, end.y);
@@ -226,15 +222,30 @@ export default function WhiteboardPage() {
         const centerX = start.x + dx / 2;
         const centerY = start.y + dy / 2;
         contextRef.current.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
+      } else if (activeTool === 'arrow') {
+        contextRef.current.moveTo(start.x, start.y);
+        contextRef.current.lineTo(end.x, end.y);
+        // Draw arrowhead
+        const headlen = 10 + getLineWidth(); // length of head in pixels
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
+        contextRef.current.moveTo(end.x, end.y);
+        contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
+      } else if (activeTool === 'triangle') {
+        const p1 = { x: start.x + (end.x - start.x) / 2, y: start.y }; // Top-middle
+        const p2 = { x: start.x, y: end.y }; // Bottom-left
+        const p3 = { x: end.x, y: end.y }; // Bottom-right
+        contextRef.current.moveTo(p1.x, p1.y);
+        contextRef.current.lineTo(p2.x, p2.y);
+        contextRef.current.lineTo(p3.x, p3.y);
+        contextRef.current.closePath(); // Close the path to form a triangle
       }
       contextRef.current.stroke();
     }
     
-    if (activeTool === 'erase') { // Reset composite operation after erasing
+    if (activeTool === 'erase') { 
       contextRef.current.globalCompositeOperation = 'source-over';
     }
-
-    // contextRef.current.closePath(); // Not always needed, especially for open paths like freehand
 
     lastPositionRef.current = null;
     shapeStartPointRef.current = null;
@@ -242,7 +253,7 @@ export default function WhiteboardPage() {
 
 
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if (event.nativeEvent instanceof MouseEvent && event.nativeEvent.button !== 0) return; // Only main mouse button
+    if (event.nativeEvent instanceof MouseEvent && event.nativeEvent.button !== 0) return; 
 
     if (!contextRef.current || !activeTool) return;
     if (activeTool === 'select' || activeTool === 'text') return;
@@ -263,7 +274,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
     }
-  }, [activeTool, getPointerPosition, startDrawingInternal]);
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp]); // Added handlePointerMove and handlePointerUp
 
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     if (!isDrawingRef.current) return;
@@ -277,8 +288,8 @@ export default function WhiteboardPage() {
   const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
     if (!isDrawingRef.current) return;
     
-    const pos = getPointerPosition(event); // Get final position if available
-    stopDrawingInternal(pos || undefined); // Pass undefined if pos is null
+    const pos = getPointerPosition(event); 
+    stopDrawingInternal(pos || undefined); 
     isDrawingRef.current = false;
 
     if ('touches' in event) {
@@ -289,9 +300,8 @@ export default function WhiteboardPage() {
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('mouseup', handlePointerUp);
     }
-  }, [getPointerPosition, stopDrawingInternal]);
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]); // Added handlePointerMove
 
-  // Cleanup window event listeners on unmount
   useEffect(() => {
     return () => {
       window.removeEventListener('touchmove', handlePointerMove);
@@ -303,7 +313,7 @@ export default function WhiteboardPage() {
   }, [handlePointerMove, handlePointerUp]);
 
 
-  const drawingTools = ['draw', 'line', 'circle', 'square'];
+  const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
@@ -330,12 +340,13 @@ export default function WhiteboardPage() {
 
   const handleColorSelect = (color: string) => {
     setSelectedColor(color);
-    // Toast is now handled by useEffect for contextRef.current.strokeStyle update
+    toast({ title: "Color Selected", description: `Drawing color set to ${color}` });
   };
 
   const handleBrushSizeSelect = (size: string) => {
     setSelectedBrushSize(size);
-    // Toast is now handled by useEffect for contextRef.current.lineWidth update
+    const brush = brushSizes.find(b => b.name === size);
+    toast({ title: "Brush Size Selected", description: `${brush?.label || size} selected.` });
   };
 
   useEffect(() => {
@@ -346,10 +357,10 @@ export default function WhiteboardPage() {
 
   const handleClearAll = () => {
     if (contextRef.current && canvasRef.current) {
-      contextRef.current.globalCompositeOperation = 'source-over'; // Ensure correct mode for clearing
+      contextRef.current.globalCompositeOperation = 'source-over'; 
       contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
-    setTextToolInput(""); // Clear text input as well
+    setTextToolInput(""); 
     toast({
       title: "Whiteboard Cleared",
       description: "The canvas has been cleared.",
@@ -393,7 +404,7 @@ export default function WhiteboardPage() {
             icon={Brush} 
             label="Draw" 
             onClick={() => handleToolClick("Draw")} 
-            isActive={activeTool === 'draw'} // Main draw tool active only if 'draw'
+            isActive={activeTool === 'draw' || (drawingTools.includes(activeTool || '') && activeTool !== 'erase')}
           />
           <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
           <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
@@ -437,8 +448,10 @@ export default function WhiteboardPage() {
                     <span className="text-xs font-medium text-muted-foreground mr-1">Shape:</span>
                     <ToolButton icon={Edit3} label="Freehand" onClick={() => {setActiveTool("draw");}} isActive={activeTool === "draw"} />
                     <ToolButton icon={Minus} label="Line" onClick={() => {setActiveTool("line");}} isActive={activeTool === "line"} />
+                    <ToolButton icon={ArrowRight} label="Arrow" onClick={() => {setActiveTool("arrow");}} isActive={activeTool === "arrow"} />
                     <ToolButton icon={CircleIcon} label="Circle" onClick={() => {setActiveTool("circle");}} isActive={activeTool === "circle"} />
                     <ToolButton icon={SquareIconShape} label="Square" onClick={() => {setActiveTool("square");}} isActive={activeTool === "square"} />
+                    <ToolButton icon={TriangleIcon} label="Triangle" onClick={() => {setActiveTool("triangle");}} isActive={activeTool === "triangle"} />
                 </div>
               </div>
             </div>
@@ -468,7 +481,7 @@ export default function WhiteboardPage() {
             <canvas
               ref={canvasRef}
               onMouseDown={handlePointerDown}
-              onTouchStart={handlePointerDown}
+              onTouchStart={(e) => { e.preventDefault(); handlePointerDown(e);}}
               className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair touch-none w-full h-full block"
             />
             {activeTool === 'text' && (
@@ -483,7 +496,7 @@ export default function WhiteboardPage() {
              {(!activeTool || (!currentActiveToolIsDrawingRelated && activeTool !== 'text')) && !isDrawingRef.current && (
                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <p className="text-muted-foreground text-lg p-4 bg-background/50 rounded-md backdrop-blur-sm">
-                        Interactive canvas area - Select a tool to begin.
+                        Interactive canvas area - Select a tool to begin. Click and drag to draw.
                     </p>
                  </div>
              )}
