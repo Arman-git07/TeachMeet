@@ -47,7 +47,7 @@ export default function WhiteboardPage() {
   const [textToolInput, setTextToolInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [selectedColor, setSelectedColor] = useState<string>("#000000");
+  const [selectedColor, setSelectedColor] = useState<string>("#000000"); // Default to black
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(false);
 
@@ -66,8 +66,8 @@ export default function WhiteboardPage() {
 
   const brushSizes = [
     { name: 'small', icon: CircleIcon, label: 'Small Brush', lineWidth: 2 },
-    { name: 'medium', icon: SquareIconShape, label: 'Medium Brush', lineWidth: 5 },
-    { name: 'large', icon: SquareIconShape, label: 'Large Brush', lineWidth: 10 },
+    { name: 'medium', icon: SquareIconShape, label: 'Medium Brush', lineWidth: 5 }, // Changed icon
+    { name: 'large', icon: SquareIconShape, label: 'Large Brush', lineWidth: 10 },  // Changed icon
   ];
 
   const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
@@ -83,7 +83,11 @@ export default function WhiteboardPage() {
       let imageData: ImageData | undefined;
       if (context) {
         try {
-            imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            // Save current canvas content before resizing (if canvas has content)
+            // This can be unreliable if the canvas is tainted or very large
+            if (canvas.width > 0 && canvas.height > 0) {
+               imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            }
         } catch (e) {
             console.error("Error getting imageData (possibly due to tainted canvas):", e);
         }
@@ -94,6 +98,7 @@ export default function WhiteboardPage() {
       canvas.height = availableHeight;
 
       if (context) {
+        // Re-apply context settings as they might be reset on resize
         context.lineCap = "round";
         context.lineJoin = "round";
         context.strokeStyle = selectedColor;
@@ -103,12 +108,18 @@ export default function WhiteboardPage() {
         } else {
             context.globalCompositeOperation = 'source-over';
         }
+
+        // Restore canvas content if it was saved
         if (imageData) {
-          context.putImageData(imageData, 0, 0);
+          try {
+            context.putImageData(imageData, 0, 0);
+          } catch (e) {
+            console.error("Error putting imageData (possibly due to tainted canvas):", e);
+          }
         }
       }
     }
-  }, [selectedColor, getLineWidth, activeTool]); 
+  }, [selectedColor, getLineWidth, activeTool]); // Dependencies are crucial here
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -147,20 +158,21 @@ export default function WhiteboardPage() {
     } else if ('changedTouches' in event && (event as TouchEvent).changedTouches.length > 0) { 
         clientX = (event as TouchEvent).changedTouches[0].clientX;
         clientY = (event as TouchEvent).changedTouches[0].clientY;
-    } else if ('clientX' in event) {
+    } else if ('clientX' in event && 'clientY' in event && typeof (event as MouseEvent).clientX === 'number') { // Check if it's a MouseEvent
         clientX = (event as MouseEvent).clientX;
         clientY = (event as MouseEvent).clientY;
-    } else if ('nativeEvent' in event && 'clientX' in (event as React.MouseEvent).nativeEvent) {
+    } else if ('nativeEvent' in event && 'clientX' in (event as React.MouseEvent).nativeEvent) { // React MouseEvent
         clientX = (event as React.MouseEvent).nativeEvent.clientX;
         clientY = (event as React.MouseEvent).nativeEvent.clientY;
-    } else if ('nativeEvent' in event && 'touches' in (event as React.TouchEvent).nativeEvent && (event as React.TouchEvent).nativeEvent.touches.length > 0 ) {
+    } else if ('nativeEvent' in event && 'touches' in (event as React.TouchEvent).nativeEvent && (event as React.TouchEvent).nativeEvent.touches.length > 0 ) { // React TouchEvent (start)
         clientX = (event as React.TouchEvent).nativeEvent.touches[0].clientX;
         clientY = (event as React.TouchEvent).nativeEvent.touches[0].clientY;
-    } else if ('nativeEvent' in event && 'changedTouches' in (event as React.TouchEvent).nativeEvent && (event as React.TouchEvent).nativeEvent.changedTouches.length > 0 ) { 
+    } else if ('nativeEvent' in event && 'changedTouches' in (event as React.TouchEvent).nativeEvent && (event as React.TouchEvent).nativeEvent.changedTouches.length > 0 ) {  // React TouchEvent (end)
         clientX = (event as React.TouchEvent).nativeEvent.changedTouches[0].clientX;
         clientY = (event as React.TouchEvent).nativeEvent.changedTouches[0].clientY;
     }
      else {
+        console.warn("Could not determine pointer position from event:", event);
         return null;
     }
     return {
@@ -181,7 +193,7 @@ export default function WhiteboardPage() {
 
     if (activeTool === 'erase') {
       contextRef.current.globalCompositeOperation = 'destination-out';
-      contextRef.current.lineWidth = getLineWidth();
+      contextRef.current.lineWidth = getLineWidth(); // Eraser uses brush size
     } else {
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.strokeStyle = selectedColor;
@@ -197,21 +209,22 @@ export default function WhiteboardPage() {
       contextRef.current.stroke();
       lastPositionRef.current = pos;
     }
+    // For shapes, drawing happens on mouse up/touch end
   }, [activeTool]);
 
   const stopDrawingInternal = useCallback((pos?: {x: number, y: number}) => {
     if (!contextRef.current) return;
     
-    const finalPos = pos || lastPositionRef.current;
+    const finalPos = pos || lastPositionRef.current; // Use last known position if current is undefined
 
     if (shapeStartPointRef.current && finalPos && activeTool && ['line', 'circle', 'square', 'arrow', 'triangle'].includes(activeTool)) {
-      contextRef.current.globalCompositeOperation = 'source-over';
+      contextRef.current.globalCompositeOperation = 'source-over'; // Ensure drawing mode
       contextRef.current.strokeStyle = selectedColor;
       contextRef.current.lineWidth = getLineWidth();
 
       const start = shapeStartPointRef.current;
       const end = finalPos;
-      contextRef.current.beginPath(); 
+      contextRef.current.beginPath(); // Start a new path for the shape
       if (activeTool === 'line') {
         contextRef.current.moveTo(start.x, start.y);
         contextRef.current.lineTo(end.x, end.y);
@@ -227,24 +240,26 @@ export default function WhiteboardPage() {
       } else if (activeTool === 'arrow') {
         contextRef.current.moveTo(start.x, start.y);
         contextRef.current.lineTo(end.x, end.y);
-        const headlen = 10 + getLineWidth(); 
+        // Draw arrowhead
+        const headlen = 10 + getLineWidth(); // length of head in pixels
         const angle = Math.atan2(end.y - start.y, end.x - start.x);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
         contextRef.current.moveTo(end.x, end.y);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
       } else if (activeTool === 'triangle') {
-        const p1 = { x: start.x + (end.x - start.x) / 2, y: start.y }; 
-        const p2 = { x: start.x, y: end.y }; 
-        const p3 = { x: end.x, y: end.y }; 
+        // Simple isosceles triangle based on bounding box
+        const p1 = { x: start.x + (end.x - start.x) / 2, y: start.y }; // Top-middle
+        const p2 = { x: start.x, y: end.y }; // Bottom-left
+        const p3 = { x: end.x, y: end.y }; // Bottom-right
         contextRef.current.moveTo(p1.x, p1.y);
         contextRef.current.lineTo(p2.x, p2.y);
         contextRef.current.lineTo(p3.x, p3.y);
-        contextRef.current.closePath(); 
+        contextRef.current.closePath(); // Close path for filled triangle (if fill is used later)
       }
       contextRef.current.stroke();
     }
     
-    if (activeTool === 'erase') { 
+    if (activeTool === 'erase') { // Reset composite operation if erase was active
       contextRef.current.globalCompositeOperation = 'source-over';
     }
 
@@ -252,9 +267,11 @@ export default function WhiteboardPage() {
     shapeStartPointRef.current = null;
   }, [activeTool, selectedColor, getLineWidth]);
 
+
+  // Define these before the useEffect that uses them in its dependency array
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     if (!isDrawingRef.current) return;
-    if ('touches' in event) event.preventDefault();
+    if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault(); // Prevent scroll on touch
 
     const pos = getPointerPosition(event);
     if (!pos) return;
@@ -268,24 +285,21 @@ export default function WhiteboardPage() {
     stopDrawingInternal(pos || undefined); 
     isDrawingRef.current = false;
 
-    if ('touches' in event) {
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
-      window.removeEventListener('touchcancel', handlePointerUp);
-    } else {
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-    }
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]);
-
+    // Clean up window event listeners
+    window.removeEventListener('touchmove', handlePointerMove);
+    window.removeEventListener('touchend', handlePointerUp);
+    window.removeEventListener('touchcancel', handlePointerUp);
+    window.removeEventListener('mousemove', handlePointerMove);
+    window.removeEventListener('mouseup', handlePointerUp);
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]); // Ensure handlePointerMove is in deps if it changes
 
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if (event.nativeEvent instanceof MouseEvent && event.nativeEvent.button !== 0) return; 
+    if (event.nativeEvent instanceof MouseEvent && event.nativeEvent.button !== 0) return; // Only main mouse button
 
     if (!contextRef.current || !activeTool) return;
     if (activeTool === 'select' || activeTool === 'text') return;
 
-    if ('touches' in event.nativeEvent) event.preventDefault();
+    if (event.type === 'touchstart') event.preventDefault();
 
     const pos = getPointerPosition(event);
     if (!pos) return;
@@ -293,7 +307,8 @@ export default function WhiteboardPage() {
     isDrawingRef.current = true;
     startDrawingInternal(pos);
 
-    if ('touches' in event.nativeEvent) {
+    // Add window event listeners for continuous drawing/shape finalization
+    if (event.type.startsWith('touch')) {
       window.addEventListener('touchmove', handlePointerMove, { passive: false });
       window.addEventListener('touchend', handlePointerUp);
       window.addEventListener('touchcancel', handlePointerUp);
@@ -303,6 +318,7 @@ export default function WhiteboardPage() {
     }
   }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp]);
 
+  // Effect to clean up global listeners if component unmounts while drawing
   useEffect(() => {
     return () => {
       window.removeEventListener('touchmove', handlePointerMove);
@@ -358,15 +374,15 @@ export default function WhiteboardPage() {
 
   const handleClearAll = () => {
     if (contextRef.current && canvasRef.current) {
-      contextRef.current.globalCompositeOperation = 'source-over'; 
+      contextRef.current.globalCompositeOperation = 'source-over'; // Ensure we are in drawing mode to clear
       contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
     setTextToolInput(""); 
-    toast({
-      title: "Whiteboard Cleared",
-      description: "The canvas has been cleared.",
-      duration: 3000,
-    });
+    // toast({
+    //   title: "Whiteboard Cleared",
+    //   description: "The canvas has been cleared.",
+    //   duration: 3000,
+    // });
   }
   
   const topToolbarOffset = 65; 
@@ -375,6 +391,7 @@ export default function WhiteboardPage() {
   const totalOffset = topToolbarOffset + mainToolsToolbarOffset + drawingOptionsToolbarOffset;
 
   const currentActiveToolIsDrawingRelated = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
+  const mainDrawToolActive = activeTool && (drawingTools.includes(activeTool) && activeTool !== 'erase');
   const activeToolDisplayName = activeTool ? activeTool.charAt(0).toUpperCase() + activeTool.slice(1) : 'None';
 
   return (
@@ -405,7 +422,7 @@ export default function WhiteboardPage() {
             icon={Brush} 
             label="Draw" 
             onClick={() => handleToolClick("Draw")} 
-            isActive={activeTool === 'draw' || (drawingTools.includes(activeTool || '') && activeTool !== 'erase' && activeTool !== 'line' && activeTool !== 'circle' && activeTool !== 'square' && activeTool !== 'arrow' && activeTool !== 'triangle')} 
+            isActive={mainDrawToolActive || (drawingTools.includes(activeTool || '') && activeTool !== 'erase')} 
           />
           <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
           <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
@@ -483,7 +500,7 @@ export default function WhiteboardPage() {
               ref={canvasRef}
               onMouseDown={handlePointerDown}
               onTouchStart={(e) => { e.preventDefault(); handlePointerDown(e);}}
-              className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair touch-none w-full h-full block"
+              className="bg-white dark:bg-muted/20 rounded-md border-2 border-dashed border-border/30 cursor-crosshair touch-none w-full h-full block" // Added w-full h-full block
             />
             {activeTool === 'text' && (
               <Textarea
