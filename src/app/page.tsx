@@ -13,8 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 interface OngoingMeeting {
   id: string;
   title: string;
-  participants?: number; // Participants will be undefined for locally started meetings
-  startedAt?: number; // Optional: to potentially sort by later
+  participants?: number;
+  startedAt?: number;
 }
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
@@ -31,7 +31,6 @@ export default function HomePage() {
 
   const loadMeetings = () => {
     console.log('[HomePage] loadMeetings: Attempting to load meetings from localStorage.');
-    // Load started meetings
     const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
     console.log('[HomePage] loadMeetings: Raw started meetings from localStorage:', startedMeetingsRaw);
     let activeMeetings: OngoingMeeting[] = [];
@@ -40,12 +39,11 @@ export default function HomePage() {
       if (!Array.isArray(activeMeetings)) activeMeetings = [];
     } catch (e) {
       console.error("[HomePage] loadMeetings: Error parsing started meetings from localStorage", e);
-      localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear if malformed
+      localStorage.removeItem(STARTED_MEETINGS_KEY);
       activeMeetings = [];
     }
     console.log('[HomePage] loadMeetings: Parsed activeMeetings:', activeMeetings);
-    
-    // Load dismissed meetings
+
     const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
     console.log('[HomePage] loadMeetings: Raw dismissed IDs from localStorage:', dismissedIdsString);
     let dismissedIds: string[] = [];
@@ -54,7 +52,7 @@ export default function HomePage() {
       if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
       console.error("[HomePage] loadMeetings: Error parsing dismissed meetings from localStorage", e);
-      localStorage.removeItem(DISMISSED_MEETINGS_KEY); // Clear if malformed
+      localStorage.removeItem(DISMISSED_MEETINGS_KEY);
       dismissedIds = [];
     }
     console.log('[HomePage] loadMeetings: Parsed dismissedIds:', dismissedIds);
@@ -62,7 +60,6 @@ export default function HomePage() {
     const now = Date.now();
     let newDismissalsMade = false;
 
-    // Auto-dismiss old meetings from started list
     activeMeetings.forEach(meeting => {
       if (meeting.startedAt && (now - meeting.startedAt > TWO_HOURS_IN_MS)) {
         if (!dismissedIds.includes(meeting.id)) {
@@ -78,12 +75,10 @@ export default function HomePage() {
       console.log('[HomePage] loadMeetings: Updated dismissedIds in localStorage due to auto-dismissal:', dismissedIds);
     }
 
-    // Filter out dismissed meetings from the started meetings
     const meetingsToDisplay = activeMeetings.filter(
       meeting => !dismissedIds.includes(meeting.id)
     );
-    
-    // Optionally sort by startedAt if we want newest first, for example
+
     meetingsToDisplay.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 
     console.log('[HomePage] loadMeetings: Final meetingsToDisplay:', meetingsToDisplay);
@@ -91,7 +86,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    loadMeetings(); // Initial load
+    loadMeetings();
 
     const handleMeetingStarted = () => {
       console.log('[HomePage] Received teachmeet_meeting_started event. Reloading meetings.');
@@ -105,22 +100,21 @@ export default function HomePage() {
     };
   }, []);
 
-
   const tmVisibleDuration = 350;
-  const characterAnimationTotalDuration = 1000; 
+  const characterAnimationTotalDuration = 1000;
 
   const handleComplexLogoAnimation = () => {
     if (animationLock) return;
 
     setAnimationLock(true);
-    setAnimateChars(false); 
+    setAnimateChars(false);
     setLogoText('TM');
 
     setTimeout(() => {
       setLogoText('TeachMeet');
-      setAnimateChars(true); 
+      setAnimateChars(true);
       setTimeout(() => {
-        setAnimateChars(false); 
+        setAnimateChars(false);
         setAnimationLock(false);
       }, characterAnimationTotalDuration);
     }, tmVisibleDuration);
@@ -129,7 +123,7 @@ export default function HomePage() {
   const handleDismissMeeting = (meetingIdToDismiss: string) => {
     const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
     let dismissedIds: string[] = [];
-     try {
+    try {
       dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
       if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
@@ -150,7 +144,6 @@ export default function HomePage() {
     });
   };
 
-
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
@@ -167,7 +160,7 @@ export default function HomePage() {
         <div className="relative z-10 flex flex-col items-center text-center">
           <Logo
             text={logoText}
-            size="large"
+            size="medium" // Changed from large to medium
             className={cn(
               'mb-8 text-center cursor-pointer',
               animateChars && logoText === 'TeachMeet' && 'logo-animate-complex'
@@ -189,12 +182,12 @@ export default function HomePage() {
                       <a
                         className={cn(
                           "w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center",
-                          "border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow" 
+                          "border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow"
                         )}
                       >
                         <Video className="mr-3 h-5 w-5 text-primary/80" />
                         <span className="truncate flex-grow text-foreground">{meeting.title}</span>
-                        {meeting.participants && ( // This won't show for localStorage meetings as participants count isn't stored
+                        {meeting.participants && (
                           <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
                             <UsersIcon className="h-3 w-3 mr-1" />
                             {meeting.participants}
@@ -202,9 +195,9 @@ export default function HomePage() {
                         )}
                       </a>
                     </Link>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="text-muted-foreground hover:text-destructive rounded-full p-2 flex-shrink-0"
                       onClick={() => handleDismissMeeting(meeting.id)}
                       aria-label="Dismiss meeting"
