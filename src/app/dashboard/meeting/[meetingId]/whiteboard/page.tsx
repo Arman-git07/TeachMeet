@@ -70,6 +70,8 @@ export default function WhiteboardPage() {
     { name: 'large', icon: SquareIconShape, label: 'Large Brush', lineWidth: 10 },
   ];
 
+  const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
+
   const getLineWidth = useCallback(() => {
     return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 5;
   }, [selectedBrushSize, brushSizes]);
@@ -225,20 +227,19 @@ export default function WhiteboardPage() {
       } else if (activeTool === 'arrow') {
         contextRef.current.moveTo(start.x, start.y);
         contextRef.current.lineTo(end.x, end.y);
-        // Draw arrowhead
-        const headlen = 10 + getLineWidth(); // length of head in pixels
+        const headlen = 10 + getLineWidth(); 
         const angle = Math.atan2(end.y - start.y, end.x - start.x);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
         contextRef.current.moveTo(end.x, end.y);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
       } else if (activeTool === 'triangle') {
-        const p1 = { x: start.x + (end.x - start.x) / 2, y: start.y }; // Top-middle
-        const p2 = { x: start.x, y: end.y }; // Bottom-left
-        const p3 = { x: end.x, y: end.y }; // Bottom-right
+        const p1 = { x: start.x + (end.x - start.x) / 2, y: start.y }; 
+        const p2 = { x: start.x, y: end.y }; 
+        const p3 = { x: end.x, y: end.y }; 
         contextRef.current.moveTo(p1.x, p1.y);
         contextRef.current.lineTo(p2.x, p2.y);
         contextRef.current.lineTo(p3.x, p3.y);
-        contextRef.current.closePath(); // Close the path to form a triangle
+        contextRef.current.closePath(); 
       }
       contextRef.current.stroke();
     }
@@ -250,31 +251,6 @@ export default function WhiteboardPage() {
     lastPositionRef.current = null;
     shapeStartPointRef.current = null;
   }, [activeTool, selectedColor, getLineWidth]);
-
-
-  const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if (event.nativeEvent instanceof MouseEvent && event.nativeEvent.button !== 0) return; 
-
-    if (!contextRef.current || !activeTool) return;
-    if (activeTool === 'select' || activeTool === 'text') return;
-
-    if ('touches' in event.nativeEvent) event.preventDefault();
-
-    const pos = getPointerPosition(event);
-    if (!pos) return;
-
-    isDrawingRef.current = true;
-    startDrawingInternal(pos);
-
-    if ('touches' in event.nativeEvent) {
-      window.addEventListener('touchmove', handlePointerMove, { passive: false });
-      window.addEventListener('touchend', handlePointerUp);
-      window.addEventListener('touchcancel', handlePointerUp);
-    } else {
-      window.addEventListener('mousemove', handlePointerMove);
-      window.addEventListener('mouseup', handlePointerUp);
-    }
-  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp]); // Added handlePointerMove and handlePointerUp
 
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     if (!isDrawingRef.current) return;
@@ -300,7 +276,32 @@ export default function WhiteboardPage() {
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('mouseup', handlePointerUp);
     }
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]); // Added handlePointerMove
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]);
+
+
+  const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
+    if (event.nativeEvent instanceof MouseEvent && event.nativeEvent.button !== 0) return; 
+
+    if (!contextRef.current || !activeTool) return;
+    if (activeTool === 'select' || activeTool === 'text') return;
+
+    if ('touches' in event.nativeEvent) event.preventDefault();
+
+    const pos = getPointerPosition(event);
+    if (!pos) return;
+
+    isDrawingRef.current = true;
+    startDrawingInternal(pos);
+
+    if ('touches' in event.nativeEvent) {
+      window.addEventListener('touchmove', handlePointerMove, { passive: false });
+      window.addEventListener('touchend', handlePointerUp);
+      window.addEventListener('touchcancel', handlePointerUp);
+    } else {
+      window.addEventListener('mousemove', handlePointerMove);
+      window.addEventListener('mouseup', handlePointerUp);
+    }
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp]);
 
   useEffect(() => {
     return () => {
@@ -313,16 +314,16 @@ export default function WhiteboardPage() {
   }, [handlePointerMove, handlePointerUp]);
 
 
-  const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
-
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-    
-    if (activeTool === toolId && (drawingTools.includes(toolId) || toolId === 'erase')) {
+    const currentIsDrawingTool = drawingTools.includes(activeTool || '') || activeTool === 'erase';
+    const newIsDrawingTool = drawingTools.includes(toolId) || toolId === 'erase';
+
+    if (activeTool === toolId && (newIsDrawingTool)) {
         setShowDrawingToolOptions(prev => !prev);
     } else {
         setActiveTool(toolId);
-        if (drawingTools.includes(toolId) || toolId === 'erase') {
+        if (newIsDrawingTool) {
             setShowDrawingToolOptions(true); 
         } else {
             setShowDrawingToolOptions(false); 
@@ -404,7 +405,7 @@ export default function WhiteboardPage() {
             icon={Brush} 
             label="Draw" 
             onClick={() => handleToolClick("Draw")} 
-            isActive={activeTool === 'draw' || (drawingTools.includes(activeTool || '') && activeTool !== 'erase')}
+            isActive={activeTool === 'draw' || (drawingTools.includes(activeTool || '') && activeTool !== 'erase' && activeTool !== 'line' && activeTool !== 'circle' && activeTool !== 'square' && activeTool !== 'arrow' && activeTool !== 'triangle')} 
           />
           <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
           <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
@@ -509,3 +510,4 @@ export default function WhiteboardPage() {
     </div>
   );
 }
+
