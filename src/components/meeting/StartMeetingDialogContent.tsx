@@ -101,7 +101,7 @@ export function StartMeetingDialogContent() {
       await setDoc(meetingDocRef, meetingData);
       console.log("[StartMeetingDialog] Successfully created main meeting document in Firestore.");
 
-      toast({ title: "Meeting Room Created", description: "Successfully registered the meeting room."});
+      // toast({ title: "Meeting Room Created", description: "Successfully registered the meeting room."});
 
       const newMeetingEntry: OngoingMeeting = { 
         id: meetingId, 
@@ -123,11 +123,14 @@ export function StartMeetingDialogContent() {
         const updatedStartedMeetings = [...existingStartedMeetings, newMeetingEntry];
         localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedStartedMeetings));
         console.log("[StartMeetingDialog] Meeting added to localStorage 'started-meetings'.");
-        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started')); // Dispatch event
+        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started')); 
       }
 
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
-      // No need for DialogClose here if navigation unmounts the dialog
+      
+      // Note: DialogClose will handle closing the dialog if this button is its child.
+      // If navigation happens before DialogClose fully unmounts, there might be React warnings.
+      // For simplicity, we rely on DialogClose wrapping a button that calls this.
       router.push(joinNowLinkPath);
 
     } catch (error: any) {
@@ -222,6 +225,7 @@ export function StartMeetingDialogContent() {
             Cancel
           </Button>
         </DialogClose>
+        {/* This button is wrapped by DialogClose in the parent if needed */}
         <Button 
           type="button" 
           onClick={handleStartAndJoinMeeting} 
