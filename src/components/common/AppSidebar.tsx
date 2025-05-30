@@ -63,7 +63,7 @@ const NavItem = ({
   dropdownItems = [],
   target,
 }: NavItemProps) => {
-  const isActive = href ? currentPath === href || (href !== '/' && currentPath.startsWith(href)) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
+  const isActive = href ? (href === '/' ? currentPath === '/' : currentPath.startsWith(href)) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
   const isStrictlyHomeActive = href === '/' && currentPath === '/';
 
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
@@ -196,7 +196,7 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter(); // Added missing import
+  const router = useRouter(); 
   const { isMobile, setOpenMobile } = useSidebar();
 
   const legalAndInfoItems = [
@@ -232,6 +232,7 @@ export function AppSidebar() {
               <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
+              <NavItem href="/dashboard/classes" icon={Users} currentPath={pathname}>Classes</NavItem>
             </>
           ) : (
             <>
