@@ -64,6 +64,7 @@ export default function WhiteboardPage() {
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
   const [showHeaderInfo, setShowHeaderInfo] = useState(true);
+  const [canvasBackgroundColor, setCanvasBackgroundColor] = useState<string>("#FFFFFF");
 
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -96,6 +97,17 @@ export default function WhiteboardPage() {
     return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6;
   }, [selectedBrushSize, brushSizes]);
 
+  useEffect(() => {
+    const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
+    if (storedBgColor) {
+      setCanvasBackgroundColor(storedBgColor);
+    }
+    const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
+    if (storedPenColor) {
+      setSelectedColor(storedPenColor);
+    }
+  }, []);
+
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -117,6 +129,8 @@ export default function WhiteboardPage() {
       if (newWidth > 0 && newHeight > 0) {
         canvas.width = newWidth;
         canvas.height = newHeight;
+        canvas.style.backgroundColor = canvasBackgroundColor;
+
 
         if (context) {
           context.lineCap = "round";
@@ -135,11 +149,15 @@ export default function WhiteboardPage() {
             } catch (e) {
               console.error("Error putting imageData during resize:", e);
             }
+          } else {
+            // If no imageData (e.g., initial load or canvas was 0x0), fill with background
+            context.fillStyle = canvasBackgroundColor;
+            context.fillRect(0, 0, canvas.width, canvas.height);
           }
         }
       }
     }
-  }, [selectedColor, getLineWidth, activeTool]);
+  }, [selectedColor, getLineWidth, activeTool, canvasBackgroundColor]);
 
 
   useEffect(() => {
@@ -330,7 +348,7 @@ export default function WhiteboardPage() {
       initialCanvasDataForSelectionRef.current = null;
       currentSelectionRectRef.current = null;
     }
-    if (activeTool !== 'text') { // Keep header hidden if text tool is still active
+    if (activeTool !== 'text') { 
       setShowHeaderInfo(true);
     }
     
@@ -360,7 +378,7 @@ export default function WhiteboardPage() {
       isSelectingRef.current = true;
       selectionStartPointRef.current = pos;
       setShowHeaderInfo(false);
-    } else if (activeTool && activeTool !== 'text') { // Draw, erase, shapes
+    } else if (activeTool && activeTool !== 'text') { 
       if (event.type === 'touchstart') event.preventDefault();
       startDrawingInternal(pos);
       setShowHeaderInfo(false);
@@ -374,11 +392,11 @@ export default function WhiteboardPage() {
           contextRef.current.textBaseline = "top";
           contextRef.current.fillText(textToolInput, x, y);
           setTextToolInput(""); 
-          setActiveTool('draw'); // Revert to draw tool after placing text
-          setShowHeaderInfo(true); // Show header again after placing text
+          setActiveTool('draw'); 
+          setShowHeaderInfo(true); 
        } else {
          textareaRef.current?.focus();
-         // Keep header hidden as text tool is still active for input
+         setShowHeaderInfo(false);
        }
     } else {
       console.log("No tool active or unhandled tool, click at:", pos);
@@ -423,7 +441,7 @@ export default function WhiteboardPage() {
     if (toolId === 'text') {
       setShowHeaderInfo(false);
     } else {
-      // Only show header if not actively interacting from a previous tool
+      
       if (!isDrawingRef.current && !isSelectingRef.current) {
         setShowHeaderInfo(true);
       }
@@ -446,8 +464,11 @@ export default function WhiteboardPage() {
 
   const handleConfirmClearAll = () => {
     if (contextRef.current && canvasRef.current) {
-      contextRef.current.globalCompositeOperation = 'source-over';
-      contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      const context = contextRef.current;
+      const canvas = canvasRef.current;
+      context.globalCompositeOperation = 'source-over'; 
+      context.fillStyle = canvasBackgroundColor;
+      context.fillRect(0, 0, canvas.width, canvas.height);
     }
     setTextToolInput("");
     setShowClearConfirmDialog(false);
@@ -504,7 +525,7 @@ export default function WhiteboardPage() {
             <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
             <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
-            <AlertDialog>
+            <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
                         <Trash2 className="h-5 w-5 mb-0.5" />
@@ -609,7 +630,7 @@ export default function WhiteboardPage() {
                     if (activeTool === 'select') {
                       return <span className="block text-xs mt-0.5 text-muted-foreground">Select tool active. Drag to select an area.</span>;
                     }
-                    if (activeTool === 'text') { // This case should ideally not be reached if header is hidden
+                    if (activeTool === 'text') { 
                       return <span className="block text-xs mt-0.5 text-muted-foreground">Text tool active. Click on canvas to place text, or type below.</span>;
                     }
                     if (!activeTool || activeTool === 'shapeassist') { 
@@ -630,7 +651,8 @@ export default function WhiteboardPage() {
                   else { e.preventDefault(); }
                   handleCanvasPointerDown(e); 
                 }}
-                className={cn("bg-white dark:bg-muted/20 border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
+                className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
+                style={{ backgroundColor: canvasBackgroundColor }}
               />
               {activeTool === 'text' && (
                 <Textarea
@@ -659,3 +681,4 @@ export default function WhiteboardPage() {
     </>
   );
 }
+

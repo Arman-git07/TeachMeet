@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, Image as ImageIcon } from "lucide-react"; // Renamed Users to UsersIconLucide
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -46,11 +46,27 @@ export default function SettingsPage() {
 
   const { toast } = useToast();
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
+  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#32CD32");
+  const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
+  const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
+
 
   useEffect(() => {
     const storedFilter = localStorage.getItem("teachmeet-camera-filter");
     if (storedFilter) {
       setSelectedFilter(storedFilter);
+    }
+    const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
+    if (storedPenColor) {
+      setWhiteboardPenColor(storedPenColor);
+    }
+    const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
+    if (storedBgColor) {
+      setWhiteboardBackgroundColor(storedBgColor);
+    }
+    const storedShapeRecognition = localStorage.getItem("teachmeet-whiteboard-shape-recognition");
+    if (storedShapeRecognition) {
+      setEnableShapeRecognition(storedShapeRecognition === 'true');
     }
   }, []);
 
@@ -61,6 +77,39 @@ export default function SettingsPage() {
     toast({
       title: "Filter Selected",
       description: `${filterDisplayName} filter has been applied. This will take effect in the meeting waiting area.`,
+    });
+  };
+
+  const handleWhiteboardPenColorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newColor = event.target.value;
+    setWhiteboardPenColor(newColor);
+    localStorage.setItem("teachmeet-whiteboard-pen-color", newColor);
+  };
+
+  const handleWhiteboardBackgroundColorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newColor = event.target.value;
+    setWhiteboardBackgroundColor(newColor);
+    localStorage.setItem("teachmeet-whiteboard-bg-color", newColor);
+     toast({
+      title: "Whiteboard Background Changed",
+      description: `Background color set to ${newColor}. This will apply when you next open or clear a whiteboard.`,
+    });
+  };
+  
+  const handleShapeRecognitionToggle = (checked: boolean) => {
+    setEnableShapeRecognition(checked);
+    localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(checked));
+     toast({
+      title: "Shape Recognition Setting Changed",
+      description: `Shape recognition is now ${checked ? 'enabled' : 'disabled'}.`,
+    });
+  };
+  
+  const handleSaveWhiteboardSettings = () => {
+    // Values are already saved to localStorage on change. This button can provide user feedback.
+    toast({
+      title: "Whiteboard Settings Saved",
+      description: "Your whiteboard preferences have been updated in local storage.",
     });
   };
   
@@ -143,7 +192,7 @@ export default function SettingsPage() {
               <SelectTrigger id="cameraFilterSelect" className="w-full mt-1 rounded-lg">
                 <SelectValue placeholder="Select a filter" />
               </SelectTrigger>
-              <SelectContent className="rounded-lg"> {/* Added rounded-lg */}
+              <SelectContent className="rounded-lg">
                 <SelectItem value="none" className="rounded-md">No Filter</SelectItem>
                 <SelectItem value="vintage" className="rounded-md">Vintage</SelectItem>
                 <SelectItem value="luminous" className="rounded-md">Luminous</SelectItem>
@@ -174,7 +223,7 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Cloud Storage Used: <span className="font-semibold text-foreground">0 GB / 5 GB</span></span>
-            <Button variant="outline" size="sm" className="rounded-lg">Manage Storage</Button> {/* Changed to rounded-lg */}
+            <Button variant="outline" size="sm" className="rounded-lg">Manage Storage</Button>
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="autoRecord" className="flex-grow">Auto-record new meetings</Label>
@@ -205,19 +254,19 @@ export default function SettingsPage() {
       <SettingsSection title="Whiteboard Customization" description="Personalize your whiteboard appearance." icon={Palette}>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="defaultColor">Default Pen Color</Label>
-            <Input id="defaultColor" type="color" defaultValue="#32CD32" className="mt-1 w-full h-10 rounded-lg" />
+            <Label htmlFor="defaultPenColor">Default Pen Color</Label>
+            <Input id="defaultPenColor" type="color" value={whiteboardPenColor} onChange={handleWhiteboardPenColorChange} className="mt-1 w-full h-10 rounded-lg" />
           </div>
           <div>
             <Label htmlFor="backgroundColor">Background Color</Label>
-            <Input id="backgroundColor" type="color" defaultValue="#FFFFFF" className="mt-1 w-full h-10 rounded-lg" />
+            <Input id="backgroundColor" type="color" value={whiteboardBackgroundColor} onChange={handleWhiteboardBackgroundColorChange} className="mt-1 w-full h-10 rounded-lg" />
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="shapeRecognition" className="flex-grow">Enable Shape Recognition</Label>
-            <Switch id="shapeRecognition" defaultChecked />
+            <Switch id="shapeRecognition" checked={enableShapeRecognition} onCheckedChange={handleShapeRecognitionToggle} />
           </div>
         </div>
-        <Button className="mt-6 btn-gel rounded-lg">Save Whiteboard Settings</Button>
+        <Button className="mt-6 btn-gel rounded-lg" onClick={handleSaveWhiteboardSettings}>Save Whiteboard Settings</Button>
       </SettingsSection>
       
       <SettingsSection title="Privacy & Security" description="Manage your account security and data." icon={ShieldCheck}>
@@ -269,3 +318,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
