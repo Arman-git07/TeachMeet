@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon } from "lucide-react"; // Renamed Circle to CircleIconShape
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +62,8 @@ export default function WhiteboardPage() {
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
+  const [showToolStatusMessage, setShowToolStatusMessage] = useState(true);
+
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -90,7 +92,7 @@ export default function WhiteboardPage() {
   ];
 
   const getLineWidth = useCallback(() => {
-    return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6; // Default to medium's lineWidth
+    return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6;
   }, [selectedBrushSize, brushSizes]);
 
 
@@ -178,7 +180,7 @@ export default function WhiteboardPage() {
       if (nativeEvent.touches && nativeEvent.touches.length > 0) {
         clientX = nativeEvent.touches[0].clientX;
         clientY = nativeEvent.touches[0].clientY;
-      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) {
+      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { // For touchend/touchcancel
         clientX = nativeEvent.changedTouches[0].clientX;
         clientY = nativeEvent.changedTouches[0].clientY;
       }
@@ -327,6 +329,7 @@ export default function WhiteboardPage() {
       initialCanvasDataForSelectionRef.current = null;
       currentSelectionRectRef.current = null;
     }
+    setShowToolStatusMessage(true);
     
     window.removeEventListener('touchmove', handlePointerMove);
     window.removeEventListener('touchend', handlePointerUp);
@@ -353,9 +356,11 @@ export default function WhiteboardPage() {
       }
       isSelectingRef.current = true;
       selectionStartPointRef.current = pos;
-    } else if (activeTool && activeTool !== 'text') {
+      setShowToolStatusMessage(false);
+    } else if (activeTool && activeTool !== 'text') { // Draw, erase, shapes
       if (event.type === 'touchstart') event.preventDefault();
       startDrawingInternal(pos);
+      setShowToolStatusMessage(false);
     } else if (activeTool === 'text') {
        if (contextRef.current && textToolInput.trim() !== "" && textareaRef.current) {
           const { x, y } = pos;
@@ -485,7 +490,25 @@ export default function WhiteboardPage() {
             <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
             <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
-            <ToolButton icon={Trash2} label="Clear" onClick={() => setShowClearConfirmDialog(true)} />
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
+                        <Trash2 className="h-5 w-5 mb-0.5" />
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                        This will clear the entire whiteboard. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmClearAll} className="rounded-lg">Clear Whiteboard</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
@@ -521,7 +544,7 @@ export default function WhiteboardPage() {
                             aria-label={brush.label}
                         >
                             <brush.icon className={cn(
-                                "h-5 w-5", // Default for medium
+                                "h-5 w-5", 
                                 brush.name === 'tiny' && 'h-2 w-2',
                                 brush.name === 'small' && 'h-3 w-3',
                                 brush.name === 'large' && 'h-6 w-6',
@@ -554,26 +577,28 @@ export default function WhiteboardPage() {
             <CardHeader className="flex-none py-2 space-y-0.5"> 
               <CardTitle className="text-sm font-medium">TeachMeet Whiteboard</CardTitle> 
               <CardDescription className="text-xs">
-                Meeting ID: {meetingId || "N/A"}
-                {activeTool === 'erase' && (
-                  <span className="block text-xs mt-0.5">Tool: Eraser | Size: {selectedBrushSize}</span>
-                )}
-                {activeTool && activeTool !== 'select' && activeTool !== 'text' && activeTool !== 'shapeassist' && activeTool !== 'erase' && (
-                  <span className="block text-xs mt-0.5">
-                    Tool: {activeToolDisplayName} |
-                    Color: <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> |
-                    Size: {selectedBrushSize}
-                  </span>
-                )}
-                {activeTool === 'select' && (
-                   <span className="block text-xs mt-0.5 text-muted-foreground">Select tool active. Drag to select an area. (Manipulation features are planned)</span>
-                )}
-                {activeTool === 'text' && (
-                   <span className="block text-xs mt-0.5 text-muted-foreground">Text tool active. Click on canvas to place text, or type below and then click.</span>
-                )}
-                {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
-                  <span className="block text-xs mt-0.5 text-muted-foreground">Select a tool to begin.</span>
-                )}
+                <span className="block">Meeting ID: {meetingId || "N/A"}</span>
+                {showToolStatusMessage && (() => {
+                  if (activeTool === 'erase') {
+                    return <span className="block text-xs mt-0.5">Tool: Eraser | Size: {selectedBrushSize}</span>;
+                  }
+                  if (mainDrawToolIsActive) { // Covers 'draw', 'line', 'circle', 'square', 'arrow', 'triangle'
+                    return (
+                      <span className="block text-xs mt-0.5">
+                        Tool: {activeToolDisplayName} |
+                        Color: <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> |
+                        Size: {selectedBrushSize}
+                      </span>
+                    );
+                  }
+                  if (activeTool === 'select') {
+                    return <span className="block text-xs mt-0.5 text-muted-foreground">Select tool active. Drag to select an area. (Manipulation features are planned)</span>;
+                  }
+                  if (activeTool === 'text') {
+                    return <span className="block text-xs mt-0.5 text-muted-foreground">Text tool active. Click on canvas to place text, or type below and then click.</span>;
+                  }
+                  return <span className="block text-xs mt-0.5 text-muted-foreground">Select a tool to begin.</span>;
+                })()}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
@@ -598,7 +623,7 @@ export default function WhiteboardPage() {
                   rows={2}
                 />
               )}
-              {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
+              {showToolStatusMessage && (!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
                     Interactive canvas area - Select a tool to begin drawing or select an area.
@@ -612,21 +637,6 @@ export default function WhiteboardPage() {
           TeachMeet Whiteboard - Drawing, shapes, text, erase, and area selection enabled.
         </footer>
       </div>
-
-      <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}>
-        <AlertDialogContent className="rounded-xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will clear the entire whiteboard. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowClearConfirmDialog(false)} className="rounded-lg">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmClearAll} className="rounded-lg">Clear Whiteboard</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
