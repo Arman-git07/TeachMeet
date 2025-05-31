@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation"; // Added useRouter
 import { useToast } from "@/hooks/use-toast";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { useDynamicHeader } from '@/contexts/DynamicHeaderContext'; // Import useDynamicHeader
 
 const ToolButton = ({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType, label: string, onClick: () => void, isActive?: boolean }) => (
   <Button
@@ -54,6 +55,8 @@ export default function WhiteboardPage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
   const { toast } = useToast();
+  const router = useRouter();
+  const { setHeaderContent } = useDynamicHeader();
 
   const [activeTool, setActiveTool] = useState<string | null>("draw");
   const [textToolInput, setTextToolInput] = useState("");
@@ -68,7 +71,7 @@ export default function WhiteboardPage() {
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
-  const [showHeaderInfo, setShowHeaderInfo] = useState(true);
+  const [showHeaderInfo, setShowHeaderInfo] = useState(true); // This controls the local CardHeader visibility
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem("teachmeet-whiteboard-bg-color") || "#FFFFFF";
@@ -108,7 +111,6 @@ export default function WhiteboardPage() {
   }, [selectedBrushSize, brushSizes]);
 
  useEffect(() => {
-    // Load initial background color from localStorage
     if (typeof window !== 'undefined') {
         const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
         if (storedBgColor) {
@@ -133,7 +135,6 @@ export default function WhiteboardPage() {
           imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         } catch (e) {
           console.error("Error getting imageData during resize:", e);
-          // Potentially clear imageData if error (e.g., tainted canvas, though less likely here)
           imageData = undefined;
         }
       }
@@ -141,15 +142,11 @@ export default function WhiteboardPage() {
       const newWidth = canvas.parentElement.clientWidth;
       const newHeight = canvas.parentElement.clientHeight;
 
-      // Only resize and restore if new dimensions are valid
       if (newWidth > 0 && newHeight > 0) {
         canvas.width = newWidth;
         canvas.height = newHeight;
-        // No need to set canvas.style.backgroundColor here, as the canvas itself should be transparent
-        // and the background is handled by the Card or parent elements if needed, or filled during clear.
-
+        
         if (context) {
-          // Always clear to the current background color before restoring or starting fresh
           context.fillStyle = canvasBackgroundColor;
           context.fillRect(0, 0, canvas.width, canvas.height);
           
@@ -168,7 +165,6 @@ export default function WhiteboardPage() {
               context.putImageData(imageData, 0, 0);
             } catch (e) {
               console.error("Error putting imageData during resize:", e);
-              // If putImageData fails, the canvas will remain with the background color fill
             }
           }
         }
@@ -176,6 +172,32 @@ export default function WhiteboardPage() {
     }
   }, [selectedColor, getLineWidth, activeTool, canvasBackgroundColor]);
 
+
+  useEffect(() => {
+    const WhiteboardPageHeader = () => (
+      <div className="flex items-center justify-between w-full">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Wand2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+          <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">
+            TeachMeet Whiteboard
+          </h1>
+        </div>
+        {meetingId && (
+          <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior>
+            <Button variant="outline" size="sm" className="rounded-lg text-xs sm:text-sm">
+              <ArrowLeft className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+              Back to Meeting
+            </Button>
+          </Link>
+        )}
+      </div>
+    );
+    setHeaderContent(<WhiteboardPageHeader />);
+
+    return () => {
+      setHeaderContent(null); // Clean up on unmount
+    };
+  }, [setHeaderContent, meetingId, router]); // Added router to dependencies
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -226,7 +248,6 @@ export default function WhiteboardPage() {
     }
   
     if (typeof clientX !== 'number' || typeof clientY !== 'number') {
-      // console.warn("Could not determine clientX/Y from event:", event);
       return null;
     }
   
@@ -460,7 +481,6 @@ export default function WhiteboardPage() {
     if (toolId === 'text') {
       setShowHeaderInfo(false);
     } else {
-      // Only show header if not actively drawing or selecting
       if (!isDrawingRef.current && !isSelectingRef.current) {
         setShowHeaderInfo(true);
       }
@@ -492,14 +512,9 @@ export default function WhiteboardPage() {
     setTextToolInput("");
     setShowClearConfirmDialog(false);
   };
-
-  const topToolbarOffset = 65;
-  const mainToolsToolbarOffset = 58; 
   
   const isDrawingRelatedToolWithOptionsActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
-  const drawingOptionsToolbarHeight = showDrawingToolOptions && isDrawingRelatedToolWithOptionsActive ? 150 : 0; 
-  const totalOffset = topToolbarOffset + mainToolsToolbarOffset + drawingOptionsToolbarHeight;
-
+  
   const mainDrawToolIsActive = activeTool && (drawingTools.includes(activeTool)) && activeTool !== 'erase';
   const activeToolDisplayName = activeTool ? activeTool.charAt(0).toUpperCase() + activeTool.slice(1) : 'None';
 
@@ -513,26 +528,9 @@ export default function WhiteboardPage() {
   return (
     <>
       <div className="flex flex-col h-screen bg-muted/30">
-        <header className="flex-none p-3 border-b bg-background shadow-sm sticky top-0 z-20">
-          <div className="container mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Wand2 className="h-7 w-7 text-primary" />
-              <h1 className="text-xl font-semibold text-foreground">
-                TeachMeet Whiteboard
-              </h1>
-            </div>
-            {meetingId && (
-              <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior>
-                <Button variant="outline" className="rounded-lg">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Meeting
-                </Button>
-              </Link>
-            )}
-          </div>
-        </header>
+        {/* Local header removed, content moved to DashboardLayout via DynamicHeaderContext */}
 
-        <div className="flex-none p-2 border-b bg-background shadow-md sticky top-[65px] z-10">
+        <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-10"> {/* Adjusted top-16 for global header */}
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
             <ToolButton
@@ -567,7 +565,7 @@ export default function WhiteboardPage() {
         </div>
 
         {showDrawingToolOptions && isDrawingRelatedToolWithOptionsActive && (
-           <div className="flex-none p-3 border-b bg-muted/50 shadow-sm sticky top-[calc(65px+58px)] z-10">
+           <div className="flex-none p-3 border-b bg-muted/50 shadow-sm sticky top-[calc(64px+64px)] z-10"> {/* Adjusted top for global header (64px) + main tools toolbar (approx 64px) */}
             <div className="container mx-auto">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 {activeTool !== 'erase' && (
@@ -626,11 +624,11 @@ export default function WhiteboardPage() {
           </div>
         )}
 
-        <main className="flex-grow" style={{ paddingTop: `${totalOffset}px` }}>
+        <main className="flex-grow"> {/* Removed explicit paddingTop */}
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
-            {showHeaderInfo && (
+            {showHeaderInfo && ( // This is the local CardHeader for tool info, not the main page header
               <CardHeader className="flex-none py-2 space-y-0.5"> 
-                <CardTitle className="text-sm font-medium">TeachMeet Whiteboard</CardTitle> 
+                <CardTitle className="text-sm font-medium">TeachMeet Whiteboard Canvas</CardTitle> 
                 <CardDescription className="text-xs">
                   <span className="block">Meeting ID: {meetingId || "N/A"}</span>
                   {(() => {
@@ -667,11 +665,11 @@ export default function WhiteboardPage() {
                 onTouchStart={(e) => { 
                   if (activeTool === 'select') { /* Allow default for select */ } 
                   else if (activeTool === 'text') { /* Handled in handleCanvasPointerDown */ }
-                  else { e.preventDefault(); } // Prevent default for drawing tools
+                  else { e.preventDefault(); } 
                   handleCanvasPointerDown(e); 
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
-                style={{ backgroundColor: canvasBackgroundColor }} // Applied dynamic background color
+                style={{ backgroundColor: canvasBackgroundColor }}
               />
               {activeTool === 'text' && (
                 <Textarea

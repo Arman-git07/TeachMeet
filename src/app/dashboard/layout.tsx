@@ -7,6 +7,40 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PanelLeftOpen } from 'lucide-react';
+import { DynamicHeaderProvider, useDynamicHeader } from '@/contexts/DynamicHeaderContext';
+
+// New component to render the header content dynamically
+function DashboardHeaderContentInternal() {
+  const { headerContent } = useDynamicHeader();
+  const { toggleSidebar } = useSidebar();
+
+  return (
+    <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
+      <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-2 sm:gap-4"> {/* Adjusted gap for consistency */}
+          <SidebarTrigger className="md:hidden">
+            <PanelLeftOpen className="h-6 w-6" />
+          </SidebarTrigger>
+          <SidebarTrigger className="hidden md:flex" onClick={toggleSidebar}>
+            {/* Uses default PanelLeftOpen/Close from SidebarTrigger */}
+          </SidebarTrigger>
+        </div>
+        {/* Dynamic content area - takes up available space and centers its content */}
+        <div className="flex-grow flex items-center justify-center px-4">
+          {headerContent}
+        </div>
+        {/* Placeholder for truly right-aligned static elements if needed in the future,
+            ensure it has a defined width or use flex-shrink-0 if it contains elements.
+            For now, UserProfileDropdown and ThemeToggle are in AppHeader (RootLayout)
+        */}
+        <div className="w-auto flex-shrink-0">
+          {/* e.g. <UserProfileDropdown /> if moved here */}
+        </div>
+      </div>
+    </header>
+  );
+}
+
 
 export default function DashboardLayout({
   children,
@@ -15,7 +49,7 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const { state: sidebarState, isMobile: sidebarIsMobile, toggleSidebar } = useSidebar();
+  // const { state: sidebarState, isMobile: sidebarIsMobile, toggleSidebar } = useSidebar(); // toggleSidebar moved to DashboardHeaderContentInternal
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -24,17 +58,15 @@ export default function DashboardLayout({
   }, [isAuthenticated, loading, router]);
 
   if (loading || (!isAuthenticated && !loading) ) {
-    // Skeleton structure remains similar, but AppSidebar and SidebarInset are handled by RootLayout
     return (
       <div className="flex h-screen bg-background">
-        {/* Sidebar skeleton part would be implicitly handled by RootLayout's sidebar if it had its own skeleton */}
         <div className="flex flex-1 flex-col">
           <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
               <Skeleton className="h-8 w-8 rounded-md" /> {/* Sidebar trigger skeleton */}
             </div>
           </header>
-          <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
+          <main className="flex-1 p-4 md:p-8 bg-background"> {/* No overflow-y-auto here */}
             <Skeleton className="h-32 w-full mb-4 rounded-lg" />
             <Skeleton className="h-64 w-full rounded-lg" />
           </main>
@@ -44,25 +76,13 @@ export default function DashboardLayout({
   }
 
   return (
-    // AppSidebar and SidebarInset are now handled by RootLayout
-    // This component now only defines the content area for the dashboard
-    <div className="flex flex-1 flex-col">
-      {/* Minimal header for DashboardLayout */}
-      <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto flex h-16 items-center justify-start gap-4 px-4 sm:px-6 lg:px-8">
-          <SidebarTrigger className="md:hidden">
-            <PanelLeftOpen className="h-6 w-6" />
-          </SidebarTrigger>
-          {/* Desktop sidebar toggle, controls the global sidebar */}
-          <SidebarTrigger className="hidden md:flex" onClick={toggleSidebar}>
-             {/* Uses default PanelLeftOpen/Close from SidebarTrigger */}
-          </SidebarTrigger>
-          {/* Other dashboard-specific header elements could go here if needed */}
-        </div>
-      </header>
-      <main className="flex flex-col flex-1 p-4 md:p-8 bg-background">
-        {children}
-      </main>
-    </div>
+    <DynamicHeaderProvider>
+      <div className="flex flex-1 flex-col">
+        <DashboardHeaderContentInternal />
+        <main className="flex flex-col flex-1 p-4 md:p-8 bg-background">
+          {children}
+        </main>
+      </div>
+    </DynamicHeaderProvider>
   );
 }
