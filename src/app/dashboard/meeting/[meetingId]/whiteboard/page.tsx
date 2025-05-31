@@ -13,7 +13,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added missing import
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon } from "lucide-react";
 import Link from "next/link";
@@ -63,7 +63,7 @@ export default function WhiteboardPage() {
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
-  const [showToolStatusMessage, setShowToolStatusMessage] = useState(true);
+  const [showHeaderInfo, setShowHeaderInfo] = useState(true);
 
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -178,10 +178,10 @@ export default function WhiteboardPage() {
     const nativeEvent = 'nativeEvent' in event ? event.nativeEvent : event;
 
     if (nativeEvent instanceof TouchEvent) {
-      if (nativeEvent.touches && nativeEvent.touches.length > 0) { // For touchstart, touchmove
+      if (nativeEvent.touches && nativeEvent.touches.length > 0) {
         clientX = nativeEvent.touches[0].clientX;
         clientY = nativeEvent.touches[0].clientY;
-      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { // For touchend, touchcancel
+      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { 
         clientX = nativeEvent.changedTouches[0].clientX;
         clientY = nativeEvent.changedTouches[0].clientY;
       }
@@ -191,7 +191,6 @@ export default function WhiteboardPage() {
     }
   
     if (typeof clientX !== 'number' || typeof clientY !== 'number') {
-      // console.warn("Could not determine clientX/Y from event", nativeEvent);
       return null;
     }
   
@@ -331,14 +330,16 @@ export default function WhiteboardPage() {
       initialCanvasDataForSelectionRef.current = null;
       currentSelectionRectRef.current = null;
     }
-    setShowToolStatusMessage(true);
+    if (activeTool !== 'text') { // Keep header hidden if text tool is still active
+      setShowHeaderInfo(true);
+    }
     
     window.removeEventListener('touchmove', handlePointerMove);
     window.removeEventListener('touchend', handlePointerUp);
     window.removeEventListener('touchcancel', handlePointerUp);
     window.removeEventListener('mousemove', handlePointerMove);
     window.removeEventListener('mouseup', handlePointerUp);
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]); 
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool]); 
   
   const handleCanvasPointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return;
@@ -347,7 +348,7 @@ export default function WhiteboardPage() {
     if (!pos) return;
 
     if (activeTool === 'select') {
-      if (event.type === 'touchstart') { /* No preventDefault here to allow potential text selection later */ }
+      if (event.type === 'touchstart') { /* No preventDefault here */ }
       if (contextRef.current && canvasRef.current) {
         try {
           initialCanvasDataForSelectionRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -358,11 +359,11 @@ export default function WhiteboardPage() {
       }
       isSelectingRef.current = true;
       selectionStartPointRef.current = pos;
-      setShowToolStatusMessage(false);
+      setShowHeaderInfo(false);
     } else if (activeTool && activeTool !== 'text') { // Draw, erase, shapes
       if (event.type === 'touchstart') event.preventDefault();
       startDrawingInternal(pos);
-      setShowToolStatusMessage(false);
+      setShowHeaderInfo(false);
     } else if (activeTool === 'text') {
        if (contextRef.current && textToolInput.trim() !== "" && textareaRef.current) {
           const { x, y } = pos;
@@ -373,9 +374,11 @@ export default function WhiteboardPage() {
           contextRef.current.textBaseline = "top";
           contextRef.current.fillText(textToolInput, x, y);
           setTextToolInput(""); 
-          setActiveTool('draw'); 
+          setActiveTool('draw'); // Revert to draw tool after placing text
+          setShowHeaderInfo(true); // Show header again after placing text
        } else {
          textareaRef.current?.focus();
+         // Keep header hidden as text tool is still active for input
        }
     } else {
       console.log("No tool active or unhandled tool, click at:", pos);
@@ -414,6 +417,15 @@ export default function WhiteboardPage() {
         setShowDrawingToolOptions(true);
       } else { 
         setShowDrawingToolOptions(false);
+      }
+    }
+
+    if (toolId === 'text') {
+      setShowHeaderInfo(false);
+    } else {
+      // Only show header if not actively interacting from a previous tool
+      if (!isDrawingRef.current && !isSelectingRef.current) {
+        setShowHeaderInfo(true);
       }
     }
   };
@@ -576,39 +588,44 @@ export default function WhiteboardPage() {
 
         <main className="flex-grow" style={{ paddingTop: `${totalOffset}px` }}>
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
-            <CardHeader className="flex-none py-2 space-y-0.5"> 
-              <CardTitle className="text-sm font-medium">TeachMeet Whiteboard</CardTitle> 
-              <CardDescription className="text-xs">
-                <span className="block">Meeting ID: {meetingId || "N/A"}</span>
-                {showToolStatusMessage && (() => {
-                  if (activeTool === 'erase') {
-                    return <span className="block text-xs mt-0.5">Tool: Eraser | Size: {selectedBrushSize}</span>;
-                  }
-                  if (mainDrawToolIsActive) { // Covers 'draw', 'line', 'circle', 'square', 'arrow', 'triangle'
-                    return (
-                      <span className="block text-xs mt-0.5">
-                        Tool: {activeToolDisplayName} |
-                        Color: <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> |
-                        Size: {selectedBrushSize}
-                      </span>
-                    );
-                  }
-                  if (activeTool === 'select') {
-                    return <span className="block text-xs mt-0.5 text-muted-foreground">Select tool active. Drag to select an area. (Manipulation features are planned)</span>;
-                  }
-                  if (activeTool === 'text') {
-                    return <span className="block text-xs mt-0.5 text-muted-foreground">Text tool active. Click on canvas to place text, or type below and then click.</span>;
-                  }
-                  return <span className="block text-xs mt-0.5 text-muted-foreground">Select a tool to begin.</span>;
-                })()}
-              </CardDescription>
-            </CardHeader>
+            {showHeaderInfo && (
+              <CardHeader className="flex-none py-2 space-y-0.5"> 
+                <CardTitle className="text-sm font-medium">TeachMeet Whiteboard</CardTitle> 
+                <CardDescription className="text-xs">
+                  <span className="block">Meeting ID: {meetingId || "N/A"}</span>
+                  {(() => {
+                    if (activeTool === 'erase') {
+                      return <span className="block text-xs mt-0.5">Tool: Eraser | Size: {selectedBrushSize}</span>;
+                    }
+                    if (mainDrawToolIsActive) { 
+                      return (
+                        <span className="block text-xs mt-0.5">
+                          Tool: {activeToolDisplayName} |
+                          Color: <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> |
+                          Size: {selectedBrushSize}
+                        </span>
+                      );
+                    }
+                    if (activeTool === 'select') {
+                      return <span className="block text-xs mt-0.5 text-muted-foreground">Select tool active. Drag to select an area.</span>;
+                    }
+                    if (activeTool === 'text') { // This case should ideally not be reached if header is hidden
+                      return <span className="block text-xs mt-0.5 text-muted-foreground">Text tool active. Click on canvas to place text, or type below.</span>;
+                    }
+                    if (!activeTool || activeTool === 'shapeassist') { 
+                      return <span className="block text-xs mt-0.5 text-muted-foreground">Select a tool to begin.</span>;
+                    }
+                    return null;
+                  })()}
+                </CardDescription>
+              </CardHeader>
+            )}
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
               <canvas
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => { 
-                  if (activeTool === 'select') { /* Allow default for text selection, etc. */ } 
+                  if (activeTool === 'select') { /* Allow default */ } 
                   else if (activeTool === 'text') { /* Handled in handleCanvasPointerDown */ }
                   else { e.preventDefault(); }
                   handleCanvasPointerDown(e); 
@@ -625,7 +642,7 @@ export default function WhiteboardPage() {
                   rows={2}
                 />
               )}
-              {showToolStatusMessage && (!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
+              {showHeaderInfo && (!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
                     Interactive canvas area - Select a tool to begin drawing or select an area.
