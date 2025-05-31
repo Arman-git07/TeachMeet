@@ -13,6 +13,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger, // Added missing import
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon } from "lucide-react";
 import Link from "next/link";
@@ -177,10 +178,10 @@ export default function WhiteboardPage() {
     const nativeEvent = 'nativeEvent' in event ? event.nativeEvent : event;
 
     if (nativeEvent instanceof TouchEvent) {
-      if (nativeEvent.touches && nativeEvent.touches.length > 0) {
+      if (nativeEvent.touches && nativeEvent.touches.length > 0) { // For touchstart, touchmove
         clientX = nativeEvent.touches[0].clientX;
         clientY = nativeEvent.touches[0].clientY;
-      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { // For touchend/touchcancel
+      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { // For touchend, touchcancel
         clientX = nativeEvent.changedTouches[0].clientX;
         clientY = nativeEvent.changedTouches[0].clientY;
       }
@@ -190,6 +191,7 @@ export default function WhiteboardPage() {
     }
   
     if (typeof clientX !== 'number' || typeof clientY !== 'number') {
+      // console.warn("Could not determine clientX/Y from event", nativeEvent);
       return null;
     }
   
@@ -640,4 +642,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
