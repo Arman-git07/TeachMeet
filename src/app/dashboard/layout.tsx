@@ -49,7 +49,6 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  // const { state: sidebarState, isMobile: sidebarIsMobile, toggleSidebar } = useSidebar(); // toggleSidebar moved to DashboardHeaderContentInternal
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -57,7 +56,8 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, loading, router]);
 
-  if (loading || (!isAuthenticated && !loading) ) {
+  // Simplified loading condition
+  if (loading || !isAuthenticated) {
     return (
       <div className="flex h-screen bg-background">
         <div className="flex flex-1 flex-col">
@@ -66,7 +66,7 @@ export default function DashboardLayout({
               <Skeleton className="h-8 w-8 rounded-md" /> {/* Sidebar trigger skeleton */}
             </div>
           </header>
-          <main className="flex-1 p-4 md:p-8 bg-background"> {/* No overflow-y-auto here */}
+          <main className="flex-1 p-4 md:p-8 bg-background">
             <Skeleton className="h-32 w-full mb-4 rounded-lg" />
             <Skeleton className="h-64 w-full rounded-lg" />
           </main>
@@ -77,7 +77,7 @@ export default function DashboardLayout({
 
   return (
     <DynamicHeaderProvider>
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-col flex-1">
         <DashboardHeaderContentInternal />
         <main className="flex flex-col flex-1 p-4 md:p-8 bg-background">
           {children}
