@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useSearchParams, useRouter, useParams } from 'next/navigation'; // Added useParams
+import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData } from 'firebase/firestore';
@@ -97,14 +97,24 @@ const ParticipantView = React.memo(function ParticipantView({
              </div>
            )}
         </>
-      ) : isCameraOff || !photoURL && !isScreenSharing ? ( // Simplified condition for avatar display for remote users
+      ) : isScreenSharing ? (
+        <div className="w-full h-full bg-muted/80 flex flex-col items-center justify-center p-4 text-center">
+          <ScreenShare className="w-16 h-16 text-primary mb-3" />
+          <p className="text-lg font-semibold text-foreground mb-1">{name}</p>
+          <p className="text-sm text-muted-foreground">is sharing their screen</p>
+          <Avatar className="mt-3 w-10 h-10 border-2 border-background shadow-sm">
+            <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user" />
+            <AvatarFallback>{avatarFallbackName}</AvatarFallback>
+          </Avatar>
+        </div>
+      ) : isCameraOff || !photoURL ? (
         <div className="w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
           <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
              <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user"/>
              <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
           </Avatar>
           <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
-           {isScreenSharing ? <ScreenShare className="w-7 h-7 text-muted-foreground mt-1" title="Sharing screen"/> : <VideoOff className="w-7 h-7 text-muted-foreground mt-1" title="Camera off"/>}
+          <VideoOff className="w-7 h-7 text-muted-foreground mt-1" title="Camera off"/>
         </div>
       ) : (
         // This block is for remote users with camera ON (actual video stream not implemented here, so shows avatar as placeholder)
@@ -114,7 +124,7 @@ const ParticipantView = React.memo(function ParticipantView({
              <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
           </Avatar>
            <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
-           {isScreenSharing ? <ScreenShare className="w-7 h-7 text-muted-foreground mt-1" title="Sharing screen"/> : <Video className="w-7 h-7 text-muted-foreground mt-1" title="Camera on"/>}
+           <Video className="w-7 h-7 text-muted-foreground mt-1" title="Camera on"/>
         </div>
       )}
       <div className="absolute bottom-2 left-2 bg-gradient-to-r from-black/70 to-transparent px-3 py-1.5 rounded-md backdrop-blur-sm">
@@ -226,7 +236,7 @@ export default function MeetingPage() {
           setJoinStatus('failed');
         });
     }
-  }, [currentUser, meetingId, db, toast, joinStatus]);
+  }, [currentUser, meetingId, toast, joinStatus]); // Removed db from dependency array as it's stable
 
   useEffect(() => {
     if (joinStatus !== 'joined' || !meetingId || !db) return;
@@ -264,7 +274,7 @@ export default function MeetingPage() {
       console.log(`[MeetingPage] Cleaning up Firestore listener for participants in meeting ${meetingId}`);
       unsubscribeParticipants();
     };
-  }, [meetingId, db, toast, joinStatus]);
+  }, [meetingId, toast, joinStatus]); // Removed db from dependency array
 
   useEffect(() => {
     if (joinStatus !== 'joined') return;
@@ -367,7 +377,7 @@ export default function MeetingPage() {
       localAudioStreamRef.current?.getTracks().forEach(track => track.stop());
       console.log("[MeetingPage] Cleaned up media streams on unmount.");
     };
-  }, [meetingId, db]);
+  }, [meetingId]); // Removed db from dependency array
 
 
   const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'videoRef' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
@@ -915,4 +925,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
