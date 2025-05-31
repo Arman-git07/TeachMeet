@@ -511,7 +511,7 @@ export default function WhiteboardPage() {
 
   return (
     <>
-      <div className="flex flex-col h-screen bg-muted/30">
+      <div className="flex flex-col h-full bg-muted/30">
 
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-10"> 
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
@@ -607,7 +607,7 @@ export default function WhiteboardPage() {
           </div>
         )}
 
-        <main className="flex-grow"> 
+        <main className="flex-grow flex flex-col overflow-hidden"> 
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
               <canvas
