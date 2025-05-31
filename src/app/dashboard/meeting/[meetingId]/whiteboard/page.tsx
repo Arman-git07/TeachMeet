@@ -69,6 +69,11 @@ export default function WhiteboardPage() {
   const isDrawingRef = useRef(false);
   const lastPositionRef = useRef<{ x: number, y: number } | null>(null);
   const shapeStartPointRef = useRef<{ x: number, y: number } | null>(null);
+  
+  const isSelectingRef = useRef(false);
+  const selectionStartPointRef = useRef<{ x: number, y: number } | null>(null);
+  const initialCanvasDataForSelectionRef = useRef<ImageData | null>(null);
+  const currentSelectionRectRef = useRef<{ x: number, y: number, w: number, h: number } | null>(null);
 
 
   const availableColors = [
@@ -112,10 +117,7 @@ export default function WhiteboardPage() {
         context.lineWidth = getLineWidth();
         if (activeTool === 'erase') {
           context.globalCompositeOperation = 'destination-out';
-        } else if (activeTool === 'select') {
-          context.globalCompositeOperation = 'source-over'; // Or whatever is appropriate for selection
-        }
-         else {
+        } else {
           context.globalCompositeOperation = 'source-over';
         }
 
@@ -151,10 +153,6 @@ export default function WhiteboardPage() {
       contextRef.current.lineWidth = getLineWidth();
       if (activeTool === 'erase') {
         contextRef.current.globalCompositeOperation = 'destination-out';
-      } else if (activeTool === 'select') {
-        // For select tool, we might not change composite operation immediately,
-        // or might set it to 'source-over' if it was previously 'destination-out' (erase)
-        contextRef.current.globalCompositeOperation = 'source-over';
       } else {
         contextRef.current.globalCompositeOperation = 'source-over';
       }
@@ -174,7 +172,7 @@ export default function WhiteboardPage() {
       if (nativeEvent.touches && nativeEvent.touches.length > 0) {
         clientX = nativeEvent.touches[0].clientX;
         clientY = nativeEvent.touches[0].clientY;
-      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) {
+      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { // Use changedTouches for touchend/touchcancel
         clientX = nativeEvent.changedTouches[0].clientX;
         clientY = nativeEvent.changedTouches[0].clientY;
       }
@@ -184,6 +182,7 @@ export default function WhiteboardPage() {
     }
   
     if (typeof clientX !== 'number' || typeof clientY !== 'number') {
+      // console.warn("Could not determine clientX/Y from event:", event);
       return null;
     }
   
@@ -278,40 +277,86 @@ export default function WhiteboardPage() {
   }, [activeTool, selectedColor, getLineWidth]);
   
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
-    if (!isDrawingRef.current) return;
-    if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
     const pos = getPointerPosition(event);
     if (!pos) return;
-    drawInternal(pos);
-  }, [getPointerPosition, drawInternal]);
+
+    if (isDrawingRef.current) {
+      if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
+      drawInternal(pos);
+    } else if (isSelectingRef.current) {
+      if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
+      if (contextRef.current && initialCanvasDataForSelectionRef.current && selectionStartPointRef.current) {
+        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); // Restore
+
+        const start = selectionStartPointRef.current;
+        const rectX = Math.min(start.x, pos.x);
+        const rectY = Math.min(start.y, pos.y);
+        const rectW = Math.abs(pos.x - start.x);
+        const rectH = Math.abs(pos.y - start.y);
+
+        currentSelectionRectRef.current = { x: rectX, y: rectY, w: rectW, h: rectH };
+
+        contextRef.current.strokeStyle = 'rgba(0, 100, 255, 0.7)';
+        contextRef.current.lineWidth = 1.5;
+        contextRef.current.setLineDash([5, 3]);
+        contextRef.current.strokeRect(rectX, rectY, rectW, rectH);
+        contextRef.current.setLineDash([]);
+      }
+    }
+  }, [getPointerPosition, drawInternal]); // Removed isDrawingRef, isSelectingRef etc. as they are refs
 
   const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
-    if (!isDrawingRef.current) return;
     const pos = getPointerPosition(event);
-    stopDrawingInternal(pos || undefined);
 
+    if (isDrawingRef.current) {
+      stopDrawingInternal(pos || undefined);
+    } else if (isSelectingRef.current) {
+      if (contextRef.current && initialCanvasDataForSelectionRef.current) {
+        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); // Restore
+        if (currentSelectionRectRef.current) {
+          console.log("Selected area (top-left x,y, width, height):", currentSelectionRectRef.current);
+          // Placeholder for what to do with the selection.
+          // For now, the selection is visual during drag and logged on release.
+        }
+      }
+      isSelectingRef.current = false;
+      selectionStartPointRef.current = null;
+      initialCanvasDataForSelectionRef.current = null;
+      currentSelectionRectRef.current = null;
+    }
+    
     window.removeEventListener('touchmove', handlePointerMove);
     window.removeEventListener('touchend', handlePointerUp);
     window.removeEventListener('touchcancel', handlePointerUp);
     window.removeEventListener('mousemove', handlePointerMove);
     window.removeEventListener('mouseup', handlePointerUp);
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]);
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove]); // Removed isDrawingRef etc.
   
   const handleCanvasPointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return;
-    if (!contextRef.current || !activeTool || activeTool === 'select' || activeTool === 'text') {
-        if (activeTool === 'select') {
-             // Placeholder for select tool click logic
-             console.log("Select tool clicked on canvas. Future: Implement hit detection.");
-        }
-        return;
-    }
-    if (event.type === 'touchstart') event.preventDefault();
-
+    
     const pos = getPointerPosition(event);
     if (!pos) return;
 
-    startDrawingInternal(pos);
+    if (activeTool === 'select') {
+      if (event.type === 'touchstart') event.preventDefault(); // Prevent default only if selecting
+      if (contextRef.current && canvasRef.current) {
+        try {
+          initialCanvasDataForSelectionRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+        } catch (e) {
+          console.error("Error getting image data for selection:", e);
+          initialCanvasDataForSelectionRef.current = null; // Ensure it's null if failed
+        }
+      }
+      isSelectingRef.current = true;
+      selectionStartPointRef.current = pos;
+      // No actual drawing for select tool start, just setup for drag
+    } else if (activeTool && activeTool !== 'text') {
+      if (event.type === 'touchstart') event.preventDefault();
+      startDrawingInternal(pos);
+    } else {
+      console.log("Select tool active or no tool, click at:", pos, "Implement object hit detection or text placement here.");
+    }
 
     if (event.type.startsWith('touch')) {
       window.addEventListener('touchmove', handlePointerMove, { passive: false });
@@ -324,6 +369,7 @@ export default function WhiteboardPage() {
   }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp]);
   
   useEffect(() => {
+    // Cleanup function
     return () => {
       window.removeEventListener('touchmove', handlePointerMove);
       window.removeEventListener('touchend', handlePointerUp);
@@ -344,8 +390,8 @@ export default function WhiteboardPage() {
       setActiveTool(toolId);
       if (isDrawingToolWithOptions) {
         setShowDrawingToolOptions(true);
-      } else {
-        setShowDrawingToolOptions(false); // Hide for 'select', 'text', 'shapeassist'
+      } else { // Hide for 'select', 'text', 'shapeassist'
+        setShowDrawingToolOptions(false);
       }
     }
   };
@@ -380,13 +426,13 @@ export default function WhiteboardPage() {
   const drawingOptionsToolbarHeight = showDrawingToolOptions && isDrawingRelatedToolWithOptionsActive ? 150 : 0; 
   const totalOffset = topToolbarOffset + mainToolsToolbarOffset + drawingOptionsToolbarHeight;
 
-
-  const mainDrawToolIsActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
+  const mainDrawToolIsActive = activeTool && (drawingTools.includes(activeTool)) && activeTool !== 'erase';
   const activeToolDisplayName = activeTool ? activeTool.charAt(0).toUpperCase() + activeTool.slice(1) : 'None';
 
-  const canvasCursorClass = activeTool === 'select' ? 'cursor-default' : 
-                            (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'cursor-crosshair' : 
-                            'cursor-default';
+  const canvasCursorClass = 
+    activeTool === 'select' ? 'cursor-default' : 
+    (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'cursor-crosshair' : 
+    'cursor-default';
 
 
   return (
@@ -417,8 +463,8 @@ export default function WhiteboardPage() {
             <ToolButton
               icon={Brush}
               label="Draw"
-              onClick={() => handleToolClick(activeTool === 'draw' || (drawingTools.includes(activeTool || "") && activeTool !== "erase") ? (activeTool || "draw") : "draw")}
-              isActive={mainDrawToolIsActive && activeTool !== 'erase'}
+              onClick={() => handleToolClick(mainDrawToolIsActive ? (activeTool || "draw") : "draw")}
+              isActive={mainDrawToolIsActive}
             />
             <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
@@ -487,17 +533,20 @@ export default function WhiteboardPage() {
               <CardTitle className="text-base">TeachMeet Whiteboard</CardTitle> 
               <CardDescription className="text-xs">
                 Meeting ID: {meetingId || "N/A"}
-                {activeTool && activeTool !== 'select' && activeTool !== 'text' && activeTool !== 'shapeassist' && (
+                {activeTool && activeTool === 'erase' && (
+                  <span className="block text-xs mt-0.5">Tool: Eraser | Size: {selectedBrushSize}</span>
+                )}
+                {activeTool && activeTool !== 'select' && activeTool !== 'text' && activeTool !== 'shapeassist' && activeTool !== 'erase' && (
                   <span className="block text-xs mt-0.5">
                     Tool: {activeToolDisplayName} |
-                    {activeTool !== 'erase' && <> Color: <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> |</>}
+                    Color: <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedColor, border: '1px solid #ccc', verticalAlign: 'middle' }}></span> |
                     Size: {selectedBrushSize}
                   </span>
                 )}
                 {activeTool === 'select' && (
-                   <span className="block text-xs mt-0.5 text-muted-foreground">Select tool active. (Functionality to select/resize elements is planned)</span>
+                   <span className="block text-xs mt-0.5 text-muted-foreground">Select tool active. Drag to select an area. (Manipulation features are planned)</span>
                 )}
-                {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select')) && !isDrawingRef.current && (
+                {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
                   <span className="block text-xs mt-0.5 text-muted-foreground">Select a tool to begin.</span>
                 )}
               </CardDescription>
@@ -506,7 +555,10 @@ export default function WhiteboardPage() {
               <canvas
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
-                onTouchStart={(e) => { if (activeTool !== 'select') e.preventDefault(); handleCanvasPointerDown(e); }}
+                onTouchStart={(e) => { 
+                  if (activeTool !== 'select') e.preventDefault(); 
+                  handleCanvasPointerDown(e); 
+                }}
                 className={cn("bg-white dark:bg-muted/20 border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
               />
               {activeTool === 'text' && (
@@ -518,10 +570,10 @@ export default function WhiteboardPage() {
                   className="absolute inset-0 w-full h-full z-10 rounded-lg shadow-xl border-primary resize-none p-4 text-base bg-background/80"
                 />
               )}
-              {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && (
+              {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
-                    Interactive canvas area - Select a tool to begin.
+                    Interactive canvas area - Select a tool to begin drawing or select an area.
                   </p>
                 </div>
               )}
@@ -529,7 +581,7 @@ export default function WhiteboardPage() {
           </Card>
         </main>
         <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-          TeachMeet Whiteboard - Basic drawing and shape tools enabled.
+          TeachMeet Whiteboard - Basic drawing, shape tools, and area selection enabled.
         </footer>
       </div>
 
