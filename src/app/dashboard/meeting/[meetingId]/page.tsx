@@ -33,17 +33,6 @@ interface Participant {
   photoURL?: string | null;
 }
 
-// Dev Note: For "outstanding quality and experience" with "less internet":
-// - Frontend can optimize rendering (React.memo, virtualized lists for chat/participants if very long).
-// - Frontend can ensure efficient state updates and avoid unnecessary re-renders.
-// - Core data usage (video/audio streams) depends heavily on:
-//   - WebRTC configuration (STUN/TURN servers).
-// - Backend media servers (SFU/MCU) for handling multiple streams efficiently.
-// - Video/Audio codecs (e.g., AV1, VP9, H.264 for video; Opus for audio).
-// - Adaptive Bitrate Streaming to adjust quality based on network.
-// - Efficient signaling mechanisms.
-// These are primarily backend/WebRTC/infrastructure concerns.
-
 const ParticipantView = React.memo(function ParticipantView({
   name,
   isMe = false,
@@ -179,9 +168,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
   const [joinStatus, setJoinStatus] = useState<'pending' | 'joining' | 'joined' | 'failed'>('pending');
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const localAudioStreamRef = useRef<MediaStream | null>(null);
   const currentLocalStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
@@ -209,10 +200,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         userId: currentUser.uid,
         name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
         photoURL: currentUser.photoURL,
-        isMicMuted: false, // Default on join
+        isMicMuted: false, 
         isCameraOff: initialCameraOffFromStorage,
-        isHandRaised: false, // Default on join
-        isScreenSharing: false, // Default on join
+        isHandRaised: false, 
+        isScreenSharing: false, 
         joinedAt: serverTimestamp(),
       };
 
@@ -303,16 +294,15 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
       } else {
         console.log("[MeetingPage] Camera is set to off, checking permissions silently.");
         try {
-          // Attempt to get media to check permission without actually using the stream
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop()); // Stop tracks immediately
+          stream.getTracks().forEach(track => track.stop()); 
           setHasCameraPermission(true);
           console.log("[MeetingPage] Camera permission exists (checked silently).");
         } catch {
           setHasCameraPermission(false);
           console.log("[MeetingPage] Camera permission denied (checked silently).");
         }
-         if (currentLocalStreamRef.current) { // If a stream was active, stop it
+         if (currentLocalStreamRef.current) { 
             currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
             currentLocalStreamRef.current = null;
             if(localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -322,25 +312,60 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
     initializeCameraAndPermissions();
 
-    return () => {
-      console.log("[MeetingPage] Cleaning up local media streams on unmount or deps change.");
-      currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
-      screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
+  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]); 
+
+  useEffect(() => {
+    const initializeMicrophone = async () => {
+      if (joinStatus !== 'joined') return;
+  
+      if (!localMicMuted) { 
+        console.log("[MeetingPage] Initializing microphone (localMicMuted is false).");
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          localAudioStreamRef.current = stream;
+          setHasMicPermission(true);
+          console.log("[MeetingPage] Microphone initialized successfully and is ON.");
+        } catch (err) {
+          console.error("[MeetingPage] Failed to get microphone on initial setup:", err);
+          setHasMicPermission(false);
+          setLocalMicMuted(true); 
+          await updateUserStatusInFirestore({ isMicMuted: true });
+          toast({
+            variant: 'destructive',
+            title: 'Microphone Access Denied',
+            description: 'Please enable microphone permissions in your browser settings.',
+          });
+        }
+      } else { 
+        console.log("[MeetingPage] Microphone is initially OFF. Checking permissions silently.");
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop());
+          setHasMicPermission(true);
+        } catch {
+          setHasMicPermission(false);
+        }
+      }
     };
-  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]); // Re-run if localCameraOff, joinStatus, or screen sharing status changes
+  
+    initializeMicrophone();
+  }, [joinStatus, localMicMuted, toast]);
 
 
    useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
       if (auth.currentUser && meetingId && db) {
         console.log(`[MeetingPage] beforeunload: Removing user ${auth.currentUser.uid} from meeting ${meetingId}`);
-        // This is best-effort. Not guaranteed to complete.
         await deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid));
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+      screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
+      localAudioStreamRef.current?.getTracks().forEach(track => track.stop());
+      console.log("[MeetingPage] Cleaned up media streams on unmount.");
     };
   }, [meetingId, db]);
 
@@ -361,10 +386,49 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
   };
 
-  const toggleMic = () => {
-    const newMicState = !localMicMuted;
-    setLocalMicMuted(newMicState);
-    updateUserStatusInFirestore({ isMicMuted: newMicState });
+  const toggleMic = async () => {
+    const newMicStateIsMuted = !localMicMuted;
+    console.log(`[MeetingPage] Toggling mic. New state is muted: ${newMicStateIsMuted}`);
+  
+    setLocalMicMuted(newMicStateIsMuted);
+    await updateUserStatusInFirestore({ isMicMuted: newMicStateIsMuted });
+  
+    if (!newMicStateIsMuted) { // Turning mic ON
+      if (localAudioStreamRef.current) {
+        localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
+        console.log("[MeetingPage] Mic ON: Enabled existing audio tracks.");
+        toast({ title: "Microphone ON" });
+      } else {
+        if (hasMicPermission === false) {
+          toast({ variant: 'destructive', title: 'Microphone Permission Denied', description: 'Please enable microphone permissions in browser settings.' });
+          setLocalMicMuted(true);
+          await updateUserStatusInFirestore({ isMicMuted: true });
+          return;
+        }
+        try {
+          console.log("[MeetingPage] Mic ON: Requesting audio stream.");
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          localAudioStreamRef.current = stream;
+          setHasMicPermission(true);
+          console.log("[MeetingPage] Mic ON: Audio stream acquired.");
+          toast({ title: "Microphone ON" });
+        } catch (err) {
+          console.error("[MeetingPage] Error getting audio stream for mic ON:", err);
+          setHasMicPermission(false);
+          setLocalMicMuted(true); 
+          await updateUserStatusInFirestore({ isMicMuted: true });
+          toast({ variant: 'destructive', title: 'Microphone Access Failed', description: 'Could not access microphone.' });
+        }
+      }
+    } else { // Turning mic OFF (muting)
+      if (localAudioStreamRef.current) {
+        localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
+        console.log("[MeetingPage] Mic OFF: Disabled audio tracks.");
+        toast({ title: "Microphone OFF" });
+      } else {
+        console.log("[MeetingPage] Mic OFF: No active audio stream to disable tracks on.");
+      }
+    }
   };
 
   const stopScreenShare = async (showToast = true) => {
@@ -400,7 +464,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         } catch (err) {
           console.error("[MeetingPage] Failed to re-initialize camera after screen share stop:", err);
           setLocalCameraOff(true);
-          await updateUserStatusInFirestore({ isCameraOff: true }); // Reflect this failure in Firestore
+          await updateUserStatusInFirestore({ isCameraOff: true }); 
         }
     }
   };
@@ -411,15 +475,15 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
 
     if (isScreenSharingActive) {
       console.log("[MeetingPage] Screen sharing is active, stopping it before toggling camera.");
-      await stopScreenShare(false); // Stop screen share without toast, then proceed
+      await stopScreenShare(false); 
     }
     
-    setLocalCameraOff(newCameraStateIsOff); // Optimistically update local state for UI responsiveness
+    setLocalCameraOff(newCameraStateIsOff); 
 
-    if (!newCameraStateIsOff) { // Turning camera ON
+    if (!newCameraStateIsOff) { 
       if (hasCameraPermission === false) {
         toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
-        setLocalCameraOff(true); // Revert UI state if permission denied
+        setLocalCameraOff(true); 
         return;
       }
       try {
@@ -429,18 +493,18 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
-        setHasCameraPermission(true); // In case it was null
+        setHasCameraPermission(true); 
         await updateUserStatusInFirestore({ isCameraOff: false });
         console.log("[MeetingPage] Camera turned ON successfully.");
       } catch (err) {
         console.error("[MeetingPage] Failed to get camera on toggle:", err);
         setHasCameraPermission(false);
-        setLocalCameraOff(true); // Revert UI and ensure state is off
+        setLocalCameraOff(true); 
         await updateUserStatusInFirestore({ isCameraOff: true });
         toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
-        return; // Important to return to prevent further inconsistent states
+        return; 
       }
-    } else { // Turning camera OFF
+    } else { 
       console.log("[MeetingPage] Turning camera OFF.");
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       currentLocalStreamRef.current = null;
@@ -472,6 +536,9 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     }
 
     currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+    localAudioStreamRef.current?.getTracks().forEach(track => track.stop());
+    localAudioStreamRef.current = null;
+
 
     if (currentUser && meetingId && db) {
       const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
@@ -481,7 +548,6 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         console.log(`[MeetingPage] Successfully deleted participant ${currentUser.uid}.`);
       } catch (error) {
         console.error("[MeetingPage] Error removing participant from Firestore on leave:", error);
-        // Don't block navigation for this, but log it.
       }
     }
 
@@ -495,10 +561,10 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
         } catch (e) {
           console.error("[MeetingPage] Error parsing dismissed meetings from localStorage on leave:", e);
-          localStorage.removeItem(DISMISSED_MEETINGS_KEY); // Clear corrupted data
+          localStorage.removeItem(DISMISSED_MEETINGS_KEY); 
         }
 
-        if (!Array.isArray(dismissedIds)) { // Ensure it's an array
+        if (!Array.isArray(dismissedIds)) { 
             dismissedIds = [];
         }
 
@@ -571,7 +637,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         localVideoRef.current.srcObject = stream;
       }
       setIsScreenSharingActive(true);
-      setLocalCameraOff(true); // Camera must be "off" conceptually while screen sharing
+      setLocalCameraOff(true); 
       await updateUserStatusInFirestore({ isScreenSharing: true, isCameraOff: true });
       toast({ title: "Screen Sharing Started" });
 
@@ -734,11 +800,21 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
               </AlertDescription>
             </Alert>
         )}
+        {hasMicPermission === false && (
+           <Alert variant="destructive" className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Microphone Permission Required</AlertTitle>
+              <AlertDescription>
+                TeachMeet needs access to your microphone to share your audio.
+                Please enable microphone permissions in your browser settings.
+              </AlertDescription>
+            </Alert>
+        )}
          {combinedParticipants.length === 1 && combinedParticipants[0].isMe ? (
             <div className={cn(
                 "flex-grow flex items-center justify-center",
                 currentLayout === 'speaker' && "p-4 bg-muted rounded-lg",
-                currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg", // More noticeable background
+                currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg", 
                 currentLayout === 'grid' && "p-0"
             )}>
                 <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
@@ -757,11 +833,11 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             <div className={cn(
                 "grid gap-4 flex-1",
                 combinedParticipants.length === 0 ? "grid-cols-1" : 
-                combinedParticipants.length === 1 ? "grid-cols-1" : // Should take full space if only one participant
+                combinedParticipants.length === 1 ? "grid-cols-1" : 
                 combinedParticipants.length === 2 ? "grid-cols-1 sm:grid-cols-2 lg:max-w-4xl mx-auto" :
                 combinedParticipants.length === 3 ? "grid-cols-1 sm:grid-cols-3 lg:max-w-6xl mx-auto" :
                 combinedParticipants.length >= 4 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" :
-                "grid-cols-1" // Fallback
+                "grid-cols-1" 
             )}>
                 {combinedParticipants.map(participant => (
                 <ParticipantView key={participant.id} {...participant} />
@@ -796,12 +872,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
           </Button>
            <Button
             size="lg"
-            variant={localHandRaised ? "default" : "default"} // Keep variant consistent for base color
+            variant={localHandRaised ? "default" : "default"} 
             className={cn(
               "rounded-full p-4",
               localHandRaised
-                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" // Accent color when hand is raised
-                : "btn-gel shadow-md" // Primary color (green gel) when hand is not raised
+                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
+                : "btn-gel shadow-md" 
             )}
             onClick={toggleHandRaise}
             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
@@ -839,3 +915,4 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
+
