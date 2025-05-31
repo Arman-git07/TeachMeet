@@ -38,10 +38,10 @@ interface Participant {
 // - Frontend can ensure efficient state updates and avoid unnecessary re-renders.
 // - Core data usage (video/audio streams) depends heavily on:
 //   - WebRTC configuration (STUN/TURN servers).
-//   - Backend media servers (SFU/MCU) for handling multiple streams efficiently.
-//   - Video/Audio codecs (e.g., AV1, VP9, H.264 for video; Opus for audio).
-//   - Adaptive Bitrate Streaming to adjust quality based on network.
-//   - Efficient signaling mechanisms.
+// - Backend media servers (SFU/MCU) for handling multiple streams efficiently.
+// - Video/Audio codecs (e.g., AV1, VP9, H.264 for video; Opus for audio).
+// - Adaptive Bitrate Streaming to adjust quality based on network.
+// - Efficient signaling mechanisms.
 // These are primarily backend/WebRTC/infrastructure concerns.
 
 const ParticipantView = React.memo(function ParticipantView({
@@ -723,7 +723,7 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
         </DropdownMenu>
       </header>
 
-      <main className="flex-1 p-4 overflow-y-auto flex flex-col">
+      <main className="flex-1 p-4 flex flex-col">
         {hasCameraPermission === false && !isScreenSharingActive && (
            <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
@@ -756,11 +756,12 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
             ) : (
             <div className={cn(
                 "grid gap-4 flex-1",
-                combinedParticipants.length === 0 ? "grid-cols-1" : // Should not happen if 'You' are always there
+                combinedParticipants.length === 0 ? "grid-cols-1" : 
+                combinedParticipants.length === 1 ? "grid-cols-1" : // Should take full space if only one participant
                 combinedParticipants.length === 2 ? "grid-cols-1 sm:grid-cols-2 lg:max-w-4xl mx-auto" :
                 combinedParticipants.length === 3 ? "grid-cols-1 sm:grid-cols-3 lg:max-w-6xl mx-auto" :
                 combinedParticipants.length >= 4 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" :
-                "grid-cols-1" // Fallback, covers length 1 but that's handled above
+                "grid-cols-1" // Fallback
             )}>
                 {combinedParticipants.map(participant => (
                 <ParticipantView key={participant.id} {...participant} />
@@ -838,4 +839,3 @@ export default function MeetingPage({ params: paramsPromise }: { params: Promise
     </div>
   );
 }
-

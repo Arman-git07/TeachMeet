@@ -300,7 +300,7 @@ export default function RecordingsPage() {
           
           <div className="relative flex-1 overflow-hidden">
             <div className={cn(
-              "absolute inset-0 transition-all duration-300 ease-in-out",
+              "absolute inset-0 transition-all duration-300 ease-in-out flex flex-col",
               activeTab === 'private' 
                 ? 'opacity-100 translate-x-0 z-10' 
                 : 'opacity-0 -translate-x-full pointer-events-none'
@@ -317,7 +317,7 @@ export default function RecordingsPage() {
             </div>
 
             <div className={cn(
-              "absolute inset-0 transition-all duration-300 ease-in-out",
+              "absolute inset-0 transition-all duration-300 ease-in-out flex flex-col",
               activeTab === 'public' 
                 ? 'opacity-100 translate-x-0 z-10' 
                 : 'opacity-0 translate-x-full pointer-events-none'
