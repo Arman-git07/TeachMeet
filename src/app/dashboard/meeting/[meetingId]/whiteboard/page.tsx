@@ -82,13 +82,15 @@ export default function WhiteboardPage() {
   ];
 
   const brushSizes = [
-    { name: 'small', icon: CircleIconShape, label: 'Small Brush', lineWidth: 2 },
-    { name: 'medium', icon: CircleIconShape, label: 'Medium Brush', lineWidth: 5 },
+    { name: 'tiny', icon: CircleIconShape, label: 'Tiny Brush', lineWidth: 1 },
+    { name: 'small', icon: CircleIconShape, label: 'Small Brush', lineWidth: 3 },
+    { name: 'medium', icon: CircleIconShape, label: 'Medium Brush', lineWidth: 6 },
     { name: 'large', icon: CircleIconShape, label: 'Large Brush', lineWidth: 10 },
+    { name: 'xlarge', icon: CircleIconShape, label: 'X-Large Brush', lineWidth: 15 },
   ];
 
   const getLineWidth = useCallback(() => {
-    return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 5;
+    return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6; // Default to medium's lineWidth
   }, [selectedBrushSize, brushSizes]);
 
 
@@ -98,26 +100,22 @@ export default function WhiteboardPage() {
       const context = contextRef.current;
       let imageData: ImageData | undefined;
       
-      // Capture current content only if canvas has valid dimensions
       if (context && canvas.width > 0 && canvas.height > 0) {
         try {
           imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         } catch (e) {
           console.error("Error getting imageData during resize:", e);
-          // imageData will remain undefined, content might be lost on this specific resize
         }
       }
       
       const newWidth = canvas.parentElement.clientWidth;
       const newHeight = canvas.parentElement.clientHeight;
 
-      // Only resize and attempt to restore if new dimensions are valid
       if (newWidth > 0 && newHeight > 0) {
         canvas.width = newWidth;
         canvas.height = newHeight;
 
         if (context) {
-          // Re-apply current drawing styles
           context.lineCap = "round";
           context.lineJoin = "round";
           context.strokeStyle = selectedColor;
@@ -128,18 +126,14 @@ export default function WhiteboardPage() {
             context.globalCompositeOperation = 'source-over';
           }
 
-          // Restore content if it was successfully captured
           if (imageData) {
             try {
               context.putImageData(imageData, 0, 0);
             } catch (e) {
               console.error("Error putting imageData during resize:", e);
-              // Content might be lost if putImageData fails
             }
           }
         }
-      } else {
-        // Optional: console.warn("Parent element has zero dimensions, canvas not resized.");
       }
     }
   }, [selectedColor, getLineWidth, activeTool]);
@@ -181,10 +175,10 @@ export default function WhiteboardPage() {
     const nativeEvent = 'nativeEvent' in event ? event.nativeEvent : event;
 
     if (nativeEvent instanceof TouchEvent) {
-      if (nativeEvent.touches && nativeEvent.touches.length > 0) { // For touchstart, touchmove
+      if (nativeEvent.touches && nativeEvent.touches.length > 0) {
         clientX = nativeEvent.touches[0].clientX;
         clientY = nativeEvent.touches[0].clientY;
-      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { // For touchend, touchcancel
+      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) {
         clientX = nativeEvent.changedTouches[0].clientX;
         clientY = nativeEvent.changedTouches[0].clientY;
       }
@@ -371,8 +365,8 @@ export default function WhiteboardPage() {
           contextRef.current.textAlign = "left";
           contextRef.current.textBaseline = "top";
           contextRef.current.fillText(textToolInput, x, y);
-          setTextToolInput(""); // Clear input after placing text
-          setActiveTool('draw'); // Revert to draw tool
+          setTextToolInput(""); 
+          setActiveTool('draw'); 
        } else {
          textareaRef.current?.focus();
        }
@@ -526,7 +520,13 @@ export default function WhiteboardPage() {
                             onClick={() => handleBrushSizeSelect(brush.name)}
                             aria-label={brush.label}
                         >
-                            <brush.icon className={cn("h-5 w-5", brush.name === 'small' && 'h-3 w-3', brush.name === 'large' && 'h-6 w-6')} />
+                            <brush.icon className={cn(
+                                "h-5 w-5", // Default for medium
+                                brush.name === 'tiny' && 'h-2 w-2',
+                                brush.name === 'small' && 'h-3 w-3',
+                                brush.name === 'large' && 'h-6 w-6',
+                                brush.name === 'xlarge' && 'h-7 w-7'
+                            )} />
                         </Button>
                     ))}
                     </div>
