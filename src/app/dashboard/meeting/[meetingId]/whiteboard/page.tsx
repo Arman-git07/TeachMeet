@@ -2,8 +2,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,9 +58,7 @@ export default function WhiteboardPage() {
   const { setHeaderContent } = useDynamicHeader();
 
   const [activeTool, setActiveTool] = useState<string | null>("draw");
-  const [textToolInput, setTextToolInput] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
+  
   const [selectedColor, setSelectedColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem("teachmeet-whiteboard-pen-color") || "#000000";
@@ -119,6 +116,8 @@ export default function WhiteboardPage() {
         const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
         if (storedPenColor) {
             setSelectedColor(storedPenColor);
+        } else {
+           localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); // Default if not set
         }
     }
   }, []);
@@ -417,18 +416,19 @@ export default function WhiteboardPage() {
       if (event.type === 'touchstart') event.preventDefault();
       startDrawingInternal(pos);
     } else if (activeTool === 'text') {
-       if (contextRef.current && textToolInput.trim() !== "" && textareaRef.current) {
-          const { x, y } = pos;
-          contextRef.current.globalCompositeOperation = 'source-over';
-          contextRef.current.fillStyle = selectedColor;
-          contextRef.current.font = "16px sans-serif";
-          contextRef.current.textAlign = "left";
-          contextRef.current.textBaseline = "top";
-          contextRef.current.fillText(textToolInput, x, y);
-          setTextToolInput(""); 
-          setActiveTool('draw'); 
-       } else {
-         textareaRef.current?.focus();
+       if (contextRef.current) {
+          const textToAdd = window.prompt("Enter text to add:", "");
+          if (textToAdd && textToAdd.trim() !== "") {
+              const { x, y } = pos;
+              contextRef.current.globalCompositeOperation = 'source-over';
+              contextRef.current.fillStyle = selectedColor;
+              contextRef.current.font = "16px sans-serif"; 
+              contextRef.current.textAlign = "left";
+              contextRef.current.textBaseline = "top";
+              contextRef.current.fillText(textToAdd, x, y);
+          } else {
+             toast({ title: "Text input cancelled", description: "No text was added to the whiteboard.", duration: 2000 });
+          }
        }
     } else {
       console.log("No tool active or unhandled tool, click at:", pos);
@@ -442,7 +442,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
     }
-  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, textToolInput, selectedColor]);
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, selectedColor, toast]);
   
   useEffect(() => {
     return () => {
@@ -479,12 +479,6 @@ export default function WhiteboardPage() {
     setSelectedBrushSize(size);
   };
 
-  useEffect(() => {
-    if (activeTool === "text" && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [activeTool]);
-
   const handleConfirmClearAll = () => {
     if (contextRef.current && canvasRef.current) {
       const context = contextRef.current;
@@ -493,15 +487,13 @@ export default function WhiteboardPage() {
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
     }
-    setTextToolInput("");
     setShowClearConfirmDialog(false);
   };
   
   const isDrawingRelatedToolWithOptionsActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
   
   const mainDrawToolIsActive = activeTool && (drawingTools.includes(activeTool)) && activeTool !== 'erase';
-  const activeToolDisplayName = activeTool ? activeTool.charAt(0).toUpperCase() + activeTool.slice(1) : 'None';
-
+  
   const canvasCursorClass = 
     activeTool === 'select' ? 'cursor-default' : 
     activeTool === 'text' ? 'cursor-text' :
@@ -622,16 +614,6 @@ export default function WhiteboardPage() {
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
                 style={{ backgroundColor: canvasBackgroundColor }}
               />
-              {activeTool === 'text' && (
-                <Textarea
-                  ref={textareaRef}
-                  value={textToolInput}
-                  onChange={(e) => setTextToolInput(e.target.value)}
-                  placeholder="Type text here, then click on canvas to place..."
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 w-11/12 max-w-lg z-10 rounded-lg shadow-xl border-primary resize-none p-3 text-sm bg-background/90 backdrop-blur-sm"
-                  rows={2}
-                />
-              )}
               {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
