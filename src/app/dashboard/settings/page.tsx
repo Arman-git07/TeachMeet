@@ -46,8 +46,8 @@ export default function SettingsPage() {
 
   const { toast } = useToast();
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
-  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#32CD32"); // Default vibrant green
-  const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF"); // Default white
+  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#000000"); // Default to black for pen
+  const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
   const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
 
 
@@ -59,14 +59,20 @@ export default function SettingsPage() {
     const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
     if (storedPenColor) {
       setWhiteboardPenColor(storedPenColor);
+    } else {
+      localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); // Ensure default is saved if nothing there
     }
     const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
     if (storedBgColor) {
       setWhiteboardBackgroundColor(storedBgColor);
+    } else {
+      localStorage.setItem("teachmeet-whiteboard-bg-color", "#FFFFFF");
     }
     const storedShapeRecognition = localStorage.getItem("teachmeet-whiteboard-shape-recognition");
     if (storedShapeRecognition) {
       setEnableShapeRecognition(storedShapeRecognition === 'true');
+    } else {
+       localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(true));
     }
   }, []);
 
@@ -106,7 +112,6 @@ export default function SettingsPage() {
   };
   
   const handleSaveWhiteboardSettings = () => {
-    // Values are already saved to localStorage on change. This button provides user feedback.
     toast({
       title: "Whiteboard Settings Confirmed",
       description: "Your whiteboard preferences are up-to-date and saved in your browser's local storage.",
@@ -240,7 +245,7 @@ export default function SettingsPage() {
             <Switch id="meetingReminders" defaultChecked />
           </div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="chatNotifications" className="flex-grow">Chat Message Notifications</Label>
+            <Label htmlFor="chatNotifications" className="flex-grow">Chat Message Notifications</Label>            
             <Switch id="chatNotifications" defaultChecked />
           </div>
           <div className="flex items-center justify-between">

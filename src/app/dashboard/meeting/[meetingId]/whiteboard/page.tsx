@@ -59,12 +59,22 @@ export default function WhiteboardPage() {
   const [textToolInput, setTextToolInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [selectedColor, setSelectedColor] = useState<string>("#000000");
+  const [selectedColor, setSelectedColor] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("teachmeet-whiteboard-pen-color") || "#000000";
+    }
+    return "#000000";
+  });
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
   const [showHeaderInfo, setShowHeaderInfo] = useState(true);
-  const [canvasBackgroundColor, setCanvasBackgroundColor] = useState<string>("#FFFFFF");
+  const [canvasBackgroundColor, setCanvasBackgroundColor] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("teachmeet-whiteboard-bg-color") || "#FFFFFF";
+    }
+    return "#FFFFFF";
+  });
 
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -97,14 +107,17 @@ export default function WhiteboardPage() {
     return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6;
   }, [selectedBrushSize, brushSizes]);
 
-  useEffect(() => {
-    const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
-    if (storedBgColor) {
-      setCanvasBackgroundColor(storedBgColor);
-    }
-    const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
-    if (storedPenColor) {
-      setSelectedColor(storedPenColor);
+ useEffect(() => {
+    // Load initial background color from localStorage
+    if (typeof window !== 'undefined') {
+        const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
+        if (storedBgColor) {
+            setCanvasBackgroundColor(storedBgColor);
+        }
+        const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
+        if (storedPenColor) {
+            setSelectedColor(storedPenColor);
+        }
     }
   }, []);
 
@@ -120,19 +133,26 @@ export default function WhiteboardPage() {
           imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         } catch (e) {
           console.error("Error getting imageData during resize:", e);
+          // Potentially clear imageData if error (e.g., tainted canvas, though less likely here)
+          imageData = undefined;
         }
       }
       
       const newWidth = canvas.parentElement.clientWidth;
       const newHeight = canvas.parentElement.clientHeight;
 
+      // Only resize and restore if new dimensions are valid
       if (newWidth > 0 && newHeight > 0) {
         canvas.width = newWidth;
         canvas.height = newHeight;
-        canvas.style.backgroundColor = canvasBackgroundColor;
-
+        // No need to set canvas.style.backgroundColor here, as the canvas itself should be transparent
+        // and the background is handled by the Card or parent elements if needed, or filled during clear.
 
         if (context) {
+          // Always clear to the current background color before restoring or starting fresh
+          context.fillStyle = canvasBackgroundColor;
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          
           context.lineCap = "round";
           context.lineJoin = "round";
           context.strokeStyle = selectedColor;
@@ -148,11 +168,8 @@ export default function WhiteboardPage() {
               context.putImageData(imageData, 0, 0);
             } catch (e) {
               console.error("Error putting imageData during resize:", e);
+              // If putImageData fails, the canvas will remain with the background color fill
             }
-          } else {
-            // If no imageData (e.g., initial load or canvas was 0x0), fill with background
-            context.fillStyle = canvasBackgroundColor;
-            context.fillRect(0, 0, canvas.width, canvas.height);
           }
         }
       }
@@ -209,6 +226,7 @@ export default function WhiteboardPage() {
     }
   
     if (typeof clientX !== 'number' || typeof clientY !== 'number') {
+      // console.warn("Could not determine clientX/Y from event:", event);
       return null;
     }
   
@@ -348,6 +366,7 @@ export default function WhiteboardPage() {
       initialCanvasDataForSelectionRef.current = null;
       currentSelectionRectRef.current = null;
     }
+
     if (activeTool !== 'text') { 
       setShowHeaderInfo(true);
     }
@@ -366,7 +385,7 @@ export default function WhiteboardPage() {
     if (!pos) return;
 
     if (activeTool === 'select') {
-      if (event.type === 'touchstart') { /* No preventDefault here */ }
+      if (event.type === 'touchstart') { /* No preventDefault here for select */ }
       if (contextRef.current && canvasRef.current) {
         try {
           initialCanvasDataForSelectionRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -441,7 +460,7 @@ export default function WhiteboardPage() {
     if (toolId === 'text') {
       setShowHeaderInfo(false);
     } else {
-      
+      // Only show header if not actively drawing or selecting
       if (!isDrawingRef.current && !isSelectingRef.current) {
         setShowHeaderInfo(true);
       }
@@ -646,13 +665,13 @@ export default function WhiteboardPage() {
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => { 
-                  if (activeTool === 'select') { /* Allow default */ } 
+                  if (activeTool === 'select') { /* Allow default for select */ } 
                   else if (activeTool === 'text') { /* Handled in handleCanvasPointerDown */ }
-                  else { e.preventDefault(); }
+                  else { e.preventDefault(); } // Prevent default for drawing tools
                   handleCanvasPointerDown(e); 
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
-                style={{ backgroundColor: canvasBackgroundColor }}
+                style={{ backgroundColor: canvasBackgroundColor }} // Applied dynamic background color
               />
               {activeTool === 'text' && (
                 <Textarea
