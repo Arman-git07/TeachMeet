@@ -46,8 +46,8 @@ export default function SettingsPage() {
 
   const { toast } = useToast();
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
-  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#32CD32");
-  const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
+  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#32CD32"); // Default vibrant green
+  const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF"); // Default white
   const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
 
 
@@ -106,10 +106,10 @@ export default function SettingsPage() {
   };
   
   const handleSaveWhiteboardSettings = () => {
-    // Values are already saved to localStorage on change. This button can provide user feedback.
+    // Values are already saved to localStorage on change. This button provides user feedback.
     toast({
-      title: "Whiteboard Settings Saved",
-      description: "Your whiteboard preferences have been updated in local storage.",
+      title: "Whiteboard Settings Confirmed",
+      description: "Your whiteboard preferences are up-to-date and saved in your browser's local storage.",
     });
   };
   
