@@ -149,8 +149,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const handleJoinNow = () => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
-      // Optionally persist mic state too if needed:
-      // localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
+      localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
     }
     const joinNowLinkPath = topic 
       ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 

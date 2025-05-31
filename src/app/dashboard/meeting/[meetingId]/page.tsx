@@ -77,9 +77,9 @@ const ParticipantView = React.memo(function ParticipantView({
             muted
             autoPlay
             playsInline
-            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject && !isScreenSharing}, { 'block': isScreenSharing && videoRef?.current?.srcObject})}
+            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject && !isScreenSharingActive}, { 'block': isScreenSharingActive && videoRef?.current?.srcObject})}
           />
-          {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || (!videoRef?.current?.srcObject && !isScreenSharing)) && (
+          {((isCameraOff && !isScreenSharingActive) || hasCameraPermissionForView === false || (!videoRef?.current?.srcObject && !isScreenSharingActive)) && (
             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
               <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
                 <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user" />
@@ -90,7 +90,7 @@ const ParticipantView = React.memo(function ParticipantView({
               {hasCameraPermissionForView === false && <p className="text-xs text-muted-foreground">Camera permission denied</p>}
             </div>
           )}
-           {isScreenSharing && !videoRef?.current?.srcObject && (
+           {isScreenSharingActive && !videoRef?.current?.srcObject && (
              <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
                 <ScreenShare className="w-16 h-16 text-muted-foreground mb-2"/>
                 <p className="text-base font-medium text-foreground">Sharing Screen...</p>
@@ -165,13 +165,19 @@ export default function MeetingPage() {
   const router = useRouter();
   const currentUser = auth.currentUser;
 
-  const [localMicMuted, setLocalMicMuted] = useState(false);
+  const [localMicMuted, setLocalMicMuted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const desiredState = localStorage.getItem('teachmeet-desired-mic-state');
+      return desiredState === 'off'; // if 'off', muted is true. if 'on' or null, muted is false.
+    }
+    return false; // Default to unmuted if window is not defined (SSR)
+  });
   const [localCameraOff, setLocalCameraOff] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
       return desiredState === 'off';
     }
-    return true;
+    return true; // Default to camera off if window is not defined
   });
   const [localHandRaised, setLocalHandRaised] = useState(false);
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
@@ -204,13 +210,16 @@ export default function MeetingPage() {
       console.log(`[MeetingPage] User ${currentUser.uid} attempting to join meeting ${meetingId}. Status: joining`);
 
       const initialCameraOffFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
+      const initialMicMutedFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') === 'off' : false;
       console.log(`[MeetingPage] Initial camera off from storage for Firestore: ${initialCameraOffFromStorage}`);
+      console.log(`[MeetingPage] Initial mic muted from storage for Firestore: ${initialMicMutedFromStorage}`);
+
 
       const participantData = {
         userId: currentUser.uid,
         name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
         photoURL: currentUser.photoURL,
-        isMicMuted: false, 
+        isMicMuted: initialMicMutedFromStorage, 
         isCameraOff: initialCameraOffFromStorage,
         isHandRaised: false, 
         isScreenSharing: false, 
@@ -236,7 +245,7 @@ export default function MeetingPage() {
           setJoinStatus('failed');
         });
     }
-  }, [currentUser, meetingId, toast, joinStatus]); // Removed db from dependency array as it's stable
+  }, [currentUser, meetingId, toast, joinStatus]); 
 
   useEffect(() => {
     if (joinStatus !== 'joined' || !meetingId || !db) return;
@@ -274,7 +283,7 @@ export default function MeetingPage() {
       console.log(`[MeetingPage] Cleaning up Firestore listener for participants in meeting ${meetingId}`);
       unsubscribeParticipants();
     };
-  }, [meetingId, toast, joinStatus]); // Removed db from dependency array
+  }, [meetingId, toast, joinStatus]); 
 
   useEffect(() => {
     if (joinStatus !== 'joined') return;
@@ -377,7 +386,7 @@ export default function MeetingPage() {
       localAudioStreamRef.current?.getTracks().forEach(track => track.stop());
       console.log("[MeetingPage] Cleaned up media streams on unmount.");
     };
-  }, [meetingId]); // Removed db from dependency array
+  }, [meetingId]); 
 
 
   const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'videoRef' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
