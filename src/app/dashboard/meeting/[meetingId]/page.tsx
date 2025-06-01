@@ -1,22 +1,63 @@
 
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter, useParams } from 'next/navigation';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle, Loader2, Share2, PanelLeftOpen } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import { Badge } from '@/components/ui/badge';
+import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
+import { Skeleton } from '@/components/ui/skeleton'; // Assuming Skeleton might be used for a loading state
+
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  PhoneOff,
+  MessageSquare,
+  Settings,
+  Users,
+  MoreVertical,
+  Hand,
+  Maximize,
+  Columns,
+  Edit3,
+  AlertTriangle,
+  AlertCircle,
+  ScreenShare,
+  StopCircle,
+  Loader2,
+  Share2
+} from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useSearchParams, useRouter, useParams } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import { auth, db } from '@/lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData } from 'firebase/firestore';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
-
+import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData } from 'firebase/firestore';
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
@@ -41,7 +82,7 @@ const ParticipantView = React.memo(function ParticipantView({
   videoRef,
   hasCameraPermissionForView,
   isHandRaisedForView,
-  isScreenSharing, // This prop indicates if THIS participant is screen sharing
+  isScreenSharing,
   photoURL
 }: Participant) {
   const { toast } = useToast();
@@ -58,7 +99,7 @@ const ParticipantView = React.memo(function ParticipantView({
         } else {
             toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
         }
-    } else if (isScreenSharing && !targetElement?.srcObject) { // Screen sharing is active, but srcObject is null (e.g. placeholder)
+    } else if (isScreenSharing && !targetElement?.srcObject) { 
         toast({ title: 'Screen Share Active', description: 'Screen is being shared. Fullscreen will apply to the shared content when available.' });
     } else {
         toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream or screen share.' });
@@ -117,7 +158,6 @@ const ParticipantView = React.memo(function ParticipantView({
           <VideoOff className="w-7 h-7 text-muted-foreground mt-1" title="Camera off"/>
         </div>
       ) : (
-        // This block is for remote users with camera ON (actual video stream not implemented here, so shows avatar as placeholder)
         <div className="w-full h-full bg-muted flex flex-col items-center justify-center p-4 text-center">
           <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
              <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user"/>
@@ -412,7 +452,7 @@ export default function MeetingPage() {
     setLocalMicMuted(newMicStateIsMuted);
     await updateUserStatusInFirestore({ isMicMuted: newMicStateIsMuted });
   
-    if (!newMicStateIsMuted) { // Turning mic ON
+    if (!newMicStateIsMuted) { 
       if (localAudioStreamRef.current) {
         localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
         console.log("[MeetingPage] Mic ON: Enabled existing audio tracks.");
@@ -439,7 +479,7 @@ export default function MeetingPage() {
           toast({ variant: 'destructive', title: 'Microphone Access Failed', description: 'Could not access microphone.' });
         }
       }
-    } else { // Turning mic OFF (muting)
+    } else { 
       if (localAudioStreamRef.current) {
         localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
         console.log("[MeetingPage] Mic OFF: Disabled audio tracks.");
