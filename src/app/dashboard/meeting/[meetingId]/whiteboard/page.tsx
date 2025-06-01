@@ -61,9 +61,10 @@ export default function WhiteboardPage() {
   
   const [selectedColor, setSelectedColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem("teachmeet-whiteboard-pen-color") || "#000000";
+      const storedColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
+      return storedColor || "#000000"; // Default to black if nothing stored
     }
-    return "#000000";
+    return "#000000"; // Server-side default or if localStorage not available
   });
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
@@ -117,7 +118,7 @@ export default function WhiteboardPage() {
         if (storedPenColor) {
             setSelectedColor(storedPenColor);
         } else {
-           localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); // Default if not set
+           localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); 
         }
     }
   }, []);
@@ -599,7 +600,7 @@ export default function WhiteboardPage() {
           </div>
         )}
 
-        <main className="flex-grow flex flex-col overflow-hidden"> 
+        <main className="flex-grow flex flex-col overflow-hidden min-h-0"> 
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
               <canvas
@@ -631,4 +632,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
