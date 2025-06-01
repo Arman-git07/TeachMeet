@@ -234,9 +234,9 @@ export default function WhiteboardPage() {
 
       if (
         drawingOptionsToolbarRef.current &&
-        !drawingOptionsToolbarRef.current.contains(target) && // Click is outside the panel
-        !isClickOnOptionsToggler && // And click is NOT on a button that primarily toggles the panel
-        showDrawingToolOptions // And the panel is currently shown
+        !drawingOptionsToolbarRef.current.contains(target) && 
+        !isClickOnOptionsToggler && 
+        showDrawingToolOptions 
       ) {
         setShowDrawingToolOptions(false);
       }
@@ -521,9 +521,7 @@ export default function WhiteboardPage() {
   };
   
   const isDrawingRelatedToolWithOptionsActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
-  
-  const mainDrawToolIsActive = activeTool && (drawingTools.includes(activeTool)) && activeTool !== 'erase';
-  
+    
   const canvasCursorClass = 
     activeTool === 'select' ? 'cursor-default' : 
     activeTool === 'text' ? 'cursor-text' :
@@ -537,7 +535,6 @@ export default function WhiteboardPage() {
 
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20"> 
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-            <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
             <ToolButton
               icon={Brush}
               label="Draw"
@@ -554,6 +551,7 @@ export default function WhiteboardPage() {
               isActive={activeTool === "erase"} 
               data-options-toggler="true"
             />
+            <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
             <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
