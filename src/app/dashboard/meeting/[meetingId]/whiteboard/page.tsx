@@ -80,6 +80,7 @@ export default function WhiteboardPage() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const drawingOptionsToolbarRef = useRef<HTMLDivElement>(null);
 
   const isDrawingRef = useRef(false);
   const lastPositionRef = useRef<{ x: number, y: number } | null>(null);
@@ -224,6 +225,35 @@ export default function WhiteboardPage() {
       }
     }
   }, [selectedColor, selectedBrushSize, getLineWidth, activeTool]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (
+        drawingOptionsToolbarRef.current &&
+        !drawingOptionsToolbarRef.current.contains(event.target as Node) &&
+        showDrawingToolOptions
+      ) {
+        // Check if the click was on one of the main tool buttons that control this panel.
+        // If so, handleToolClick would have already handled it or will handle it.
+        // This is to prevent closing if a main tool button itself was the target.
+        // A more robust way might involve checking class or data attributes on main tool buttons.
+        // For now, we assume that if the click is outside the options panel, it should close.
+        // The main tool buttons are in a separate DOM tree section.
+        setShowDrawingToolOptions(false);
+      }
+    };
+
+    if (showDrawingToolOptions) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showDrawingToolOptions, setShowDrawingToolOptions]);
+
 
   const getPointerPosition = useCallback((event: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent): { x: number, y: number } | null => {
     const canvas = canvasRef.current;
@@ -541,7 +571,7 @@ export default function WhiteboardPage() {
         </div>
 
         {showDrawingToolOptions && isDrawingRelatedToolWithOptionsActive && (
-           <div className="p-3 border-b bg-muted/50 shadow-sm absolute top-32 left-0 right-0 z-10">
+           <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 shadow-sm absolute top-32 left-0 right-0 z-10">
             <div className="container mx-auto">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 {activeTool !== 'erase' && (
