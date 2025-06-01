@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle, Loader2, Share2 } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MessageSquare, Settings, Users, MoreVertical, Hand, Maximize, Columns, Edit3, AlertTriangle, AlertCircle, ScreenShare, StopCircle, Loader2, Share2, PanelLeftOpen } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ const ParticipantView = React.memo(function ParticipantView({
   videoRef,
   hasCameraPermissionForView,
   isHandRaisedForView,
-  isScreenSharing,
+  isScreenSharing, // This prop indicates if THIS participant is screen sharing
   photoURL
 }: Participant) {
   const { toast } = useToast();
@@ -77,9 +77,9 @@ const ParticipantView = React.memo(function ParticipantView({
             muted
             autoPlay
             playsInline
-            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject && !isScreenSharingActive}, { 'block': isScreenSharingActive && videoRef?.current?.srcObject})}
+            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject && !isScreenSharing}, { 'block': isScreenSharing && videoRef?.current?.srcObject})}
           />
-          {((isCameraOff && !isScreenSharingActive) || hasCameraPermissionForView === false || (!videoRef?.current?.srcObject && !isScreenSharingActive)) && (
+          {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || (!videoRef?.current?.srcObject && !isScreenSharing)) && (
             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
               <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
                 <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user" />
@@ -90,7 +90,7 @@ const ParticipantView = React.memo(function ParticipantView({
               {hasCameraPermissionForView === false && <p className="text-xs text-muted-foreground">Camera permission denied</p>}
             </div>
           )}
-           {isScreenSharingActive && !videoRef?.current?.srcObject && (
+           {isScreenSharing && !videoRef?.current?.srcObject && (
              <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
                 <ScreenShare className="w-16 h-16 text-muted-foreground mb-2"/>
                 <p className="text-base font-medium text-foreground">Sharing Screen...</p>
@@ -168,16 +168,16 @@ export default function MeetingPage() {
   const [localMicMuted, setLocalMicMuted] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-mic-state');
-      return desiredState === 'off'; // if 'off', muted is true. if 'on' or null, muted is false.
+      return desiredState === 'off'; 
     }
-    return false; // Default to unmuted if window is not defined (SSR)
+    return false; 
   });
   const [localCameraOff, setLocalCameraOff] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
       return desiredState === 'off';
     }
-    return true; // Default to camera off if window is not defined
+    return true; 
   });
   const [localHandRaised, setLocalHandRaised] = useState(false);
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
