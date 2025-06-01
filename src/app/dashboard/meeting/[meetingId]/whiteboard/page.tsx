@@ -100,6 +100,12 @@ export default function WhiteboardPage() {
   const [isInitialStateSaved, setIsInitialStateSaved] = useState(false);
   const [activeSelection, setActiveSelection] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
 
+  // State for live text input
+  const [isTypingText, setIsTypingText] = useState(false);
+  const [currentText, setCurrentText] = useState('');
+  const [textInputPosition, setTextInputPosition] = useState<{ x: number, y: number } | null>(null);
+  const liveTextInputRef = useRef<HTMLInputElement>(null);
+
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -222,10 +228,19 @@ export default function WhiteboardPage() {
       setIsInitialStateSaved(true);
     }
     
+    // Draw live text if applicable
+    if (isTypingText && currentText && textInputPosition) {
+      context.fillStyle = selectedColor;
+      context.font = `${getFontSize()}px sans-serif`;
+      context.textAlign = "left";
+      context.textBaseline = "top";
+      context.fillText(currentText, textInputPosition.x, textInputPosition.y);
+    }
+
     if (activeSelection) {
       drawSelectionBoxWithHandles(activeSelection);
     }
-  }, [history, historyStep, canvasBackgroundColor, activeSelection, drawSelectionBoxWithHandles, isInitialStateSaved, saveCurrentCanvasState, setIsInitialStateSaved]);
+  }, [history, historyStep, canvasBackgroundColor, activeSelection, drawSelectionBoxWithHandles, isInitialStateSaved, saveCurrentCanvasState, setIsInitialStateSaved, isTypingText, currentText, textInputPosition, selectedColor, getFontSize]);
 
 
  useEffect(() => {
@@ -279,12 +294,16 @@ export default function WhiteboardPage() {
       const newHeight = canvas.parentElement.clientHeight;
 
       if (newWidth > 0 && newHeight > 0) {
+        const currentImageData = context?.getImageData(0, 0, canvas.width, canvas.height);
         canvas.width = newWidth;
         canvas.height = newHeight;
 
         if (context) {
           context.lineCap = "round";
           context.lineJoin = "round";
+          if (currentImageData) {
+            context.putImageData(currentImageData, 0, 0);
+          }
           redrawCanvasContent(); 
         }
       }
@@ -320,12 +339,47 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawCanvasContent();
-  }, [activeSelection, historyStep, redrawCanvasContent]); 
+  }, [activeSelection, historyStep, redrawCanvasContent, isTypingText, currentText, textInputPosition]); 
+
+  const finalizeLiveText = useCallback(() => {
+    if (isTypingText && currentText.trim() && textInputPosition && contextRef.current) {
+      // Redraw canvas up to the point before this text was added
+      if (history[historyStep]) {
+        contextRef.current.putImageData(history[historyStep], 0, 0);
+      } else if (canvasRef.current) {
+        contextRef.current.fillStyle = canvasBackgroundColor;
+        contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+
+      // Draw the finalized text
+      contextRef.current.globalCompositeOperation = 'source-over';
+      contextRef.current.fillStyle = selectedColor;
+      contextRef.current.font = `${getFontSize()}px sans-serif`;
+      contextRef.current.textAlign = "left";
+      contextRef.current.textBaseline = "top";
+      contextRef.current.fillText(currentText, textInputPosition.x, textInputPosition.y);
+      
+      saveCurrentCanvasState();
+    }
+    setIsTypingText(false);
+    setCurrentText('');
+    setTextInputPosition(null);
+    if (liveTextInputRef.current) {
+      liveTextInputRef.current.value = ''; // Clear hidden input
+      liveTextInputRef.current.blur();
+    }
+  }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor]);
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
       const isClickOnOptionsToggler = (target as HTMLElement).closest('[data-options-toggler="true"]');
+      
+      if (isTypingText && canvasRef.current && !canvasRef.current.contains(target) && drawingOptionsToolbarRef.current && !drawingOptionsToolbarRef.current.contains(target) && !isClickOnOptionsToggler) {
+        finalizeLiveText();
+      }
+
 
       if (
         drawingOptionsToolbarRef.current &&
@@ -334,15 +388,16 @@ export default function WhiteboardPage() {
         showDrawingToolOptions
       ) {
         const canvasElem = canvasRef.current;
-        if (canvasElem && !canvasElem.contains(target)) {
-          setShowDrawingToolOptions(false);
-        } else if (canvasElem && canvasElem.contains(target) && !isDrawingRef.current && !isSelectingRef.current) {
+        // Don't close if clicking on canvas to type or draw
+        if (canvasElem && canvasElem.contains(target) && (isDrawingRef.current || isSelectingRef.current || (activeTool === 'text' && !isTypingText))) {
+           // If click is on canvas and about to start drawing/selecting/typing, don't close options.
+        } else {
           setShowDrawingToolOptions(false);
         }
       }
     };
 
-    if (showDrawingToolOptions) {
+    if (showDrawingToolOptions || isTypingText) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("touchstart", handleClickOutside);
     }
@@ -351,7 +406,7 @@ export default function WhiteboardPage() {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
     };
-  }, [showDrawingToolOptions]);
+  }, [showDrawingToolOptions, isTypingText, finalizeLiveText, activeTool]);
 
 
   const getPointerPosition = useCallback((event: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent): { x: number, y: number } | null => {
@@ -574,6 +629,7 @@ export default function WhiteboardPage() {
           } else {
               setActiveSelection(null); 
           }
+          redrawCanvasContent(); // Ensure selection box is drawn if selection is committed
       }
       isSelectingRef.current = false;
       selectionStartPointRef.current = null;
@@ -585,18 +641,21 @@ export default function WhiteboardPage() {
     window.removeEventListener('touchcancel', handlePointerUp);
     window.removeEventListener('mousemove', handlePointerMove);
     window.removeEventListener('mouseup', handlePointerUp);
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool, toast]);
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool, toast, redrawCanvasContent]);
 
   const handleCanvasPointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return;
 
     const pos = getPointerPosition(event);
     if (!pos) return;
+    
+    if (isTypingText) { // If already typing, finalize before starting new action
+      finalizeLiveText();
+    }
+    setActiveSelection(null); // Clear any active selection box
 
     if (activeTool === 'select') {
-      setActiveSelection(null); 
-
-      if (event.type === 'touchstart') {  }
+      if (event.type === 'touchstart') { event.preventDefault(); }
       if (contextRef.current && canvasRef.current) {
         try {
           if (history[historyStep]) {
@@ -612,25 +671,17 @@ export default function WhiteboardPage() {
       isSelectingRef.current = true;
       selectionStartPointRef.current = pos;
       currentSelectionRectRef.current = null; 
-    } else if (activeTool && activeTool !== 'text') {
+    } else if (activeTool === 'text') {
+        setIsTypingText(true);
+        setTextInputPosition(pos);
+        setCurrentText('');
+        if (liveTextInputRef.current) {
+          liveTextInputRef.current.value = ''; // Clear previous value
+          liveTextInputRef.current.focus();
+        }
+    } else if (activeTool) { // Drawing tools
       if (event.type === 'touchstart') event.preventDefault();
       startDrawingInternal(pos);
-    } else if (activeTool === 'text') {
-       if (contextRef.current) {
-          const textToAdd = window.prompt("Enter text to add:", "");
-          if (textToAdd && textToAdd.trim() !== "") {
-              const { x, y } = pos;
-              contextRef.current.globalCompositeOperation = 'source-over';
-              contextRef.current.fillStyle = selectedColor; 
-              contextRef.current.font = `${getFontSize()}px sans-serif`; 
-              contextRef.current.textAlign = "left";
-              contextRef.current.textBaseline = "top";
-              contextRef.current.fillText(textToAdd, x, y);
-              saveCurrentCanvasState();
-          } else {
-             toast({ title: "Text input cancelled", description: "No text was added to the whiteboard.", duration: 2000 });
-          }
-       }
     } else {
       console.log("No tool active or unhandled tool, click at:", pos);
     }
@@ -643,7 +694,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
     }
-  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, selectedColor, toast, saveCurrentCanvasState, history, historyStep, getFontSize]);
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, finalizeLiveText, history, historyStep]);
 
   useEffect(() => {
     return () => {
@@ -657,8 +708,13 @@ export default function WhiteboardPage() {
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-    const isToolWithToggleableOptions = drawingTools.includes(toolId) || toolId === 'erase' || toolId === 'text';
+    
+    if (isTypingText) {
+      finalizeLiveText();
+    }
     setActiveSelection(null); 
+
+    const isToolWithToggleableOptions = drawingTools.includes(toolId) || toolId === 'erase' || toolId === 'text';
 
     if (activeTool === toolId && isToolWithToggleableOptions) {
       setShowDrawingToolOptions(prev => !prev);
@@ -692,12 +748,14 @@ export default function WhiteboardPage() {
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
       setActiveSelection(null);
+      finalizeLiveText(); // Ensure any live text is cleared
       saveCurrentCanvasState(); 
     }
     setShowClearConfirmDialog(false);
   };
 
   const handleUndo = useCallback(() => {
+    finalizeLiveText(); // Finalize any pending text before undo
     if (historyStep > 0) {
         const newStep = historyStep - 1;
         setHistoryStep(newStep);
@@ -710,30 +768,60 @@ export default function WhiteboardPage() {
     } else {
         toast({ title: "Nothing to undo", duration: 2000 });
     }
-  }, [historyStep, canvasBackgroundColor, toast]);
+    setActiveSelection(null);
+  }, [historyStep, canvasBackgroundColor, toast, finalizeLiveText]);
 
   const handleRedo = useCallback(() => {
+    finalizeLiveText(); // Finalize any pending text before redo
     if (historyStep < history.length - 1) {
         const newStep = historyStep + 1;
         setHistoryStep(newStep);
     } else {
         toast({ title: "Nothing to redo", duration: 2000 });
     }
-  }, [history, historyStep, toast]);
+    setActiveSelection(null);
+  }, [history, historyStep, toast, finalizeLiveText]);
 
   const isOptionsPanelToolActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase' || activeTool === 'text');
 
   const canvasCursorClass =
+    isTypingText ? 'cursor-text' : // Force text cursor if actively typing
     activeTool === 'select' ? 'cursor-crosshair' :
     activeTool === 'text' ? 'cursor-text' :
     (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'cursor-crosshair' :
     'cursor-default';
 
+  const handleLiveTextInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentText(event.target.value);
+  };
+
+  const handleLiveTextInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      finalizeLiveText();
+    }
+  };
+
 
   return (
     <>
+      <input
+        ref={liveTextInputRef}
+        type="text"
+        onChange={handleLiveTextInputChange}
+        onKeyDown={handleLiveTextInputKeyDown}
+        onBlur={finalizeLiveText} // Finalize if input loses focus
+        style={{
+          position: 'absolute',
+          left: '-9999px', // Visually hide it
+          opacity: 0,
+          width: '1px',
+          height: '1px',
+        }}
+        aria-hidden="true"
+        tabIndex={-1} // Not focusable by tabbing
+      />
       <div className="flex flex-col h-full bg-muted/30">
-
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <ToolButton
@@ -899,15 +987,14 @@ export default function WhiteboardPage() {
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => {
-                  if (activeTool === 'select') {  }
-                  else if (activeTool === 'text') {  }
-                  else { e.preventDefault(); }
+                  if (activeTool === 'select' || activeTool === 'text') { /* No preventDefault for select/text */ }
+                  else { e.preventDefault(); } // Prevent default for drawing tools to avoid scroll on touch
                   handleCanvasPointerDown(e);
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
                 style={{ backgroundColor: canvasBackgroundColor }}
               />
-              {(!activeTool || !isOptionsPanelToolActive) && !isDrawingRef.current && !isSelectingRef.current && (
+              {(!activeTool || !isOptionsPanelToolActive) && !isDrawingRef.current && !isSelectingRef.current && !isTypingText && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
                     Interactive canvas area - Select a tool to begin.
