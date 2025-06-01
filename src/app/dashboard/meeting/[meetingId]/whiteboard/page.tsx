@@ -22,13 +22,14 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext'; 
 
-const ToolButton = ({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType, label: string, onClick: () => void, isActive?: boolean }) => (
+const ToolButton = ({ icon: Icon, label, onClick, isActive = false, ...rest }: { icon: React.ElementType, label: string, onClick: () => void, isActive?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
   <Button
     variant={isActive ? "default" : "outline"}
     size="icon"
     className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs"
     onClick={onClick}
     aria-label={label}
+    {...rest}
   >
     <Icon className="h-5 w-5 mb-0.5" />
   </Button>
@@ -228,17 +229,15 @@ export default function WhiteboardPage() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      const isClickOnOptionsToggler = (target as HTMLElement).closest('[data-options-toggler="true"]');
+
       if (
         drawingOptionsToolbarRef.current &&
-        !drawingOptionsToolbarRef.current.contains(event.target as Node) &&
-        showDrawingToolOptions
+        !drawingOptionsToolbarRef.current.contains(target) && // Click is outside the panel
+        !isClickOnOptionsToggler && // And click is NOT on a button that primarily toggles the panel
+        showDrawingToolOptions // And the panel is currently shown
       ) {
-        // Check if the click was on one of the main tool buttons that control this panel.
-        // If so, handleToolClick would have already handled it or will handle it.
-        // This is to prevent closing if a main tool button itself was the target.
-        // A more robust way might involve checking class or data attributes on main tool buttons.
-        // For now, we assume that if the click is outside the options panel, it should close.
-        // The main tool buttons are in a separate DOM tree section.
         setShowDrawingToolOptions(false);
       }
     };
@@ -252,7 +251,7 @@ export default function WhiteboardPage() {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
     };
-  }, [showDrawingToolOptions, setShowDrawingToolOptions]);
+  }, [showDrawingToolOptions]);
 
 
   const getPointerPosition = useCallback((event: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent): { x: number, y: number } | null => {
@@ -542,12 +541,19 @@ export default function WhiteboardPage() {
             <ToolButton
               icon={Brush}
               label="Draw"
-              onClick={() => handleToolClick(drawingTools.includes(activeTool || "") && activeTool !== "erase" ? (activeTool || "draw") : "draw")}
+              onClick={() => handleToolClick("draw")}
               isActive={drawingTools.includes(activeTool || "") && activeTool !== "erase"}
+              data-options-toggler="true"
             />
             <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
-            <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} />
+            <ToolButton 
+              icon={Eraser} 
+              label="Erase" 
+              onClick={() => handleToolClick("Erase")} 
+              isActive={activeTool === "erase"} 
+              data-options-toggler="true"
+            />
             <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
