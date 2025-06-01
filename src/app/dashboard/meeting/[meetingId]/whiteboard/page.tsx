@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -751,12 +751,12 @@ export default function WhiteboardPage() {
               isActive={activeTool === "erase"}
               data-options-toggler={true}
             />
-            <ToolButton
-              icon={MousePointer2}
-              label="Select"
-              onClick={() => handleToolClick("Select")}
-              isActive={activeTool === "select"}
-            />
+             <ToolButton 
+                icon={MousePointer2} 
+                label="Select" 
+                onClick={() => handleToolClick("Select")} 
+                isActive={activeTool === "select"} 
+             />
             <ToolButton
                 icon={Undo2}
                 label="Undo"
