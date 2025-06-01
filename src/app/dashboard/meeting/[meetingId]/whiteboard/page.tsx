@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -103,7 +103,7 @@ export default function WhiteboardPage() {
   const [isTypingText, setIsTypingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number, y: number } | null>(null);
-  const liveTextInputRef = useRef<HTMLTextAreaElement>(null); // Changed to HTMLTextAreaElement
+  const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
   const [cursorBlinkVisible, setCursorBlinkVisible] = useState(true);
   const cursorIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -249,7 +249,7 @@ export default function WhiteboardPage() {
         context.beginPath();
         context.moveTo(cursorX, cursorY);
         context.lineTo(cursorX, cursorY + fontSize);
-        context.strokeStyle = selectedColor; // Use selectedColor for cursor
+        context.strokeStyle = selectedColor; 
         context.lineWidth = 1;
         context.stroke();
       }
@@ -286,7 +286,7 @@ export default function WhiteboardPage() {
         clearInterval(cursorIntervalRef.current);
         cursorIntervalRef.current = null;
       }
-      setCursorBlinkVisible(true); // Reset for next time
+      setCursorBlinkVisible(true); 
     }
     return () => {
       if (cursorIntervalRef.current) {
@@ -332,7 +332,6 @@ export default function WhiteboardPage() {
 
       if (newWidth > 0 && newHeight > 0) {
         let currentImageData = null;
-        // Try to preserve current drawing if context exists
         if (context && canvas.width > 0 && canvas.height > 0) {
             try {
                currentImageData = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -352,7 +351,7 @@ export default function WhiteboardPage() {
                 context.putImageData(currentImageData, 0, 0);
             } catch (e) {
                 console.warn("Could not put image data after resize, redrawing from history:", e);
-                redrawCanvasContent(); // Fallback to redraw from history if putImageData fails
+                redrawCanvasContent(); 
             }
           } else {
             redrawCanvasContent(); 
@@ -394,11 +393,10 @@ export default function WhiteboardPage() {
   }, [activeSelection, historyStep, redrawCanvasContent, isTypingText, currentText, textInputPosition, cursorBlinkVisible]); 
 
   const finalizeLiveText = useCallback(() => {
-    if (!isTypingText) return; // Avoid multiple finalizations
+    if (!isTypingText) return; 
 
-    const textToDraw = currentText.trim();
+    const textToDraw = currentText.trimEnd(); // Keep leading/internal spaces, trim trailing.
     if (textToDraw && textInputPosition && contextRef.current) {
-      // Restore canvas state before this text was typed
       if (history[historyStep]) {
         contextRef.current.putImageData(history[historyStep], 0, 0);
       } else if (canvasRef.current) {
@@ -406,7 +404,6 @@ export default function WhiteboardPage() {
         contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
 
-      // Draw the finalized text (multi-line)
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.fillStyle = selectedColor;
       contextRef.current.font = `${getFontSize()}px sans-serif`;
@@ -425,7 +422,6 @@ export default function WhiteboardPage() {
     setCurrentText('');
     // textInputPosition is reset by handleCanvasPointerDown or tool change
     if (liveTextInputRef.current) {
-      liveTextInputRef.current.value = ''; 
       liveTextInputRef.current.blur();
     }
   }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor]);
@@ -437,21 +433,17 @@ export default function WhiteboardPage() {
       const isClickOnOptionsToggler = (target as HTMLElement).closest('[data-options-toggler="true"]');
       
       if (isTypingText) {
-         // If clicking on canvas, handleCanvasPointerDown will manage finalization
          if (canvasRef.current && canvasRef.current.contains(target)) {
            return;
          }
-         // If clicking on options toggler for text tool, don't finalize yet
          if (isClickOnOptionsToggler && activeTool === 'text') {
            return;
          }
-         // If clicking on drawing options toolbar for text tool, don't finalize
          if (drawingOptionsToolbarRef.current && drawingOptionsToolbarRef.current.contains(target) && activeTool === 'text') {
             return;
          }
          finalizeLiveText();
       }
-
 
       if (
         drawingOptionsToolbarRef.current &&
@@ -461,7 +453,6 @@ export default function WhiteboardPage() {
       ) {
         const canvasElem = canvasRef.current;
         if (canvasElem && canvasElem.contains(target) && (isDrawingRef.current || isSelectingRef.current || (activeTool === 'text' && !isTypingText))) {
-           // If click is on canvas and about to start drawing/selecting/typing, don't close options.
         } else {
           setShowDrawingToolOptions(false);
         }
@@ -721,41 +712,46 @@ export default function WhiteboardPage() {
     const pos = getPointerPosition(event);
     if (!pos) return;
     
-    if (isTypingText) { 
-      finalizeLiveText();
-    }
-    setActiveSelection(null); 
-
-    if (activeTool === 'select') {
-      if (event.type === 'touchstart') { event.preventDefault(); }
-      if (contextRef.current && canvasRef.current) {
-        try {
-          if (history[historyStep]) {
-            initialCanvasDataForSelectionRef.current = history[historyStep];
-          } else { 
-            initialCanvasDataForSelectionRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-          }
-        } catch (e) {
-          console.error("Error getting image data for selection:", e);
-          initialCanvasDataForSelectionRef.current = null;
+    if (activeTool === 'text') {
+        if (isTypingText) {
+            finalizeLiveText();
         }
-      }
-      isSelectingRef.current = true;
-      selectionStartPointRef.current = pos;
-      currentSelectionRectRef.current = null; 
-    } else if (activeTool === 'text') {
-        setIsTypingText(true);
         setTextInputPosition(pos);
         setCurrentText('');
-        if (liveTextInputRef.current) {
-          liveTextInputRef.current.value = ''; 
-          liveTextInputRef.current.focus();
+        setIsTypingText(true);
+        setTimeout(() => {
+            if (liveTextInputRef.current) {
+                liveTextInputRef.current.focus();
+            }
+        }, 0);
+    } else if (activeTool === 'select') {
+        if (isTypingText) finalizeLiveText();
+        setActiveSelection(null);
+        if (event.type === 'touchstart') { event.preventDefault(); }
+        if (contextRef.current && canvasRef.current) {
+            try {
+            if (history[historyStep]) {
+                initialCanvasDataForSelectionRef.current = history[historyStep];
+            } else { 
+                initialCanvasDataForSelectionRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+            }
+            } catch (e) {
+            console.error("Error getting image data for selection:", e);
+            initialCanvasDataForSelectionRef.current = null;
+            }
         }
-    } else if (activeTool) { 
-      if (event.type === 'touchstart') event.preventDefault();
-      startDrawingInternal(pos);
+        isSelectingRef.current = true;
+        selectionStartPointRef.current = pos;
+        currentSelectionRectRef.current = null; 
+    } else if (activeTool) { // For drawing tools (draw, erase, shapes)
+        if (isTypingText) finalizeLiveText();
+        setActiveSelection(null); 
+        if (event.type === 'touchstart') event.preventDefault();
+        startDrawingInternal(pos);
     } else {
       console.log("No tool active or unhandled tool, click at:", pos);
+       if (isTypingText) finalizeLiveText(); // Finalize text if clicking with no tool active
+       setActiveSelection(null);
     }
 
     if (event.type.startsWith('touch')) {
@@ -766,7 +762,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
     }
-  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, finalizeLiveText, history, historyStep]);
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, finalizeLiveText, history, historyStep, isTypingText]);
 
   useEffect(() => {
     return () => {
@@ -781,7 +777,7 @@ export default function WhiteboardPage() {
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
     
-    if (isTypingText) {
+    if (isTypingText && toolId !== 'text') { // Finalize text if switching away from text tool
       finalizeLiveText();
     }
     setActiveSelection(null); 
@@ -868,11 +864,10 @@ export default function WhiteboardPage() {
   };
 
   const handleLiveTextInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) { // Allow Shift+Enter for new line in textarea if needed later
+    if (event.key === 'Enter' && !event.shiftKey) { 
       event.preventDefault();
       setCurrentText(prev => prev + '\n');
     }
-    // Note: Finalization on "Enter" is removed, text finalizes on blur/tool change/click outside.
   };
 
 
@@ -880,7 +875,7 @@ export default function WhiteboardPage() {
     <>
       <textarea
         ref={liveTextInputRef}
-        value={currentText} // Bind value for consistency
+        value={currentText} 
         onChange={handleLiveTextInputChange}
         onKeyDown={handleLiveTextInputKeyDown}
         onBlur={finalizeLiveText} 
@@ -896,7 +891,7 @@ export default function WhiteboardPage() {
           margin: 0,
           overflow: 'hidden',
           resize: 'none',
-          whiteSpace: 'pre', // To respect spaces and let browser handle wrapping if input area was visible
+          whiteSpace: 'pre', 
         }}
         aria-hidden="true"
         tabIndex={-1} 
@@ -969,7 +964,7 @@ export default function WhiteboardPage() {
         </div>
 
         {showDrawingToolOptions && isOptionsPanelToolActive && (
-           <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg"> {/* Adjusted top from top-32 to account for removed padding */}
+           <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg">
             <div className="container mx-auto">
               {activeTool === 'text' ? (
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -1070,8 +1065,6 @@ export default function WhiteboardPage() {
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => {
-                  if (activeTool === 'select' || activeTool === 'text') { /* No preventDefault for select/text */ }
-                  else { e.preventDefault(); } 
                   handleCanvasPointerDown(e);
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
