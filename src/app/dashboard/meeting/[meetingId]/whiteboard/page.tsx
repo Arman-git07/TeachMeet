@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -100,11 +100,12 @@ export default function WhiteboardPage() {
   const [isInitialStateSaved, setIsInitialStateSaved] = useState(false);
   const [activeSelection, setActiveSelection] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
 
-  // State for live text input
   const [isTypingText, setIsTypingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number, y: number } | null>(null);
-  const liveTextInputRef = useRef<HTMLInputElement>(null);
+  const liveTextInputRef = useRef<HTMLTextAreaElement>(null); // Changed to HTMLTextAreaElement
+  const [cursorBlinkVisible, setCursorBlinkVisible] = useState(true);
+  const cursorIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -210,6 +211,8 @@ export default function WhiteboardPage() {
 
     const canvas = canvasRef.current;
     const context = contextRef.current;
+    const fontSize = getFontSize();
+    const lineHeight = fontSize * 1.2;
 
     context.globalCompositeOperation = 'source-over';
     context.fillStyle = canvasBackgroundColor;
@@ -228,19 +231,34 @@ export default function WhiteboardPage() {
       setIsInitialStateSaved(true);
     }
     
-    // Draw live text if applicable
-    if (isTypingText && currentText && textInputPosition) {
+    if (isTypingText && textInputPosition) {
       context.fillStyle = selectedColor;
-      context.font = `${getFontSize()}px sans-serif`;
+      context.font = `${fontSize}px sans-serif`;
       context.textAlign = "left";
       context.textBaseline = "top";
-      context.fillText(currentText, textInputPosition.x, textInputPosition.y);
+      
+      const lines = currentText.split('\n');
+      lines.forEach((line, index) => {
+        context.fillText(line, textInputPosition.x, textInputPosition.y + (index * lineHeight));
+      });
+
+      if (cursorBlinkVisible) {
+        const lastLine = lines[lines.length - 1];
+        const cursorX = textInputPosition.x + context.measureText(lastLine).width;
+        const cursorY = textInputPosition.y + (lines.length - 1) * lineHeight;
+        context.beginPath();
+        context.moveTo(cursorX, cursorY);
+        context.lineTo(cursorX, cursorY + fontSize);
+        context.strokeStyle = selectedColor; // Use selectedColor for cursor
+        context.lineWidth = 1;
+        context.stroke();
+      }
     }
 
     if (activeSelection) {
       drawSelectionBoxWithHandles(activeSelection);
     }
-  }, [history, historyStep, canvasBackgroundColor, activeSelection, drawSelectionBoxWithHandles, isInitialStateSaved, saveCurrentCanvasState, setIsInitialStateSaved, isTypingText, currentText, textInputPosition, selectedColor, getFontSize]);
+  }, [history, historyStep, canvasBackgroundColor, activeSelection, drawSelectionBoxWithHandles, isInitialStateSaved, saveCurrentCanvasState, setIsInitialStateSaved, isTypingText, currentText, textInputPosition, selectedColor, getFontSize, cursorBlinkVisible]);
 
 
  useEffect(() => {
@@ -257,6 +275,25 @@ export default function WhiteboardPage() {
         }
     }
   }, []);
+
+  useEffect(() => {
+    if (isTypingText) {
+      cursorIntervalRef.current = setInterval(() => {
+        setCursorBlinkVisible(prev => !prev);
+      }, 500);
+    } else {
+      if (cursorIntervalRef.current) {
+        clearInterval(cursorIntervalRef.current);
+        cursorIntervalRef.current = null;
+      }
+      setCursorBlinkVisible(true); // Reset for next time
+    }
+    return () => {
+      if (cursorIntervalRef.current) {
+        clearInterval(cursorIntervalRef.current);
+      }
+    };
+  }, [isTypingText]);
 
 
   useEffect(() => {
@@ -294,7 +331,16 @@ export default function WhiteboardPage() {
       const newHeight = canvas.parentElement.clientHeight;
 
       if (newWidth > 0 && newHeight > 0) {
-        const currentImageData = context?.getImageData(0, 0, canvas.width, canvas.height);
+        let currentImageData = null;
+        // Try to preserve current drawing if context exists
+        if (context && canvas.width > 0 && canvas.height > 0) {
+            try {
+               currentImageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            } catch (e) {
+                console.warn("Could not get image data before resize, canvas might be tainted or empty:", e);
+            }
+        }
+        
         canvas.width = newWidth;
         canvas.height = newHeight;
 
@@ -302,9 +348,15 @@ export default function WhiteboardPage() {
           context.lineCap = "round";
           context.lineJoin = "round";
           if (currentImageData) {
-            context.putImageData(currentImageData, 0, 0);
+            try {
+                context.putImageData(currentImageData, 0, 0);
+            } catch (e) {
+                console.warn("Could not put image data after resize, redrawing from history:", e);
+                redrawCanvasContent(); // Fallback to redraw from history if putImageData fails
+            }
+          } else {
+            redrawCanvasContent(); 
           }
-          redrawCanvasContent(); 
         }
       }
     }
@@ -339,11 +391,14 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawCanvasContent();
-  }, [activeSelection, historyStep, redrawCanvasContent, isTypingText, currentText, textInputPosition]); 
+  }, [activeSelection, historyStep, redrawCanvasContent, isTypingText, currentText, textInputPosition, cursorBlinkVisible]); 
 
   const finalizeLiveText = useCallback(() => {
-    if (isTypingText && currentText.trim() && textInputPosition && contextRef.current) {
-      // Redraw canvas up to the point before this text was added
+    if (!isTypingText) return; // Avoid multiple finalizations
+
+    const textToDraw = currentText.trim();
+    if (textToDraw && textInputPosition && contextRef.current) {
+      // Restore canvas state before this text was typed
       if (history[historyStep]) {
         contextRef.current.putImageData(history[historyStep], 0, 0);
       } else if (canvasRef.current) {
@@ -351,21 +406,26 @@ export default function WhiteboardPage() {
         contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
 
-      // Draw the finalized text
+      // Draw the finalized text (multi-line)
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.fillStyle = selectedColor;
       contextRef.current.font = `${getFontSize()}px sans-serif`;
       contextRef.current.textAlign = "left";
       contextRef.current.textBaseline = "top";
-      contextRef.current.fillText(currentText, textInputPosition.x, textInputPosition.y);
+      
+      const lines = textToDraw.split('\n');
+      const lineHeight = getFontSize() * 1.2;
+      lines.forEach((line, index) => {
+        contextRef.current!.fillText(line, textInputPosition.x, textInputPosition.y + (index * lineHeight));
+      });
       
       saveCurrentCanvasState();
     }
     setIsTypingText(false);
     setCurrentText('');
-    setTextInputPosition(null);
+    // textInputPosition is reset by handleCanvasPointerDown or tool change
     if (liveTextInputRef.current) {
-      liveTextInputRef.current.value = ''; // Clear hidden input
+      liveTextInputRef.current.value = ''; 
       liveTextInputRef.current.blur();
     }
   }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor]);
@@ -376,8 +436,20 @@ export default function WhiteboardPage() {
       const target = event.target as Node;
       const isClickOnOptionsToggler = (target as HTMLElement).closest('[data-options-toggler="true"]');
       
-      if (isTypingText && canvasRef.current && !canvasRef.current.contains(target) && drawingOptionsToolbarRef.current && !drawingOptionsToolbarRef.current.contains(target) && !isClickOnOptionsToggler) {
-        finalizeLiveText();
+      if (isTypingText) {
+         // If clicking on canvas, handleCanvasPointerDown will manage finalization
+         if (canvasRef.current && canvasRef.current.contains(target)) {
+           return;
+         }
+         // If clicking on options toggler for text tool, don't finalize yet
+         if (isClickOnOptionsToggler && activeTool === 'text') {
+           return;
+         }
+         // If clicking on drawing options toolbar for text tool, don't finalize
+         if (drawingOptionsToolbarRef.current && drawingOptionsToolbarRef.current.contains(target) && activeTool === 'text') {
+            return;
+         }
+         finalizeLiveText();
       }
 
 
@@ -388,7 +460,6 @@ export default function WhiteboardPage() {
         showDrawingToolOptions
       ) {
         const canvasElem = canvasRef.current;
-        // Don't close if clicking on canvas to type or draw
         if (canvasElem && canvasElem.contains(target) && (isDrawingRef.current || isSelectingRef.current || (activeTool === 'text' && !isTypingText))) {
            // If click is on canvas and about to start drawing/selecting/typing, don't close options.
         } else {
@@ -629,11 +700,12 @@ export default function WhiteboardPage() {
           } else {
               setActiveSelection(null); 
           }
-          redrawCanvasContent(); // Ensure selection box is drawn if selection is committed
+          redrawCanvasContent();
       }
       isSelectingRef.current = false;
       selectionStartPointRef.current = null;
       initialCanvasDataForSelectionRef.current = null;
+      currentSelectionRectRef.current = null;
     }
 
     window.removeEventListener('touchmove', handlePointerMove);
@@ -649,10 +721,10 @@ export default function WhiteboardPage() {
     const pos = getPointerPosition(event);
     if (!pos) return;
     
-    if (isTypingText) { // If already typing, finalize before starting new action
+    if (isTypingText) { 
       finalizeLiveText();
     }
-    setActiveSelection(null); // Clear any active selection box
+    setActiveSelection(null); 
 
     if (activeTool === 'select') {
       if (event.type === 'touchstart') { event.preventDefault(); }
@@ -676,10 +748,10 @@ export default function WhiteboardPage() {
         setTextInputPosition(pos);
         setCurrentText('');
         if (liveTextInputRef.current) {
-          liveTextInputRef.current.value = ''; // Clear previous value
+          liveTextInputRef.current.value = ''; 
           liveTextInputRef.current.focus();
         }
-    } else if (activeTool) { // Drawing tools
+    } else if (activeTool) { 
       if (event.type === 'touchstart') event.preventDefault();
       startDrawingInternal(pos);
     } else {
@@ -748,14 +820,14 @@ export default function WhiteboardPage() {
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
       setActiveSelection(null);
-      finalizeLiveText(); // Ensure any live text is cleared
+      finalizeLiveText(); 
       saveCurrentCanvasState(); 
     }
     setShowClearConfirmDialog(false);
   };
 
   const handleUndo = useCallback(() => {
-    finalizeLiveText(); // Finalize any pending text before undo
+    finalizeLiveText(); 
     if (historyStep > 0) {
         const newStep = historyStep - 1;
         setHistoryStep(newStep);
@@ -772,7 +844,7 @@ export default function WhiteboardPage() {
   }, [historyStep, canvasBackgroundColor, toast, finalizeLiveText]);
 
   const handleRedo = useCallback(() => {
-    finalizeLiveText(); // Finalize any pending text before redo
+    finalizeLiveText(); 
     if (historyStep < history.length - 1) {
         const newStep = historyStep + 1;
         setHistoryStep(newStep);
@@ -785,41 +857,52 @@ export default function WhiteboardPage() {
   const isOptionsPanelToolActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase' || activeTool === 'text');
 
   const canvasCursorClass =
-    isTypingText ? 'cursor-text' : // Force text cursor if actively typing
+    isTypingText ? 'cursor-text' : 
     activeTool === 'select' ? 'cursor-crosshair' :
     activeTool === 'text' ? 'cursor-text' :
     (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'cursor-crosshair' :
     'cursor-default';
 
-  const handleLiveTextInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLiveTextInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setCurrentText(event.target.value);
   };
 
-  const handleLiveTextInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
+  const handleLiveTextInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) { // Allow Shift+Enter for new line in textarea if needed later
       event.preventDefault();
-      finalizeLiveText();
+      setCurrentText(prev => prev + '\n');
     }
+    // Note: Finalization on "Enter" is removed, text finalizes on blur/tool change/click outside.
   };
 
 
   return (
     <>
-      <input
+      <textarea
         ref={liveTextInputRef}
-        type="text"
+        value={currentText} // Bind value for consistency
         onChange={handleLiveTextInputChange}
         onKeyDown={handleLiveTextInputKeyDown}
-        onBlur={finalizeLiveText} // Finalize if input loses focus
+        onBlur={finalizeLiveText} 
         style={{
           position: 'absolute',
-          left: '-9999px', // Visually hide it
-          opacity: 0,
+          top: '-9999px', 
+          left: '-9999px',
           width: '1px',
           height: '1px',
+          opacity: 0,
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          overflow: 'hidden',
+          resize: 'none',
+          whiteSpace: 'pre', // To respect spaces and let browser handle wrapping if input area was visible
         }}
         aria-hidden="true"
-        tabIndex={-1} // Not focusable by tabbing
+        tabIndex={-1} 
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck="false"
       />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
@@ -886,7 +969,7 @@ export default function WhiteboardPage() {
         </div>
 
         {showDrawingToolOptions && isOptionsPanelToolActive && (
-           <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg">
+           <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg"> {/* Adjusted top from top-32 to account for removed padding */}
             <div className="container mx-auto">
               {activeTool === 'text' ? (
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -988,7 +1071,7 @@ export default function WhiteboardPage() {
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => {
                   if (activeTool === 'select' || activeTool === 'text') { /* No preventDefault for select/text */ }
-                  else { e.preventDefault(); } // Prevent default for drawing tools to avoid scroll on touch
+                  else { e.preventDefault(); } 
                   handleCanvasPointerDown(e);
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
