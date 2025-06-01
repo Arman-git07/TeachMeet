@@ -506,7 +506,7 @@ export default function WhiteboardPage() {
     <>
       <div className="flex flex-col h-full bg-muted/30">
 
-        <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-10"> 
+        <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20"> 
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
             <ToolButton
@@ -541,7 +541,7 @@ export default function WhiteboardPage() {
         </div>
 
         {showDrawingToolOptions && isDrawingRelatedToolWithOptionsActive && (
-           <div className="flex-none p-3 border-b bg-muted/50 shadow-sm sticky top-[calc(64px+64px)] z-10"> 
+           <div className="p-3 border-b bg-muted/50 shadow-sm absolute top-32 left-0 right-0 z-10">
             <div className="container mx-auto">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 {activeTool !== 'erase' && (
@@ -632,3 +632,4 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
