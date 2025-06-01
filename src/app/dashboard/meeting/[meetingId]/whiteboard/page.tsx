@@ -342,8 +342,6 @@ export default function WhiteboardPage() {
         const centerY = start.y + dy / 2;
         contextRef.current.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
       } else if (activeTool === 'arrow') {
-        contextRef.current.moveTo(start.x, start.y);
-        contextRef.current.lineTo(end.x, end.y);
         const headlen = 10 + getLineWidth(); 
         const angle = Math.atan2(end.y - start.y, end.x - start.x);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
@@ -542,7 +540,6 @@ export default function WhiteboardPage() {
               isActive={drawingTools.includes(activeTool || "") && activeTool !== "erase"}
               data-options-toggler="true"
             />
-            <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
             <ToolButton 
               icon={Eraser} 
@@ -552,6 +549,7 @@ export default function WhiteboardPage() {
               data-options-toggler="true"
             />
             <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
+            <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
             <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
