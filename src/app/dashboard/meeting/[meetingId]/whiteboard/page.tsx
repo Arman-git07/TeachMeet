@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation"; 
 import { useToast } from "@/hooks/use-toast";
@@ -191,7 +191,6 @@ export default function WhiteboardPage() {
               console.error("Error putting imageData during resize:", e);
             }
           } else if (!isInitialStateSaved && canvas.width > 0 && canvas.height > 0) {
-            // Only save initial state if not already saved and canvas has dimensions
             saveCurrentCanvasState();
             setIsInitialStateSaved(true);
           }
@@ -221,7 +220,8 @@ export default function WhiteboardPage() {
     const WhiteboardPageHeader = () => (
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 sm:gap-3">
-          <Wand2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+          {/* Using Edit3 as a placeholder for Wand2 since it's more drawing related */}
+          <Edit3 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
           <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">
             TeachMeet Whiteboard
           </h1>
@@ -360,7 +360,7 @@ export default function WhiteboardPage() {
 
   const stopDrawingInternal = useCallback((pos?: { x: number, y: number }) => {
     if (!contextRef.current || !isDrawingRef.current || activeTool === 'select' || activeTool === 'text') {
-      if (isDrawingRef.current) { // Ensure this only runs if drawing was actually in progress
+      if (isDrawingRef.current) { 
         isDrawingRef.current = false;
         lastPositionRef.current = null;
         shapeStartPointRef.current = null;
@@ -414,7 +414,7 @@ export default function WhiteboardPage() {
       contextRef.current.globalCompositeOperation = 'source-over';
     }
     
-    saveCurrentCanvasState(); // Save state after drawing operation completes
+    saveCurrentCanvasState(); 
     isDrawingRef.current = false;
     lastPositionRef.current = null;
     shapeStartPointRef.current = null;
@@ -506,7 +506,7 @@ export default function WhiteboardPage() {
               contextRef.current.textAlign = "left";
               contextRef.current.textBaseline = "top";
               contextRef.current.fillText(textToAdd, x, y);
-              saveCurrentCanvasState(); // Save state after adding text
+              saveCurrentCanvasState(); 
           } else {
              toast({ title: "Text input cancelled", description: "No text was added to the whiteboard.", duration: 2000 });
           }
@@ -535,17 +535,15 @@ export default function WhiteboardPage() {
     };
   }, [handlePointerMove, handlePointerUp]);
 
-
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-    const isDrawingToolType = drawingTools.includes(toolId) || toolId === 'erase';
-    const isSelectToolType = toolId === 'select';
+    const isDrawingToolWithOptions = drawingTools.includes(toolId) || toolId === 'erase';
 
-    if (activeTool === toolId && (isDrawingToolType || isSelectToolType)) {
+    if (activeTool === toolId && isDrawingToolWithOptions) {
       setShowDrawingToolOptions(prev => !prev);
     } else {
       setActiveTool(toolId);
-      if (isDrawingToolType || isSelectToolType) {
+      if (isDrawingToolWithOptions) {
         setShowDrawingToolOptions(true); 
       } else {
         setShowDrawingToolOptions(false); 
@@ -568,7 +566,7 @@ export default function WhiteboardPage() {
       context.globalCompositeOperation = 'source-over'; 
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
-      saveCurrentCanvasState(); // Save the cleared state
+      saveCurrentCanvasState(); 
     }
     setShowClearConfirmDialog(false);
   };
@@ -638,21 +636,8 @@ export default function WhiteboardPage() {
               label="Select" 
               onClick={() => handleToolClick("Select")} 
               isActive={activeTool === "select"}
-              data-options-toggler="true"
             />
             <ToolButton
-              icon={Wand2}
-              label="Assist"
-              onClick={() => {
-                if (activeTool === 'select') {
-                   toast({ title: "Shape Assist Clicked (from main toolbar)", description: "This would ideally be in the select options. Placeholder."});
-                } else {
-                   toast({ title: "Assist Tool", description: "Assist features are in development."});
-                }
-              }}
-              isActive={activeTool === 'assist'}
-            />
-             <ToolButton
                 icon={Undo2}
                 label="Undo"
                 onClick={handleUndo}
@@ -686,7 +671,7 @@ export default function WhiteboardPage() {
           </div>
         </div>
 
-        {showDrawingToolOptions && (activeTool === 'draw' || activeTool === 'erase' || activeTool === 'select') && (
+        {showDrawingToolOptions && (activeTool === 'draw' || activeTool === 'erase') && (
            <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 shadow-sm absolute top-32 left-0 right-0 z-10">
             <div className="container mx-auto">
               {(activeTool === 'draw' || activeTool === 'erase') && (
@@ -744,20 +729,6 @@ export default function WhiteboardPage() {
                   )}
                 </div>
               )}
-              {activeTool === 'select' && (
-                <div className="flex flex-col items-center md:items-start gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">Selection Tools:</span>
-                  <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
-                    <ToolButton
-                      icon={Wand2}
-                      label="Shape Assist"
-                      onClick={() => {
-                        toast({ title: "Shape Assist Clicked", description: "Shape Assist functionality is a creative idea for future implementation!"});
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -777,7 +748,7 @@ export default function WhiteboardPage() {
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
                 style={{ backgroundColor: canvasBackgroundColor }}
               />
-              {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select' && activeTool !== 'shapeassist')) && !isDrawingRef.current && !isSelectingRef.current && (
+              {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select')) && !isDrawingRef.current && !isSelectingRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
                     Interactive canvas area - Select a tool to begin drawing or select an area.
@@ -794,4 +765,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
