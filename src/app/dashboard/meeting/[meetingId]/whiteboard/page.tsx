@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +84,7 @@ export default function WhiteboardPage() {
     return "#000000";
   });
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
+  const [selectedTextSize, setSelectedTextSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
 
@@ -126,10 +127,22 @@ export default function WhiteboardPage() {
     { name: 'large', icon: CircleIconShape, label: 'Large Brush', lineWidth: 10 },
     { name: 'xlarge', icon: CircleIconShape, label: 'X-Large Brush', lineWidth: 15 },
   ];
+  
+  const textSizes = [
+    { name: 'small', label: 'Small Text', fontSize: 12 },
+    { name: 'medium', label: 'Medium Text', fontSize: 16 },
+    { name: 'large', label: 'Large Text', fontSize: 24 },
+    { name: 'xlarge', label: 'X-Large Text', fontSize: 32 },
+  ];
 
   const getLineWidth = useCallback(() => {
     return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6;
   }, [selectedBrushSize, brushSizes]);
+  
+  const getFontSize = useCallback(() => {
+    return textSizes.find(s => s.name === selectedTextSize)?.fontSize || 16;
+  }, [selectedTextSize, textSizes]);
+
 
   const saveCurrentCanvasState = useCallback(() => {
     if (!canvasRef.current || !contextRef.current || canvasRef.current.width === 0 || canvasRef.current.height === 0) return;
@@ -155,24 +168,22 @@ export default function WhiteboardPage() {
     if (!contextRef.current || !canvasRef.current) return;
     const ctx = contextRef.current;
 
-    ctx.save(); // Save current context state
+    ctx.save(); 
 
-    // Draw the main selection rectangle
     ctx.strokeStyle = 'rgba(0, 100, 255, 0.9)'; 
     ctx.lineWidth = 1.5;
-    ctx.setLineDash([]); // Solid line for persistent box
+    ctx.setLineDash([]); 
     ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
 
-    // Define handle positions
     const handles = [
-        { x: rect.x, y: rect.y }, // Top-left
-        { x: rect.x + rect.w / 2, y: rect.y }, // Top-center
-        { x: rect.x + rect.w, y: rect.y }, // Top-right
-        { x: rect.x, y: rect.y + rect.h / 2 }, // Middle-left
-        { x: rect.x + rect.w, y: rect.y + rect.h / 2 }, // Middle-right
-        { x: rect.x, y: rect.y + rect.h }, // Bottom-left
-        { x: rect.x + rect.w / 2, y: rect.y + rect.h }, // Bottom-center
-        { x: rect.x + rect.w, y: rect.y + rect.h }, // Bottom-right
+        { x: rect.x, y: rect.y }, 
+        { x: rect.x + rect.w / 2, y: rect.y }, 
+        { x: rect.x + rect.w, y: rect.y }, 
+        { x: rect.x, y: rect.y + rect.h / 2 }, 
+        { x: rect.x + rect.w, y: rect.y + rect.h / 2 }, 
+        { x: rect.x, y: rect.y + rect.h }, 
+        { x: rect.x + rect.w / 2, y: rect.y + rect.h }, 
+        { x: rect.x + rect.w, y: rect.y + rect.h }, 
     ];
 
     ctx.fillStyle = 'white';
@@ -185,7 +196,7 @@ export default function WhiteboardPage() {
         ctx.fill();
         ctx.stroke();
     });
-    ctx.restore(); // Restore context state
+    ctx.restore(); 
   }, [HANDLE_SIZE]);
 
   const redrawCanvasContent = useCallback(() => {
@@ -203,7 +214,6 @@ export default function WhiteboardPage() {
         context.putImageData(history[historyStep], 0, 0);
       } catch (e) {
         console.error("Error redrawing from history:", e);
-        // Fallback: re-clear if putImageData fails
         context.fillStyle = canvasBackgroundColor;
         context.fillRect(0, 0, canvas.width, canvas.height);
       }
@@ -275,7 +285,7 @@ export default function WhiteboardPage() {
         if (context) {
           context.lineCap = "round";
           context.lineJoin = "round";
-          redrawCanvasContent(); // This will handle background and history restoration
+          redrawCanvasContent(); 
         }
       }
     }
@@ -288,12 +298,12 @@ export default function WhiteboardPage() {
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (context) {
         contextRef.current = context;
-        resizeCanvas(); // Initial resize and draw
+        resizeCanvas(); 
       }
     }
     window.addEventListener("resize", resizeCanvas);
     return () => window.removeEventListener("resize", resizeCanvas);
-  }, [resizeCanvas]); // resizeCanvas depends on redrawCanvasContent
+  }, [resizeCanvas]); 
 
 
   useEffect(() => {
@@ -310,7 +320,7 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawCanvasContent();
-  }, [activeSelection, historyStep, redrawCanvasContent]); // Redraw if selection or history changes
+  }, [activeSelection, historyStep, redrawCanvasContent]); 
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -323,13 +333,10 @@ export default function WhiteboardPage() {
         !isClickOnOptionsToggler &&
         showDrawingToolOptions
       ) {
-        // If click is outside the options panel AND not on a toggler button,
-        // AND not on the canvas itself (if a selection drag is not happening)
         const canvasElem = canvasRef.current;
         if (canvasElem && !canvasElem.contains(target)) {
           setShowDrawingToolOptions(false);
         } else if (canvasElem && canvasElem.contains(target) && !isDrawingRef.current && !isSelectingRef.current) {
-          // Click on canvas but not dragging, close options panel
           setShowDrawingToolOptions(false);
         }
       }
@@ -382,7 +389,7 @@ export default function WhiteboardPage() {
   const startDrawingInternal = useCallback((pos: { x: number, y: number }) => {
     if (!contextRef.current || !activeTool || activeTool === 'select' || activeTool === 'text') return;
     
-    setActiveSelection(null); // Clear any active selection when starting to draw
+    setActiveSelection(null); 
     isDrawingRef.current = true;
     lastPositionRef.current = pos;
     shapeStartPointRef.current = pos;
@@ -408,10 +415,9 @@ export default function WhiteboardPage() {
       contextRef.current.stroke();
       lastPositionRef.current = pos;
     } else if (drawingTools.includes(activeTool) && shapeStartPointRef.current) {
-        // For shapes, redraw from history then draw temp shape
         if (history[historyStep] && contextRef.current && canvasRef.current) {
             contextRef.current.putImageData(history[historyStep], 0, 0);
-        } else if (canvasRef.current && contextRef.current) { // Handle empty history
+        } else if (canvasRef.current && contextRef.current) { 
             contextRef.current.fillStyle = canvasBackgroundColor;
             contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
@@ -466,8 +472,6 @@ export default function WhiteboardPage() {
       return;
     }
 
-    // Ensure the final shape is drawn on the actual canvas before saving history
-    // This is similar to drawInternal but for the final state.
     if (drawingTools.includes(activeTool || "") && activeTool !== 'draw' && shapeStartPointRef.current && (pos || lastPositionRef.current)) {
         const finalPos = pos || lastPositionRef.current!;
          if (history[historyStep] && contextRef.current && canvasRef.current) {
@@ -476,7 +480,6 @@ export default function WhiteboardPage() {
             contextRef.current.fillStyle = canvasBackgroundColor;
             contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
-        // Draw the final shape
         const start = shapeStartPointRef.current;
         const end = finalPos;
         contextRef.current.beginPath();
@@ -517,7 +520,7 @@ export default function WhiteboardPage() {
 
 
     if (activeTool === 'erase') {
-      contextRef.current.globalCompositeOperation = 'source-over'; // Reset composite operation
+      contextRef.current.globalCompositeOperation = 'source-over'; 
     }
 
     saveCurrentCanvasState();
@@ -536,7 +539,7 @@ export default function WhiteboardPage() {
     } else if (isSelectingRef.current && activeTool === 'select') {
       if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
       if (contextRef.current && initialCanvasDataForSelectionRef.current && selectionStartPointRef.current) {
-        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); // Restore pre-drag state
+        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); 
 
         const start = selectionStartPointRef.current;
         const rectX = Math.min(start.x, pos.x);
@@ -551,7 +554,7 @@ export default function WhiteboardPage() {
         contextRef.current.lineWidth = 1.5;
         contextRef.current.setLineDash([5, 3]);
         contextRef.current.strokeRect(rectX, rectY, rectW, rectH);
-        contextRef.current.restore(); // Restore line dash and other properties
+        contextRef.current.restore(); 
       }
     }
   }, [getPointerPosition, drawInternal, activeTool]);
@@ -563,20 +566,18 @@ export default function WhiteboardPage() {
       stopDrawingInternal(pos || undefined);
     } else if (isSelectingRef.current && activeTool === 'select') {
       if (contextRef.current && initialCanvasDataForSelectionRef.current) {
-          // Restore canvas to pre-drag state, removing the temporary dashed line
           contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0);
 
-          if (currentSelectionRectRef.current && (currentSelectionRectRef.current.w > 5 || currentSelectionRectRef.current.h > 5)) { // Min selection size
+          if (currentSelectionRectRef.current && (currentSelectionRectRef.current.w > 5 || currentSelectionRectRef.current.h > 5)) { 
               setActiveSelection(currentSelectionRectRef.current); 
               toast({ title: "Area Selected", description: "Resize handles are shown. Resize/Enhance features are under development." });
           } else {
-              setActiveSelection(null); // Clear selection if too small or invalid
+              setActiveSelection(null); 
           }
       }
       isSelectingRef.current = false;
       selectionStartPointRef.current = null;
       initialCanvasDataForSelectionRef.current = null;
-      // currentSelectionRectRef.current is effectively captured by setActiveSelection or nulled
     }
 
     window.removeEventListener('touchmove', handlePointerMove);
@@ -593,15 +594,14 @@ export default function WhiteboardPage() {
     if (!pos) return;
 
     if (activeTool === 'select') {
-      setActiveSelection(null); // Clear previous persistent selection when starting a new one
+      setActiveSelection(null); 
 
-      if (event.type === 'touchstart') { /* No preventDefault here for select */ }
+      if (event.type === 'touchstart') {  }
       if (contextRef.current && canvasRef.current) {
         try {
-          // Capture the current clean canvas state (from history) before drawing dashed selection
           if (history[historyStep]) {
             initialCanvasDataForSelectionRef.current = history[historyStep];
-          } else { // Handle case where history is empty (initial canvas)
+          } else { 
             initialCanvasDataForSelectionRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
           }
         } catch (e) {
@@ -621,8 +621,8 @@ export default function WhiteboardPage() {
           if (textToAdd && textToAdd.trim() !== "") {
               const { x, y } = pos;
               contextRef.current.globalCompositeOperation = 'source-over';
-              contextRef.current.fillStyle = selectedColor;
-              contextRef.current.font = "16px sans-serif"; // TODO: Make font size/style configurable
+              contextRef.current.fillStyle = selectedColor; 
+              contextRef.current.font = `${getFontSize()}px sans-serif`; 
               contextRef.current.textAlign = "left";
               contextRef.current.textBaseline = "top";
               contextRef.current.fillText(textToAdd, x, y);
@@ -643,7 +643,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
     }
-  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, selectedColor, toast, saveCurrentCanvasState, history, historyStep]);
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, selectedColor, toast, saveCurrentCanvasState, history, historyStep, getFontSize]);
 
   useEffect(() => {
     return () => {
@@ -657,14 +657,14 @@ export default function WhiteboardPage() {
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-    const isDrawingToolWithOptions = drawingTools.includes(toolId) || toolId === 'erase';
-    setActiveSelection(null); // Clear selection when changing tools
+    const isToolWithToggleableOptions = drawingTools.includes(toolId) || toolId === 'erase' || toolId === 'text';
+    setActiveSelection(null); 
 
-    if (activeTool === toolId && isDrawingToolWithOptions) {
+    if (activeTool === toolId && isToolWithToggleableOptions) {
       setShowDrawingToolOptions(prev => !prev);
     } else {
       setActiveTool(toolId);
-      if (isDrawingToolWithOptions) {
+      if (isToolWithToggleableOptions) {
         setShowDrawingToolOptions(true);
       } else {
         setShowDrawingToolOptions(false);
@@ -679,6 +679,10 @@ export default function WhiteboardPage() {
   const handleBrushSizeSelect = (size: string) => {
     setSelectedBrushSize(size);
   };
+  
+  const handleTextSizeSelect = (sizeName: string) => {
+    setSelectedTextSize(sizeName);
+  };
 
   const handleConfirmClearAll = () => {
     if (contextRef.current && canvasRef.current) {
@@ -688,7 +692,7 @@ export default function WhiteboardPage() {
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
       setActiveSelection(null);
-      saveCurrentCanvasState(); // Save the cleared state
+      saveCurrentCanvasState(); 
     }
     setShowClearConfirmDialog(false);
   };
@@ -697,9 +701,8 @@ export default function WhiteboardPage() {
     if (historyStep > 0) {
         const newStep = historyStep - 1;
         setHistoryStep(newStep);
-        // activeSelection remains, redraw will handle it
-    } else if (historyStep === 0) { // Undoing the very first state to blank
-        setHistoryStep(-1); // Go to a "before initial" state
+    } else if (historyStep === 0) { 
+        setHistoryStep(-1); 
         if (contextRef.current && canvasRef.current) {
             contextRef.current.fillStyle = canvasBackgroundColor;
             contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -707,21 +710,18 @@ export default function WhiteboardPage() {
     } else {
         toast({ title: "Nothing to undo", duration: 2000 });
     }
-    // Redraw will be triggered by historyStep change via useEffect
   }, [historyStep, canvasBackgroundColor, toast]);
 
   const handleRedo = useCallback(() => {
     if (historyStep < history.length - 1) {
         const newStep = historyStep + 1;
         setHistoryStep(newStep);
-        // activeSelection remains, redraw will handle it
     } else {
         toast({ title: "Nothing to redo", duration: 2000 });
     }
-     // Redraw will be triggered by historyStep change via useEffect
   }, [history, historyStep, toast]);
 
-  const isDrawingRelatedToolWithOptionsActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
+  const isOptionsPanelToolActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase' || activeTool === 'text');
 
   const canvasCursorClass =
     activeTool === 'select' ? 'cursor-crosshair' :
@@ -743,7 +743,13 @@ export default function WhiteboardPage() {
               isActive={drawingTools.includes(activeTool || "") && activeTool !== "erase"}
               data-options-toggler={true}
             />
-            <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
+            <ToolButton 
+                icon={Type} 
+                label="Text" 
+                onClick={() => handleToolClick("Text")} 
+                isActive={activeTool === "text"} 
+                data-options-toggler={true}
+            />
             <ToolButton
               icon={Eraser}
               label="Erase"
@@ -791,10 +797,43 @@ export default function WhiteboardPage() {
           </div>
         </div>
 
-        {showDrawingToolOptions && isDrawingRelatedToolWithOptionsActive && (
+        {showDrawingToolOptions && isOptionsPanelToolActive && (
            <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg">
             <div className="container mx-auto">
-              {(activeTool === 'draw' || activeTool === 'erase' || drawingTools.includes(activeTool || "")) && (
+              {activeTool === 'text' ? (
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div className="flex flex-col items-center md:items-start gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">Color:</span>
+                    <div className="flex flex-wrap justify-center md:justify-start gap-2 items-center">
+                      {availableColors.map(color => (
+                        <ColorSwatch
+                          key={color}
+                          color={color}
+                          onClick={() => handleColorSelect(color)}
+                          isSelected={selectedColor === color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center md:items-start gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">Text Size:</span>
+                    <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
+                      {textSizes.map(size => (
+                        <Button
+                          key={size.name}
+                          variant={selectedTextSize === size.name ? "default" : "outline"}
+                          size="sm"
+                          className="rounded-lg px-3 py-1.5 h-auto"
+                          onClick={() => handleTextSizeSelect(size.name)}
+                          aria-label={size.label}
+                        >
+                          {size.label.split(' ')[0]}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (activeTool === 'draw' || activeTool === 'erase' || drawingTools.includes(activeTool || "")) ? (
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   {activeTool !== 'erase' && (
                     <div className="flex flex-col items-center md:items-start gap-2">
@@ -848,7 +887,7 @@ export default function WhiteboardPage() {
                       </div>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}
@@ -860,18 +899,18 @@ export default function WhiteboardPage() {
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => {
-                  if (activeTool === 'select') { /* Allow default for select */ }
-                  else if (activeTool === 'text') { /* Handled in handleCanvasPointerDown */ }
+                  if (activeTool === 'select') {  }
+                  else if (activeTool === 'text') {  }
                   else { e.preventDefault(); }
                   handleCanvasPointerDown(e);
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
                 style={{ backgroundColor: canvasBackgroundColor }}
               />
-              {(!activeTool || (activeTool !== 'text' && !isDrawingRelatedToolWithOptionsActive && activeTool !== 'select')) && !isDrawingRef.current && !isSelectingRef.current && (
+              {(!activeTool || !isOptionsPanelToolActive) && !isDrawingRef.current && !isSelectingRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
-                    Interactive canvas area - Select a tool to begin drawing or select an area.
+                    Interactive canvas area - Select a tool to begin.
                   </p>
                 </div>
               )}
