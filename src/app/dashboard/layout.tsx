@@ -12,7 +12,7 @@ import { DynamicHeaderProvider, useDynamicHeader } from '@/contexts/DynamicHeade
 // New component to render the header content dynamically
 function DashboardHeaderContentInternal() {
   const { headerContent } = useDynamicHeader();
-  const { toggleSidebar } = useSidebar();
+  // const { toggleSidebar } = useSidebar(); // toggleSidebar is available via SidebarTrigger directly
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
@@ -21,8 +21,8 @@ function DashboardHeaderContentInternal() {
           <SidebarTrigger className="md:hidden">
             <PanelLeftOpen className="h-6 w-6" />
           </SidebarTrigger>
-          <SidebarTrigger className="hidden md:flex" onClick={toggleSidebar}>
-            {/* Uses default PanelLeftOpen/Close from SidebarTrigger */}
+          <SidebarTrigger className="hidden md:flex">
+            {/* Uses default PanelLeftOpen/Close from SidebarTrigger, onClick is handled internally */}
           </SidebarTrigger>
         </div>
         {/* Dynamic content area - takes up available space and centers its content */}
