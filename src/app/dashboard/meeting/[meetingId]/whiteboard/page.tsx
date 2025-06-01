@@ -30,8 +30,10 @@ interface ToolButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
   disabled?: boolean; 
 }
 
-const ToolButton = ({ icon: Icon, label, onClick, isActive = false, disabled = false, ...rest }: ToolButtonProps) => (
+const ToolButton = React.forwardRef<HTMLButtonElement, ToolButtonProps>(
+  ({ icon: Icon, label, onClick, isActive = false, disabled = false, ...rest }, ref) => (
   <Button
+    ref={ref}
     variant={isActive ? "default" : "outline"}
     size="icon"
     className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs"
@@ -42,7 +44,8 @@ const ToolButton = ({ icon: Icon, label, onClick, isActive = false, disabled = f
   >
     <Icon className="h-5 w-5 mb-0.5" />
   </Button>
-);
+));
+ToolButton.displayName = "ToolButton";
 
 
 const ColorSwatch = ({ color, onClick, isSelected }: { color: string, onClick: () => void, isSelected: boolean }) => (
@@ -634,10 +637,22 @@ export default function WhiteboardPage() {
               icon={MousePointer2} 
               label="Select" 
               onClick={() => handleToolClick("Select")} 
-              isActive={activeTool === "select"} 
+              isActive={activeTool === "select"}
               data-options-toggler="true"
             />
             <ToolButton
+              icon={Wand2}
+              label="Assist"
+              onClick={() => {
+                if (activeTool === 'select') {
+                   toast({ title: "Shape Assist Clicked (from main toolbar)", description: "This would ideally be in the select options. Placeholder."});
+                } else {
+                   toast({ title: "Assist Tool", description: "Assist features are in development."});
+                }
+              }}
+              isActive={activeTool === 'assist'}
+            />
+             <ToolButton
                 icon={Undo2}
                 label="Undo"
                 onClick={handleUndo}
@@ -747,7 +762,7 @@ export default function WhiteboardPage() {
           </div>
         )}
 
-        <main className="flex-grow flex flex-col overflow-hidden min-h-0 pt-[65px]">
+        <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
               <canvas
