@@ -63,9 +63,9 @@ export default function WhiteboardPage() {
   const [selectedColor, setSelectedColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const storedColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
-      return storedColor || "#000000"; // Default to black if nothing stored
+      return storedColor || "#000000"; 
     }
-    return "#000000"; // Server-side default or if localStorage not available
+    return "#000000"; 
   });
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
@@ -344,6 +344,9 @@ export default function WhiteboardPage() {
       } else if (activeTool === 'arrow') {
         const headlen = 10 + getLineWidth(); 
         const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        contextRef.current.moveTo(start.x, start.y); // Start drawing the line part
+        contextRef.current.lineTo(end.x, end.y);     // End drawing the line part
+        // Draw arrowhead
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
         contextRef.current.moveTo(end.x, end.y);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
@@ -485,16 +488,19 @@ export default function WhiteboardPage() {
 
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-    const isDrawingToolWithOptions = drawingTools.includes(toolId) || toolId === 'erase';
-  
-    if (activeTool === toolId && isDrawingToolWithOptions) {
+    const isDrawingToolType = drawingTools.includes(toolId) || toolId === 'erase';
+    const isSelectToolType = toolId === 'select';
+
+    if (activeTool === toolId && (isDrawingToolType || isSelectToolType)) {
+      // If clicking the same tool that has options, toggle the options panel
       setShowDrawingToolOptions(prev => !prev);
     } else {
+      // If clicking a different tool OR a tool that doesn't have its options panel open
       setActiveTool(toolId);
-      if (isDrawingToolWithOptions) {
-        setShowDrawingToolOptions(true);
-      } else { 
-        setShowDrawingToolOptions(false);
+      if (isDrawingToolType || isSelectToolType) {
+        setShowDrawingToolOptions(true); // Open/keep options open for this tool
+      } else {
+        setShowDrawingToolOptions(false); // Close options if new tool doesn't have them
       }
     }
   };
@@ -548,8 +554,13 @@ export default function WhiteboardPage() {
               isActive={activeTool === "erase"} 
               data-options-toggler="true"
             />
-            <ToolButton icon={MousePointer2} label="Select" onClick={() => handleToolClick("Select")} isActive={activeTool === "select"} />
-            <ToolButton icon={Wand2} label="Assist" onClick={() => handleToolClick("Shape Assist")} isActive={activeTool === "shapeassist"} />
+            <ToolButton 
+              icon={MousePointer2} 
+              label="Select" 
+              onClick={() => handleToolClick("Select")} 
+              isActive={activeTool === "select"} 
+              data-options-toggler="true"
+            />
             <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
@@ -572,67 +583,87 @@ export default function WhiteboardPage() {
           </div>
         </div>
 
-        {showDrawingToolOptions && isDrawingRelatedToolWithOptionsActive && (
+        {showDrawingToolOptions && (activeTool === 'draw' || activeTool === 'erase' || activeTool === 'select') && (
            <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 shadow-sm absolute top-32 left-0 right-0 z-10">
             <div className="container mx-auto">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                {activeTool !== 'erase' && (
-                  <div className="flex flex-col items-center md:items-start gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">Color:</span>
-                    <div className="flex flex-wrap justify-center md:justify-start gap-2 items-center">
-                      {availableColors.map(color => (
-                        <ColorSwatch
-                          key={color}
-                          color={color}
-                          onClick={() => handleColorSelect(color)}
-                          isSelected={selectedColor === color}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-col items-center md:items-start gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">Size:</span>
-                    <div className="flex items-center justify-center md:justify-start gap-2">
-                    {brushSizes.map(brush => (
-                        <Button
-                            key={brush.name}
-                            variant={selectedBrushSize === brush.name ? "default" : "outline"}
-                            size="icon"
-                            className="rounded-lg w-10 h-10"
-                            onClick={() => handleBrushSizeSelect(brush.name)}
-                            aria-label={brush.label}
-                        >
-                            <brush.icon className={cn(
-                                "h-5 w-5", 
-                                brush.name === 'tiny' && 'h-2 w-2',
-                                brush.name === 'small' && 'h-3 w-3',
-                                brush.name === 'large' && 'h-6 w-6',
-                                brush.name === 'xlarge' && 'h-7 w-7'
-                            )} />
-                        </Button>
-                    ))}
-                    </div>
-                </div>
-                 {activeTool !== 'erase' && (
+              {(activeTool === 'draw' || activeTool === 'erase') && (
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  {activeTool !== 'erase' && (
                     <div className="flex flex-col items-center md:items-start gap-2">
-                        <span className="text-xs font-medium text-muted-foreground">Shape:</span>
-                        <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
-                            <ToolButton icon={Edit3} label="Freehand" onClick={() => {setActiveTool("draw");}} isActive={activeTool === "draw"} />
-                            <ToolButton icon={Minus} label="Line" onClick={() => {setActiveTool("line");}} isActive={activeTool === "line"} />
-                            <ToolButton icon={ArrowRight} label="Arrow" onClick={() => {setActiveTool("arrow");}} isActive={activeTool === "arrow"} />
-                            <ToolButton icon={CircleIconShape} label="Circle" onClick={() => {setActiveTool("circle");}} isActive={activeTool === "circle"} />
-                            <ToolButton icon={SquareIconShape} label="Square" onClick={() => {setActiveTool("square");}} isActive={activeTool === "square"} />
-                            <ToolButton icon={TriangleIcon} label="Triangle" onClick={() => {setActiveTool("triangle");}} isActive={activeTool === "triangle"} />
-                        </div>
+                      <span className="text-xs font-medium text-muted-foreground">Color:</span>
+                      <div className="flex flex-wrap justify-center md:justify-start gap-2 items-center">
+                        {availableColors.map(color => (
+                          <ColorSwatch
+                            key={color}
+                            color={color}
+                            onClick={() => handleColorSelect(color)}
+                            isSelected={selectedColor === color}
+                          />
+                        ))}
+                      </div>
                     </div>
-                 )}
-              </div>
+                  )}
+                  <div className="flex flex-col items-center md:items-start gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">Size:</span>
+                      <div className="flex items-center justify-center md:justify-start gap-2">
+                      {brushSizes.map(brush => (
+                          <Button
+                              key={brush.name}
+                              variant={selectedBrushSize === brush.name ? "default" : "outline"}
+                              size="icon"
+                              className="rounded-lg w-10 h-10"
+                              onClick={() => handleBrushSizeSelect(brush.name)}
+                              aria-label={brush.label}
+                          >
+                              <brush.icon className={cn(
+                                  "h-5 w-5", 
+                                  brush.name === 'tiny' && 'h-2 w-2',
+                                  brush.name === 'small' && 'h-3 w-3',
+                                  brush.name === 'large' && 'h-6 w-6',
+                                  brush.name === 'xlarge' && 'h-7 w-7'
+                              )} />
+                          </Button>
+                      ))}
+                      </div>
+                  </div>
+                  {activeTool !== 'erase' && (
+                      <div className="flex flex-col items-center md:items-start gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Shape:</span>
+                          <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
+                              <ToolButton icon={Edit3} label="Freehand" onClick={() => {setActiveTool("draw");}} isActive={activeTool === "draw"} />
+                              <ToolButton icon={Minus} label="Line" onClick={() => {setActiveTool("line");}} isActive={activeTool === "line"} />
+                              <ToolButton icon={ArrowRight} label="Arrow" onClick={() => {setActiveTool("arrow");}} isActive={activeTool === "arrow"} />
+                              <ToolButton icon={CircleIconShape} label="Circle" onClick={() => {setActiveTool("circle");}} isActive={activeTool === "circle"} />
+                              <ToolButton icon={SquareIconShape} label="Square" onClick={() => {setActiveTool("square");}} isActive={activeTool === "square"} />
+                              <ToolButton icon={TriangleIcon} label="Triangle" onClick={() => {setActiveTool("triangle");}} isActive={activeTool === "triangle"} />
+                          </div>
+                      </div>
+                  )}
+                </div>
+              )}
+              {activeTool === 'select' && (
+                <div className="flex flex-col items-center md:items-start gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">Selection Tools:</span>
+                  <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
+                    <ToolButton
+                      icon={Wand2}
+                      label="Shape Assist"
+                      onClick={() => {
+                        toast({ title: "Shape Assist Clicked", description: "Shape Assist functionality is a creative idea for future implementation!"});
+                        // This is where you'd trigger the "assist" functionality
+                        // For now, it just shows a toast.
+                      }}
+                      // isActive could be used if "Assist" becomes a sub-mode of "Select"
+                    />
+                    {/* Add other selection-related tool buttons here if needed */}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        <main className="flex-grow flex flex-col overflow-hidden min-h-0"> 
+        <main className="flex-grow flex flex-col overflow-hidden min-h-0 pt-[65px]"> {/* Adjusted pt to account for main tools toolbar height */}
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
               <canvas
