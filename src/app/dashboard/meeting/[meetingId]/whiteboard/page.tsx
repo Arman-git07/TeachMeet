@@ -16,18 +16,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation"; 
+import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { useDynamicHeader } from '@/contexts/DynamicHeaderContext'; 
+import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 interface ToolButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon: React.ElementType;
   label: string;
   onClick: () => void;
   isActive?: boolean;
-  disabled?: boolean; 
+  disabled?: boolean;
+  'data-options-toggler'?: boolean;
 }
 
 const ToolButton = React.forwardRef<HTMLButtonElement, ToolButtonProps>(
@@ -73,18 +74,18 @@ export default function WhiteboardPage() {
   const { setHeaderContent } = useDynamicHeader();
 
   const [activeTool, setActiveTool] = useState<string | null>("draw");
-  
+
   const [selectedColor, setSelectedColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const storedColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
-      return storedColor || "#000000"; 
+      return storedColor || "#000000";
     }
-    return "#000000"; 
+    return "#000000";
   });
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
-  
+
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem("teachmeet-whiteboard-bg-color") || "#FFFFFF";
@@ -104,7 +105,7 @@ export default function WhiteboardPage() {
   const isDrawingRef = useRef(false);
   const lastPositionRef = useRef<{ x: number, y: number } | null>(null);
   const shapeStartPointRef = useRef<{ x: number, y: number } | null>(null);
-  
+
   const isSelectingRef = useRef(false);
   const selectionStartPointRef = useRef<{ x: number, y: number } | null>(null);
   const initialCanvasDataForSelectionRef = useRef<ImageData | null>(null);
@@ -162,18 +163,18 @@ export default function WhiteboardPage() {
           imageDataToRestore = undefined;
         }
       }
-      
+
       const newWidth = canvas.parentElement.clientWidth;
       const newHeight = canvas.parentElement.clientHeight;
 
       if (newWidth > 0 && newHeight > 0) {
         canvas.width = newWidth;
         canvas.height = newHeight;
-        
+
         if (context) {
           context.fillStyle = canvasBackgroundColor;
           context.fillRect(0, 0, canvas.width, canvas.height);
-          
+
           context.lineCap = "round";
           context.lineJoin = "round";
           context.strokeStyle = selectedColor;
@@ -210,7 +211,7 @@ export default function WhiteboardPage() {
         if (storedPenColor) {
             setSelectedColor(storedPenColor);
         } else {
-           localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); 
+           localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000");
         }
     }
   }, []);
@@ -220,7 +221,6 @@ export default function WhiteboardPage() {
     const WhiteboardPageHeader = () => (
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Using Edit3 as a placeholder for Wand2 since it's more drawing related */}
           <Edit3 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
           <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">
             TeachMeet Whiteboard
@@ -239,17 +239,17 @@ export default function WhiteboardPage() {
     setHeaderContent(<WhiteboardPageHeader />);
 
     return () => {
-      setHeaderContent(null); 
+      setHeaderContent(null);
     };
-  }, [setHeaderContent, meetingId, router]); 
+  }, [setHeaderContent, meetingId, router]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
-      const context = canvas.getContext("2d", { willReadFrequently: true }); 
+      const context = canvas.getContext("2d", { willReadFrequently: true });
       if (context) {
         contextRef.current = context;
-        resizeCanvas(); 
+        resizeCanvas();
       }
     }
     window.addEventListener("resize", resizeCanvas);
@@ -276,9 +276,9 @@ export default function WhiteboardPage() {
 
       if (
         drawingOptionsToolbarRef.current &&
-        !drawingOptionsToolbarRef.current.contains(target) && 
-        !isClickOnOptionsToggler && 
-        showDrawingToolOptions 
+        !drawingOptionsToolbarRef.current.contains(target) &&
+        !isClickOnOptionsToggler &&
+        showDrawingToolOptions
       ) {
         setShowDrawingToolOptions(false);
       }
@@ -302,14 +302,14 @@ export default function WhiteboardPage() {
     const rect = canvas.getBoundingClientRect();
     let clientX: number | undefined;
     let clientY: number | undefined;
-  
+
     const nativeEvent = 'nativeEvent' in event ? event.nativeEvent : event;
 
     if (nativeEvent instanceof TouchEvent) {
       if (nativeEvent.touches && nativeEvent.touches.length > 0) {
         clientX = nativeEvent.touches[0].clientX;
         clientY = nativeEvent.touches[0].clientY;
-      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) { 
+      } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) {
         clientX = nativeEvent.changedTouches[0].clientX;
         clientY = nativeEvent.changedTouches[0].clientY;
       }
@@ -317,17 +317,17 @@ export default function WhiteboardPage() {
       clientX = nativeEvent.clientX;
       clientY = nativeEvent.clientY;
     }
-  
+
     if (typeof clientX !== 'number' || typeof clientY !== 'number') {
       return null;
     }
-  
+
     return {
       x: clientX - rect.left,
       y: clientY - rect.top
     };
   }, []);
-  
+
   const startDrawingInternal = useCallback((pos: { x: number, y: number }) => {
     if (!contextRef.current || !activeTool || activeTool === 'select' || activeTool === 'text') return;
 
@@ -340,7 +340,7 @@ export default function WhiteboardPage() {
 
     if (activeTool === 'erase') {
       contextRef.current.globalCompositeOperation = 'destination-out';
-      contextRef.current.lineWidth = getLineWidth(); 
+      contextRef.current.lineWidth = getLineWidth();
     } else {
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.strokeStyle = selectedColor;
@@ -360,7 +360,7 @@ export default function WhiteboardPage() {
 
   const stopDrawingInternal = useCallback((pos?: { x: number, y: number }) => {
     if (!contextRef.current || !isDrawingRef.current || activeTool === 'select' || activeTool === 'text') {
-      if (isDrawingRef.current) { 
+      if (isDrawingRef.current) {
         isDrawingRef.current = false;
         lastPositionRef.current = null;
         shapeStartPointRef.current = null;
@@ -377,7 +377,7 @@ export default function WhiteboardPage() {
 
       const start = shapeStartPointRef.current;
       const end = finalPos;
-      contextRef.current.beginPath(); 
+      contextRef.current.beginPath();
       if (activeTool === 'line') {
         contextRef.current.moveTo(start.x, start.y);
         contextRef.current.lineTo(end.x, end.y);
@@ -391,10 +391,10 @@ export default function WhiteboardPage() {
         const centerY = start.y + dy / 2;
         contextRef.current.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
       } else if (activeTool === 'arrow') {
-        const headlen = 10 + getLineWidth(); 
+        const headlen = 10 + getLineWidth();
         const angle = Math.atan2(end.y - start.y, end.x - start.x);
-        contextRef.current.moveTo(start.x, start.y); 
-        contextRef.current.lineTo(end.x, end.y);     
+        contextRef.current.moveTo(start.x, start.y);
+        contextRef.current.lineTo(end.x, end.y);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
         contextRef.current.moveTo(end.x, end.y);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
@@ -413,13 +413,13 @@ export default function WhiteboardPage() {
     if (activeTool === 'erase') {
       contextRef.current.globalCompositeOperation = 'source-over';
     }
-    
-    saveCurrentCanvasState(); 
+
+    saveCurrentCanvasState();
     isDrawingRef.current = false;
     lastPositionRef.current = null;
     shapeStartPointRef.current = null;
   }, [activeTool, selectedColor, getLineWidth, saveCurrentCanvasState]);
-  
+
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
     if (!pos) return;
@@ -427,10 +427,10 @@ export default function WhiteboardPage() {
     if (isDrawingRef.current) {
       if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
       drawInternal(pos);
-    } else if (isSelectingRef.current) {
+    } else if (isSelectingRef.current && activeTool === 'select') {
       if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
       if (contextRef.current && initialCanvasDataForSelectionRef.current && selectionStartPointRef.current) {
-        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); 
+        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0);
 
         const start = selectionStartPointRef.current;
         const rectX = Math.min(start.x, pos.x);
@@ -447,18 +447,19 @@ export default function WhiteboardPage() {
         contextRef.current.setLineDash([]);
       }
     }
-  }, [getPointerPosition, drawInternal]);
+  }, [getPointerPosition, drawInternal, activeTool]);
 
   const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
 
     if (isDrawingRef.current) {
       stopDrawingInternal(pos || undefined);
-    } else if (isSelectingRef.current) {
+    } else if (isSelectingRef.current && activeTool === 'select') {
       if (contextRef.current && initialCanvasDataForSelectionRef.current) {
-        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); 
-        if (currentSelectionRectRef.current) {
+        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0);
+        if (currentSelectionRectRef.current && (currentSelectionRectRef.current.w > 0 || currentSelectionRectRef.current.h > 0) ) {
           console.log("Selected area (top-left x,y, width, height):", currentSelectionRectRef.current);
+           toast({ title: "Area Selected", description: "Resize/Enhance features are under development." });
         }
       }
       isSelectingRef.current = false;
@@ -466,17 +467,17 @@ export default function WhiteboardPage() {
       initialCanvasDataForSelectionRef.current = null;
       currentSelectionRectRef.current = null;
     }
-    
+
     window.removeEventListener('touchmove', handlePointerMove);
     window.removeEventListener('touchend', handlePointerUp);
     window.removeEventListener('touchcancel', handlePointerUp);
     window.removeEventListener('mousemove', handlePointerMove);
     window.removeEventListener('mouseup', handlePointerUp);
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool]); 
-  
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool, toast]);
+
   const handleCanvasPointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return;
-    
+
     const pos = getPointerPosition(event);
     if (!pos) return;
 
@@ -492,7 +493,8 @@ export default function WhiteboardPage() {
       }
       isSelectingRef.current = true;
       selectionStartPointRef.current = pos;
-    } else if (activeTool && activeTool !== 'text') { 
+      currentSelectionRectRef.current = null; // Reset any previous selection rect
+    } else if (activeTool && activeTool !== 'text') {
       if (event.type === 'touchstart') event.preventDefault();
       startDrawingInternal(pos);
     } else if (activeTool === 'text') {
@@ -502,11 +504,11 @@ export default function WhiteboardPage() {
               const { x, y } = pos;
               contextRef.current.globalCompositeOperation = 'source-over';
               contextRef.current.fillStyle = selectedColor;
-              contextRef.current.font = "16px sans-serif"; 
+              contextRef.current.font = "16px sans-serif";
               contextRef.current.textAlign = "left";
               contextRef.current.textBaseline = "top";
               contextRef.current.fillText(textToAdd, x, y);
-              saveCurrentCanvasState(); 
+              saveCurrentCanvasState();
           } else {
              toast({ title: "Text input cancelled", description: "No text was added to the whiteboard.", duration: 2000 });
           }
@@ -524,7 +526,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mouseup', handlePointerUp);
     }
   }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, selectedColor, toast, saveCurrentCanvasState]);
-  
+
   useEffect(() => {
     return () => {
       window.removeEventListener('touchmove', handlePointerMove);
@@ -544,13 +546,13 @@ export default function WhiteboardPage() {
     } else {
       setActiveTool(toolId);
       if (isDrawingToolWithOptions) {
-        setShowDrawingToolOptions(true); 
+        setShowDrawingToolOptions(true);
       } else {
-        setShowDrawingToolOptions(false); 
+        setShowDrawingToolOptions(false);
       }
     }
   };
-  
+
   const handleColorSelect = (color: string) => {
     setSelectedColor(color);
   };
@@ -563,10 +565,10 @@ export default function WhiteboardPage() {
     if (contextRef.current && canvasRef.current) {
       const context = contextRef.current;
       const canvas = canvasRef.current;
-      context.globalCompositeOperation = 'source-over'; 
+      context.globalCompositeOperation = 'source-over';
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
-      saveCurrentCanvasState(); 
+      saveCurrentCanvasState();
     }
     setShowClearConfirmDialog(false);
   };
@@ -600,13 +602,13 @@ export default function WhiteboardPage() {
         toast({ title: "Nothing to redo", duration: 2000 });
     }
   }, [history, historyStep, canvasBackgroundColor, toast]);
-  
+
   const isDrawingRelatedToolWithOptionsActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
-    
-  const canvasCursorClass = 
-    activeTool === 'select' ? 'cursor-default' : 
+
+  const canvasCursorClass =
+    activeTool === 'select' ? 'cursor-crosshair' :
     activeTool === 'text' ? 'cursor-text' :
-    (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'cursor-crosshair' : 
+    (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'cursor-crosshair' :
     'cursor-default';
 
 
@@ -614,27 +616,27 @@ export default function WhiteboardPage() {
     <>
       <div className="flex flex-col h-full bg-muted/30">
 
-        <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20"> 
+        <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <ToolButton
               icon={Brush}
               label="Draw"
               onClick={() => handleToolClick("draw")}
               isActive={drawingTools.includes(activeTool || "") && activeTool !== "erase"}
-              data-options-toggler="true"
+              data-options-toggler={true}
             />
             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} />
-            <ToolButton 
-              icon={Eraser} 
-              label="Erase" 
-              onClick={() => handleToolClick("Erase")} 
-              isActive={activeTool === "erase"} 
-              data-options-toggler="true"
+            <ToolButton
+              icon={Eraser}
+              label="Erase"
+              onClick={() => handleToolClick("Erase")}
+              isActive={activeTool === "erase"}
+              data-options-toggler={true}
             />
-            <ToolButton 
-              icon={MousePointer2} 
-              label="Select" 
-              onClick={() => handleToolClick("Select")} 
+            <ToolButton
+              icon={MousePointer2}
+              label="Select"
+              onClick={() => handleToolClick("Select")}
               isActive={activeTool === "select"}
             />
             <ToolButton
@@ -704,7 +706,7 @@ export default function WhiteboardPage() {
                               aria-label={brush.label}
                           >
                               <brush.icon className={cn(
-                                  "h-5 w-5", 
+                                  "h-5 w-5",
                                   brush.name === 'tiny' && 'h-2 w-2',
                                   brush.name === 'small' && 'h-3 w-3',
                                   brush.name === 'large' && 'h-6 w-6',
@@ -739,11 +741,11 @@ export default function WhiteboardPage() {
               <canvas
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
-                onTouchStart={(e) => { 
-                  if (activeTool === 'select') { /* Allow default for select */ } 
+                onTouchStart={(e) => {
+                  if (activeTool === 'select') { /* Allow default for select */ }
                   else if (activeTool === 'text') { /* Handled in handleCanvasPointerDown */ }
-                  else { e.preventDefault(); } 
-                  handleCanvasPointerDown(e); 
+                  else { e.preventDefault(); }
+                  handleCanvasPointerDown(e);
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
                 style={{ backgroundColor: canvasBackgroundColor }}
@@ -765,3 +767,4 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
