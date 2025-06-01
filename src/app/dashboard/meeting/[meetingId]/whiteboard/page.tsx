@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, MousePointer2, Wand2, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation"; 
 import { useToast } from "@/hooks/use-toast";
@@ -22,18 +22,28 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext'; 
 
-const ToolButton = ({ icon: Icon, label, onClick, isActive = false, ...rest }: { icon: React.ElementType, label: string, onClick: () => void, isActive?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+interface ToolButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  isActive?: boolean;
+  disabled?: boolean; 
+}
+
+const ToolButton = ({ icon: Icon, label, onClick, isActive = false, disabled = false, ...rest }: ToolButtonProps) => (
   <Button
     variant={isActive ? "default" : "outline"}
     size="icon"
     className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs"
     onClick={onClick}
     aria-label={label}
+    disabled={disabled}
     {...rest}
   >
     <Icon className="h-5 w-5 mb-0.5" />
   </Button>
 );
+
 
 const ColorSwatch = ({ color, onClick, isSelected }: { color: string, onClick: () => void, isSelected: boolean }) => (
   <Button
@@ -50,6 +60,7 @@ const ColorSwatch = ({ color, onClick, isSelected }: { color: string, onClick: (
 );
 
 const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
+const MAX_HISTORY_STEPS = 20;
 
 export default function WhiteboardPage() {
   const params = useParams();
@@ -77,6 +88,10 @@ export default function WhiteboardPage() {
     }
     return "#FFFFFF";
   });
+
+  const [history, setHistory] = useState<ImageData[]>([]);
+  const [historyStep, setHistoryStep] = useState<number>(-1);
+  const [isInitialStateSaved, setIsInitialStateSaved] = useState(false);
 
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -110,34 +125,38 @@ export default function WhiteboardPage() {
     return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6;
   }, [selectedBrushSize, brushSizes]);
 
- useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
-        if (storedBgColor) {
-            setCanvasBackgroundColor(storedBgColor);
-        }
-        const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
-        if (storedPenColor) {
-            setSelectedColor(storedPenColor);
-        } else {
-           localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); 
-        }
+  const saveCurrentCanvasState = useCallback(() => {
+    if (!canvasRef.current || !contextRef.current || canvasRef.current.width === 0 || canvasRef.current.height === 0) return;
+    const canvas = canvasRef.current;
+    const context = contextRef.current;
+    try {
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        setHistory(prevHistory => {
+            const newHistoryBase = historyStep === -1 ? [] : prevHistory.slice(0, historyStep + 1);
+            let updatedHistory = [...newHistoryBase, imageData];
+            if (updatedHistory.length > MAX_HISTORY_STEPS) {
+                updatedHistory = updatedHistory.slice(updatedHistory.length - MAX_HISTORY_STEPS);
+            }
+            setHistoryStep(updatedHistory.length - 1);
+            return updatedHistory;
+        });
+    } catch (e) {
+        console.error("Error saving canvas state for history:", e);
     }
-  }, []);
-
+  }, [historyStep, MAX_HISTORY_STEPS]);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (canvas && canvas.parentElement) {
       const context = contextRef.current;
-      let imageData: ImageData | undefined;
-      
-      if (context && canvas.width > 0 && canvas.height > 0) {
+      let imageDataToRestore: ImageData | undefined;
+
+      if (context && canvas.width > 0 && canvas.height > 0 && history.length > 0 && historyStep >= 0 && historyStep < history.length) {
         try {
-          imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          imageDataToRestore = history[historyStep];
         } catch (e) {
-          console.error("Error getting imageData during resize:", e);
-          imageData = undefined;
+          console.error("Error getting imageData for resize restoration:", e);
+          imageDataToRestore = undefined;
         }
       }
       
@@ -162,17 +181,37 @@ export default function WhiteboardPage() {
             context.globalCompositeOperation = 'source-over';
           }
 
-          if (imageData) {
+          if (imageDataToRestore) {
             try {
-              context.putImageData(imageData, 0, 0);
+              context.putImageData(imageDataToRestore, 0, 0);
             } catch (e) {
               console.error("Error putting imageData during resize:", e);
             }
+          } else if (!isInitialStateSaved && canvas.width > 0 && canvas.height > 0) {
+            // Only save initial state if not already saved and canvas has dimensions
+            saveCurrentCanvasState();
+            setIsInitialStateSaved(true);
           }
         }
       }
     }
-  }, [selectedColor, getLineWidth, activeTool, canvasBackgroundColor]);
+  }, [selectedColor, getLineWidth, activeTool, canvasBackgroundColor, history, historyStep, saveCurrentCanvasState, isInitialStateSaved, setIsInitialStateSaved]);
+
+
+ useEffect(() => {
+    if (typeof window !== 'undefined') {
+        const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
+        if (storedBgColor) {
+            setCanvasBackgroundColor(storedBgColor);
+        }
+        const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
+        if (storedPenColor) {
+            setSelectedColor(storedPenColor);
+        } else {
+           localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); 
+        }
+    }
+  }, []);
 
 
   useEffect(() => {
@@ -317,7 +356,14 @@ export default function WhiteboardPage() {
   }, [activeTool]);
 
   const stopDrawingInternal = useCallback((pos?: { x: number, y: number }) => {
-    if (!contextRef.current || !isDrawingRef.current || activeTool === 'select' || activeTool === 'text') return;
+    if (!contextRef.current || !isDrawingRef.current || activeTool === 'select' || activeTool === 'text') {
+      if (isDrawingRef.current) { // Ensure this only runs if drawing was actually in progress
+        isDrawingRef.current = false;
+        lastPositionRef.current = null;
+        shapeStartPointRef.current = null;
+      }
+      return;
+    }
 
     const finalPos = pos || lastPositionRef.current;
 
@@ -344,9 +390,8 @@ export default function WhiteboardPage() {
       } else if (activeTool === 'arrow') {
         const headlen = 10 + getLineWidth(); 
         const angle = Math.atan2(end.y - start.y, end.x - start.x);
-        contextRef.current.moveTo(start.x, start.y); // Start drawing the line part
-        contextRef.current.lineTo(end.x, end.y);     // End drawing the line part
-        // Draw arrowhead
+        contextRef.current.moveTo(start.x, start.y); 
+        contextRef.current.lineTo(end.x, end.y);     
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
         contextRef.current.moveTo(end.x, end.y);
         contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
@@ -365,11 +410,12 @@ export default function WhiteboardPage() {
     if (activeTool === 'erase') {
       contextRef.current.globalCompositeOperation = 'source-over';
     }
-
+    
+    saveCurrentCanvasState(); // Save state after drawing operation completes
     isDrawingRef.current = false;
     lastPositionRef.current = null;
     shapeStartPointRef.current = null;
-  }, [activeTool, selectedColor, getLineWidth]);
+  }, [activeTool, selectedColor, getLineWidth, saveCurrentCanvasState]);
   
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
@@ -457,6 +503,7 @@ export default function WhiteboardPage() {
               contextRef.current.textAlign = "left";
               contextRef.current.textBaseline = "top";
               contextRef.current.fillText(textToAdd, x, y);
+              saveCurrentCanvasState(); // Save state after adding text
           } else {
              toast({ title: "Text input cancelled", description: "No text was added to the whiteboard.", duration: 2000 });
           }
@@ -473,7 +520,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
     }
-  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, selectedColor, toast]);
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, selectedColor, toast, saveCurrentCanvasState]);
   
   useEffect(() => {
     return () => {
@@ -492,15 +539,13 @@ export default function WhiteboardPage() {
     const isSelectToolType = toolId === 'select';
 
     if (activeTool === toolId && (isDrawingToolType || isSelectToolType)) {
-      // If clicking the same tool that has options, toggle the options panel
       setShowDrawingToolOptions(prev => !prev);
     } else {
-      // If clicking a different tool OR a tool that doesn't have its options panel open
       setActiveTool(toolId);
       if (isDrawingToolType || isSelectToolType) {
-        setShowDrawingToolOptions(true); // Open/keep options open for this tool
+        setShowDrawingToolOptions(true); 
       } else {
-        setShowDrawingToolOptions(false); // Close options if new tool doesn't have them
+        setShowDrawingToolOptions(false); 
       }
     }
   };
@@ -520,9 +565,40 @@ export default function WhiteboardPage() {
       context.globalCompositeOperation = 'source-over'; 
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
+      saveCurrentCanvasState(); // Save the cleared state
     }
     setShowClearConfirmDialog(false);
   };
+
+  const handleUndo = useCallback(() => {
+    if (historyStep > 0) {
+        const newStep = historyStep - 1;
+        setHistoryStep(newStep);
+        if (contextRef.current && canvasRef.current && history[newStep]) {
+            contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            contextRef.current.fillStyle = canvasBackgroundColor;
+            contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            contextRef.current.putImageData(history[newStep], 0, 0);
+        }
+    } else {
+        toast({ title: "Nothing to undo", duration: 2000 });
+    }
+  }, [history, historyStep, canvasBackgroundColor, toast]);
+
+  const handleRedo = useCallback(() => {
+    if (historyStep < history.length - 1) {
+        const newStep = historyStep + 1;
+        setHistoryStep(newStep);
+        if (contextRef.current && canvasRef.current && history[newStep]) {
+            contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            contextRef.current.fillStyle = canvasBackgroundColor;
+            contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            contextRef.current.putImageData(history[newStep], 0, 0);
+        }
+    } else {
+        toast({ title: "Nothing to redo", duration: 2000 });
+    }
+  }, [history, historyStep, canvasBackgroundColor, toast]);
   
   const isDrawingRelatedToolWithOptionsActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase');
     
@@ -561,6 +637,18 @@ export default function WhiteboardPage() {
               isActive={activeTool === "select"} 
               data-options-toggler="true"
             />
+            <ToolButton
+                icon={Undo2}
+                label="Undo"
+                onClick={handleUndo}
+                disabled={historyStep <= 0}
+            />
+            <ToolButton
+                icon={Redo2}
+                label="Redo"
+                onClick={handleRedo}
+                disabled={historyStep >= history.length - 1 || history.length === 0}
+            />
             <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
@@ -571,7 +659,7 @@ export default function WhiteboardPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                        This will clear the entire whiteboard. This action cannot be undone.
+                        This will clear the entire whiteboard. This action cannot be undone from the history.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -650,12 +738,8 @@ export default function WhiteboardPage() {
                       label="Shape Assist"
                       onClick={() => {
                         toast({ title: "Shape Assist Clicked", description: "Shape Assist functionality is a creative idea for future implementation!"});
-                        // This is where you'd trigger the "assist" functionality
-                        // For now, it just shows a toast.
                       }}
-                      // isActive could be used if "Assist" becomes a sub-mode of "Select"
                     />
-                    {/* Add other selection-related tool buttons here if needed */}
                   </div>
                 </div>
               )}
@@ -663,7 +747,7 @@ export default function WhiteboardPage() {
           </div>
         )}
 
-        <main className="flex-grow flex flex-col overflow-hidden min-h-0 pt-[65px]"> {/* Adjusted pt to account for main tools toolbar height */}
+        <main className="flex-grow flex flex-col overflow-hidden min-h-0 pt-[65px]">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
               <canvas
@@ -689,7 +773,7 @@ export default function WhiteboardPage() {
           </Card>
         </main>
         <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-          TeachMeet Whiteboard - Drawing, shapes, text, erase, and area selection enabled.
+          TeachMeet Whiteboard - Drawing, shapes, text, erase, and area selection enabled. Undo/Redo available.
         </footer>
       </div>
     </>
