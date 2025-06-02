@@ -63,9 +63,20 @@ const ColorSwatch = ({ color, onClick, isSelected }: { color: string, onClick: (
   />
 );
 
+interface TextElement {
+  id: string;
+  textLines: string[];
+  x: number;
+  y: number;
+  color: string;
+  font: string;
+  fontSize: number;
+  lineHeight: number;
+}
+
 const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
 const MAX_HISTORY_STEPS = 20;
-const HANDLE_SIZE = 8; // Size of the resize handles
+const HANDLE_SIZE = 8; 
 
 export default function WhiteboardPage() {
   const params = useParams();
@@ -106,6 +117,7 @@ export default function WhiteboardPage() {
   const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
   const [cursorBlinkVisible, setCursorBlinkVisible] = useState(true);
   const cursorIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [drawnTextObjects, setDrawnTextObjects] = useState<TextElement[]>([]);
 
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -156,7 +168,9 @@ export default function WhiteboardPage() {
     const canvas = canvasRef.current;
     const context = contextRef.current;
     try {
+        // Capture the current state of the main canvas (which should only contain drawings)
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        
         setHistory(prevHistory => {
             const newHistoryBase = historyStep === -1 ? [] : prevHistory.slice(0, historyStep + 1);
             let updatedHistory = [...newHistoryBase, imageData];
@@ -211,54 +225,71 @@ export default function WhiteboardPage() {
 
     const canvas = canvasRef.current;
     const context = contextRef.current;
-    const fontSize = getFontSize();
-    const lineHeight = fontSize * 1.2;
-
+    
+    // 1. Clear canvas with background color
     context.globalCompositeOperation = 'source-over';
     context.fillStyle = canvasBackgroundColor;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
+    // 2. Draw the drawings from history
     if (history.length > 0 && historyStep >= 0 && historyStep < history.length && history[historyStep]) {
       try {
         context.putImageData(history[historyStep], 0, 0);
       } catch (e) {
-        console.error("Error redrawing from history:", e);
+        console.error("Error redrawing drawings from history:", e);
         context.fillStyle = canvasBackgroundColor;
         context.fillRect(0, 0, canvas.width, canvas.height);
       }
     } else if (!isInitialStateSaved && canvas.width > 0 && canvas.height > 0) {
-      saveCurrentCanvasState();
+      const blankImageData = context.getImageData(0,0, canvas.width, canvas.height);
+      setHistory([blankImageData]);
+      setHistoryStep(0);
       setIsInitialStateSaved(true);
     }
     
+    // 3. Draw all finalized text objects on top
+    drawnTextObjects.forEach(textObj => {
+      context.fillStyle = textObj.color;
+      context.font = textObj.font;
+      context.textAlign = "left";
+      context.textBaseline = "top";
+      textObj.textLines.forEach((line, index) => {
+        context.fillText(line, textObj.x, textObj.y + (index * textObj.lineHeight));
+      });
+    });
+    
+    // 4. Draw live text input if active
     if (isTypingText && textInputPosition) {
+      const liveFontSize = getFontSize();
+      const liveLineHeight = liveFontSize * 1.2;
       context.fillStyle = selectedColor;
-      context.font = `${fontSize}px sans-serif`;
+      context.font = `${liveFontSize}px sans-serif`;
       context.textAlign = "left";
       context.textBaseline = "top";
       
       const lines = currentText.split('\n');
       lines.forEach((line, index) => {
-        context.fillText(line, textInputPosition.x, textInputPosition.y + (index * lineHeight));
+        context.fillText(line, textInputPosition.x, textInputPosition.y + (index * liveLineHeight));
       });
 
       if (cursorBlinkVisible) {
         const lastLine = lines[lines.length - 1];
         const cursorX = textInputPosition.x + context.measureText(lastLine).width;
-        const cursorY = textInputPosition.y + (lines.length - 1) * lineHeight;
+        const cursorY = textInputPosition.y + (lines.length - 1) * liveLineHeight;
         context.beginPath();
         context.moveTo(cursorX, cursorY);
-        context.lineTo(cursorX, cursorY + fontSize);
+        context.lineTo(cursorX, cursorY + liveFontSize);
         context.strokeStyle = selectedColor; 
         context.lineWidth = 1;
         context.stroke();
       }
     }
 
+    // 5. Draw selection box if active
     if (activeSelection) {
       drawSelectionBoxWithHandles(activeSelection);
     }
-  }, [history, historyStep, canvasBackgroundColor, activeSelection, drawSelectionBoxWithHandles, isInitialStateSaved, saveCurrentCanvasState, setIsInitialStateSaved, isTypingText, currentText, textInputPosition, selectedColor, getFontSize, cursorBlinkVisible]);
+  }, [history, historyStep, canvasBackgroundColor, activeSelection, drawSelectionBoxWithHandles, isInitialStateSaved, setIsInitialStateSaved, isTypingText, currentText, textInputPosition, selectedColor, getFontSize, cursorBlinkVisible, drawnTextObjects]);
 
 
  useEffect(() => {
@@ -331,31 +362,13 @@ export default function WhiteboardPage() {
       const newHeight = canvas.parentElement.clientHeight;
 
       if (newWidth > 0 && newHeight > 0) {
-        let currentImageData = null;
-        if (context && canvas.width > 0 && canvas.height > 0) {
-            try {
-               currentImageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            } catch (e) {
-                console.warn("Could not get image data before resize, canvas might be tainted or empty:", e);
-            }
-        }
-        
         canvas.width = newWidth;
         canvas.height = newHeight;
 
         if (context) {
           context.lineCap = "round";
           context.lineJoin = "round";
-          if (currentImageData) {
-            try {
-                context.putImageData(currentImageData, 0, 0);
-            } catch (e) {
-                console.warn("Could not put image data after resize, redrawing from history:", e);
-                redrawCanvasContent(); 
-            }
-          } else {
-            redrawCanvasContent(); 
-          }
+          redrawCanvasContent(); 
         }
       }
     }
@@ -379,8 +392,8 @@ export default function WhiteboardPage() {
   useEffect(() => {
     if (contextRef.current) {
       if (activeTool === 'erase') {
-        contextRef.current.strokeStyle = canvasBackgroundColor; // Erase with background color
-        contextRef.current.globalCompositeOperation = 'source-over'; // Normal drawing mode for erasing
+        contextRef.current.strokeStyle = canvasBackgroundColor; 
+        contextRef.current.globalCompositeOperation = 'source-over';
       } else {
         contextRef.current.strokeStyle = selectedColor;
         contextRef.current.globalCompositeOperation = 'source-over';
@@ -391,41 +404,33 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawCanvasContent();
-  }, [activeSelection, historyStep, redrawCanvasContent, isTypingText, currentText, textInputPosition, cursorBlinkVisible]); 
+  }, [activeSelection, historyStep, drawnTextObjects, canvasBackgroundColor]); // Simpler dependencies for full redraw
 
   const finalizeLiveText = useCallback(() => {
-    if (!isTypingText) return; 
+    if (!isTypingText || !contextRef.current) return; 
 
     const textToDraw = currentText.trimEnd(); 
-    if (textToDraw && textInputPosition && contextRef.current) {
-      if (history[historyStep]) {
-        contextRef.current.putImageData(history[historyStep], 0, 0);
-      } else if (canvasRef.current) {
-        contextRef.current.fillStyle = canvasBackgroundColor;
-        contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      }
-
-      contextRef.current.globalCompositeOperation = 'source-over';
-      contextRef.current.fillStyle = selectedColor;
-      contextRef.current.font = `${getFontSize()}px sans-serif`;
-      contextRef.current.textAlign = "left";
-      contextRef.current.textBaseline = "top";
-      
-      const lines = textToDraw.split('\n');
-      const lineHeight = getFontSize() * 1.2;
-      lines.forEach((line, index) => {
-        contextRef.current!.fillText(line, textInputPosition.x, textInputPosition.y + (index * lineHeight));
-      });
-      
-      saveCurrentCanvasState();
+    if (textToDraw && textInputPosition) {
+      const newTextElement: TextElement = {
+        id: Date.now().toString(),
+        textLines: textToDraw.split('\n'),
+        x: textInputPosition.x,
+        y: textInputPosition.y,
+        color: selectedColor,
+        fontSize: getFontSize(),
+        font: `${getFontSize()}px sans-serif`,
+        lineHeight: getFontSize() * 1.2,
+      };
+      setDrawnTextObjects(prev => [...prev, newTextElement]);
     }
     setIsTypingText(false);
     setCurrentText('');
-    // textInputPosition is reset by handleCanvasPointerDown or tool change
+    setTextInputPosition(null);
     if (liveTextInputRef.current) {
       liveTextInputRef.current.blur();
     }
-  }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor]);
+    redrawCanvasContent(); 
+  }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, setDrawnTextObjects, redrawCanvasContent]);
 
 
   useEffect(() => {
@@ -435,18 +440,14 @@ export default function WhiteboardPage() {
       
       if (isTypingText) {
          if (canvasRef.current && canvasRef.current.contains(target)) {
-           // If click is on canvas, handleCanvasPointerDown will finalize or continue text
            return;
          }
          if (isClickOnOptionsToggler && activeTool === 'text') {
-           // Allow clicking text tool options without finalizing
            return;
          }
          if (drawingOptionsToolbarRef.current && drawingOptionsToolbarRef.current.contains(target) && activeTool === 'text') {
-            // Allow interaction with options panel for text tool
             return;
          }
-         // Otherwise, finalize if clicking outside text-related areas
          finalizeLiveText();
       }
 
@@ -458,7 +459,6 @@ export default function WhiteboardPage() {
       ) {
         const canvasElem = canvasRef.current;
         if (canvasElem && canvasElem.contains(target) && (isDrawingRef.current || isSelectingRef.current || (activeTool === 'text' && !isTypingText))) {
-          // Don't close options panel if interaction is on canvas for drawing/selecting, or starting text
         } else {
           setShowDrawingToolOptions(false);
         }
@@ -517,72 +517,85 @@ export default function WhiteboardPage() {
     lastPositionRef.current = pos;
     shapeStartPointRef.current = pos;
 
+    // Restore drawing layer before starting a new stroke
+    if (history[historyStep] && canvasRef.current) {
+      contextRef.current.putImageData(history[historyStep], 0, 0);
+    } else if(canvasRef.current) {
+      contextRef.current.fillStyle = canvasBackgroundColor;
+      contextRef.current.fillRect(0,0,canvasRef.current.width, canvasRef.current.height);
+    }
+
+
     contextRef.current.beginPath();
     contextRef.current.moveTo(pos.x, pos.y);
 
     if (activeTool === 'erase') {
       contextRef.current.globalCompositeOperation = 'source-over';
-      contextRef.current.strokeStyle = canvasBackgroundColor;
-      contextRef.current.lineWidth = getLineWidth();
+      contextRef.current.strokeStyle = canvasBackgroundColor; 
     } else {
       contextRef.current.globalCompositeOperation = 'source-over';
       contextRef.current.strokeStyle = selectedColor;
-      contextRef.current.lineWidth = getLineWidth();
     }
-  }, [activeTool, selectedColor, getLineWidth, canvasBackgroundColor]);
+    contextRef.current.lineWidth = getLineWidth();
+  }, [activeTool, selectedColor, getLineWidth, canvasBackgroundColor, history, historyStep]);
 
   const drawInternal = useCallback((pos: { x: number, y: number }) => {
     if (!contextRef.current || !lastPositionRef.current || !activeTool || !isDrawingRef.current || activeTool === 'select' || activeTool === 'text') return;
 
+    const currentCtx = contextRef.current;
+
     if (activeTool === 'draw' || activeTool === 'erase') {
-      contextRef.current.lineTo(pos.x, pos.y);
-      contextRef.current.stroke();
+      currentCtx.lineTo(pos.x, pos.y);
+      currentCtx.stroke();
       lastPositionRef.current = pos;
     } else if (drawingTools.includes(activeTool) && shapeStartPointRef.current) {
-        if (history[historyStep] && contextRef.current && canvasRef.current) {
-            contextRef.current.putImageData(history[historyStep], 0, 0);
-        } else if (canvasRef.current && contextRef.current) { 
-            contextRef.current.fillStyle = canvasBackgroundColor;
-            contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        // Restore the drawing layer from history before drawing the temporary shape
+        if (history[historyStep] && canvasRef.current) {
+            currentCtx.putImageData(history[historyStep], 0, 0);
+        } else if (canvasRef.current) { 
+            currentCtx.fillStyle = canvasBackgroundColor;
+            currentCtx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
+        
+        //Shapes do not need text redrawn during preview, only on redrawCanvasContent
         
         const start = shapeStartPointRef.current;
         const end = pos;
-        contextRef.current.beginPath();
-        contextRef.current.globalCompositeOperation = 'source-over';
-        contextRef.current.strokeStyle = activeTool === 'erase' ? canvasBackgroundColor : selectedColor;
-        contextRef.current.lineWidth = getLineWidth();
+        currentCtx.beginPath(); 
+        currentCtx.globalCompositeOperation = 'source-over';
+        currentCtx.strokeStyle = activeTool === 'erase' ? canvasBackgroundColor : selectedColor;
+        currentCtx.lineWidth = getLineWidth();
 
         if (activeTool === 'line') {
-            contextRef.current.moveTo(start.x, start.y);
-            contextRef.current.lineTo(end.x, end.y);
+            currentCtx.moveTo(start.x, start.y);
+            currentCtx.lineTo(end.x, end.y);
         } else if (activeTool === 'square') {
-            contextRef.current.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+            currentCtx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
         } else if (activeTool === 'circle') {
             const dx = end.x - start.x;
             const dy = end.y - start.y;
             const radius = Math.sqrt(dx * dx + dy * dy) / 2;
             const centerX = start.x + dx / 2;
             const centerY = start.y + dy / 2;
-            contextRef.current.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
+            currentCtx.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
         } else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth();
             const angle = Math.atan2(end.y - start.y, end.x - start.x);
-            contextRef.current.moveTo(start.x, start.y);
-            contextRef.current.lineTo(end.x, end.y);
-            contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
-            contextRef.current.moveTo(end.x, end.y);
-            contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
+            currentCtx.moveTo(start.x, start.y);
+            currentCtx.lineTo(end.x, end.y);
+            currentCtx.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
+            currentCtx.moveTo(end.x, end.y);
+            currentCtx.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
         } else if (activeTool === 'triangle') {
             const p1 = { x: start.x + (end.x - start.x) / 2, y: start.y };
             const p2 = { x: start.x, y: end.y };
             const p3 = { x: end.x, y: end.y };
-            contextRef.current.moveTo(p1.x, p1.y);
-            contextRef.current.lineTo(p2.x, p2.y);
-            contextRef.current.lineTo(p3.x, p3.y);
-            contextRef.current.closePath();
+            currentCtx.moveTo(p1.x, p1.y);
+            currentCtx.lineTo(p2.x, p2.y);
+            currentCtx.lineTo(p3.x, p3.y);
+            currentCtx.closePath();
         }
-        contextRef.current.stroke();
+        currentCtx.stroke();
     }
   }, [activeTool, history, historyStep, canvasBackgroundColor, selectedColor, getLineWidth]);
 
@@ -595,58 +608,61 @@ export default function WhiteboardPage() {
       }
       return;
     }
-
+    
+    const currentCtx = contextRef.current;
     if (drawingTools.includes(activeTool || "") && activeTool !== 'draw' && shapeStartPointRef.current && (pos || lastPositionRef.current)) {
-        const finalPos = pos || lastPositionRef.current!;
-         if (history[historyStep] && contextRef.current && canvasRef.current) {
-            contextRef.current.putImageData(history[historyStep], 0, 0);
-        } else if (canvasRef.current && contextRef.current) {
-            contextRef.current.fillStyle = canvasBackgroundColor;
-            contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        if (history[historyStep] && canvasRef.current) {
+            currentCtx.putImageData(history[historyStep], 0, 0);
+        } else if (canvasRef.current) { 
+            currentCtx.fillStyle = canvasBackgroundColor;
+            currentCtx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
+
+        const finalPos = pos || lastPositionRef.current!;
         const start = shapeStartPointRef.current;
         const end = finalPos;
-        contextRef.current.beginPath();
-        contextRef.current.globalCompositeOperation = 'source-over';
-        contextRef.current.strokeStyle = activeTool === 'erase' ? canvasBackgroundColor : selectedColor;
-        contextRef.current.lineWidth = getLineWidth();
+        currentCtx.beginPath();
+        currentCtx.globalCompositeOperation = 'source-over';
+        currentCtx.strokeStyle = activeTool === 'erase' ? canvasBackgroundColor : selectedColor;
+        currentCtx.lineWidth = getLineWidth();
         if (activeTool === 'line') {
-            contextRef.current.moveTo(start.x, start.y);
-            contextRef.current.lineTo(end.x, end.y);
+            currentCtx.moveTo(start.x, start.y);
+            currentCtx.lineTo(end.x, end.y);
         } else if (activeTool === 'square') {
-            contextRef.current.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+            currentCtx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
         } else if (activeTool === 'circle') {
             const dx = end.x - start.x;
             const dy = end.y - start.y;
             const radius = Math.sqrt(dx * dx + dy * dy) / 2;
             const centerX = start.x + dx / 2;
             const centerY = start.y + dy / 2;
-            contextRef.current.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
+            currentCtx.arc(centerX, centerY, Math.abs(radius), 0, 2 * Math.PI);
         } else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth();
             const angle = Math.atan2(end.y - start.y, end.x - start.x);
-            contextRef.current.moveTo(start.x, start.y);
-            contextRef.current.lineTo(end.x, end.y);
-            contextRef.current.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
-            contextRef.current.moveTo(end.x, end.y);
-            contextRef.current.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
+            currentCtx.moveTo(start.x, start.y);
+            currentCtx.lineTo(end.x, end.y);
+            currentCtx.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
+            currentCtx.moveTo(end.x, end.y);
+            currentCtx.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
         } else if (activeTool === 'triangle') {
             const p1 = { x: start.x + (end.x - start.x) / 2, y: start.y };
             const p2 = { x: start.x, y: end.y };
             const p3 = { x: end.x, y: end.y };
-            contextRef.current.moveTo(p1.x, p1.y);
-            contextRef.current.lineTo(p2.x, p2.y);
-            contextRef.current.lineTo(p3.x, p3.y);
-            contextRef.current.closePath();
+            currentCtx.moveTo(p1.x, p1.y);
+            currentCtx.lineTo(p2.x, p2.y);
+            currentCtx.lineTo(p3.x, p3.y);
+            currentCtx.closePath();
         }
-        contextRef.current.stroke();
+        currentCtx.stroke();
     }
 
-    saveCurrentCanvasState();
+    saveCurrentCanvasState(); 
     isDrawingRef.current = false;
     lastPositionRef.current = null;
     shapeStartPointRef.current = null;
-  }, [activeTool, selectedColor, getLineWidth, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor]);
+    redrawCanvasContent(); 
+  }, [activeTool, selectedColor, getLineWidth, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor, redrawCanvasContent]);
 
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
@@ -659,7 +675,8 @@ export default function WhiteboardPage() {
       if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
       if (contextRef.current && initialCanvasDataForSelectionRef.current && selectionStartPointRef.current) {
         contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); 
-
+        // No need to redraw text objects here explicitly, as initialCanvasData already included them.
+        
         const start = selectionStartPointRef.current;
         const rectX = Math.min(start.x, pos.x);
         const rectY = Math.min(start.y, pos.y);
@@ -693,7 +710,7 @@ export default function WhiteboardPage() {
           } else {
               setActiveSelection(null); 
           }
-          redrawCanvasContent();
+          redrawCanvasContent(); 
       }
       isSelectingRef.current = false;
       selectionStartPointRef.current = null;
@@ -715,43 +732,56 @@ export default function WhiteboardPage() {
     if (!pos) return;
     
     if (activeTool === 'text') {
-        if (isTypingText) { // Finalize previous text if already typing
+        if (isTypingText) { 
             finalizeLiveText();
         }
         setTextInputPosition(pos);
-        setCurrentText(''); // Reset for new text block
+        setCurrentText(''); 
         setIsTypingText(true);
-        setTimeout(() => { // Ensure state update and then focus
+        setTimeout(() => { 
             if (liveTextInputRef.current) {
+                liveTextInputRef.current.style.top = `${pos.y + (canvasRef.current?.getBoundingClientRect().top || 0)}px`;
+                liveTextInputRef.current.style.left = `${pos.x + (canvasRef.current?.getBoundingClientRect().left || 0)}px`;
                 liveTextInputRef.current.focus();
             }
         }, 0);
     } else if (activeTool === 'select') {
         if (isTypingText) finalizeLiveText();
-        setActiveSelection(null); // Clear any existing selection box
-        if (event.type === 'touchstart') { /* No explicit preventDefault here for touch */ }
+        setActiveSelection(null); 
         if (contextRef.current && canvasRef.current) {
-            try {
-            if (history[historyStep]) {
-                initialCanvasDataForSelectionRef.current = history[historyStep];
-            } else { 
-                initialCanvasDataForSelectionRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvasRef.current.width;
+            tempCanvas.height = canvasRef.current.height;
+            const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+            if (tempCtx) {
+                tempCtx.fillStyle = canvasBackgroundColor;
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                if (history[historyStep]) {
+                    tempCtx.putImageData(history[historyStep], 0, 0);
+                }
+                drawnTextObjects.forEach(textObj => {
+                    tempCtx.fillStyle = textObj.color;
+                    tempCtx.font = textObj.font;
+                    textObj.textLines.forEach((line, index) => {
+                        tempCtx.fillText(line, textObj.x, textObj.y + (index * textObj.lineHeight));
+                    });
+                });
+                initialCanvasDataForSelectionRef.current = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            } else {
+                 initialCanvasDataForSelectionRef.current = null;
             }
-            } catch (e) {
-            console.error("Error getting image data for selection:", e);
+        } else {
             initialCanvasDataForSelectionRef.current = null;
-            }
         }
         isSelectingRef.current = true;
         selectionStartPointRef.current = pos;
         currentSelectionRectRef.current = null; 
-    } else if (activeTool) { // For drawing tools (draw, erase, shapes)
-        if (isTypingText) finalizeLiveText(); // Finalize text if switching to a drawing tool
-        setActiveSelection(null); // Clear any existing selection box
-        if (event.type === 'touchstart') event.preventDefault(); // Prevent scrolling on touch for drawing
+    } else if (activeTool) { 
+        if (isTypingText) finalizeLiveText(); 
+        setActiveSelection(null); 
+        if (event.type === 'touchstart' && (drawingTools.includes(activeTool) || activeTool === 'erase')) event.preventDefault(); 
         startDrawingInternal(pos);
     } else {
-      // No tool active, or an unhandled tool
        if (isTypingText) finalizeLiveText(); 
        setActiveSelection(null);
     }
@@ -764,7 +794,7 @@ export default function WhiteboardPage() {
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
     }
-  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, finalizeLiveText, history, historyStep, isTypingText]);
+  }, [activeTool, getPointerPosition, startDrawingInternal, handlePointerMove, handlePointerUp, finalizeLiveText, history, historyStep, isTypingText, canvasBackgroundColor, drawnTextObjects]);
 
   useEffect(() => {
     return () => {
@@ -817,9 +847,16 @@ export default function WhiteboardPage() {
       context.globalCompositeOperation = 'source-over';
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      setDrawnTextObjects([]); 
       setActiveSelection(null);
       finalizeLiveText(); 
-      saveCurrentCanvasState(); 
+      
+      const blankImageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      setHistory([blankImageData]);
+      setHistoryStep(0);
+      setIsInitialStateSaved(true); 
+      redrawCanvasContent(); 
     }
     setShowClearConfirmDialog(false);
   };
@@ -831,15 +868,12 @@ export default function WhiteboardPage() {
         setHistoryStep(newStep);
     } else if (historyStep === 0) { 
         setHistoryStep(-1); 
-        if (contextRef.current && canvasRef.current) {
-            contextRef.current.fillStyle = canvasBackgroundColor;
-            contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        }
     } else {
         toast({ title: "Nothing to undo", duration: 2000 });
     }
     setActiveSelection(null);
-  }, [historyStep, canvasBackgroundColor, toast, finalizeLiveText]);
+    redrawCanvasContent();
+  }, [historyStep, toast, finalizeLiveText, redrawCanvasContent]);
 
   const handleRedo = useCallback(() => {
     finalizeLiveText(); 
@@ -850,7 +884,8 @@ export default function WhiteboardPage() {
         toast({ title: "Nothing to redo", duration: 2000 });
     }
     setActiveSelection(null);
-  }, [history, historyStep, toast, finalizeLiveText]);
+    redrawCanvasContent();
+  }, [history, historyStep, toast, finalizeLiveText, redrawCanvasContent]);
 
   const isOptionsPanelToolActive = activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase' || activeTool === 'text');
 
@@ -883,17 +918,21 @@ export default function WhiteboardPage() {
         onBlur={finalizeLiveText} 
         style={{
           position: 'absolute',
-          top: '-9999px', 
-          left: '-9999px',
-          width: '1px',
+          // top will be set dynamically when text input starts
+          // left will be set dynamically
+          width: '1px', 
           height: '1px',
-          opacity: 0,
+          opacity: 0, 
           border: 'none',
           padding: 0,
           margin: 0,
           overflow: 'hidden',
           resize: 'none',
           whiteSpace: 'pre', 
+          fontSize: `${getFontSize()}px`, 
+          fontFamily: 'sans-serif', 
+          color: selectedColor, 
+          background: 'transparent', 
         }}
         aria-hidden="true"
         tabIndex={-1} 
@@ -953,7 +992,7 @@ export default function WhiteboardPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                        This will clear the entire whiteboard. This action cannot be undone from the history.
+                        This will clear the entire whiteboard including all drawings and text. This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -1001,7 +1040,7 @@ export default function WhiteboardPage() {
                     </div>
                   </div>
                 </div>
-              ) : (activeTool === 'draw' || drawingTools.includes(activeTool || "")) ? ( // Excludes 'erase' for color/shape options
+              ) : (activeTool === 'draw' || (drawingTools.includes(activeTool || ""))) && activeTool !== 'erase' ? ( 
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   <div className="flex flex-col items-center md:items-start gap-2">
                     <span className="text-xs font-medium text-muted-foreground">Color:</span>
@@ -1089,6 +1128,9 @@ export default function WhiteboardPage() {
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => {
+                  if (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase' || activeTool === 'select')) {
+                     e.preventDefault();
+                  }
                   handleCanvasPointerDown(e);
                 }}
                 className={cn("border-2 border-dashed border-border/30 touch-none w-full h-full block", canvasCursorClass)}
@@ -1105,7 +1147,7 @@ export default function WhiteboardPage() {
           </Card>
         </main>
         <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-          TeachMeet Whiteboard - Drawing, shapes, text, erase, and area selection enabled. Undo/Redo available.
+          TeachMeet Whiteboard - Drawings, shapes, live text, erase (drawings only), and area selection. Undo/Redo for drawings.
         </footer>
       </div>
     </>
