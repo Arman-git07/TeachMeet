@@ -147,13 +147,8 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
-      {/* 
-        Main content area adjustments:
-        - Removed justify-center to allow content to flow from top if it's taller than viewport.
-        - Removed overflow-hidden to allow scrolling if content overflows.
-        - Adjusted padding for better spacing, especially py-8 for vertical space.
-      */}
-      <main className="flex-grow flex flex-col items-center px-4 py-8 relative">
+      {/* Main content area */}
+      <main className="flex-grow flex flex-col items-center justify-center overflow-hidden px-4 relative">
         <div
           className="absolute inset-0 opacity-10"
           style={{
@@ -163,10 +158,10 @@ export default function HomePage() {
             maskImage: "radial-gradient(circle at center, white, transparent 70%)"
           }}
         />
-        <div className="relative z-10 flex flex-col items-center text-center w-full">
+        <div className="relative z-10 flex flex-col items-center text-center">
           <Logo
             text={logoText}
-            size="small" // Changed from medium to small for better fit on smaller screens
+            size="medium"
             className={cn(
               'mb-8 text-center cursor-pointer',
               animateChars && logoText === 'TeachMeet' && 'logo-animate-complex'
@@ -174,7 +169,7 @@ export default function HomePage() {
             onClick={handleComplexLogoAnimation}
             animateChars={animateChars && logoText === 'TeachMeet'}
           />
-          <div className="mt-4 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center"> {/* Reduced mt from 8 to 4 */}
+          <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
             <h2 className="text-2xl font-semibold text-primary mb-4">Ongoing Meetings</h2>
             {ongoingMeetings.length > 0 ? (
               <ul className="space-y-3 text-left">
@@ -223,4 +218,6 @@ export default function HomePage() {
     </div>
   );
 }
+    
+
     
