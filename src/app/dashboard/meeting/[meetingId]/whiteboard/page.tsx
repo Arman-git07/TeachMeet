@@ -72,6 +72,10 @@ interface TextElement {
   font: string;
   fontSize: number;
   lineHeight: number;
+  // For resizing
+  originalX?: number;
+  originalY?: number;
+  originalFontSize?: number;
 }
 
 const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
@@ -110,7 +114,11 @@ export default function WhiteboardPage() {
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyStep, setHistoryStep] = useState<number>(-1);
   const [isInitialStateSaved, setIsInitialStateSaved] = useState(false);
+  
   const [activeSelection, setActiveSelection] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const selectionContentForResizeRef = useRef<{ drawing: ImageData | null; texts: TextElement[] }>({ drawing: null, texts: [] });
+  const originalContentBoundsRef = useRef<{ x: number, y: number, w: number, h: number } | null>(null);
+
 
   const [isTypingText, setIsTypingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
@@ -227,14 +235,12 @@ export default function WhiteboardPage() {
         context.fillRect(0, 0, canvas.width, canvas.height);
       }
     } else if (!isInitialStateSaved && canvas.width > 0 && canvas.height > 0) {
-      // Save blank state as initial history if no history exists yet
       const blankImageData = context.getImageData(0,0, canvas.width, canvas.height);
       setHistory([blankImageData]);
       setHistoryStep(0);
       setIsInitialStateSaved(true);
     }
     
-    // Draw finalized text objects on top of drawings
     drawnTextObjects.forEach(textObj => {
       context.fillStyle = textObj.color;
       context.font = textObj.font;
@@ -245,7 +251,6 @@ export default function WhiteboardPage() {
       });
     });
     
-    // Draw live text input if active
     if (isTypingText && textInputPosition) {
       const liveFontSize = getFontSize();
       const liveLineHeight = liveFontSize * 1.2;
@@ -259,7 +264,6 @@ export default function WhiteboardPage() {
         context.fillText(line, textInputPosition.x, textInputPosition.y + (index * liveLineHeight));
       });
 
-      // Draw blinking cursor
       if (cursorBlinkVisible) {
         const lastLine = lines[lines.length - 1];
         const cursorX = textInputPosition.x + context.measureText(lastLine).width;
@@ -267,7 +271,7 @@ export default function WhiteboardPage() {
         context.beginPath();
         context.moveTo(cursorX, cursorY);
         context.lineTo(cursorX, cursorY + liveFontSize);
-        context.strokeStyle = selectedColor; // Cursor color same as text
+        context.strokeStyle = selectedColor; 
         context.lineWidth = 1;
         context.stroke();
       }
@@ -283,43 +287,32 @@ export default function WhiteboardPage() {
     const canvas = canvasRef.current;
     const context = contextRef.current;
     try {
-        // Create a temporary canvas to draw only drawings (without text or selection box)
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width;
         tempCanvas.height = canvas.height;
         const tempCtx = tempCanvas.getContext('2d');
         if (!tempCtx) return;
 
-        // 1. Fill with background color
         tempCtx.fillStyle = canvasBackgroundColor;
         tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
         
-        // 2. Draw the existing drawing history onto the temp canvas
-        // This assumes history[historyStep] ONLY contains drawings, not text.
         if (history.length > 0 && historyStep >= 0 && history[historyStep]) {
             tempCtx.putImageData(history[historyStep], 0, 0);
         }
         
-        // 3. If there was a drawing operation that just finished (the one we want to save),
-        // it should already be on the main context (contextRef.current).
-        // We need to capture THIS state.
-        // The issue is: contextRef.current might also have text on it if redrawCanvasContent just ran.
-        // So, we take the drawing from the main canvas context.
-        const imageData = context.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        // Capture only the drawing layer from the main canvas by excluding text and selection box
+        // This means we need to draw *only* what the drawing tools draw onto this tempCtx
+        // The current approach is to take the full main context.getImageData(), which is problematic
+        // because it includes text.
+        // A better approach is: the drawing operations directly modify history[historyStep] (or its successor)
+        // So, context.getImageData() should be what we want for the *drawing layer*.
+
+        // Get current state of main canvas (which SHOULD include latest drawing, but not text yet)
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         
-        // We must ensure this imageData does NOT contain text rendered by redrawCanvasContent.
-        // A cleaner way: the drawing functions (drawInternal, stopDrawingInternal) should
-        // draw on a temporary canvas that only contains the background and history[historyStep],
-        // then the new drawing, then get image data from THAT.
-        // For now, the simplest is to capture the main canvas *before* text is redrawn on top.
-        // This is tricky with current `redrawCanvasContent`.
-
-        // Let's simplify: the drawing functions themselves (start, draw, stop) draw on top of history[historyStep].
-        // So, when stopDrawingInternal finishes, context.getImageData() should capture that.
-
         setHistory(prevHistory => {
             const newHistoryBase = historyStep === -1 ? [] : prevHistory.slice(0, historyStep + 1);
-            let updatedHistory = [...newHistoryBase, imageData]; // imageData from main canvas context
+            let updatedHistory = [...newHistoryBase, imageData];
             if (updatedHistory.length > MAX_HISTORY_STEPS) {
                 updatedHistory = updatedHistory.slice(updatedHistory.length - MAX_HISTORY_STEPS);
             }
@@ -329,7 +322,7 @@ export default function WhiteboardPage() {
     } catch (e) {
         console.error("Error saving canvas state for history:", e);
     }
-  }, [historyStep, MAX_HISTORY_STEPS, canvasBackgroundColor, history]);
+  }, [historyStep, MAX_HISTORY_STEPS, canvasBackgroundColor, history]); // Removed `contextRef` and `canvasRef` as they are refs
 
  useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -356,7 +349,7 @@ export default function WhiteboardPage() {
         clearInterval(cursorIntervalRef.current);
         cursorIntervalRef.current = null;
       }
-      setCursorBlinkVisible(true); // Default to visible when not typing
+      setCursorBlinkVisible(true); 
     }
     return () => {
       if (cursorIntervalRef.current) {
@@ -397,9 +390,8 @@ export default function WhiteboardPage() {
     if (canvas && canvas.parentElement) {
       const context = contextRef.current;
       
-      // Save current drawing state including text
-      const oldImageData = context ? context.getImageData(0, 0, canvas.width, canvas.height) : null;
-      const oldTextObjects = [...drawnTextObjects];
+      const oldImageData = context ? context.getImageData(0, 0, canvas.width, canvas.height) : null; // Not used for restore currently, but might be for complex redraws
+      // const oldTextObjects = [...drawnTextObjects]; // Not used for restore
 
       const newWidth = canvas.parentElement.clientWidth;
       const newHeight = canvas.parentElement.clientHeight;
@@ -411,19 +403,11 @@ export default function WhiteboardPage() {
         if (context) {
           context.lineCap = "round";
           context.lineJoin = "round";
-          redrawCanvasContent(); // This will apply current background and redraw history + text
-          
-          // If there was previous content, try to restore it (this is a simple restore, might not scale well)
-          // For a more robust solution, content scaling would be needed.
-          // if (oldImageData) {
-          //   context.putImageData(oldImageData, 0, 0);
-          // }
-          // setDrawnTextObjects(oldTextObjects); // Restore text objects
-          // redrawCanvasContent(); // Redraw again with potentially restored old content
+          redrawCanvasContent(); 
         }
       }
     }
-  }, [redrawCanvasContent, drawnTextObjects]);
+  }, [redrawCanvasContent]);
 
 
   useEffect(() => {
@@ -433,7 +417,6 @@ export default function WhiteboardPage() {
       if (context) {
         contextRef.current = context;
         resizeCanvas(); 
-        // Initialize history with a blank state if it's empty
         if (history.length === 0 && canvas.width > 0 && canvas.height > 0 && !isInitialStateSaved) {
             context.fillStyle = canvasBackgroundColor;
             context.fillRect(0, 0, canvas.width, canvas.height);
@@ -446,7 +429,7 @@ export default function WhiteboardPage() {
     }
     window.addEventListener("resize", resizeCanvas);
     return () => window.removeEventListener("resize", resizeCanvas);
-  }, [resizeCanvas, history.length, canvasBackgroundColor, isInitialStateSaved]); // Added dependencies
+  }, [resizeCanvas, history.length, canvasBackgroundColor, isInitialStateSaved]);
 
 
   useEffect(() => {
@@ -464,12 +447,12 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawCanvasContent();
-  }, [activeSelection, historyStep, drawnTextObjects, canvasBackgroundColor, redrawCanvasContent, isTypingText, cursorBlinkVisible, currentText]); // Added dependencies for live text and cursor
+  }, [activeSelection, historyStep, drawnTextObjects, canvasBackgroundColor, redrawCanvasContent, isTypingText, cursorBlinkVisible, currentText]); 
 
   const finalizeLiveText = useCallback(() => {
     if (!isTypingText || !contextRef.current) return; 
 
-    const textToDraw = currentText.trimEnd(); // Trim trailing newlines/spaces
+    const textToDraw = currentText.trimEnd(); 
     if (textToDraw && textInputPosition) {
       const newTextElement: TextElement = {
         id: Date.now().toString(),
@@ -482,7 +465,6 @@ export default function WhiteboardPage() {
         lineHeight: getFontSize() * 1.2,
       };
       setDrawnTextObjects(prev => [...prev, newTextElement]);
-      // Do NOT save text to drawing history here. Text is a separate layer.
     }
     setIsTypingText(false);
     setCurrentText('');
@@ -491,7 +473,7 @@ export default function WhiteboardPage() {
       liveTextInputRef.current.blur();
       liveTextInputRef.current.value = '';
     }
-    redrawCanvasContent(); // Redraw to remove live text and show finalized text
+    redrawCanvasContent(); 
   }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, setDrawnTextObjects, redrawCanvasContent]);
 
 
@@ -501,19 +483,15 @@ export default function WhiteboardPage() {
       const isClickOnOptionsToggler = (target as HTMLElement).closest('[data-options-toggler="true"]');
       
       if (isTypingText) {
-         // If click is on canvas, finalize text. But handleCanvasPointerDown will handle this.
          if (canvasRef.current && canvasRef.current.contains(target)) {
-           // Let handleCanvasPointerDown finalize text if it's a new text click
            return;
          }
-         // If click is on text tool options, don't finalize
          if (isClickOnOptionsToggler && activeTool === 'text') {
            return;
          }
          if (drawingOptionsToolbarRef.current && drawingOptionsToolbarRef.current.contains(target) && activeTool === 'text') {
             return;
          }
-         // Otherwise, finalize (e.g., click on another tool button not in options panel)
          finalizeLiveText();
       }
 
@@ -523,10 +501,9 @@ export default function WhiteboardPage() {
         !isClickOnOptionsToggler &&
         showDrawingToolOptions
       ) {
-        // Special condition for canvas: if drawing or selecting, don't hide options.
         const canvasElem = canvasRef.current;
         if (canvasElem && canvasElem.contains(target) && (isDrawingRef.current || isSelectingRef.current || (activeTool === 'text' && !isTypingText))) {
-          // Do nothing, user is interacting with canvas while options are open
+          // Do nothing
         } else {
           setShowDrawingToolOptions(false);
         }
@@ -559,7 +536,6 @@ export default function WhiteboardPage() {
         clientX = nativeEvent.touches[0].clientX;
         clientY = nativeEvent.touches[0].clientY;
       } else if (nativeEvent.changedTouches && nativeEvent.changedTouches.length > 0) {
-        // Use changedTouches for touchend if touches is empty
         clientX = nativeEvent.changedTouches[0].clientX;
         clientY = nativeEvent.changedTouches[0].clientY;
       }
@@ -585,12 +561,10 @@ export default function WhiteboardPage() {
     lastPositionRef.current = pos;
     shapeStartPointRef.current = pos;
 
-    // Restore only the drawing layer from history
     if (history[historyStep] && canvasRef.current) {
       contextRef.current.putImageData(history[historyStep], 0, 0);
-    } else if(canvasRef.current) { // If no history (e.g. first drawing or after clear all)
-      // Clear canvas (only drawing layer)
-      contextRef.current.fillStyle = canvasBackgroundColor; // Should be transparent if text is separate
+    } else if(canvasRef.current) { 
+      contextRef.current.fillStyle = canvasBackgroundColor;
       contextRef.current.fillRect(0,0,canvasRef.current.width, canvasRef.current.height);
     }
 
@@ -599,7 +573,7 @@ export default function WhiteboardPage() {
     contextRef.current.moveTo(pos.x, pos.y);
 
     if (activeTool === 'erase') {
-      contextRef.current.globalCompositeOperation = 'source-over'; // Erase by drawing background color
+      contextRef.current.globalCompositeOperation = 'source-over'; 
       contextRef.current.strokeStyle = canvasBackgroundColor; 
     } else {
       contextRef.current.globalCompositeOperation = 'source-over';
@@ -618,11 +592,10 @@ export default function WhiteboardPage() {
       currentCtx.stroke();
       lastPositionRef.current = pos;
     } else if (drawingTools.includes(activeTool) && shapeStartPointRef.current) {
-        // Restore the drawing layer to draw the shape preview
         if (history[historyStep] && canvasRef.current) {
             currentCtx.putImageData(history[historyStep], 0, 0);
         } else if (canvasRef.current) { 
-            currentCtx.fillStyle = canvasBackgroundColor; // Transparent for drawing layer
+            currentCtx.fillStyle = canvasBackgroundColor; 
             currentCtx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
         
@@ -668,7 +641,7 @@ export default function WhiteboardPage() {
 
   const stopDrawingInternal = useCallback((pos?: { x: number, y: number }) => {
     if (!contextRef.current || !isDrawingRef.current || activeTool === 'select' || activeTool === 'text') {
-      if (isDrawingRef.current) { // Ensure refs are reset even if no drawing happens
+      if (isDrawingRef.current) { 
         isDrawingRef.current = false;
         lastPositionRef.current = null;
         shapeStartPointRef.current = null;
@@ -677,18 +650,15 @@ export default function WhiteboardPage() {
     }
     
     const currentCtx = contextRef.current;
-    // For shapes, ensure the final shape is drawn on the correct base (history[historyStep])
     if (drawingTools.includes(activeTool || "") && activeTool !== 'draw' && shapeStartPointRef.current && (pos || lastPositionRef.current)) {
-        // Restore canvas to state before this shape preview started
         if (history[historyStep] && canvasRef.current) {
             currentCtx.putImageData(history[historyStep], 0, 0);
         } else if (canvasRef.current) { 
-            currentCtx.fillStyle = canvasBackgroundColor; // transparent
+            currentCtx.fillStyle = canvasBackgroundColor; 
             currentCtx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
 
-        // Draw the final shape
-        const finalPos = pos || lastPositionRef.current!; // Make sure lastPositionRef.current is not null
+        const finalPos = pos || lastPositionRef.current!; 
         const start = shapeStartPointRef.current;
         const end = finalPos;
         currentCtx.beginPath();
@@ -727,20 +697,19 @@ export default function WhiteboardPage() {
         currentCtx.stroke();
     }
 
-    saveCurrentCanvasState(); // Save the drawing layer (which should now include the new drawing)
+    saveCurrentCanvasState(); 
     isDrawingRef.current = false;
     lastPositionRef.current = null;
     shapeStartPointRef.current = null;
-    redrawCanvasContent(); // Redraw everything (bg, history, text, selection)
+    redrawCanvasContent(); 
   }, [activeTool, selectedColor, getLineWidth, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor, redrawCanvasContent]);
 
   const getHandleAtPosition = useCallback((pos: { x: number, y: number }): ResizeHandleType | null => {
     if (!activeSelection) return null;
     const handles = getResizeHandles(activeSelection);
-    const checkRadius = HANDLE_SIZE; // Make it a bit more generous for touch
+    const checkRadius = HANDLE_SIZE; 
 
     for (const [type, handlePos] of Object.entries(handles) as [ResizeHandleType, { x: number, y: number }][]) {
-        // Check if click is within a square around the handle center
         if (Math.abs(pos.x - handlePos.x) < checkRadius && Math.abs(pos.y - handlePos.y) < checkRadius) {
             return type;
         }
@@ -749,7 +718,7 @@ export default function WhiteboardPage() {
   }, [activeSelection, getResizeHandles, HANDLE_SIZE]);
 
   const getCursorForHandle = useCallback((handleType: ResizeHandleType | null): string => {
-    if (!handleType) return 'default'; // Should not happen if called with a valid handleType
+    if (!handleType) return 'default'; 
     switch (handleType) {
         case 'tl': case 'br': return 'nwse-resize';
         case 'tr': case 'bl': return 'nesw-resize';
@@ -776,17 +745,17 @@ export default function WhiteboardPage() {
         const deltaX = pos.x - startPoint.x;
         const deltaY = pos.y - startPoint.y;
 
-        if (type.includes('l')) { // left handles
+        if (type.includes('l')) { 
             w -= deltaX;
             x += deltaX;
-        } else if (type.includes('r')) { // right handles
+        } else if (type.includes('r')) { 
             w += deltaX;
         }
 
-        if (type.includes('t')) { // top handles
+        if (type.includes('t')) { 
             h -= deltaY;
             y += deltaY;
-        } else if (type.includes('b')) { // bottom handles
+        } else if (type.includes('b')) { 
             h += deltaY;
         }
         
@@ -809,7 +778,7 @@ export default function WhiteboardPage() {
     } else if (isSelectingRef.current && activeTool === 'select') {
       if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
       if (contextRef.current && initialCanvasDataForSelectionRef.current && selectionStartPointRef.current) {
-        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); // Restore canvas to pre-drag state (with drawings and text)
+        contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0); 
         
         const start = selectionStartPointRef.current;
         const rectX = Math.min(start.x, pos.x);
@@ -819,11 +788,10 @@ export default function WhiteboardPage() {
 
         currentSelectionRectRef.current = { x: rectX, y: rectY, w: rectW, h: rectH };
         
-        // Draw temporary dashed selection rectangle
         contextRef.current.save();
         contextRef.current.strokeStyle = 'rgba(0, 100, 255, 0.7)';
         contextRef.current.lineWidth = 1.5;
-        contextRef.current.setLineDash([5, 3]); // Dashed line
+        contextRef.current.setLineDash([5, 3]); 
         contextRef.current.strokeRect(rectX, rectY, rectW, rectH);
         contextRef.current.restore(); 
       }
@@ -832,45 +800,120 @@ export default function WhiteboardPage() {
         const handle = getHandleAtPosition(pos);
         currentCursor = getCursorForHandle(handle);
     } else {
-        // Default cursor logic based on current state
         currentCursor = isTypingText ? 'text' :
                         activeTool === 'text' ? 'text' :
-                        (activeTool === 'select') ? 'crosshair' :
+                        (activeTool === 'select') ? (getHandleAtPosition(pos) ? getCursorForHandle(getHandleAtPosition(pos)) : 'crosshair') :
                         (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'crosshair' :
                         'default';
     }
-    canvasRef.current.style.cursor = currentCursor || 'default'; // Ensure a fallback
+    canvasRef.current.style.cursor = currentCursor || 'default'; 
   }, [getPointerPosition, drawInternal, activeTool, activeSelection, getHandleAtPosition, getCursorForHandle, isTypingText]);
 
 
   const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
 
-    if (isResizingRef.current) {
+    if (isResizingRef.current && activeSelection && originalSelectionRectRef.current && selectionContentForResizeRef.current && originalContentBoundsRef.current) {
+        const oldRect = originalContentBoundsRef.current; 
+        const newRect = activeSelection; 
+
+        if (contextRef.current && canvasRef.current) {
+            const ctx = contextRef.current;
+            const canvas = canvasRef.current;
+
+            // 1. Prepare drawing layer base: Load history[historyStep] or blank.
+            const baseDrawingLayer = document.createElement('canvas');
+            baseDrawingLayer.width = canvas.width;
+            baseDrawingLayer.height = canvas.height;
+            const baseCtx = baseDrawingLayer.getContext('2d');
+
+            if (baseCtx) {
+                if (history[historyStep]) {
+                    baseCtx.putImageData(history[historyStep], 0, 0);
+                } else {
+                    baseCtx.fillStyle = canvasBackgroundColor;
+                    baseCtx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                // Clear the area of the original selection from this base layer
+                baseCtx.fillStyle = canvasBackgroundColor; // Erase with background color
+                baseCtx.fillRect(oldRect.x, oldRect.y, oldRect.w, oldRect.h);
+            }
+            
+            // 2. Scale and draw the captured drawing content onto the base layer
+            if (selectionContentForResizeRef.current.drawing && baseCtx) {
+                const drawingContent = selectionContentForResizeRef.current.drawing;
+                if (drawingContent.width > 0 && drawingContent.height > 0 && newRect.w > 0 && newRect.h > 0) {
+                    const tempScaleCanvas = document.createElement('canvas');
+                    tempScaleCanvas.width = drawingContent.width;
+                    tempScaleCanvas.height = drawingContent.height;
+                    tempScaleCanvas.getContext('2d')?.putImageData(drawingContent, 0, 0);
+                    baseCtx.drawImage(tempScaleCanvas, 0, 0, drawingContent.width, drawingContent.height, newRect.x, newRect.y, newRect.w, newRect.h);
+                }
+            }
+            
+            // 3. Save the modified drawing layer to history
+            if (baseCtx) {
+                 const newDrawingLayerData = baseCtx.getImageData(0, 0, canvas.width, canvas.height);
+                 setHistory(prevHistory => {
+                    const newHistoryBase = historyStep === -1 ? [] : prevHistory.slice(0, historyStep + 1);
+                    let updatedHistory = [...newHistoryBase, newDrawingLayerData];
+                    if (updatedHistory.length > MAX_HISTORY_STEPS) {
+                        updatedHistory = updatedHistory.slice(updatedHistory.length - MAX_HISTORY_STEPS);
+                    }
+                    setHistoryStep(updatedHistory.length - 1);
+                    return updatedHistory;
+                });
+            }
+
+
+            // 4. Scale and update text objects
+            const scaleX = oldRect.w === 0 ? 1 : newRect.w / oldRect.w; // Avoid division by zero
+            const scaleY = oldRect.h === 0 ? 1 : newRect.h / oldRect.h; // Avoid division by zero
+            const fontScale = Math.sqrt(Math.abs(scaleX * scaleY)); 
+
+            const updatedTextObjects = drawnTextObjects.map(textObj => {
+                const originallySelectedText = selectionContentForResizeRef.current.texts.find(t => t.id === textObj.id);
+                if (originallySelectedText && originallySelectedText.originalX !== undefined && originallySelectedText.originalY !== undefined && originallySelectedText.originalFontSize !== undefined) {
+                    const relX = (originallySelectedText.originalX - oldRect.x) * scaleX;
+                    const relY = (originallySelectedText.originalY - oldRect.y) * scaleY;
+                    const newFontSize = originallySelectedText.originalFontSize * fontScale;
+
+                    return {
+                        ...textObj,
+                        x: newRect.x + relX,
+                        y: newRect.y + relY,
+                        fontSize: Math.max(newFontSize, 5), 
+                        font: `${Math.max(newFontSize, 5)}px sans-serif`,
+                        lineHeight: Math.max(newFontSize, 5) * 1.2,
+                    };
+                }
+                return textObj; 
+            });
+            setDrawnTextObjects(updatedTextObjects);
+
+            toast({ title: "Content Resized", description: "Selected content has been resized." });
+        }
+
         isResizingRef.current = false;
         resizeHandleTypeRef.current = null;
         originalSelectionRectRef.current = null;
         resizeStartPointRef.current = null;
-        toast({ title: "Selection box resized", description: "Content scaling is a future enhancement." });
-        redrawCanvasContent(); 
+        selectionContentForResizeRef.current = { drawing: null, texts: [] };
+        originalContentBoundsRef.current = null;
+        redrawCanvasContent();
     } else if (isDrawingRef.current) {
       stopDrawingInternal(pos || undefined);
     } else if (isSelectingRef.current && activeTool === 'select') {
       if (contextRef.current && initialCanvasDataForSelectionRef.current) {
-          // Restore canvas to remove temporary dashed rectangle
           contextRef.current.putImageData(initialCanvasDataForSelectionRef.current, 0, 0);
 
-          // If a valid selection was made, set it as activeSelection
-          if (currentSelectionRectRef.current && (currentSelectionRectRef.current.w > 5 || currentSelectionRectRef.current.h > 5)) { 
+          if (currentSelectionRectRef.current && (currentSelectionRectRef.current.w > HANDLE_SIZE || currentSelectionRectRef.current.h > HANDLE_SIZE)) { 
               setActiveSelection(currentSelectionRectRef.current); 
-              toast({ title: "Area Selected", description: "Drag handles to resize selection. Content scaling is a future enhancement." });
+              toast({ title: "Area Selected", description: "Drag handles to resize. Content will scale on release." });
           } else {
-              setActiveSelection(null); // No valid selection, clear it
+              setActiveSelection(null); 
           }
-          // redrawCanvasContent will be called by useEffect on activeSelection change, 
-          // or if no selection, the restored canvas is already correct.
-          // Call it explicitly if there's no activeSelection to ensure correct state.
-          if (!currentSelectionRectRef.current || (currentSelectionRectRef.current.w <= 5 && currentSelectionRectRef.current.h <=5)) {
+          if (!currentSelectionRectRef.current || (currentSelectionRectRef.current.w <= HANDLE_SIZE && currentSelectionRectRef.current.h <= HANDLE_SIZE)) {
               redrawCanvasContent();
           }
       }
@@ -880,24 +923,21 @@ export default function WhiteboardPage() {
       currentSelectionRectRef.current = null;
     }
 
-    // Clean up global listeners
     window.removeEventListener('touchmove', handlePointerMove);
     window.removeEventListener('touchend', handlePointerUp);
     window.removeEventListener('touchcancel', handlePointerUp);
     window.removeEventListener('mousemove', handlePointerMove);
     window.removeEventListener('mouseup', handlePointerUp);
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool, toast, redrawCanvasContent]);
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool, toast, redrawCanvasContent, drawnTextObjects, history, historyStep, canvasBackgroundColor, MAX_HISTORY_STEPS, activeSelection]);
 
   const handleCanvasPointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return; // Only left click
+    if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return; 
 
     const pos = getPointerPosition(event);
     if (!pos) return;
     
-    // If currently typing text and click happens on canvas, finalize current text
     if (isTypingText) {
       finalizeLiveText();
-      // If the click was for the text tool again, we'll handle starting new text below
     }
 
     if (activeSelection && activeTool === 'select') {
@@ -905,39 +945,70 @@ export default function WhiteboardPage() {
         if (handle) {
             isResizingRef.current = true;
             resizeHandleTypeRef.current = handle;
-            originalSelectionRectRef.current = { ...activeSelection };
+            originalSelectionRectRef.current = { ...activeSelection }; 
+            originalContentBoundsRef.current = { ...activeSelection }; // Store bounds of current selection for content scaling base
             resizeStartPointRef.current = pos;
+
+            if (contextRef.current && canvasRef.current && originalSelectionRectRef.current) {
+                const currentSelectionRect = originalSelectionRectRef.current;
+                
+                const tempDrawingCanvas = document.createElement('canvas');
+                tempDrawingCanvas.width = canvasRef.current.width;
+                tempDrawingCanvas.height = canvasRef.current.height;
+                const tempDrawingCtx = tempDrawingCanvas.getContext('2d');
+
+                if (tempDrawingCtx && history[historyStep]) {
+                    tempDrawingCtx.putImageData(history[historyStep], 0, 0);
+                    if (currentSelectionRect.w > 0 && currentSelectionRect.h > 0) {
+                         try {
+                            selectionContentForResizeRef.current.drawing = tempDrawingCtx.getImageData(currentSelectionRect.x, currentSelectionRect.y, currentSelectionRect.w, currentSelectionRect.h);
+                         } catch (e) {
+                            console.error("Error getting image data for resize:", e, currentSelectionRect);
+                            selectionContentForResizeRef.current.drawing = null;
+                         }
+                    } else {
+                        selectionContentForResizeRef.current.drawing = null;
+                    }
+                } else {
+                    selectionContentForResizeRef.current.drawing = null;
+                }
+
+                selectionContentForResizeRef.current.texts = drawnTextObjects.filter(textObj => {
+                    const textFontSize = textObj.fontSize;
+                    const textApproxWidth = contextRef.current!.measureText(textObj.textLines.join(" ")).width; // Very rough
+                    const textApproxHeight = textObj.textLines.length * textObj.lineHeight;
+                    const textRight = textObj.x + textApproxWidth;
+                    const textBottom = textObj.y + textApproxHeight;
+                    return !(textObj.x > currentSelectionRect.x + currentSelectionRect.w ||
+                             textRight < currentSelectionRect.x ||
+                             textObj.y > currentSelectionRect.y + currentSelectionRect.h ||
+                             textBottom < currentSelectionRect.y);
+                }).map(t => ({ ...t, originalX: t.x, originalY: t.y, originalFontSize: t.fontSize }));
+            } else {
+                 selectionContentForResizeRef.current = { drawing: null, texts: [] };
+            }
             if (event.type === 'touchstart') event.preventDefault();
-            // Don't clear activeSelection here, we are resizing it.
         } else {
-            // Clicked outside an existing selection's handle.
-            // If click is INSIDE the selection box, it might be for dragging (future).
-            // For now, if not on a handle, assume it's to start a new selection, so clear current.
             const rect = activeSelection;
             const clickedInsideSelection = pos.x >= rect.x && pos.x <= rect.x + rect.w && pos.y >= rect.y && pos.y <= rect.y + rect.h;
             
             if (clickedInsideSelection) {
-                 // TODO: Implement dragging the selection box
-                 // For now, do nothing if clicked inside and not on a handle
                  console.log("Clicked inside active selection, but not on a handle. Drag planned for future.");
-                 return; // Prevent starting a new selection or tool action
+                 return; 
             } else {
-                 setActiveSelection(null); // Clicked outside: clear current selection
+                 setActiveSelection(null); 
                  isResizingRef.current = false; 
-                 startNewSelection(pos, event); // And start a new one
+                 startNewSelection(pos, event); 
             }
         }
     } else if (activeTool === 'select') {
-        setActiveSelection(null); // Clear any previous selection if starting a new one
+        setActiveSelection(null); 
         isResizingRef.current = false; 
         startNewSelection(pos, event);
     } else if (activeTool === 'text') {
-        // If we just finalized text by clicking, textInputPosition might be where we just clicked.
-        // We want to start new text input at the new click position.
         setTextInputPosition(pos);
-        setCurrentText(''); // Clear any previous live text
+        setCurrentText(''); 
         setIsTypingText(true);
-        // Use setTimeout to ensure focus happens after React state updates
         setTimeout(() => { 
             if (liveTextInputRef.current) {
                 const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -949,17 +1020,15 @@ export default function WhiteboardPage() {
             }
         }, 0);
     } else if (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) { 
-        setActiveSelection(null); // Clear selection when starting to draw
+        setActiveSelection(null); 
         isResizingRef.current = false;
         if (event.type === 'touchstart') event.preventDefault(); 
         startDrawingInternal(pos);
     } else {
-       // Default: clear selection if no specific tool action taken that uses it
        setActiveSelection(null);
        isResizingRef.current = false;
     }
 
-    // Add global listeners for move and up
     if (event.type.startsWith('touch')) {
       window.addEventListener('touchmove', handlePointerMove, { passive: false });
       window.addEventListener('touchend', handlePointerUp);
@@ -972,20 +1041,16 @@ export default function WhiteboardPage() {
 
   const startNewSelection = useCallback((pos: {x: number, y:number}, event: React.MouseEvent | React.TouchEvent) => {
      if (contextRef.current && canvasRef.current) {
-        // Capture the current visual state (drawings + text) for the selection overlay
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvasRef.current.width;
         tempCanvas.height = canvasRef.current.height;
-        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); // willReadFrequently for getImageData
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); 
         if (tempCtx) {
-            // 1. Draw background
             tempCtx.fillStyle = canvasBackgroundColor;
             tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-            // 2. Draw drawings from history
             if (history[historyStep]) {
                 tempCtx.putImageData(history[historyStep], 0, 0);
             }
-            // 3. Draw finalized text objects
             drawnTextObjects.forEach(textObj => {
                 tempCtx.fillStyle = textObj.color;
                 tempCtx.font = textObj.font;
@@ -997,19 +1062,18 @@ export default function WhiteboardPage() {
             });
             initialCanvasDataForSelectionRef.current = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
         } else {
-             initialCanvasDataForSelectionRef.current = null; // Fallback
+             initialCanvasDataForSelectionRef.current = null; 
         }
     } else {
         initialCanvasDataForSelectionRef.current = null;
     }
     isSelectingRef.current = true;
     selectionStartPointRef.current = pos;
-    currentSelectionRectRef.current = null; // Reset current selection rect
-    if (event.type === 'touchstart' && activeTool === 'select') event.preventDefault(); // Prevent scroll only if selecting
+    currentSelectionRectRef.current = null; 
+    if (event.type === 'touchstart' && activeTool === 'select') event.preventDefault(); 
   }, [canvasBackgroundColor, history, historyStep, drawnTextObjects, activeTool]);
 
 
-  // Cleanup global event listeners
   useEffect(() => {
     return () => {
       window.removeEventListener('touchmove', handlePointerMove);
@@ -1023,28 +1087,26 @@ export default function WhiteboardPage() {
   const handleToolClick = (toolName: string) => {
     const toolId = toolName.toLowerCase().replace(/\s+/g, '');
     
-    if (isTypingText && toolId !== 'text') { // Finalize text if switching away from text tool
+    if (isTypingText && toolId !== 'text') { 
       finalizeLiveText();
     }
     
-    // If switching away from select tool, or to select tool without an active selection, clear active selection
     if (toolId !== 'select' && activeSelection) {
         setActiveSelection(null);
     }
-    isResizingRef.current = false; // Ensure resizing is off when changing tools
+    isResizingRef.current = false; 
 
 
     const isToolWithToggleableOptions = drawingTools.includes(toolId) || toolId === 'erase' || toolId === 'text';
 
     if (activeTool === toolId && isToolWithToggleableOptions) {
-      // If clicking the same tool that has options, toggle its options panel
       setShowDrawingToolOptions(prev => !prev);
     } else {
       setActiveTool(toolId);
       if (isToolWithToggleableOptions) {
-        setShowDrawingToolOptions(true); // Show options for tools that have them
+        setShowDrawingToolOptions(true); 
       } else {
-        setShowDrawingToolOptions(false); // Hide for tools like select, undo, redo, clear
+        setShowDrawingToolOptions(false); 
       }
     }
   };
@@ -1070,51 +1132,46 @@ export default function WhiteboardPage() {
       context.fillStyle = canvasBackgroundColor;
       context.fillRect(0, 0, canvas.width, canvas.height);
       
-      setDrawnTextObjects([]); // Clear text objects
-      setActiveSelection(null); // Clear active selection
+      setDrawnTextObjects([]); 
+      setActiveSelection(null); 
       isResizingRef.current = false;
-      finalizeLiveText(); // Finalize any live text input
+      finalizeLiveText(); 
       
-      // Reset history to a single blank state
       const blankImageData = context.getImageData(0, 0, canvas.width, canvas.height);
       setHistory([blankImageData]);
       setHistoryStep(0);
-      setIsInitialStateSaved(true); // Mark that the initial (blank) state is saved
-      redrawCanvasContent(); // Redraw to show the cleared state
+      setIsInitialStateSaved(true); 
+      redrawCanvasContent(); 
     }
     setShowClearConfirmDialog(false);
   };
 
   const handleUndo = useCallback(() => {
-    finalizeLiveText(); // Finalize any live text before undoing
+    finalizeLiveText(); 
     if (historyStep > 0) {
         const newStep = historyStep - 1;
         setHistoryStep(newStep);
-        // Text objects are not part of this history, so they remain.
-        // Selection is visual only, clear it.
         setActiveSelection(null);
         isResizingRef.current = false;
-        redrawCanvasContent(); // Redraw with previous drawing state + current text objects
-    } else if (historyStep === 0) { // Last drawing state, going to blank
+        redrawCanvasContent(); 
+    } else if (historyStep === 0) { 
         setHistoryStep(-1); 
         setActiveSelection(null);
         isResizingRef.current = false;
-        redrawCanvasContent(); // Should show blank canvas + text objects
+        redrawCanvasContent(); 
     } else {
         toast({ title: "Nothing to undo", duration: 2000 });
     }
   }, [historyStep, toast, finalizeLiveText, redrawCanvasContent]);
 
   const handleRedo = useCallback(() => {
-    finalizeLiveText(); // Finalize any live text before redoing
+    finalizeLiveText(); 
     if (historyStep < history.length - 1) {
         const newStep = historyStep + 1;
         setHistoryStep(newStep);
-        // Text objects are not part of this history.
-        // Selection is visual only, clear it.
         setActiveSelection(null);
         isResizingRef.current = false;
-        redrawCanvasContent(); // Redraw with redone drawing state + current text objects
+        redrawCanvasContent(); 
     } else {
         toast({ title: "Nothing to redo", duration: 2000 });
     }
@@ -1129,46 +1186,42 @@ export default function WhiteboardPage() {
 
   const handleLiveTextInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) { 
-      event.preventDefault(); // Prevent default textarea Enter behavior
-      setCurrentText(prev => prev + '\n'); // Add newline to our state
+      event.preventDefault(); 
+      setCurrentText(prev => prev + '\n'); 
     }
-    // Tab, Escape could also be handled here to finalize or cancel text input
   };
 
 
   return (
     <>
-      {/* Hidden textarea for live text input, positioned off-screen */}
       <textarea
         ref={liveTextInputRef}
-        value={currentText} // Controlled component
+        value={currentText} 
         onChange={handleLiveTextInputChange}
         onKeyDown={handleLiveTextInputKeyDown}
-        onBlur={finalizeLiveText} // Finalize text if textarea loses focus (e.g., keypad dismissed)
+        onBlur={finalizeLiveText} 
         style={{
           position: 'absolute',
-          opacity: 0, // Visually hidden
-          width: '1px', height: '1px', // Minimal size
+          opacity: 0, 
+          width: '1px', height: '1px', 
           border: 'none', padding: 0, margin: 0,
           overflow: 'hidden', resize: 'none',
-          whiteSpace: 'pre', // Preserve spaces and newlines
-          // Font settings should ideally match canvas for accurate measurements if needed later
-          fontSize: `${getFontSize()}px`, // Match canvas font size
-          fontFamily: 'sans-serif', // Match canvas font family
-          color: selectedColor, // Match canvas text color
-          background: 'transparent', // Ensure no visible background
-          top: '-9999px', // Position off-screen
+          whiteSpace: 'pre', 
+          fontSize: `${getFontSize()}px`, 
+          fontFamily: 'sans-serif', 
+          color: selectedColor, 
+          background: 'transparent', 
+          top: '-9999px', 
           left: '-9999px',
         }}
-        aria-hidden="true" // For accessibility, indicate it's not for direct user interaction
-        tabIndex={-1} // Not tabbable
+        aria-hidden="true" 
+        tabIndex={-1} 
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck="false"
       />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
-          {/* Toolbar */}
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <ToolButton
               icon={Brush}
@@ -1196,7 +1249,6 @@ export default function WhiteboardPage() {
                 label="Select" 
                 onClick={() => handleToolClick("Select")} 
                 isActive={activeTool === "select"}
-                // data-options-toggler={true} // Select tool might have its own options later (e.g. enhance)
              />
             <ToolButton
                 icon={Undo2}
@@ -1232,7 +1284,6 @@ export default function WhiteboardPage() {
           </div>
         </div>
 
-        {/* Options Panel */}
         {showDrawingToolOptions && isOptionsPanelToolActive && (
            <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg">
             <div className="container mx-auto">
@@ -1270,7 +1321,6 @@ export default function WhiteboardPage() {
                   </div>
                 </div>
               ) : (activeTool === 'draw' || (drawingTools.includes(activeTool || ""))) && activeTool !== 'erase' ? ( 
-                // Drawing tools (Brush, Line, Shapes)
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   <div className="flex flex-col items-center md:items-start gap-2">
                     <span className="text-xs font-medium text-muted-foreground">Color:</span>
@@ -1298,7 +1348,7 @@ export default function WhiteboardPage() {
                               aria-label={brush.label}
                           >
                               <brush.icon className={cn(
-                                  "h-5 w-5", // Default size for medium
+                                  "h-5 w-5", 
                                   brush.name === 'tiny' && 'h-2 w-2',
                                   brush.name === 'small' && 'h-3 w-3',
                                   brush.name === 'large' && 'h-6 w-6',
@@ -1351,27 +1401,20 @@ export default function WhiteboardPage() {
           </div>
         )}
 
-        {/* Main Canvas Area */}
-        <main className="flex-grow flex flex-col overflow-hidden min-h-0"> {/* Ensure main takes space and allows canvas to fill */}
+        <main className="flex-grow flex flex-col overflow-hidden min-h-0"> 
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
-            <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0"> {/* Canvas container takes remaining space */}
+            <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0"> 
               <canvas
                 ref={canvasRef}
                 onMouseDown={handleCanvasPointerDown}
                 onTouchStart={(e) => {
-                  // Prevent default for drawing, selecting, resizing to avoid page scroll
-                  if (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase' || activeTool === 'select' || isResizingRef.current)) {
-                     // e.preventDefault(); // This might interfere with text input focus
-                  }
                   handleCanvasPointerDown(e);
                 }}
                 className={cn(
                   "border-2 border-dashed border-border/30 touch-none w-full h-full block"
-                  // Cursor class will be set dynamically via canvasRef.current.style.cursor
                 )}
                 style={{ backgroundColor: canvasBackgroundColor }}
               />
-              {/* Placeholder text if canvas is empty and no tool interaction happening */}
               {(!activeTool || !isOptionsPanelToolActive) && !isDrawingRef.current && !isSelectingRef.current && !isTypingText && !activeSelection && !isResizingRef.current && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p className="text-muted-foreground text-sm p-3 bg-background/50 rounded-md backdrop-blur-sm">
@@ -1383,7 +1426,7 @@ export default function WhiteboardPage() {
           </Card>
         </main>
         <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-          TeachMeet Whiteboard - Drawings, shapes, live text, erase (drawings only), and area selection with resize handles. Undo/Redo for drawings.
+          TeachMeet Whiteboard - Content resizing, drawings, live text, erase (drawings only), and area selection with resize handles. Undo/Redo for drawings.
         </footer>
       </div>
     </>
