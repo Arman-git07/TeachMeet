@@ -6,6 +6,18 @@ import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,7 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
-import { Skeleton } from '@/components/ui/skeleton'; // Assuming Skeleton might be used for a loading state
+import { Skeleton } from '@/components/ui/skeleton'; 
 
 import {
   Mic,
@@ -50,7 +62,8 @@ import {
   ScreenShare,
   StopCircle,
   Loader2,
-  Share2
+  Share2,
+  Volume2 as SpeakerIcon, // Added SpeakerIcon
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -58,6 +71,8 @@ import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData } from 'firebase/firestore';
+import { textToSpeech, type TextToSpeechInput, type TextToSpeechOutput } from '@/ai/flows/text-to-speech-flow';
+
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
@@ -233,6 +248,12 @@ export default function MeetingPage() {
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+
+  const [isTTSEnabled, setIsTTSEnabled] = useState(true); // Feature flag, could be from settings
+  const [isTTSDialogVisible, setIsTTSDialogVisible] = useState(false);
+  const [ttsText, setTTSText] = useState("");
+  const [isTTSProcessing, setIsTTSProcessing] = useState(false);
+  const [ttsResult, setTTSResult] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -736,6 +757,29 @@ export default function MeetingPage() {
     setIsSharePanelOpen(true);
   };
 
+  const handleTTSSubmit = async () => {
+    if (!ttsText.trim()) {
+      toast({ variant: "destructive", title: "No Text Provided", description: "Please enter some text to speak." });
+      return;
+    }
+    setIsTTSProcessing(true);
+    setTTSResult(null);
+    try {
+      const input: TextToSpeechInput = { textToSpeak: ttsText };
+      const output: TextToSpeechOutput = await textToSpeech(input);
+      setTTSResult(output.confirmationMessage);
+      // In a real app, you'd play the audio here if output.audioDataUri was available
+      toast({ title: "AI Speech (Simulated)", description: output.confirmationMessage });
+    } catch (error) {
+      console.error("Text-to-speech error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      setTTSResult(`Error: Could not process text for speech. ${errorMessage}`);
+      toast({ variant: "destructive", title: "TTS Error", description: `Failed to process text. ${errorMessage}` });
+    } finally {
+      setIsTTSProcessing(false);
+    }
+  };
+
 
   const combinedParticipants = currentUser
     ? [
@@ -906,34 +950,34 @@ export default function MeetingPage() {
       </main>
 
       <footer className="p-4 border-t border-border bg-background/80 backdrop-blur-md sticky bottom-0">
-        <div className="max-w-2xl mx-auto flex justify-around items-center">
+        <div className="max-w-xl mx-auto flex justify-around items-center">
           <Button
             variant={localMicMuted ? "destructive" : "default"}
             size="lg"
-            className="rounded-full p-4 btn-gel"
+            className="rounded-full p-3 btn-gel" // Adjusted padding
             onClick={toggleMic}
             aria-label={localMicMuted ? "Unmute Microphone" : "Mute Microphone"}
           >
-            {localMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+            {localMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </Button>
           <Button
              variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
              size="lg"
              className={cn(
-                "rounded-full p-4",
+                "rounded-full p-3", // Adjusted padding
                 isScreenSharingActive ? "opacity-50 cursor-not-allowed" : "btn-gel"
              )}
              onClick={toggleCamera}
              aria-label={(localCameraOff && !isScreenSharingActive) ? "Turn Camera On" : "Turn Camera Off"}
              disabled={isScreenSharingActive}
           >
-            {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+            {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
           </Button>
            <Button
             size="lg"
             variant={localHandRaised ? "default" : "default"} 
             className={cn(
-              "rounded-full p-4",
+              "rounded-full p-3", // Adjusted padding
               localHandRaised
                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
                 : "btn-gel shadow-md" 
@@ -941,10 +985,69 @@ export default function MeetingPage() {
             onClick={toggleHandRaise}
             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
           >
-            <Hand className="h-6 w-6" />
+            <Hand className="h-5 w-5" />
           </Button>
-          <Button variant="destructive" size="lg" className="rounded-full p-4" onClick={leaveMeeting} aria-label="Leave Meeting">
-            <PhoneOff className="h-6 w-6" />
+          {isTTSEnabled && (
+            <Dialog open={isTTSDialogVisible} onOpenChange={(isOpen) => {
+              setIsTTSDialogVisible(isOpen);
+              if (!isOpen) { // Reset on close
+                setTTSText("");
+                setTTSResult(null);
+                setIsTTSProcessing(false);
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="default"
+                  size="lg"
+                  className="rounded-full p-3 btn-gel" // Adjusted padding
+                  aria-label="Speak Text with AI"
+                >
+                  <SpeakerIcon className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md rounded-xl">
+                <DialogHeader>
+                  <DialogTitle>AI Text-to-Speech (Simulated)</DialogTitle>
+                  <DialogDescription>
+                    Enter text below to have it "spoken" by the AI.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <Label htmlFor="tts-input">Text to Speak</Label>
+                  <Textarea
+                    id="tts-input"
+                    value={ttsText}
+                    onChange={(e) => setTTSText(e.target.value)}
+                    placeholder="Type what you want the AI to say..."
+                    className="min-h-[100px] rounded-lg"
+                    disabled={isTTSProcessing}
+                  />
+                  {ttsResult && (
+                    <div className={cn(
+                      "mt-4 p-3 rounded-lg text-sm",
+                      ttsResult.startsWith("Error:") ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                    )}>
+                      <p>{ttsResult}</p>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                   <DialogClose asChild>
+                      <Button type="button" variant="outline" className="rounded-lg" disabled={isTTSProcessing}>
+                        Cancel
+                      </Button>
+                  </DialogClose>
+                  <Button type="button" onClick={handleTTSSubmit} className="btn-gel rounded-lg" disabled={isTTSProcessing || !ttsText.trim()}>
+                    {isTTSProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isTTSProcessing ? "Processing..." : "Generate & Play (Simulated)"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Button variant="destructive" size="lg" className="rounded-full p-3" onClick={leaveMeeting} aria-label="Leave Meeting"> 
+            <PhoneOff className="h-5 w-5" />
           </Button>
         </div>
       </footer>
@@ -974,3 +1077,4 @@ export default function MeetingPage() {
     </div>
   );
 }
+
