@@ -42,6 +42,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Skeleton } from '@/components/ui/skeleton'; 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 import {
   Mic,
@@ -63,7 +65,7 @@ import {
   StopCircle,
   Loader2,
   Share2,
-  Volume2 as SpeakerIcon, // Added SpeakerIcon
+  Volume2 as SpeakerIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -249,9 +251,10 @@ export default function MeetingPage() {
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
-  const [isTTSEnabled, setIsTTSEnabled] = useState(true); // Feature flag, could be from settings
+  const [isTTSEnabled, setIsTTSEnabled] = useState(true);
   const [isTTSDialogVisible, setIsTTSDialogVisible] = useState(false);
   const [ttsText, setTTSText] = useState("");
+  const [selectedTTSVoice, setSelectedTTSVoice] = useState<'neutral' | 'boy' | 'girl'>('neutral');
   const [isTTSProcessing, setIsTTSProcessing] = useState(false);
   const [ttsResult, setTTSResult] = useState<string | null>(null);
 
@@ -765,10 +768,9 @@ export default function MeetingPage() {
     setIsTTSProcessing(true);
     setTTSResult(null);
     try {
-      const input: TextToSpeechInput = { textToSpeak: ttsText };
+      const input: TextToSpeechInput = { textToSpeak: ttsText, voice: selectedTTSVoice };
       const output: TextToSpeechOutput = await textToSpeech(input);
       setTTSResult(output.confirmationMessage);
-      // In a real app, you'd play the audio here if output.audioDataUri was available
       toast({ title: "AI Speech (Simulated)", description: output.confirmationMessage });
     } catch (error) {
       console.error("Text-to-speech error:", error);
@@ -954,7 +956,7 @@ export default function MeetingPage() {
           <Button
             variant={localMicMuted ? "destructive" : "default"}
             size="lg"
-            className="rounded-full p-3 btn-gel" // Adjusted padding
+            className="rounded-full p-3 btn-gel"
             onClick={toggleMic}
             aria-label={localMicMuted ? "Unmute Microphone" : "Mute Microphone"}
           >
@@ -964,7 +966,7 @@ export default function MeetingPage() {
              variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
              size="lg"
              className={cn(
-                "rounded-full p-3", // Adjusted padding
+                "rounded-full p-3",
                 isScreenSharingActive ? "opacity-50 cursor-not-allowed" : "btn-gel"
              )}
              onClick={toggleCamera}
@@ -977,7 +979,7 @@ export default function MeetingPage() {
             size="lg"
             variant={localHandRaised ? "default" : "default"} 
             className={cn(
-              "rounded-full p-3", // Adjusted padding
+              "rounded-full p-3",
               localHandRaised
                 ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
                 : "btn-gel shadow-md" 
@@ -990,17 +992,18 @@ export default function MeetingPage() {
           {isTTSEnabled && (
             <Dialog open={isTTSDialogVisible} onOpenChange={(isOpen) => {
               setIsTTSDialogVisible(isOpen);
-              if (!isOpen) { // Reset on close
+              if (!isOpen) { 
                 setTTSText("");
                 setTTSResult(null);
                 setIsTTSProcessing(false);
+                // setSelectedTTSVoice('neutral'); // Optionally reset voice
               }
             }}>
               <DialogTrigger asChild>
                 <Button
                   variant="default"
                   size="lg"
-                  className="rounded-full p-3 btn-gel" // Adjusted padding
+                  className="rounded-full p-3 btn-gel"
                   aria-label="Speak Text with AI"
                 >
                   <SpeakerIcon className="h-5 w-5" />
@@ -1010,19 +1013,39 @@ export default function MeetingPage() {
                 <DialogHeader>
                   <DialogTitle>AI Text-to-Speech (Simulated)</DialogTitle>
                   <DialogDescription>
-                    Enter text below to have it "spoken" by the AI.
+                    Enter text and choose a voice to have it "spoken" by the AI.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <Label htmlFor="tts-input">Text to Speak</Label>
-                  <Textarea
-                    id="tts-input"
-                    value={ttsText}
-                    onChange={(e) => setTTSText(e.target.value)}
-                    placeholder="Type what you want the AI to say..."
-                    className="min-h-[100px] rounded-lg"
-                    disabled={isTTSProcessing}
-                  />
+                  <div>
+                    <Label htmlFor="tts-input" className="block mb-1">Text to Speak</Label>
+                    <Textarea
+                      id="tts-input"
+                      value={ttsText}
+                      onChange={(e) => setTTSText(e.target.value)}
+                      placeholder="Type what you want the AI to say..."
+                      className="min-h-[100px] rounded-lg"
+                      disabled={isTTSProcessing}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tts-voice-select" className="block mb-1">Voice</Label>
+                    <Select
+                      value={selectedTTSVoice}
+                      onValueChange={(value: 'neutral' | 'boy' | 'girl') => setSelectedTTSVoice(value)}
+                      disabled={isTTSProcessing}
+                    >
+                      <SelectTrigger id="tts-voice-select" className="w-full rounded-lg">
+                        <SelectValue placeholder="Select a voice" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-lg">
+                        <SelectItem value="neutral" className="rounded-md">Neutral</SelectItem>
+                        <SelectItem value="boy" className="rounded-md">Boy</SelectItem>
+                        <SelectItem value="girl" className="rounded-md">Girl</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {ttsResult && (
                     <div className={cn(
                       "mt-4 p-3 rounded-lg text-sm",

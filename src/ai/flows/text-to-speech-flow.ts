@@ -13,6 +13,7 @@ import {z} from 'genkit';
 
 const TextToSpeechInputSchema = z.object({
   textToSpeak: z.string().describe('The text to be converted to audio.'),
+  voice: z.enum(['neutral', 'boy', 'girl']).optional().describe('The desired voice for the speech. Defaults to neutral if not specified.'),
 });
 export type TextToSpeechInput = z.infer<typeof TextToSpeechInputSchema>;
 
@@ -31,8 +32,9 @@ const ttsPrompt = ai.definePrompt({
   output: {schema: TextToSpeechOutputSchema},
   prompt: `You are a helpful assistant in a meeting app. The user wants to convert the following text to speech:
 Text: "{{{textToSpeak}}}"
+{{#if voice}}Desired voice: {{{voice}}}{{/if}}
 
-Confirm that this text would now be played as audio in the meeting. Keep the confirmation concise. Example: "Playing audio for: [User's Text]"`,
+Confirm that this text would now be played as audio in the meeting{{#if voice}}{{#unless (eq voice "neutral")}} using a {{{voice}}} voice{{/unless}}{{/if}}. Keep the confirmation concise. Example: "Playing audio for: [User's Text]{{#if voice}}{{#unless (eq voice "neutral")}} in a [selected voice] voice{{/unless}}{{/if}}"`,
 });
 
 const textToSpeechFlow = ai.defineFlow(
@@ -43,10 +45,16 @@ const textToSpeechFlow = ai.defineFlow(
   },
   async input => {
     try {
-      const {output} = await ttsPrompt(input);
+      // Ensure voice has a default if not provided, for the prompt
+      const inputWithDefaultVoice = { ...input, voice: input.voice || 'neutral' };
+      const {output} = await ttsPrompt(inputWithDefaultVoice);
+      
       if (!output || !output.confirmationMessage) {
-          // Fallback if LLM doesn't produce valid output, though unlikely for this simple case.
-          return { confirmationMessage: `Audio for: "${input.textToSpeak}" would be played now (simulated).` };
+          let fallbackMessage = `Audio for: "${input.textToSpeak}" would be played now (simulated).`;
+          if (input.voice && input.voice !== 'neutral') {
+            fallbackMessage = `Audio for: "${input.textToSpeak}" in a ${input.voice} voice would be played now (simulated).`;
+          }
+          return { confirmationMessage: fallbackMessage };
       }
       return output;
     } catch (error: any) {
@@ -59,7 +67,6 @@ const textToSpeechFlow = ai.defineFlow(
         userFriendlyMessage = "Error: AI Service API Key is not configured. Please ensure GOOGLE_API_KEY or GOOGLE_GENAI_API_KEY is set in your .env file and the application is restarted.";
       } else if (error && typeof error.message === 'string') {
         const errMsg = error.message.toLowerCase();
-        // Enhanced error detection
         if (errMsg.includes('api key not valid') || errMsg.includes('invalid api key') || errMsg.includes('api_key_not_valid')) {
           userFriendlyMessage = "Error: The AI Service API Key is invalid or has restrictions. Please check your GOOGLE_API_KEY/GOOGLE_GENAI_API_KEY in the .env file and ensure it has permissions for the Generative Language API.";
         } else if (errMsg.includes('service_disabled') || errMsg.includes('generative language api has not been used')) {
