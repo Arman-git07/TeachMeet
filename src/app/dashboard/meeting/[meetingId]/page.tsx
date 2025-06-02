@@ -110,7 +110,7 @@ const ParticipantView = React.memo(function ParticipantView({
   const avatarSrc = photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`;
 
   return (
-    <Card className="aspect-video rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
+    <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
       {isMe ? (
         <>
           <video
