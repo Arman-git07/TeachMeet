@@ -17,7 +17,7 @@ const TextToSpeechInputSchema = z.object({
 export type TextToSpeechInput = z.infer<typeof TextToSpeechInputSchema>;
 
 const TextToSpeechOutputSchema = z.object({
-  confirmationMessage: z.string().describe('A message confirming the text was processed for speech and would be played.'),
+  confirmationMessage: z.string().describe('A message confirming the text was processed for speech and would be played, or an error message.'),
 });
 export type TextToSpeechOutput = z.infer<typeof TextToSpeechOutputSchema>;
 
@@ -42,11 +42,23 @@ const textToSpeechFlow = ai.defineFlow(
     outputSchema: TextToSpeechOutputSchema,
   },
   async input => {
-    const {output} = await ttsPrompt(input);
-    // Fallback if LLM doesn't produce valid output, though unlikely for this simple case.
-    if (!output || !output.confirmationMessage) {
-        return { confirmationMessage: `Audio for: "${input.textToSpeak}" would be played now (simulated).` };
+    try {
+      const {output} = await ttsPrompt(input);
+      if (!output || !output.confirmationMessage) {
+          return { confirmationMessage: `Audio for: "${input.textToSpeak}" would be played now (simulated).` };
+      }
+      return output;
+    } catch (error: any) {
+      console.error("[TextToSpeechFlow] Error during TTS prompt:", error);
+      if (error.message && (error.message.includes('SERVICE_DISABLED') || error.message.includes('Generative Language API has not been used'))) {
+        return {
+          confirmationMessage: "Error: The Generative Language API needs to be enabled in your Google Cloud project. Please visit the Google Cloud Console, find your project, and ensure the 'Generative Language API' (generativelanguage.googleapis.com) is enabled. It may take a few minutes for changes to apply."
+        };
+      }
+      return { 
+        confirmationMessage: `Error: Could not process text for speech. ${error.message || 'An unknown error occurred.'}` 
+      };
     }
-    return output;
   }
 );
+
