@@ -1,6 +1,6 @@
 
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, use } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
-import { Skeleton } from '@/components/ui/skeleton'; 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
@@ -116,7 +116,7 @@ const ParticipantView = React.memo(function ParticipantView({
         } else {
             toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
         }
-    } else if (isScreenSharing && !targetElement?.srcObject) { 
+    } else if (isScreenSharing && !targetElement?.srcObject) {
         toast({ title: 'Screen Share Active', description: 'Screen is being shared. Fullscreen will apply to the shared content when available.' });
     } else {
         toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream or screen share.' });
@@ -225,16 +225,16 @@ export default function MeetingPage() {
   const [localMicMuted, setLocalMicMuted] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-mic-state');
-      return desiredState === 'off'; 
+      return desiredState === 'off';
     }
-    return false; 
+    return false;
   });
   const [localCameraOff, setLocalCameraOff] = useState(() => {
     if (typeof window !== 'undefined') {
       const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
       return desiredState === 'off';
     }
-    return true; 
+    return true;
   });
   const [localHandRaised, setLocalHandRaised] = useState(false);
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
@@ -257,6 +257,25 @@ export default function MeetingPage() {
   const [selectedTTSVoice, setSelectedTTSVoice] = useState<'neutral' | 'boy' | 'girl'>('neutral');
   const [isTTSProcessing, setIsTTSProcessing] = useState(false);
   const [ttsResult, setTTSResult] = useState<string | null>(null);
+  const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const calculateAndSetAspectRatio = () => {
+      if (typeof window !== 'undefined') {
+        if (window.innerHeight > 0 && window.innerWidth > 0) {
+          setDeviceAspectRatio(window.innerWidth / window.innerHeight);
+        } else {
+          setDeviceAspectRatio(16 / 9); // Default to 16:9 if dimensions are zero
+        }
+      }
+    };
+
+    calculateAndSetAspectRatio();
+    window.addEventListener('resize', calculateAndSetAspectRatio);
+    return () => {
+      window.removeEventListener('resize', calculateAndSetAspectRatio);
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -283,10 +302,10 @@ export default function MeetingPage() {
         userId: currentUser.uid,
         name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
         photoURL: currentUser.photoURL,
-        isMicMuted: initialMicMutedFromStorage, 
+        isMicMuted: initialMicMutedFromStorage,
         isCameraOff: initialCameraOffFromStorage,
-        isHandRaised: false, 
-        isScreenSharing: false, 
+        isHandRaised: false,
+        isScreenSharing: false,
         joinedAt: serverTimestamp(),
       };
 
@@ -309,7 +328,7 @@ export default function MeetingPage() {
           setJoinStatus('failed');
         });
     }
-  }, [currentUser, meetingId, toast, joinStatus]); 
+  }, [currentUser, meetingId, toast, joinStatus]);
 
   useEffect(() => {
     if (joinStatus !== 'joined' || !meetingId || !db) return;
@@ -347,7 +366,7 @@ export default function MeetingPage() {
       console.log(`[MeetingPage] Cleaning up Firestore listener for participants in meeting ${meetingId}`);
       unsubscribeParticipants();
     };
-  }, [meetingId, toast, joinStatus]); 
+  }, [meetingId, toast, joinStatus]);
 
   useEffect(() => {
     if (joinStatus !== 'joined') return;
@@ -378,14 +397,14 @@ export default function MeetingPage() {
         console.log("[MeetingPage] Camera is set to off, checking permissions silently.");
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop()); 
+          stream.getTracks().forEach(track => track.stop());
           setHasCameraPermission(true);
           console.log("[MeetingPage] Camera permission exists (checked silently).");
         } catch {
           setHasCameraPermission(false);
           console.log("[MeetingPage] Camera permission denied (checked silently).");
         }
-         if (currentLocalStreamRef.current) { 
+         if (currentLocalStreamRef.current) {
             currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
             currentLocalStreamRef.current = null;
             if(localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -395,13 +414,13 @@ export default function MeetingPage() {
 
     initializeCameraAndPermissions();
 
-  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]); 
+  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]);
 
   useEffect(() => {
     const initializeMicrophone = async () => {
       if (joinStatus !== 'joined') return;
-  
-      if (!localMicMuted) { 
+
+      if (!localMicMuted) {
         console.log("[MeetingPage] Initializing microphone (localMicMuted is false).");
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -411,7 +430,7 @@ export default function MeetingPage() {
         } catch (err) {
           console.error("[MeetingPage] Failed to get microphone on initial setup:", err);
           setHasMicPermission(false);
-          setLocalMicMuted(true); 
+          setLocalMicMuted(true);
           await updateUserStatusInFirestore({ isMicMuted: true });
           toast({
             variant: 'destructive',
@@ -419,7 +438,7 @@ export default function MeetingPage() {
             description: 'Please enable microphone permissions in your browser settings.',
           });
         }
-      } else { 
+      } else {
         console.log("[MeetingPage] Microphone is initially OFF. Checking permissions silently.");
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -430,7 +449,7 @@ export default function MeetingPage() {
         }
       }
     };
-  
+
     initializeMicrophone();
   }, [joinStatus, localMicMuted, toast]);
 
@@ -450,7 +469,7 @@ export default function MeetingPage() {
       localAudioStreamRef.current?.getTracks().forEach(track => track.stop());
       console.log("[MeetingPage] Cleaned up media streams on unmount.");
     };
-  }, [meetingId]); 
+  }, [meetingId]);
 
 
   const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'videoRef' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
@@ -472,11 +491,11 @@ export default function MeetingPage() {
   const toggleMic = async () => {
     const newMicStateIsMuted = !localMicMuted;
     console.log(`[MeetingPage] Toggling mic. New state is muted: ${newMicStateIsMuted}`);
-  
+
     setLocalMicMuted(newMicStateIsMuted);
     await updateUserStatusInFirestore({ isMicMuted: newMicStateIsMuted });
-  
-    if (!newMicStateIsMuted) { 
+
+    if (!newMicStateIsMuted) {
       if (localAudioStreamRef.current) {
         localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
         console.log("[MeetingPage] Mic ON: Enabled existing audio tracks.");
@@ -498,12 +517,12 @@ export default function MeetingPage() {
         } catch (err) {
           console.error("[MeetingPage] Error getting audio stream for mic ON:", err);
           setHasMicPermission(false);
-          setLocalMicMuted(true); 
+          setLocalMicMuted(true);
           await updateUserStatusInFirestore({ isMicMuted: true });
           toast({ variant: 'destructive', title: 'Microphone Access Failed', description: 'Could not access microphone.' });
         }
       }
-    } else { 
+    } else {
       if (localAudioStreamRef.current) {
         localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
         console.log("[MeetingPage] Mic OFF: Disabled audio tracks.");
@@ -547,7 +566,7 @@ export default function MeetingPage() {
         } catch (err) {
           console.error("[MeetingPage] Failed to re-initialize camera after screen share stop:", err);
           setLocalCameraOff(true);
-          await updateUserStatusInFirestore({ isCameraOff: true }); 
+          await updateUserStatusInFirestore({ isCameraOff: true });
         }
     }
   };
@@ -558,15 +577,15 @@ export default function MeetingPage() {
 
     if (isScreenSharingActive) {
       console.log("[MeetingPage] Screen sharing is active, stopping it before toggling camera.");
-      await stopScreenShare(false); 
+      await stopScreenShare(false);
     }
-    
-    setLocalCameraOff(newCameraStateIsOff); 
 
-    if (!newCameraStateIsOff) { 
+    setLocalCameraOff(newCameraStateIsOff);
+
+    if (!newCameraStateIsOff) {
       if (hasCameraPermission === false) {
         toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
-        setLocalCameraOff(true); 
+        setLocalCameraOff(true);
         return;
       }
       try {
@@ -576,18 +595,18 @@ export default function MeetingPage() {
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
-        setHasCameraPermission(true); 
+        setHasCameraPermission(true);
         await updateUserStatusInFirestore({ isCameraOff: false });
         console.log("[MeetingPage] Camera turned ON successfully.");
       } catch (err) {
         console.error("[MeetingPage] Failed to get camera on toggle:", err);
         setHasCameraPermission(false);
-        setLocalCameraOff(true); 
+        setLocalCameraOff(true);
         await updateUserStatusInFirestore({ isCameraOff: true });
         toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
-        return; 
+        return;
       }
-    } else { 
+    } else {
       console.log("[MeetingPage] Turning camera OFF.");
       currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
       currentLocalStreamRef.current = null;
@@ -644,10 +663,10 @@ export default function MeetingPage() {
           dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
         } catch (e) {
           console.error("[MeetingPage] Error parsing dismissed meetings from localStorage on leave:", e);
-          localStorage.removeItem(DISMISSED_MEETINGS_KEY); 
+          localStorage.removeItem(DISMISSED_MEETINGS_KEY);
         }
 
-        if (!Array.isArray(dismissedIds)) { 
+        if (!Array.isArray(dismissedIds)) {
             dismissedIds = [];
         }
 
@@ -720,7 +739,7 @@ export default function MeetingPage() {
         localVideoRef.current.srcObject = stream;
       }
       setIsScreenSharingActive(true);
-      setLocalCameraOff(true); 
+      setLocalCameraOff(true);
       await updateUserStatusInFirestore({ isScreenSharing: true, isCameraOff: true });
       toast({ title: "Screen Sharing Started" });
 
@@ -919,10 +938,13 @@ export default function MeetingPage() {
             <div className={cn(
                 "flex-grow flex items-center justify-center",
                 currentLayout === 'speaker' && "p-4 bg-muted rounded-lg",
-                currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg", 
+                currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg",
                 currentLayout === 'grid' && "p-0"
             )}>
-                <div className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative">
+                <div
+                  className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative"
+                  style={deviceAspectRatio ? { aspectRatio: deviceAspectRatio } : {}}
+                >
                  {currentLayout === 'speaker' && (
                     <Badge variant="default" className="absolute top-2 left-2 z-20 bg-primary/80 text-primary-foreground backdrop-blur-sm">Speaker View Active</Badge>
                 )}
@@ -937,12 +959,12 @@ export default function MeetingPage() {
             ) : (
             <div className={cn(
                 "grid gap-4 flex-1",
-                combinedParticipants.length === 0 ? "grid-cols-1" : 
-                combinedParticipants.length === 1 ? "grid-cols-1" : 
+                combinedParticipants.length === 0 ? "grid-cols-1" :
+                combinedParticipants.length === 1 ? "grid-cols-1" :
                 combinedParticipants.length === 2 ? "grid-cols-1 sm:grid-cols-2 lg:max-w-4xl mx-auto" :
                 combinedParticipants.length === 3 ? "grid-cols-1 sm:grid-cols-3 lg:max-w-6xl mx-auto" :
                 combinedParticipants.length >= 4 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" :
-                "grid-cols-1" 
+                "grid-cols-1"
             )}>
                 {combinedParticipants.map(participant => (
                 <ParticipantView key={participant.id} {...participant} />
@@ -977,12 +999,12 @@ export default function MeetingPage() {
           </Button>
            <Button
             size="lg"
-            variant={localHandRaised ? "default" : "default"} 
+            variant={localHandRaised ? "default" : "default"}
             className={cn(
               "rounded-full p-3",
               localHandRaised
-                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg" 
-                : "btn-gel shadow-md" 
+                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg"
+                : "btn-gel shadow-md"
             )}
             onClick={toggleHandRaise}
             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
@@ -992,7 +1014,7 @@ export default function MeetingPage() {
           {isTTSEnabled && (
             <Dialog open={isTTSDialogVisible} onOpenChange={(isOpen) => {
               setIsTTSDialogVisible(isOpen);
-              if (!isOpen) { 
+              if (!isOpen) {
                 setTTSText("");
                 setTTSResult(null);
                 setIsTTSProcessing(false);
@@ -1069,7 +1091,7 @@ export default function MeetingPage() {
               </DialogContent>
             </Dialog>
           )}
-          <Button variant="destructive" size="lg" className="rounded-full p-3" onClick={leaveMeeting} aria-label="Leave Meeting"> 
+          <Button variant="destructive" size="lg" className="rounded-full p-3" onClick={leaveMeeting} aria-label="Leave Meeting">
             <PhoneOff className="h-5 w-5" />
           </Button>
         </div>
@@ -1100,4 +1122,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
