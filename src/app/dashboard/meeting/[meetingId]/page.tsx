@@ -74,6 +74,7 @@ import { auth, db } from '@/lib/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData } from 'firebase/firestore';
 import { textToSpeech, type TextToSpeechInput, type TextToSpeechOutput } from '@/ai/flows/text-to-speech-flow';
+import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 
 const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
@@ -221,6 +222,7 @@ export default function MeetingPage() {
   const { toast } = useToast();
   const router = useRouter();
   const currentUser = auth.currentUser;
+  const { setHeaderContent } = useDynamicHeader();
 
   const [localMicMuted, setLocalMicMuted] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -251,12 +253,12 @@ export default function MeetingPage() {
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
-  const [isTTSEnabled, setIsTTSEnabled] = useState(true); // Keep this if you plan to toggle TTS feature visibility
+  const [isTTSEnabled, setIsTTSEnabled] = useState(true); 
   const [isTTSDialogVisible, setIsTTSDialogVisible] = useState(false);
   const [ttsText, setTTSText] = useState("");
   const [selectedTTSVoice, setSelectedTTSVoice] = useState<'neutral' | 'boy' | 'girl'>('neutral');
   const [isTTSProcessing, setIsTTSProcessing] = useState(false);
-  const audioPlayerRef = useRef<HTMLAudioElement>(null); // Ref for the audio element
+  const audioPlayerRef = useRef<HTMLAudioElement>(null); 
 
   const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
 
@@ -277,6 +279,158 @@ export default function MeetingPage() {
       window.removeEventListener('resize', calculateAndSetAspectRatio);
     };
   }, []);
+
+  const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
+  const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
+  
+  const combinedParticipants = currentUser
+    ? [
+        {
+          id: currentUser.uid,
+          name: currentUser.displayName || currentUser.email?.split('@')[0] || "You",
+          isMe: true,
+          isMicMuted: localMicMuted,
+          isCameraOff: isScreenSharingActive ? true : localCameraOff,
+          videoRef: localVideoRef,
+          hasCameraPermissionForView: hasCameraPermission,
+          isHandRaisedForView: localHandRaised,
+          isScreenSharing: isScreenSharingActive,
+          photoURL: currentUser.photoURL
+        },
+        ...realtimeParticipants.filter(p => p.id !== currentUser.uid)
+      ]
+    : realtimeParticipants;
+
+  const handleReportIssue = () => {
+    toast({
+      title: "Report Issue",
+      description: "Issue reporting feature is planned. For now, please note the issue and report through help channels.",
+      duration: 5000,
+    });
+  };
+
+  const handleOpenSharePanel = () => {
+    setIsSharePanelOpen(true);
+  };
+
+  const handleToggleShareScreen = () => {
+    if (isScreenSharingActive) {
+      stopScreenShare();
+    } else {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        toast({
+            variant: "destructive",
+            title: "Screen Share Not Supported",
+            description: "Screen sharing is not available in your browser or current environment. Please try a different browser or ensure you are on a secure connection (HTTPS).",
+            duration: 7000
+        });
+        return;
+      }
+      setIsShareScreenDialogVisible(true);
+    }
+  };
+  
+  const handleOpenWhiteboard = () => {
+    router.push(`/dashboard/meeting/${meetingId}/whiteboard`);
+  };
+
+  const handleOpenChat = () => {
+    router.push(`/dashboard/meeting/${meetingId}/chat${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
+  };
+
+  const handleOpenParticipants = () => {
+    router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
+  };
+
+  const handleSetLayout = (layout: string) => {
+    setCurrentLayout(layout);
+    toast({ title: "Layout Changed", description: `Switched to ${layout.replace('-', ' ')} view.` });
+  };
+
+
+  useEffect(() => {
+    const newHeaderContent = (
+      <div className="flex items-center justify-between w-full gap-2 sm:gap-4">
+        <div className="flex-shrink min-w-0">
+          <h2 className="text-base sm:text-lg font-semibold text-foreground truncate" title={displayTitle}>
+            {displayTitle}
+          </h2>
+          {combinedParticipants.length > 0 && (
+            <span className="text-xs sm:text-sm text-muted-foreground">
+              {combinedParticipants.length} Participant{combinedParticipants.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full flex-shrink-0">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 rounded-lg shadow-lg">
+            <DropdownMenuItem onClick={handleOpenSharePanel} className="cursor-pointer">
+              <Share2 className="mr-2 h-4 w-4" /> Share Invite
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleToggleShareScreen} className="cursor-pointer">
+              {isScreenSharingActive ? <StopCircle className="mr-2 h-4 w-4 text-destructive" /> : <ScreenShare className="mr-2 h-4 w-4" />}
+              {isScreenSharingActive ? "Stop Sharing Screen" : "Share Screen"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpenWhiteboard} className="cursor-pointer">
+              <Edit3 className="mr-2 h-4 w-4" /> Open Whiteboard
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpenChat} className="cursor-pointer">
+              <MessageSquare className="mr-2 h-4 w-4" /> Chat
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpenParticipants} className="cursor-pointer"><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Columns className="mr-2 h-4 w-4" />
+                <span>Change Layout</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="rounded-lg">
+                <DropdownMenuItem onClick={() => handleSetLayout('grid')} className="rounded-md cursor-pointer">
+                  Grid View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSetLayout('speaker')} className="rounded-md cursor-pointer">
+                  Speaker View
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => handleSetLayout('gallery')} className="rounded-md cursor-pointer">
+                  Gallery View
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleReportIssue} className="text-destructive focus:text-destructive cursor-pointer">
+              <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')} className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" /> Settings
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+    setHeaderContent(newHeaderContent);
+
+    return () => {
+      setHeaderContent(null);
+    };
+  }, [
+      setHeaderContent, 
+      displayTitle, 
+      combinedParticipants.length, 
+      isScreenSharingActive, 
+      router, // Assuming router object itself is stable
+      // Add other stable dependencies for handlers if they aren't recreated on every render
+      // For example, if handlers are wrapped in useCallback, include them.
+      // For now, this covers the main display elements.
+      // Note: functions like handleOpenSharePanel, handleToggleShareScreen etc.
+      // are defined in the component scope and would cause this effect to re-run if
+      // not memoized with useCallback. For simplicity here, assuming core data for display is key.
+      // Proper memoization of handlers would be ideal in a larger app.
+    ]);
 
 
   useEffect(() => {
@@ -684,31 +838,6 @@ export default function MeetingPage() {
   };
 
 
-  const handleReportIssue = () => {
-    toast({
-      title: "Report Issue",
-      description: "Issue reporting feature is planned. For now, please note the issue and report through help channels.",
-      duration: 5000,
-    });
-  };
-
-  const handleToggleShareScreen = () => {
-    if (isScreenSharingActive) {
-      stopScreenShare();
-    } else {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        toast({
-            variant: "destructive",
-            title: "Screen Share Not Supported",
-            description: "Screen sharing is not available in your browser or current environment. Please try a different browser or ensure you are on a secure connection (HTTPS).",
-            duration: 7000
-        });
-        return;
-      }
-      setIsShareScreenDialogVisible(true);
-    }
-  };
-
   const handleConfirmShareScreen = async () => {
     setIsShareScreenDialogVisible(false);
     if (isScreenSharingActive) return;
@@ -759,27 +888,6 @@ export default function MeetingPage() {
     }
   };
 
-  const handleOpenWhiteboard = () => {
-    router.push(`/dashboard/meeting/${meetingId}/whiteboard`);
-  };
-
-  const handleOpenChat = () => {
-    router.push(`/dashboard/meeting/${meetingId}/chat${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
-  };
-
-  const handleOpenParticipants = () => {
-    router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
-  };
-
-  const handleSetLayout = (layout: string) => {
-    setCurrentLayout(layout);
-    toast({ title: "Layout Changed", description: `Switched to ${layout.replace('-', ' ')} view.` });
-  };
-
-  const handleOpenSharePanel = () => {
-    setIsSharePanelOpen(true);
-  };
-
   const handleTTSSubmit = async () => {
     if (!ttsText.trim()) {
       toast({ variant: "destructive", title: "No Text Provided", description: "Please enter some text to speak." });
@@ -804,7 +912,7 @@ export default function MeetingPage() {
             console.error("Error playing TTS audio:", error);
             toast({ variant: "destructive", title: "Playback Error", description: "Could not play the generated audio." });
           });
-      } else if (output.confirmationMessage) { // Fallback if no audio URI but message exists
+      } else if (output.confirmationMessage) { 
          toast({ title: "AI Speech Info", description: output.confirmationMessage });
       }
 
@@ -816,30 +924,6 @@ export default function MeetingPage() {
       setIsTTSProcessing(false);
     }
   };
-
-
-  const combinedParticipants = currentUser
-    ? [
-        {
-          id: currentUser.uid,
-          name: currentUser.displayName || currentUser.email?.split('@')[0] || "You",
-          isMe: true,
-          isMicMuted: localMicMuted,
-          isCameraOff: isScreenSharingActive ? true : localCameraOff,
-          videoRef: localVideoRef,
-          hasCameraPermissionForView: hasCameraPermission,
-          isHandRaisedForView: localHandRaised,
-          isScreenSharing: isScreenSharingActive,
-          photoURL: currentUser.photoURL
-        },
-        ...realtimeParticipants.filter(p => p.id !== currentUser.uid)
-      ]
-    : realtimeParticipants;
-
-
-  const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
-  const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
-
 
   if (joinStatus === 'pending' || joinStatus === 'joining') {
     return (
@@ -874,62 +958,7 @@ export default function MeetingPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       <audio ref={audioPlayerRef} className="hidden" />
-      <header className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-background/80 backdrop-blur-md z-10">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground truncate max-w-xs sm:max-w-md md:max-w-lg" title={displayTitle}>{displayTitle}</h2>
-          <span className="text-sm text-muted-foreground">{combinedParticipants.length} Participant{combinedParticipants.length === 1 ? '' : 's'}</span>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <MoreVertical className="h-6 w-6" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 rounded-lg shadow-lg">
-            <DropdownMenuItem onClick={handleOpenSharePanel} className="cursor-pointer">
-              <Share2 className="mr-2 h-4 w-4" /> Share Invite
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleToggleShareScreen} className="cursor-pointer">
-              {isScreenSharingActive ? <StopCircle className="mr-2 h-4 w-4 text-destructive" /> : <ScreenShare className="mr-2 h-4 w-4" />}
-              {isScreenSharingActive ? "Stop Sharing Screen" : "Share Screen"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleOpenWhiteboard} className="cursor-pointer">
-              <Edit3 className="mr-2 h-4 w-4" /> Open Whiteboard
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleOpenChat} className="cursor-pointer">
-              <MessageSquare className="mr-2 h-4 w-4" /> Chat
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleOpenParticipants} className="cursor-pointer"><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Columns className="mr-2 h-4 w-4" />
-                <span>Change Layout</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="rounded-lg">
-                <DropdownMenuItem onClick={() => handleSetLayout('grid')} className="rounded-md cursor-pointer">
-                  Grid View
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSetLayout('speaker')} className="rounded-md cursor-pointer">
-                  Speaker View
-                </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => handleSetLayout('gallery')} className="rounded-md cursor-pointer">
-                  Gallery View
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleReportIssue} className="text-destructive focus:text-destructive cursor-pointer">
-              <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')} className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" /> Settings
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </header>
-
+      
       <main className="flex-1 p-4 flex flex-col">
         {hasCameraPermission === false && !isScreenSharingActive && (
            <Alert variant="destructive" className="mb-4">

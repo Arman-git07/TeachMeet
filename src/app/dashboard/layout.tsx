@@ -25,8 +25,8 @@ function DashboardHeaderContentInternal() {
             {/* Uses default PanelLeftOpen/Close from SidebarTrigger, onClick is handled internally */}
           </SidebarTrigger>
         </div>
-        {/* Dynamic content area - takes up available space and centers its content */}
-        <div className="flex-grow flex items-center justify-center px-4">
+        {/* Dynamic content area - takes up available space */}
+        <div className="flex-grow flex items-center px-4">
           {headerContent}
         </div>
         {/* Placeholder for truly right-aligned static elements if needed in the future,
