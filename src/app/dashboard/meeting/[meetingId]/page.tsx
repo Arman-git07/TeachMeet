@@ -15,7 +15,6 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
@@ -42,7 +41,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 import {
@@ -65,7 +63,6 @@ import {
   StopCircle,
   Loader2,
   Share2,
-  Volume2 as SpeakerIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -73,7 +70,6 @@ import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData } from 'firebase/firestore';
-import { textToSpeech, type TextToSpeechInput, type TextToSpeechOutput } from '@/ai/flows/text-to-speech-flow';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 
@@ -253,12 +249,7 @@ export default function MeetingPage() {
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
-  const [isTTSEnabled, setIsTTSEnabled] = useState(true); 
-  const [isTTSDialogVisible, setIsTTSDialogVisible] = useState(false);
-  const [ttsText, setTTSText] = useState("");
-  const [selectedTTSVoice, setSelectedTTSVoice] = useState<'neutral' | 'boy' | 'girl'>('neutral');
-  const [isTTSProcessing, setIsTTSProcessing] = useState(false);
-  const audioPlayerRef = useRef<HTMLAudioElement>(null); 
+  const [isTTSEnabled, setIsTTSEnabled] = useState(true); // Keeping this state if other features depend on it, otherwise can be removed.
 
   const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
 
@@ -881,54 +872,6 @@ export default function MeetingPage() {
     }
   };
   
-  const openTTSDialog = () => {
-    if (typeof window !== 'undefined') {
-        const storedVoice = localStorage.getItem("teachmeet-tts-default-voice") as 'neutral' | 'boy' | 'girl' | null;
-        if (storedVoice && ['neutral', 'boy', 'girl'].includes(storedVoice)) {
-            setSelectedTTSVoice(storedVoice);
-        } else {
-            setSelectedTTSVoice('neutral'); // Default if nothing valid in localStorage
-        }
-    }
-    setIsTTSDialogVisible(true);
-  };
-
-  const handleTTSSubmit = async () => {
-    if (!ttsText.trim()) {
-      toast({ variant: "destructive", title: "No Text Provided", description: "Please enter some text to speak." });
-      return;
-    }
-    setIsTTSProcessing(true);
-    try {
-      const input: TextToSpeechInput = { textToSpeak: ttsText, voice: selectedTTSVoice };
-      const output: TextToSpeechOutput = await textToSpeech(input);
-      
-      if (output.audioDataUri && audioPlayerRef.current) {
-        audioPlayerRef.current.src = output.audioDataUri;
-        audioPlayerRef.current.play()
-          .then(() => {
-            if (output.confirmationMessage) {
-              toast({ title: "AI Speech", description: output.confirmationMessage });
-            } else {
-              toast({ title: "AI Speech", description: "Audio playback started (simulated)." });
-            }
-          })
-          .catch(error => {
-            console.error("Error playing TTS audio:", error);
-            toast({ variant: "destructive", title: "Playback Error", description: "Could not play the generated audio." });
-          });
-      } else if (output.confirmationMessage) { 
-         toast({ title: "AI Speech Info", description: output.confirmationMessage });
-      }
-
-    } catch (error) {
-      console.error("Text-to-speech error in component:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during TTS processing.";
-      toast({ variant: "destructive", title: "TTS Error", description: errorMessage });
-    } finally {
-      setIsTTSProcessing(false);
-    }
-  };
 
   if (joinStatus === 'pending' || joinStatus === 'joining') {
     return (
@@ -962,7 +905,6 @@ export default function MeetingPage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <audio ref={audioPlayerRef} className="hidden" />
       
       <main className="flex-1 p-4 flex flex-col">
         {hasCameraPermission === false && !isScreenSharingActive && (
@@ -1062,77 +1004,7 @@ export default function MeetingPage() {
           >
             <Hand className="h-5 w-5" />
           </Button>
-          {isTTSEnabled && (
-            <Dialog open={isTTSDialogVisible} onOpenChange={(isOpen) => {
-              if (isOpen) openTTSDialog(); // Set default voice when opening
-              else setIsTTSDialogVisible(false);
-              if (!isOpen) {
-                setTTSText("");
-                setIsTTSProcessing(false);
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="rounded-full p-3 btn-gel"
-                  aria-label="Speak Text with AI"
-                >
-                  <SpeakerIcon className="h-5 w-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md rounded-xl">
-                <DialogHeader>
-                  <DialogTitle>AI Text-to-Speech</DialogTitle>
-                  <DialogDescription>
-                    Enter text and choose a voice to have it spoken by the AI.
-                    (Audio generation is currently simulated)
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div>
-                    <Label htmlFor="tts-input" className="block mb-1">Text to Speak</Label>
-                    <Textarea
-                      id="tts-input"
-                      value={ttsText}
-                      onChange={(e) => setTTSText(e.target.value)}
-                      placeholder="Type what you want the AI to say..."
-                      className="min-h-[100px] rounded-lg"
-                      disabled={isTTSProcessing}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tts-voice-select" className="block mb-1">Voice</Label>
-                    <Select
-                      value={selectedTTSVoice}
-                      onValueChange={(value: 'neutral' | 'boy' | 'girl') => setSelectedTTSVoice(value)}
-                      disabled={isTTSProcessing}
-                    >
-                      <SelectTrigger id="tts-voice-select" className="w-full rounded-lg">
-                        <SelectValue placeholder="Select a voice" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-lg">
-                        <SelectItem value="neutral" className="rounded-md">Neutral (Female)</SelectItem>
-                        <SelectItem value="boy" className="rounded-md">Boy (Male)</SelectItem>
-                        <SelectItem value="girl" className="rounded-md">Girl (Female)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                   <DialogClose asChild>
-                      <Button type="button" variant="outline" className="rounded-lg" disabled={isTTSProcessing}>
-                        Cancel
-                      </Button>
-                  </DialogClose>
-                  <Button type="button" onClick={handleTTSSubmit} className="btn-gel rounded-lg" disabled={isTTSProcessing || !ttsText.trim()}>
-                    {isTTSProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isTTSProcessing ? "Generating..." : "Generate & Play Audio"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+          
           <Button variant="destructive" size="lg" className="rounded-full p-3" onClick={leaveMeeting} aria-label="Leave Meeting">
             <PhoneOff className="h-5 w-5" />
           </Button>
