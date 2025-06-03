@@ -422,14 +422,7 @@ export default function MeetingPage() {
       displayTitle, 
       combinedParticipants.length, 
       isScreenSharingActive, 
-      router, // Assuming router object itself is stable
-      // Add other stable dependencies for handlers if they aren't recreated on every render
-      // For example, if handlers are wrapped in useCallback, include them.
-      // For now, this covers the main display elements.
-      // Note: functions like handleOpenSharePanel, handleToggleShareScreen etc.
-      // are defined in the component scope and would cause this effect to re-run if
-      // not memoized with useCallback. For simplicity here, assuming core data for display is key.
-      // Proper memoization of handlers would be ideal in a larger app.
+      router, 
     ]);
 
 
@@ -887,6 +880,18 @@ export default function MeetingPage() {
       }
     }
   };
+  
+  const openTTSDialog = () => {
+    if (typeof window !== 'undefined') {
+        const storedVoice = localStorage.getItem("teachmeet-tts-default-voice") as 'neutral' | 'boy' | 'girl' | null;
+        if (storedVoice && ['neutral', 'boy', 'girl'].includes(storedVoice)) {
+            setSelectedTTSVoice(storedVoice);
+        } else {
+            setSelectedTTSVoice('neutral'); // Default if nothing valid in localStorage
+        }
+    }
+    setIsTTSDialogVisible(true);
+  };
 
   const handleTTSSubmit = async () => {
     if (!ttsText.trim()) {
@@ -1059,7 +1064,8 @@ export default function MeetingPage() {
           </Button>
           {isTTSEnabled && (
             <Dialog open={isTTSDialogVisible} onOpenChange={(isOpen) => {
-              setIsTTSDialogVisible(isOpen);
+              if (isOpen) openTTSDialog(); // Set default voice when opening
+              else setIsTTSDialogVisible(false);
               if (!isOpen) {
                 setTTSText("");
                 setIsTTSProcessing(false);
@@ -1080,6 +1086,7 @@ export default function MeetingPage() {
                   <DialogTitle>AI Text-to-Speech</DialogTitle>
                   <DialogDescription>
                     Enter text and choose a voice to have it spoken by the AI.
+                    (Audio generation is currently simulated)
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -1105,7 +1112,7 @@ export default function MeetingPage() {
                         <SelectValue placeholder="Select a voice" />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
-                        <SelectItem value="neutral" className="rounded-md">Neutral</SelectItem>
+                        <SelectItem value="neutral" className="rounded-md">Neutral (Female)</SelectItem>
                         <SelectItem value="boy" className="rounded-md">Boy (Male)</SelectItem>
                         <SelectItem value="girl" className="rounded-md">Girl (Female)</SelectItem>
                       </SelectContent>

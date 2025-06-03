@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, Image as ImageIcon } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Volume2 as SpeakerIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -43,36 +43,37 @@ export default function SettingsPage() {
   
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
   const recordingSettingsRef = useRef<HTMLDivElement>(null); 
+  const ttsSettingsRef = useRef<HTMLDivElement>(null);
 
   const { toast } = useToast();
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
-  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#000000"); // Default to black for pen
+  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#000000");
   const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
   const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
+  const [defaultTTSVoice, setDefaultTTSVoice] = useState<'neutral' | 'boy' | 'girl'>('neutral');
 
 
   useEffect(() => {
     const storedFilter = localStorage.getItem("teachmeet-camera-filter");
-    if (storedFilter) {
-      setSelectedFilter(storedFilter);
-    }
+    if (storedFilter) setSelectedFilter(storedFilter);
+    
     const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
-    if (storedPenColor) {
-      setWhiteboardPenColor(storedPenColor);
-    } else {
-      localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000"); // Ensure default is saved if nothing there
-    }
+    if (storedPenColor) setWhiteboardPenColor(storedPenColor);
+    else localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000");
+    
     const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
-    if (storedBgColor) {
-      setWhiteboardBackgroundColor(storedBgColor);
-    } else {
-      localStorage.setItem("teachmeet-whiteboard-bg-color", "#FFFFFF");
-    }
+    if (storedBgColor) setWhiteboardBackgroundColor(storedBgColor);
+    else localStorage.setItem("teachmeet-whiteboard-bg-color", "#FFFFFF");
+
     const storedShapeRecognition = localStorage.getItem("teachmeet-whiteboard-shape-recognition");
-    if (storedShapeRecognition) {
-      setEnableShapeRecognition(storedShapeRecognition === 'true');
+    if (storedShapeRecognition) setEnableShapeRecognition(storedShapeRecognition === 'true');
+    else localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(true));
+
+    const storedTTSVoice = localStorage.getItem("teachmeet-tts-default-voice") as 'neutral' | 'boy' | 'girl' | null;
+    if (storedTTSVoice && ['neutral', 'boy', 'girl'].includes(storedTTSVoice)) {
+        setDefaultTTSVoice(storedTTSVoice);
     } else {
-       localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(true));
+        localStorage.setItem("teachmeet-tts-default-voice", "neutral");
     }
   }, []);
 
@@ -117,6 +118,15 @@ export default function SettingsPage() {
       description: "Your whiteboard preferences are up-to-date and saved in your browser's local storage.",
     });
   };
+
+  const handleDefaultTTSVoiceChange = (value: 'neutral' | 'boy' | 'girl') => {
+    setDefaultTTSVoice(value);
+    localStorage.setItem("teachmeet-tts-default-voice", value);
+    toast({
+      title: "Default TTS Voice Changed",
+      description: `Default voice set to ${value.charAt(0).toUpperCase() + value.slice(1)}. This will apply to new TTS generations.`,
+    });
+  };
   
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
@@ -125,7 +135,8 @@ export default function SettingsPage() {
       
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
-        recordingSettings: recordingSettingsRef, 
+        recordingSettings: recordingSettingsRef,
+        ttsSettings: ttsSettingsRef,
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -152,14 +163,14 @@ export default function SettingsPage() {
       </div>
 
       <SettingsSection title="Quick Navigation" description="Jump to specific settings sections." icon={ArrowRightCircle}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Button 
             variant="outline" 
             className="rounded-lg justify-start text-left py-3" 
             onClick={() => handleNavigateToSection('advancedMeetingSettings')}
           >
             <VideoIcon className="mr-2 h-5 w-5" />
-            Go to Advanced Meeting Settings
+            Meeting Visuals
           </Button>
           <Button 
             variant="outline" 
@@ -167,7 +178,15 @@ export default function SettingsPage() {
             onClick={() => handleNavigateToSection('recordingSettings')}
           >
             <Clapperboard className="mr-2 h-5 w-5" />
-            Go to Recording Settings
+            Recording Settings
+          </Button>
+           <Button 
+            variant="outline" 
+            className="rounded-lg justify-start text-left py-3" 
+            onClick={() => handleNavigateToSection('ttsSettings')}
+          >
+            <SpeakerIcon className="mr-2 h-5 w-5" />
+            Text-to-Speech
           </Button>
         </div>
       </SettingsSection>
@@ -237,6 +256,32 @@ export default function SettingsPage() {
         </div>
         <Button className="mt-6 btn-gel rounded-lg">Save Recording Settings</Button>
       </SettingsSection>
+      
+      <SettingsSection
+        id="ttsSettings"
+        ref={ttsSettingsRef}
+        title="Text-to-Speech Preferences"
+        description="Set your default voice for AI speech generation."
+        icon={SpeakerIcon}
+        className={highlightedSectionId === 'ttsSettings' ? 'highlight-blink' : ''}
+      >
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="defaultTTSVoiceSelect" className="block mb-1">Default AI Voice</Label>
+            <Select value={defaultTTSVoice} onValueChange={handleDefaultTTSVoiceChange}>
+              <SelectTrigger id="defaultTTSVoiceSelect" className="w-full mt-1 rounded-lg">
+                <SelectValue placeholder="Select a default voice" />
+              </SelectTrigger>
+              <SelectContent className="rounded-lg">
+                <SelectItem value="neutral" className="rounded-md">Neutral (Female)</SelectItem>
+                <SelectItem value="boy" className="rounded-md">Boy (Male)</SelectItem>
+                <SelectItem value="girl" className="rounded-md">Girl (Female)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {/* Save button could be added if settings were more complex, but Select auto-saves via onValueChange */}
+      </SettingsSection>
 
       <SettingsSection title="Notifications" description="Control how you receive notifications." icon={Bell} id="notifications">
         <div className="space-y-4">
@@ -267,7 +312,7 @@ export default function SettingsPage() {
             <Input id="backgroundColor" type="color" value={whiteboardBackgroundColor} onChange={handleWhiteboardBackgroundColorChange} className="mt-1 w-full h-10 rounded-lg" />
           </div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="shapeRecognition" className="flex-grow">Enable Shape Recognition</Label>
+            <Label htmlFor="shapeRecognition" className="flex-grow">Enable Shape Recognition (Experimental)</Label>
             <Switch id="shapeRecognition" checked={enableShapeRecognition} onCheckedChange={handleShapeRecognitionToggle} />
           </div>
         </div>
@@ -323,4 +368,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
