@@ -251,12 +251,13 @@ export default function MeetingPage() {
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
-  const [isTTSEnabled, setIsTTSEnabled] = useState(true);
+  const [isTTSEnabled, setIsTTSEnabled] = useState(true); // Keep this if you plan to toggle TTS feature visibility
   const [isTTSDialogVisible, setIsTTSDialogVisible] = useState(false);
   const [ttsText, setTTSText] = useState("");
   const [selectedTTSVoice, setSelectedTTSVoice] = useState<'neutral' | 'boy' | 'girl'>('neutral');
   const [isTTSProcessing, setIsTTSProcessing] = useState(false);
-  const [ttsResult, setTTSResult] = useState<string | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement>(null); // Ref for the audio element
+
   const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
 
   useEffect(() => {
@@ -265,7 +266,7 @@ export default function MeetingPage() {
         if (window.innerHeight > 0 && window.innerWidth > 0) {
           setDeviceAspectRatio(window.innerWidth / window.innerHeight);
         } else {
-          setDeviceAspectRatio(16 / 9); // Default to 16:9 if dimensions are zero
+          setDeviceAspectRatio(16 / 9); 
         }
       }
     };
@@ -785,17 +786,32 @@ export default function MeetingPage() {
       return;
     }
     setIsTTSProcessing(true);
-    setTTSResult(null);
     try {
       const input: TextToSpeechInput = { textToSpeak: ttsText, voice: selectedTTSVoice };
       const output: TextToSpeechOutput = await textToSpeech(input);
-      setTTSResult(output.confirmationMessage);
-      toast({ title: "AI Speech (Simulated)", description: output.confirmationMessage });
+      
+      if (output.audioDataUri && audioPlayerRef.current) {
+        audioPlayerRef.current.src = output.audioDataUri;
+        audioPlayerRef.current.play()
+          .then(() => {
+            if (output.confirmationMessage) {
+              toast({ title: "AI Speech", description: output.confirmationMessage });
+            } else {
+              toast({ title: "AI Speech", description: "Audio playback started (simulated)." });
+            }
+          })
+          .catch(error => {
+            console.error("Error playing TTS audio:", error);
+            toast({ variant: "destructive", title: "Playback Error", description: "Could not play the generated audio." });
+          });
+      } else if (output.confirmationMessage) { // Fallback if no audio URI but message exists
+         toast({ title: "AI Speech Info", description: output.confirmationMessage });
+      }
+
     } catch (error) {
-      console.error("Text-to-speech error:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      setTTSResult(`Error: Could not process text for speech. ${errorMessage}`);
-      toast({ variant: "destructive", title: "TTS Error", description: `Failed to process text. ${errorMessage}` });
+      console.error("Text-to-speech error in component:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during TTS processing.";
+      toast({ variant: "destructive", title: "TTS Error", description: errorMessage });
     } finally {
       setIsTTSProcessing(false);
     }
@@ -857,6 +873,7 @@ export default function MeetingPage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
+      <audio ref={audioPlayerRef} className="hidden" />
       <header className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <div>
           <h2 className="text-xl font-semibold text-foreground truncate max-w-xs sm:max-w-md md:max-w-lg" title={displayTitle}>{displayTitle}</h2>
@@ -1016,9 +1033,7 @@ export default function MeetingPage() {
               setIsTTSDialogVisible(isOpen);
               if (!isOpen) {
                 setTTSText("");
-                setTTSResult(null);
                 setIsTTSProcessing(false);
-                // setSelectedTTSVoice('neutral'); // Optionally reset voice
               }
             }}>
               <DialogTrigger asChild>
@@ -1033,9 +1048,9 @@ export default function MeetingPage() {
               </DialogTrigger>
               <DialogContent className="sm:max-w-md rounded-xl">
                 <DialogHeader>
-                  <DialogTitle>AI Text-to-Speech (Simulated)</DialogTitle>
+                  <DialogTitle>AI Text-to-Speech</DialogTitle>
                   <DialogDescription>
-                    Enter text and choose a voice to have it "spoken" by the AI.
+                    Enter text and choose a voice to have it spoken by the AI.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -1062,20 +1077,11 @@ export default function MeetingPage() {
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
                         <SelectItem value="neutral" className="rounded-md">Neutral</SelectItem>
-                        <SelectItem value="boy" className="rounded-md">Boy</SelectItem>
-                        <SelectItem value="girl" className="rounded-md">Girl</SelectItem>
+                        <SelectItem value="boy" className="rounded-md">Boy (Male)</SelectItem>
+                        <SelectItem value="girl" className="rounded-md">Girl (Female)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {ttsResult && (
-                    <div className={cn(
-                      "mt-4 p-3 rounded-lg text-sm",
-                      ttsResult.startsWith("Error:") ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
-                    )}>
-                      <p>{ttsResult}</p>
-                    </div>
-                  )}
                 </div>
                 <DialogFooter>
                    <DialogClose asChild>
@@ -1085,7 +1091,7 @@ export default function MeetingPage() {
                   </DialogClose>
                   <Button type="button" onClick={handleTTSSubmit} className="btn-gel rounded-lg" disabled={isTTSProcessing || !ttsText.trim()}>
                     {isTTSProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isTTSProcessing ? "Processing..." : "Generate & Play (Simulated)"}
+                    {isTTSProcessing ? "Generating..." : "Generate & Play Audio"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
