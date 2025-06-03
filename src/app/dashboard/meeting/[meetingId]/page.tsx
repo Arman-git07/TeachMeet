@@ -8,14 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +35,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TranslateAndSpeakDialogContent } from '@/components/meeting/TranslateAndSpeakDialogContent';
 
 
 import {
@@ -63,6 +58,7 @@ import {
   StopCircle,
   Loader2,
   Share2,
+  Languages,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -242,14 +238,16 @@ export default function MeetingPage() {
   const localAudioStreamRef = useRef<MediaStream | null>(null);
   const currentLocalStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement>(null); // For playing synthesized audio
+
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [isTranslateAndSpeakDialogOpen, setIsTranslateAndSpeakDialogOpen] = useState(false);
 
-  const [isTTSEnabled, setIsTTSEnabled] = useState(true); // Keeping this state if other features depend on it, otherwise can be removed.
 
   const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
 
@@ -553,7 +551,7 @@ export default function MeetingPage() {
 
     initializeCameraAndPermissions();
 
-  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]);
+  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]); // Added isScreenSharingActive dependency
 
   useEffect(() => {
     const initializeMicrophone = async () => {
@@ -905,6 +903,7 @@ export default function MeetingPage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
+      <audio ref={audioPlayerRef} className="hidden" />
       
       <main className="flex-1 p-4 flex flex-col">
         {hasCameraPermission === false && !isScreenSharingActive && (
@@ -990,6 +989,23 @@ export default function MeetingPage() {
           >
             {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
           </Button>
+          
+          <Dialog open={isTranslateAndSpeakDialogOpen} onOpenChange={setIsTranslateAndSpeakDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="default"
+                size="lg"
+                className="rounded-full p-3 btn-gel"
+                aria-label="Translate and Speak"
+              >
+                <Languages className="h-5 w-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg rounded-xl">
+              <TranslateAndSpeakDialogContent audioPlayerRef={audioPlayerRef} />
+            </DialogContent>
+          </Dialog>
+
            <Button
             size="lg"
             variant={localHandRaised ? "default" : "default"}

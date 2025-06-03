@@ -2,4 +2,4 @@ import { config } from 'dotenv';
 config();
 
 import '@/ai/flows/ai-help-assistant.ts';
-// Text-to-Speech flow import removed
+import '@/ai/flows/translate-and-speak-flow.ts';
