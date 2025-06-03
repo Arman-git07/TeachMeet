@@ -1,9 +1,9 @@
 
 'use server';
 /**
- * @fileOverview A Genkit flow for translating text and synthesizing it into speech.
+ * @fileOverview A Genkit flow for transcribing audio, translating text, and synthesizing it into speech.
  *
- * - translateAndSpeakFlow - Translates text and generates spoken audio.
+ * - translateAndSpeakFlow - Transcribes, translates, and generates spoken audio.
  * - TranslateAndSpeakInput - Input schema for the flow.
  * - TranslateAndSpeakOutput - Output schema for the flow.
  */
@@ -11,18 +11,20 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import {TextToSpeechClient} from '@google-cloud/text-to-speech';
+// import { SpeechClient } from '@google-cloud/speech'; // For actual STT
 
 const TranslateAndSpeakInputSchema = z.object({
-  textToTranslate: z.string().describe('The text to be translated and spoken.'),
-  sourceLanguageCode: z.string().describe('The BCP-47 language code of the input text (e.g., "en-US", "hi-IN").'),
+  audioDataUri: z.string().describe("The recorded audio as a Base64-encoded data URI. Expected format: 'data:audio/webm;base64,<encoded_data>' or similar."),
+  sourceLanguageCode: z.string().describe('The BCP-47 language code of the input audio (e.g., "en-US", "hi-IN").'),
   targetLanguageCode: z.string().describe('The BCP-47 language code for the translation and speech output (e.g., "en-US", "es-ES").'),
   voiceGender: z.enum(['male', 'female', 'neutral']).describe('The preferred gender for the synthesized voice.'),
 });
 export type TranslateAndSpeakInput = z.infer<typeof TranslateAndSpeakInputSchema>;
 
 const TranslateAndSpeakOutputSchema = z.object({
+  originalTranscription: z.string().describe('The (simulated) transcription of the original audio.'),
   translatedText: z.string().describe('The translated text.'),
-  audioDataUri: z.string().describe("The synthesized audio as a Base64-encoded data URI. Format: 'data:audio/wav;base64,<encoded_data>'."),
+  audioDataUri: z.string().describe("The synthesized translated audio as a Base64-encoded data URI. Format: 'data:audio/wav;base64,<encoded_data>'."),
   confirmationMessage: z.string().describe('A message confirming the operation and voices used.'),
 });
 export type TranslateAndSpeakOutput = z.infer<typeof TranslateAndSpeakOutputSchema>;
@@ -37,6 +39,7 @@ const translationPrompt = ai.definePrompt({
 });
 
 const ttsClient = new TextToSpeechClient();
+// const speechClient = new SpeechClient(); // For actual STT
 
 async function synthesizeSpeech(text: string, languageCode: string, ssmlGender: 'MALE' | 'FEMALE' | 'NEUTRAL'): Promise<string> {
   let voiceName;
@@ -89,7 +92,7 @@ async function synthesizeSpeech(text: string, languageCode: string, ssmlGender: 
         detail += ` Details: ${error.details}`;
     }
 
-    throw new Error(detail); // Re-throw a more informative error
+    throw new Error(detail);
   }
 }
 
@@ -100,14 +103,34 @@ export const translateAndSpeakFlow = ai.defineFlow(
     outputSchema: TranslateAndSpeakOutputSchema,
   },
   async (input) => {
+    let originalTranscription = '';
     let translatedText = '';
     let audioDataUri = "data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQIAAAD//w=="; // Default silent WAV
     let confirmationMessage = '';
 
     try {
-      // Step 1: Translate text
+      // Step 1: Speech-to-Text (Simulated)
+      // In a real implementation, you would use input.audioDataUri with SpeechClient
+      // const audioBytes = input.audioDataUri.split(',')[1]; // Get base64 part
+      // const audio = { content: audioBytes };
+      // const sttConfig = {
+      //   encoding: 'WEBM_OPUS', // Or match your recording format
+      //   sampleRateHertz: 48000, // Match your recording format
+      //   languageCode: input.sourceLanguageCode,
+      // };
+      // const sttRequest = { audio: audio, config: sttConfig };
+      // const [sttResponse] = await speechClient.recognize(sttRequest);
+      // originalTranscription = sttResponse.results?.map(result => result.alternatives?.[0].transcript).join('\n') || '';
+      // if (!originalTranscription) {
+      //   throw new Error('Speech-to-Text failed or returned empty transcription.');
+      // }
+
+      originalTranscription = `[Simulated transcription of your audio in ${input.sourceLanguageCode}]`;
+      confirmationMessage = `Simulated transcription. `;
+      
+      // Step 2: Translate text
       const translationResponse = await translationPrompt({
-        textToTranslate: input.textToTranslate,
+        textToTranslate: originalTranscription, // Use the (simulated) transcription
         sourceLanguageCode: input.sourceLanguageCode,
         targetLanguageCode: input.targetLanguageCode,
       });
@@ -116,14 +139,16 @@ export const translateAndSpeakFlow = ai.defineFlow(
         throw new Error('Translation failed or returned empty text.');
       }
       translatedText = translationResponse.output.translatedText;
+      confirmationMessage += `Translated to ${input.targetLanguageCode}. `;
 
-      // Step 2: Synthesize translated text to speech
+      // Step 3: Synthesize translated text to speech
       const ssmlGender = input.voiceGender.toUpperCase() as 'MALE' | 'FEMALE' | 'NEUTRAL';
       audioDataUri = await synthesizeSpeech(translatedText, input.targetLanguageCode, ssmlGender);
       
-      confirmationMessage = `Successfully translated to ${input.targetLanguageCode} and synthesized with ${input.voiceGender} voice.`;
+      confirmationMessage += `Synthesized with ${input.voiceGender} voice.`;
 
       return {
+        originalTranscription,
         translatedText,
         audioDataUri,
         confirmationMessage,
@@ -131,19 +156,19 @@ export const translateAndSpeakFlow = ai.defineFlow(
 
     } catch (error: any) {
       console.error('[translateAndSpeakFlow] Error:', error);
-      // Construct a user-friendly error message. The detailed error is logged above.
       let userError = `Failed to process your request.`;
-      if (error.message.includes("Translation failed")) {
+      if (error.message.includes("Speech-to-Text failed")) {
+          userError = `Speech-to-Text step failed. Please check the audio input and source language. Original error: ${error.message}`;
+      } else if (error.message.includes("Translation failed")) {
           userError = `Translation step failed. Please check the input text and languages. Original error: ${error.message}`;
       } else if (error.message.includes("TTS Error") || error.message.includes("synthesize speech")) {
-          userError = `Speech synthesis failed. ${error.message}`; // Use the more informative error from synthesizeSpeech
+          userError = `Speech synthesis failed. ${error.message}`;
       } else {
           userError = `An unexpected error occurred: ${error.message}`;
       }
       
-      // Return a structured error in the output schema format, or rethrow if preferred
-      // For now, we'll provide a fallback response with the error in the confirmation.
       return {
+        originalTranscription: originalTranscription || "(STT failed or simulated)",
         translatedText: translatedText || "(Translation failed)",
         audioDataUri: audioDataUri, // Return silent WAV on error
         confirmationMessage: `Error: ${userError}`,
