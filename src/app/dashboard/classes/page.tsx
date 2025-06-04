@@ -2,7 +2,7 @@
 // src/app/dashboard/classes/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2 } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -25,8 +25,8 @@ interface Classroom {
   teacherAvatar?: string;
   description: string;
   memberCount: number;
-  thumbnailUrl: string; // Can be custom upload URL or placeholder
-  dataAiHint?: string; // Relevant if thumbnailUrl is a placeholder
+  thumbnailUrl: string; 
+  dataAiHint?: string; 
 }
 
 const initialMockClassrooms: Classroom[] = [
@@ -43,33 +43,60 @@ export default function ClassesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [classrooms, setClassrooms] = useState<Classroom[]>(initialMockClassrooms);
+  
+  // Create Class Dialog State
   const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
-
   const [newClassName, setNewClassName] = useState('');
   const [newClassDescription, setNewClassDescription] = useState('');
   const [newClassImageFile, setNewClassImageFile] = useState<File | null>(null);
   const [newClassImagePreview, setNewClassImagePreview] = useState<string | null>(null);
   const [isUploadingClassImage, setIsUploadingClassImage] = useState(false);
 
-  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Edit Class Dialog State
+  const [isEditClassDialogOpen, setIsEditClassDialogOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<Classroom | null>(null);
+  const [editClassName, setEditClassName] = useState('');
+  const [editClassDescription, setEditClassDescription] = useState('');
+  const [editClassImageFile, setEditClassImageFile] = useState<File | null>(null);
+  const [editClassImagePreview, setEditClassImagePreview] = useState<string | null>(null);
+  const [isUploadingEditClassImage, setIsUploadingEditClassImage] = useState(false);
+
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
         toast({ variant: "destructive", title: "Image Too Large", description: `Please select an image smaller than ${MAX_IMAGE_SIZE_MB}MB.` });
-        setNewClassImageFile(null);
-        setNewClassImagePreview(null);
-        event.target.value = ""; // Clear the input
+        if (type === 'create') {
+          setNewClassImageFile(null);
+          setNewClassImagePreview(null);
+        } else {
+          setEditClassImageFile(null);
+          // Revert to original image if new one is too large
+          setEditClassImagePreview(editingClass?.thumbnailUrl || null);
+        }
+        event.target.value = ""; 
         return;
       }
-      setNewClassImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setNewClassImagePreview(reader.result as string);
+        if (type === 'create') {
+          setNewClassImageFile(file);
+          setNewClassImagePreview(reader.result as string);
+        } else {
+          setEditClassImageFile(file);
+          setEditClassImagePreview(reader.result as string);
+        }
       };
       reader.readAsDataURL(file);
     } else {
-      setNewClassImageFile(null);
-      setNewClassImagePreview(null);
+      if (type === 'create') {
+        setNewClassImageFile(null);
+        setNewClassImagePreview(null);
+      } else {
+        setEditClassImageFile(null);
+        // Revert to original image on clearing selection
+        setEditClassImagePreview(editingClass?.thumbnailUrl || null);
+      }
     }
   };
   
@@ -77,10 +104,77 @@ export default function ClassesPage() {
     setNewClassName('');
     setNewClassDescription('');
     setNewClassImageFile(null);
+    if (newClassImagePreview?.startsWith('blob:')) URL.revokeObjectURL(newClassImagePreview);
     setNewClassImagePreview(null);
     setIsUploadingClassImage(false);
     setIsCreateClassDialogOpen(false);
   };
+
+  const resetEditClassDialog = () => {
+    setEditingClass(null);
+    setEditClassName('');
+    setEditClassDescription('');
+    setEditClassImageFile(null);
+    if (editClassImagePreview?.startsWith('blob:')) URL.revokeObjectURL(editClassImagePreview);
+    setEditClassImagePreview(null);
+    setIsUploadingEditClassImage(false);
+    setIsEditClassDialogOpen(false);
+  };
+
+  const uploadImage = async (imageFile: File, userId: string, currentImageUrl?: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
+    setIsUploadingClassImage(type === 'create');
+    setIsUploadingEditClassImage(type === 'edit');
+
+    const imageFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
+    const imagePath = `class_thumbnails/${userId}/${imageFileName}`;
+    const imageFileRef = storageRef(storage, imagePath);
+    
+    const toastId = `upload-class-image-${Date.now()}`;
+    const type = currentImageUrl ? 'edit' : 'create'; // Determine context for toast
+    const toastTitle = type === 'create' ? "Uploading Class Image..." : "Uploading New Class Image...";
+
+    toast({ 
+        id: toastId,
+        title: toastTitle,
+        description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Starting upload of {imageFile.name}. (0%)</span></div>,
+        duration: Infinity, 
+    });
+
+    return new Promise((resolve, reject) => {
+      const uploadTask = uploadBytesResumable(imageFileRef, imageFile);
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          toast({
+            id: toastId,
+            title: toastTitle,
+            description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Uploading {imageFile.name}. Please wait. ({Math.round(progress)}%)</span></div>,
+            duration: Infinity,
+          });
+        },
+        (error) => {
+          console.error("Class Image Upload Error:", error);
+          toast.dismiss(toastId);
+          toast({ variant: "destructive", title: "Image Upload Failed", description: `Could not upload ${imageFile.name}. Please try again.` });
+          reject(error);
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            toast.dismiss(toastId);
+            toast({ title: "Image Uploaded!", description: `${imageFile.name} successfully uploaded.` });
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined });
+          } catch (getUrlError) {
+             console.error("Error getting download URL for class image:", getUrlError);
+             toast.dismiss(toastId);
+             toast({ variant: "destructive", title: "Image URL Error", description: "Image uploaded, but could not get URL." });
+             reject(getUrlError);
+          }
+        }
+      );
+    });
+  };
+
 
   const handleCreateClass = async () => {
     if (!newClassName.trim() || !newClassDescription.trim()) {
@@ -93,62 +187,12 @@ export default function ClassesPage() {
     }
 
     setIsUploadingClassImage(true);
-    let thumbnailUrl = `https://placehold.co/600x400.png`;
-    let dataAiHint: string | undefined = "education general";
+    let imageDetails = { thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "education general" };
 
     if (newClassImageFile) {
-      const imageFileName = `${Date.now()}_${newClassImageFile.name.replace(/\s+/g, '_')}`;
-      const imagePath = `class_thumbnails/${user.uid}/${imageFileName}`;
-      const imageFileRef = storageRef(storage, imagePath);
-      
-      const uploadToastId = `upload-class-image-${Date.now()}`;
-      toast({ 
-          id: uploadToastId,
-          title: "Uploading Class Image...",
-          description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Starting upload of {newClassImageFile.name}. (0%)</span></div>,
-          duration: Infinity, 
-      });
-
       try {
-        const uploadTask = uploadBytesResumable(imageFileRef, newClassImageFile);
-        await new Promise<void>((resolve, reject) => {
-          uploadTask.on('state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              toast({
-                id: uploadToastId,
-                title: "Uploading Class Image...",
-                description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Uploading {newClassImageFile.name}. Please wait. ({Math.round(progress)}%)</span></div>,
-                duration: Infinity,
-              });
-            },
-            (error) => {
-              console.error("Class Image Upload Error:", error);
-              toast.dismiss(uploadToastId);
-              toast({ variant: "destructive", title: "Image Upload Failed", description: `Could not upload ${newClassImageFile.name}. Please try again.` });
-              setIsUploadingClassImage(false);
-              reject(error);
-            },
-            async () => {
-              try {
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                thumbnailUrl = downloadURL;
-                dataAiHint = undefined; // No AI hint for custom images
-                toast.dismiss(uploadToastId);
-                toast({ title: "Image Uploaded!", description: `${newClassImageFile.name} successfully uploaded.` });
-                resolve();
-              } catch (getUrlError) {
-                 console.error("Error getting download URL for class image:", getUrlError);
-                 toast.dismiss(uploadToastId);
-                 toast({ variant: "destructive", title: "Image URL Error", description: "Image uploaded, but could not get URL." });
-                 setIsUploadingClassImage(false);
-                 reject(getUrlError);
-              }
-            }
-          );
-        });
+        imageDetails = await uploadImage(newClassImageFile, user.uid, 'create');
       } catch (error) {
-        // Upload or URL retrieval failed, bail out
         setIsUploadingClassImage(false);
         return; 
       }
@@ -162,8 +206,7 @@ export default function ClassesPage() {
       teacherId: user.uid,
       teacherAvatar: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "T").charAt(0)}`,
       memberCount: 1,
-      thumbnailUrl: thumbnailUrl,
-      dataAiHint: dataAiHint,
+      ...imageDetails,
     };
     setClassrooms(prev => [newClass, ...prev]);
     toast({
@@ -174,6 +217,49 @@ export default function ClassesPage() {
     resetCreateClassDialog();
   };
 
+  const handleUpdateClass = async () => {
+    if (!editingClass || !editClassName.trim() || !editClassDescription.trim()) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Please provide a class name and description." });
+      return;
+    }
+    if (!user) {
+      toast({ variant: "destructive", title: "Authentication Error", description: "You must be logged in to update a class." });
+      return;
+    }
+
+    setIsUploadingEditClassImage(true);
+    let imageDetails = { thumbnailUrl: editingClass.thumbnailUrl, dataAiHint: editingClass.dataAiHint };
+
+    if (editClassImageFile) {
+      try {
+        imageDetails = await uploadImage(editClassImageFile, user.uid, 'edit');
+      } catch (error) {
+        setIsUploadingEditClassImage(false);
+        return;
+      }
+    }
+    
+    setClassrooms(prev => prev.map(cls => 
+      cls.id === editingClass.id 
+        ? { 
+            ...cls, 
+            name: editClassName, 
+            description: editClassDescription, 
+            thumbnailUrl: imageDetails.thumbnailUrl,
+            dataAiHint: imageDetails.dataAiHint,
+          } 
+        : cls
+    ));
+
+    toast({
+      title: "Class Updated!",
+      description: `"${editClassName}" has been successfully updated.`,
+    });
+    
+    resetEditClassDialog();
+  };
+
+
   const handleRequestToJoin = (className: string) => {
     toast({
       title: "Request Sent (Mock)",
@@ -181,11 +267,13 @@ export default function ClassesPage() {
     });
   };
 
-  const handleManageClass = (classId: string) => {
-    toast({
-      title: "Manage Class (Mock)",
-      description: `Navigating to management for class ID: ${classId}. This feature is in development.`,
-    });
+  const handleOpenEditDialog = (classToEdit: Classroom) => {
+    setEditingClass(classToEdit);
+    setEditClassName(classToEdit.name);
+    setEditClassDescription(classToEdit.description);
+    setEditClassImagePreview(classToEdit.thumbnailUrl); // Set initial preview
+    setEditClassImageFile(null); // Clear any previous file selection
+    setIsEditClassDialogOpen(true);
   };
   
   const handleViewClass = (classId: string) => {
@@ -194,17 +282,26 @@ export default function ClassesPage() {
         description: `Navigating to view class ID: ${classId}. This feature is in development.`,
     });
   };
+  
+  const handleManageMembers = (className: string) => {
+    toast({
+        title: "Manage Members (Mock)",
+        description: `Member management for "${className}" is a planned feature.`,
+    });
+  };
 
-  const visibleClassrooms = classrooms; // All classes are now considered "normal" and visible
 
-  // Clean up preview URL when dialog closes or component unmounts
+  // Clean up preview URL when dialogs close or component unmounts
   useEffect(() => {
     return () => {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(newClassImagePreview);
       }
+      if (editClassImagePreview && editClassImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(editClassImagePreview);
+      }
     };
-  }, [newClassImagePreview]);
+  }, [newClassImagePreview, editClassImagePreview]);
 
 
   return (
@@ -215,9 +312,7 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
-            if (!isOpen) { 
-                resetCreateClassDialog(); 
-            }
+            if (!isOpen) resetCreateClassDialog(); 
             setIsCreateClassDialogOpen(isOpen);
         }}>
           <DialogTrigger asChild>
@@ -242,8 +337,8 @@ export default function ClassesPage() {
                 <Textarea id="classDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="A brief overview of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingClassImage}/>
               </div>
                <div className="grid gap-2">
-                <Label htmlFor="classImage">Class Image (Optional, Max 5MB)</Label>
-                <Input id="classImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
+                <Label htmlFor="classImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
+                <Input id="classImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'create')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
                 {newClassImagePreview && (
                   <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
                     <Image src={newClassImagePreview} alt="Selected class image preview" layout="fill" objectFit="cover" />
@@ -264,7 +359,56 @@ export default function ClassesPage() {
         </Dialog>
       </div>
 
-      {visibleClassrooms.length === 0 ? (
+      {/* Edit Class Dialog */}
+      <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) resetEditClassDialog();
+          setIsEditClassDialogOpen(isOpen);
+      }}>
+        <DialogContent className="sm:max-w-[520px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Edit Classroom</DialogTitle>
+            <DialogDescription>
+              Update the details for your class: {editingClass?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+            <div className="grid gap-2">
+              <Label htmlFor="editClassName">Class Name</Label>
+              <Input id="editClassName" value={editClassName} onChange={(e) => setEditClassName(e.target.value)} placeholder="e.g., Math 101" className="rounded-lg" disabled={isUploadingEditClassImage}/>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editClassDescription">Description</Label>
+              <Textarea id="editClassDescription" value={editClassDescription} onChange={(e) => setEditClassDescription(e.target.value)} placeholder="A brief overview of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingEditClassImage}/>
+            </div>
+             <div className="grid gap-2">
+              <Label htmlFor="editClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
+              <Input id="editClassImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'edit')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingEditClassImage}/>
+              {editClassImagePreview && (
+                <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
+                  <Image src={editClassImagePreview} alt="Class image preview" layout="fill" objectFit="cover" />
+                </div>
+              )}
+            </div>
+             <div className="grid gap-2 pt-2">
+                <Button variant="outline" className="rounded-lg" onClick={() => handleManageMembers(editingClass?.name || 'this class')} disabled={isUploadingEditClassImage}>
+                    <Users className="mr-2 h-4 w-4" /> Manage Members (Mock)
+                </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-lg" disabled={isUploadingEditClassImage}>Cancel</Button>
+            </DialogClose>
+            <Button type="button" onClick={handleUpdateClass} className="btn-gel rounded-lg" disabled={isUploadingEditClassImage}>
+              {isUploadingEditClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isUploadingEditClassImage ? (editClassImageFile ? 'Uploading Image...' : 'Saving...') : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      {classrooms.length === 0 ? (
         <Card className="text-center py-12 rounded-xl shadow-lg border-border/50 flex-grow flex flex-col justify-center items-center">
           <CardHeader>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -279,7 +423,7 @@ export default function ClassesPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
-          {visibleClassrooms.map(classroom => (
+          {classrooms.map(classroom => (
             <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50">
               <div className="relative h-40 w-full">
                  <Image
@@ -309,7 +453,7 @@ export default function ClassesPage() {
                     <span className="flex items-center"><Users className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
                 </div>
                 {user && user.uid === classroom.teacherId ? (
-                    <Button onClick={() => handleManageClass(classroom.id)} className="w-full btn-gel rounded-lg text-sm">
+                    <Button onClick={() => handleOpenEditDialog(classroom)} className="w-full btn-gel rounded-lg text-sm">
                         <Edit className="mr-2 h-4 w-4" /> Manage Class
                     </Button>
                 ) : (
@@ -329,3 +473,5 @@ export default function ClassesPage() {
   );
 }
 
+
+    
