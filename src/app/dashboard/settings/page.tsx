@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Languages, Mic } from "lucide-react";
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Mic } from "lucide-react"; // Removed Languages icon
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -35,22 +35,7 @@ const SettingsSection = React.forwardRef<
 ));
 SettingsSection.displayName = "SettingsSection";
 
-
-const languageOptions = [
-  { value: "en-US", label: "English (US)" },
-  { value: "hi-IN", label: "Hindi (India)" },
-  { value: "es-ES", label: "Spanish (Spain)" },
-  { value: "fr-FR", label: "French (France)" },
-  { value: "de-DE", label: "German (Germany)" },
-  { value: "ja-JP", label: "Japanese (Japan)" },
-  { value: "ko-KR", label: "Korean (South Korea)" },
-];
-
-const ttsVoiceOptions = [
-  { value: "neutral", label: "Neutral" },
-  { value: "female", label: "Girl / Female" },
-  { value: "male", label: "Boy / Male" },
-];
+// Removed languageOptions and ttsVoiceOptions
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
@@ -60,16 +45,17 @@ export default function SettingsPage() {
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
   const recordingSettingsRef = useRef<HTMLDivElement>(null); 
-  const languageSettingsRef = useRef<HTMLDivElement>(null);
+  // const languageSettingsRef = useRef<HTMLDivElement>(null); // Removed
 
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
   const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#000000");
   const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
   const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
   
-  const [defaultSpokenLanguage, setDefaultSpokenLanguage] = useState<string>("en-US");
-  const [preferredTranslationLanguage, setPreferredTranslationLanguage] = useState<string>("en-US");
-  const [preferredTTSVoice, setPreferredTTSVoice] = useState<string>("neutral");
+  // Removed language and TTS states
+  // const [defaultSpokenLanguage, setDefaultSpokenLanguage] = useState<string>("en-US");
+  // const [preferredTranslationLanguage, setPreferredTranslationLanguage] = useState<string>("en-US");
+  // const [preferredTTSVoice, setPreferredTTSVoice] = useState<string>("neutral");
 
   useEffect(() => {
     // Camera filter
@@ -89,18 +75,7 @@ export default function SettingsPage() {
     if (storedShapeRecognition) setEnableShapeRecognition(storedShapeRecognition === 'true');
     else localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(true));
 
-    // Language & Translation
-    const storedSpokenLang = localStorage.getItem("teachmeet-default-spoken-language");
-    if (storedSpokenLang) setDefaultSpokenLanguage(storedSpokenLang);
-    else localStorage.setItem("teachmeet-default-spoken-language", "en-US");
-
-    const storedTranslationLang = localStorage.getItem("teachmeet-preferred-translation-language");
-    if (storedTranslationLang) setPreferredTranslationLanguage(storedTranslationLang);
-    else localStorage.setItem("teachmeet-preferred-translation-language", "en-US");
-
-    const storedTTSVoice = localStorage.getItem("teachmeet-preferred-tts-voice");
-    if (storedTTSVoice) setPreferredTTSVoice(storedTTSVoice);
-    else localStorage.setItem("teachmeet-preferred-tts-voice", "neutral");
+    // Removed loading of language and TTS settings from localStorage
 
   }, []);
 
@@ -146,31 +121,7 @@ export default function SettingsPage() {
     });
   };
 
-  const handleLanguageSettingChange = (type: 'spoken' | 'translation' | 'ttsVoice', value: string) => {
-    let key = '';
-    let setter: React.Dispatch<React.SetStateAction<string>> | null = null;
-    let title = '';
-
-    if (type === 'spoken') {
-      key = "teachmeet-default-spoken-language";
-      setter = setDefaultSpokenLanguage;
-      title = "Default Spoken Language Updated";
-    } else if (type === 'translation') {
-      key = "teachmeet-preferred-translation-language";
-      setter = setPreferredTranslationLanguage;
-      title = "Preferred Translation Language Updated";
-    } else if (type === 'ttsVoice') {
-      key = "teachmeet-preferred-tts-voice";
-      setter = setPreferredTTSVoice;
-      title = "Preferred TTS Voice Updated";
-    }
-
-    if (key && setter) {
-      setter(value);
-      localStorage.setItem(key, value);
-      toast({ title, description: `Your preference has been saved.` });
-    }
-  };
+  // Removed handleLanguageSettingChange function
   
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
@@ -180,7 +131,7 @@ export default function SettingsPage() {
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
         recordingSettings: recordingSettingsRef,
-        languageSettings: languageSettingsRef,
+        // languageSettings: languageSettingsRef, // Removed
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -190,7 +141,6 @@ export default function SettingsPage() {
       
       const timer = setTimeout(() => {
         setHighlightedSectionId(null);
-         // Clean URL by removing highlight param
         const current = new URL(window.location.toString());
         current.searchParams.delete('highlight');
         router.replace(current.pathname + current.search, { scroll: false });
@@ -228,14 +178,7 @@ export default function SettingsPage() {
             <Clapperboard className="mr-2 h-5 w-5" />
             Recording Settings
           </Button>
-           <Button 
-            variant="outline" 
-            className="rounded-lg justify-start text-left py-3" 
-            onClick={() => handleNavigateToSection('languageSettings')}
-          >
-            <Languages className="mr-2 h-5 w-5" />
-            Language & Translation
-          </Button>
+           {/* Removed Language & Translation quick nav button */}
         </div>
       </SettingsSection>
 
@@ -305,61 +248,7 @@ export default function SettingsPage() {
         <Button className="mt-6 btn-gel rounded-lg">Save Recording Settings</Button>
       </SettingsSection>
       
-      <SettingsSection 
-        id="languageSettings"
-        ref={languageSettingsRef}
-        title="Language & Translation Settings" 
-        description="Set your default languages for communication and translation." 
-        icon={Languages}
-        className={highlightedSectionId === 'languageSettings' ? 'highlight-blink' : ''}
-      >
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="defaultSpokenLanguageSelect">My Default Spoken Language</Label>
-            <Select value={defaultSpokenLanguage} onValueChange={(value) => handleLanguageSettingChange('spoken', value)}>
-              <SelectTrigger id="defaultSpokenLanguageSelect" className="w-full mt-1 rounded-lg">
-                <SelectValue placeholder="Select your spoken language" />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                {languageOptions.map(lang => (
-                  <SelectItem key={lang.value} value={lang.value} className="rounded-md">{lang.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">This language will be assumed as your input for translation features.</p>
-          </div>
-          <div>
-            <Label htmlFor="preferredTranslationLangSelect">My Preferred Translation Target Language</Label>
-            <Select value={preferredTranslationLanguage} onValueChange={(value) => handleLanguageSettingChange('translation', value)}>
-              <SelectTrigger id="preferredTranslationLangSelect" className="w-full mt-1 rounded-lg">
-                <SelectValue placeholder="Select preferred translation language" />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                {languageOptions.map(lang => (
-                  <SelectItem key={lang.value} value={lang.value} className="rounded-md">{lang.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-             <p className="text-xs text-muted-foreground mt-1">Translated text will default to this language.</p>
-          </div>
-           <div>
-            <Label htmlFor="preferredTTSVoiceSelect">Preferred Voice for Translated Audio</Label>
-            <Select value={preferredTTSVoice} onValueChange={(value) => handleLanguageSettingChange('ttsVoice', value)}>
-              <SelectTrigger id="preferredTTSVoiceSelect" className="w-full mt-1 rounded-lg">
-                <SelectValue placeholder="Select preferred voice" />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                {ttsVoiceOptions.map(voice => (
-                  <SelectItem key={voice.value} value={voice.value} className="rounded-md">{voice.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-             <p className="text-xs text-muted-foreground mt-1">Choose the default voice type for spoken translations.</p>
-          </div>
-        </div>
-        {/* No explicit save button needed as changes are saved on select via localStorage */}
-      </SettingsSection>
-
+      {/* Removed Language & Translation Settings Section */}
 
       <SettingsSection title="Notifications" description="Control how you receive notifications." icon={Bell} id="notifications">
         <div className="space-y-4">

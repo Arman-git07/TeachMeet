@@ -35,7 +35,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TranslateAndSpeakDialogContent } from '@/components/meeting/TranslateAndSpeakDialogContent';
+// import { TranslateAndSpeakDialogContent } from '@/components/meeting/TranslateAndSpeakDialogContent';
 
 
 import {
@@ -58,7 +58,7 @@ import {
   StopCircle,
   Loader2,
   Share2,
-  Languages,
+  // Languages, // Removed as TranslateAndSpeakDialog is removed
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -238,7 +238,7 @@ export default function MeetingPage() {
   const localAudioStreamRef = useRef<MediaStream | null>(null);
   const currentLocalStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
-  const audioPlayerRef = useRef<HTMLAudioElement>(null); // For playing synthesized audio
+  // const audioPlayerRef = useRef<HTMLAudioElement>(null); // For playing synthesized audio - Removed
 
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
@@ -246,7 +246,7 @@ export default function MeetingPage() {
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-  const [isTranslateAndSpeakDialogOpen, setIsTranslateAndSpeakDialogOpen] = useState(false);
+  // const [isTranslateAndSpeakDialogOpen, setIsTranslateAndSpeakDialogOpen] = useState(false); // Removed
 
 
   const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
@@ -903,7 +903,7 @@ export default function MeetingPage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <audio ref={audioPlayerRef} className="hidden" />
+      {/* <audio ref={audioPlayerRef} className="hidden" /> Removed audio player */}
       
       <main className="flex-1 p-4 flex flex-col">
         {hasCameraPermission === false && !isScreenSharingActive && (
@@ -990,6 +990,7 @@ export default function MeetingPage() {
             {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
           </Button>
           
+          {/* Removed TranslateAndSpeakDialog Trigger
           <Dialog open={isTranslateAndSpeakDialogOpen} onOpenChange={setIsTranslateAndSpeakDialogOpen}>
             <DialogTrigger asChild>
               <Button
@@ -1005,6 +1006,7 @@ export default function MeetingPage() {
               <TranslateAndSpeakDialogContent audioPlayerRef={audioPlayerRef} />
             </DialogContent>
           </Dialog>
+          */}
 
            <Button
             size="lg"
