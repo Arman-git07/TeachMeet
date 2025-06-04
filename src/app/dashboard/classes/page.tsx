@@ -10,12 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { PlusCircle, Users, Eye, Lock, Edit, ArrowRight, UploadCloud, Loader2 } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
-import { Badge } from '@/components/ui/badge';
 import { storage } from '@/lib/firebase'; // Import Firebase storage
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
@@ -28,15 +26,14 @@ interface Classroom {
   description: string;
   memberCount: number;
   thumbnailUrl: string; // Can be custom upload URL or placeholder
-  isPublic: boolean;
   dataAiHint?: string; // Relevant if thumbnailUrl is a placeholder
 }
 
 const initialMockClassrooms: Classroom[] = [
-  { id: "cl1", name: "Introduction to Quantum Physics", teacherName: "Dr. Evelyn Reed", teacherId: "teacher1_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=ER`, description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", memberCount: 25, thumbnailUrl: `https://placehold.co/600x400.png`, isPublic: true, dataAiHint: "science education" },
-  { id: "cl2", name: "Advanced JavaScript Techniques", teacherName: "Mr. Kenji Tanaka", teacherId: "teacher2_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=KT`, description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, isPublic: true, dataAiHint: "programming code" },
-  { id: "cl3", name: "Creative Writing Workshop", teacherName: "Ms. Aisha Khan", teacherId: "teacher3_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=AK`, description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", memberCount: 12, thumbnailUrl: `https://placehold.co/600x400.png`, isPublic: true, dataAiHint: "writing books" },
-  { id: "cl4", name: "Beginner's Yoga & Mindfulness", teacherName: "Sara Chen", teacherId: "user1_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=SC`, description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", memberCount: 30, thumbnailUrl: `https://placehold.co/600x400.png`, isPublic: false, dataAiHint: "yoga meditation" },
+  { id: "cl1", name: "Introduction to Quantum Physics", teacherName: "Dr. Evelyn Reed", teacherId: "teacher1_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=ER`, description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", memberCount: 25, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
+  { id: "cl2", name: "Advanced JavaScript Techniques", teacherName: "Mr. Kenji Tanaka", teacherId: "teacher2_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=KT`, description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
+  { id: "cl3", name: "Creative Writing Workshop", teacherName: "Ms. Aisha Khan", teacherId: "teacher3_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=AK`, description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", memberCount: 12, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
+  { id: "cl4", name: "Beginner's Yoga & Mindfulness", teacherName: "Sara Chen", teacherId: "user1_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=SC`, description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", memberCount: 30, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "yoga meditation" },
 ];
 
 const MAX_IMAGE_SIZE_MB = 5;
@@ -50,7 +47,6 @@ export default function ClassesPage() {
 
   const [newClassName, setNewClassName] = useState('');
   const [newClassDescription, setNewClassDescription] = useState('');
-  const [newClassIsPublic, setNewClassIsPublic] = useState(true);
   const [newClassImageFile, setNewClassImageFile] = useState<File | null>(null);
   const [newClassImagePreview, setNewClassImagePreview] = useState<string | null>(null);
   const [isUploadingClassImage, setIsUploadingClassImage] = useState(false);
@@ -80,7 +76,6 @@ export default function ClassesPage() {
   const resetCreateClassDialog = () => {
     setNewClassName('');
     setNewClassDescription('');
-    setNewClassIsPublic(true);
     setNewClassImageFile(null);
     setNewClassImagePreview(null);
     setIsUploadingClassImage(false);
@@ -167,7 +162,6 @@ export default function ClassesPage() {
       teacherId: user.uid,
       teacherAvatar: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "T").charAt(0)}`,
       memberCount: 1,
-      isPublic: newClassIsPublic,
       thumbnailUrl: thumbnailUrl,
       dataAiHint: dataAiHint,
     };
@@ -201,7 +195,7 @@ export default function ClassesPage() {
     });
   };
 
-  const visibleClassrooms = classrooms.filter(c => c.isPublic || (user && c.teacherId === user.uid));
+  const visibleClassrooms = classrooms; // All classes are now considered "normal" and visible
 
   // Clean up preview URL when dialog closes or component unmounts
   useEffect(() => {
@@ -221,8 +215,8 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
-            if (!isOpen) { // If dialog is closing
-                resetCreateClassDialog(); // Reset fields only when closing explicitly
+            if (!isOpen) { 
+                resetCreateClassDialog(); 
             }
             setIsCreateClassDialogOpen(isOpen);
         }}>
@@ -256,20 +250,6 @@ export default function ClassesPage() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center justify-between space-x-2 pt-2">
-                <Label htmlFor="classIsPublic" className="flex flex-col space-y-1">
-                  <span>Publicly Listed</span>
-                  <span className="font-normal leading-snug text-muted-foreground text-xs">
-                    Allow anyone to see this class in the list. Joining may still require approval.
-                  </span>
-                </Label>
-                <Switch
-                  id="classIsPublic"
-                  checked={newClassIsPublic}
-                  onCheckedChange={setNewClassIsPublic}
-                  disabled={isUploadingClassImage}
-                />
-              </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
@@ -289,11 +269,11 @@ export default function ClassesPage() {
           <CardHeader>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <CardTitle className="text-2xl">No Classes Available</CardTitle>
-            <CardDescription>There are no public classes listed right now, or you haven't created any.</CardDescription>
+            <CardDescription>There are no classes listed right now. Be the first to create one!</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => setIsCreateClassDialogOpen(true)} size="lg" className="btn-gel rounded-lg">
-              Be the First to Create a Class!
+              Create a Class
             </Button>
           </CardContent>
         </Card>
@@ -303,24 +283,13 @@ export default function ClassesPage() {
             <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50">
               <div className="relative h-40 w-full">
                  <Image
-                    src={classroom.thumbnailUrl} // Directly use thumbnailUrl
+                    src={classroom.thumbnailUrl}
                     alt={classroom.name}
                     layout="fill"
                     objectFit="cover"
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
                     data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') ? classroom.dataAiHint || "education classroom" : undefined}
                  />
-                 <div className="absolute top-2 right-2">
-                    {classroom.isPublic ? (
-                        <Badge variant="secondary" className="bg-accent/80 text-accent-foreground backdrop-blur-sm rounded-full text-xs">
-                            <Eye className="mr-1.5 h-3 w-3" /> Public
-                        </Badge>
-                    ) : (
-                        <Badge variant="default" className="bg-primary/80 text-primary-foreground backdrop-blur-sm rounded-full text-xs">
-                            <Lock className="mr-1.5 h-3 w-3" /> Private
-                        </Badge>
-                    )}
-                 </div>
               </div>
               <CardHeader className="pb-2 pt-4">
                 <CardTitle className="text-lg truncate leading-tight" title={classroom.name}>{classroom.name}</CardTitle>
