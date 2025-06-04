@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,7 +15,7 @@ import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save } from 
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
-import { storage } from '@/lib/firebase'; // Import Firebase storage
+import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 interface Classroom {
@@ -25,8 +26,8 @@ interface Classroom {
   teacherAvatar?: string;
   description: string;
   memberCount: number;
-  thumbnailUrl: string; 
-  dataAiHint?: string; 
+  thumbnailUrl: string;
+  dataAiHint?: string;
 }
 
 const initialMockClassrooms: Classroom[] = [
@@ -42,8 +43,9 @@ const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 export default function ClassesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [classrooms, setClassrooms] = useState<Classroom[]>(initialMockClassrooms);
-  
+
   // Create Class Dialog State
   const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
@@ -71,10 +73,9 @@ export default function ClassesPage() {
           setNewClassImagePreview(null);
         } else {
           setEditClassImageFile(null);
-          // Revert to original image if new one is too large
           setEditClassImagePreview(editingClass?.thumbnailUrl || null);
         }
-        event.target.value = ""; 
+        event.target.value = "";
         return;
       }
       const reader = new FileReader();
@@ -94,12 +95,11 @@ export default function ClassesPage() {
         setNewClassImagePreview(null);
       } else {
         setEditClassImageFile(null);
-        // Revert to original image on clearing selection
         setEditClassImagePreview(editingClass?.thumbnailUrl || null);
       }
     }
   };
-  
+
   const resetCreateClassDialog = () => {
     setNewClassName('');
     setNewClassDescription('');
@@ -121,23 +121,22 @@ export default function ClassesPage() {
     setIsEditClassDialogOpen(false);
   };
 
-  const uploadImage = async (imageFile: File, userId: string, currentImageUrl?: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
+  const uploadImage = async (imageFile: File, userId: string, type: 'create' | 'edit'): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
     setIsUploadingClassImage(type === 'create');
     setIsUploadingEditClassImage(type === 'edit');
 
     const imageFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
     const imagePath = `class_thumbnails/${userId}/${imageFileName}`;
     const imageFileRef = storageRef(storage, imagePath);
-    
+
     const toastId = `upload-class-image-${Date.now()}`;
-    const type = currentImageUrl ? 'edit' : 'create'; // Determine context for toast
     const toastTitle = type === 'create' ? "Uploading Class Image..." : "Uploading New Class Image...";
 
-    toast({ 
+    toast({
         id: toastId,
         title: toastTitle,
         description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Starting upload of {imageFile.name}. (0%)</span></div>,
-        duration: Infinity, 
+        duration: Infinity,
     });
 
     return new Promise((resolve, reject) => {
@@ -194,7 +193,7 @@ export default function ClassesPage() {
         imageDetails = await uploadImage(newClassImageFile, user.uid, 'create');
       } catch (error) {
         setIsUploadingClassImage(false);
-        return; 
+        return;
       }
     }
 
@@ -213,7 +212,7 @@ export default function ClassesPage() {
       title: "Class Created!",
       description: `"${newClassName}" has been successfully created.`,
     });
-    
+
     resetCreateClassDialog();
   };
 
@@ -238,16 +237,16 @@ export default function ClassesPage() {
         return;
       }
     }
-    
-    setClassrooms(prev => prev.map(cls => 
-      cls.id === editingClass.id 
-        ? { 
-            ...cls, 
-            name: editClassName, 
-            description: editClassDescription, 
+
+    setClassrooms(prev => prev.map(cls =>
+      cls.id === editingClass.id
+        ? {
+            ...cls,
+            name: editClassName,
+            description: editClassDescription,
             thumbnailUrl: imageDetails.thumbnailUrl,
             dataAiHint: imageDetails.dataAiHint,
-          } 
+          }
         : cls
     ));
 
@@ -255,7 +254,7 @@ export default function ClassesPage() {
       title: "Class Updated!",
       description: `"${editClassName}" has been successfully updated.`,
     });
-    
+
     resetEditClassDialog();
   };
 
@@ -271,18 +270,15 @@ export default function ClassesPage() {
     setEditingClass(classToEdit);
     setEditClassName(classToEdit.name);
     setEditClassDescription(classToEdit.description);
-    setEditClassImagePreview(classToEdit.thumbnailUrl); // Set initial preview
-    setEditClassImageFile(null); // Clear any previous file selection
+    setEditClassImagePreview(classToEdit.thumbnailUrl);
+    setEditClassImageFile(null);
     setIsEditClassDialogOpen(true);
   };
-  
-  const handleViewClass = (classId: string) => {
-    toast({
-        title: "View Class (Mock)",
-        description: `Navigating to view class ID: ${classId}. This feature is in development.`,
-    });
+
+  const handleViewClass = (classId: string, className: string) => {
+    router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
   };
-  
+
   const handleManageMembers = (className: string) => {
     toast({
         title: "Manage Members (Mock)",
@@ -290,8 +286,6 @@ export default function ClassesPage() {
     });
   };
 
-
-  // Clean up preview URL when dialogs close or component unmounts
   useEffect(() => {
     return () => {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
@@ -312,7 +306,7 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
-            if (!isOpen) resetCreateClassDialog(); 
+            if (!isOpen) resetCreateClassDialog();
             setIsCreateClassDialogOpen(isOpen);
         }}>
           <DialogTrigger asChild>
@@ -359,7 +353,6 @@ export default function ClassesPage() {
         </Dialog>
       </div>
 
-      {/* Edit Class Dialog */}
       <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) resetEditClassDialog();
           setIsEditClassDialogOpen(isOpen);
@@ -461,7 +454,7 @@ export default function ClassesPage() {
                          <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
                     </Button>
                 )}
-                 <Button onClick={() => handleViewClass(classroom.id)} variant="outline" className="w-full rounded-lg text-sm">
+                 <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
                     View Details
                 </Button>
               </CardFooter>
@@ -472,6 +465,4 @@ export default function ClassesPage() {
     </div>
   );
 }
-
-
     
