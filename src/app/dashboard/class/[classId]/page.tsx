@@ -49,6 +49,7 @@ interface ClassroomDetails {
   thumbnailUrl: string;
   announcements?: Announcement[];
   schedule?: { day: string; time: string }[];
+  scheduleLastUpdated?: string; // Added for schedule update date
   assignments?: Assignment[];
   materials?: Material[];
   feeDetails?: { totalFee: number; paidAmount: number; nextDueDate?: string };
@@ -79,6 +80,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       { day: "Wednesday", time: "10:00 AM - 11:00 AM (Lab)" },
       { day: "Friday", time: "01:00 PM - 02:00 PM (Discussion)" },
     ],
+    scheduleLastUpdated: "2024-07-28", // Mock date for schedule update
     assignments: [
       { id: "assign1", title: "Introduction Essay", dueDate: "2024-08-10", status: "Graded", description: "A 500-word essay about your motivations for taking this course." },
       { id: "assign2", title: "Chapter 1 Problem Set", dueDate: "2024-08-17", status: "Pending", description: "Complete all odd-numbered problems from Chapter 1." },
@@ -331,6 +333,13 @@ export default function ClassDetailsPage() {
                   </div>
                 )) : <p className="text-muted-foreground">Schedule not available.</p>}
               </CardContent>
+              {classroom.scheduleLastUpdated && (
+                <CardFooter className="border-t pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Schedule last updated: {new Date(classroom.scheduleLastUpdated).toLocaleDateString()}
+                  </p>
+                </CardFooter>
+              )}
             </Card>
           </div>
 
