@@ -12,6 +12,8 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 interface Announcement {
   title: string;
@@ -40,6 +42,7 @@ interface ClassroomDetails {
   id: string;
   name: string;
   description: string;
+  teacherId?: string; // Added teacherId
   teacherName: string;
   teacherAvatar?: string;
   memberCount: number;
@@ -54,10 +57,15 @@ interface ClassroomDetails {
 const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): ClassroomDetails | null => {
   if (!id) return null;
   const className = nameQueryParam || `Class ${id}`;
+  // Assign a default teacherId. This will be overridden for cl1 if a user is logged in.
+  let baseTeacherId = `teacher_mock_uid_for_${id}`;
+  if (id === "cl1") baseTeacherId = "dr_ada_lovelace_uid"; // Specific default for cl1
+
   return {
     id: id,
     name: className,
     description: `This is a detailed description for ${className}. It covers various topics and learning objectives. Students will engage in interactive sessions, collaborative projects, and access shared materials.`,
+    teacherId: baseTeacherId, // Default mock teacherId
     teacherName: "Dr. Ada Lovelace",
     teacherAvatar: `https://placehold.co/40x40.png?text=AL`,
     memberCount: Math.floor(Math.random() * 25) + 10,
@@ -113,6 +121,8 @@ export default function ClassDetailsPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth(); // Get current user
+  const { toast } = useToast(); // Get toast function
   const classId = params.classId as string;
   const classNameQuery = searchParams.get('name');
 
@@ -120,17 +130,26 @@ export default function ClassDetailsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (classId) {
+    if (classId && !authLoading) { // Ensure auth state is resolved
       setLoading(true);
       setTimeout(() => {
         const details = getMockClassroomDetails(classId, classNameQuery);
+        if (details && user) {
+          // For demonstration: if classId is "cl1", make current user the teacher of this mock class
+          if (details.id === 'cl1') {
+            details.teacherId = user.uid;
+            details.teacherName = user.displayName || "Current User (Teacher)";
+            const initials = (user.displayName || "CU").split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+            details.teacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${initials}`;
+          }
+        }
         setClassroom(details);
         setLoading(false);
       }, 500);
-    } else {
+    } else if (!classId) {
       setLoading(false);
     }
-  }, [classId, classNameQuery]);
+  }, [classId, classNameQuery, user, authLoading]);
 
   const handleJoinDiscussion = () => {
     if (classroom) {
@@ -139,13 +158,30 @@ export default function ClassDetailsPage() {
   };
 
   const handleStartClassMeeting = () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "You need to be signed in to start or join a meeting.",
+      });
+      return;
+    }
     if (classroom) {
-      // Use classId as meetingId and className as topic
-      router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
+      // Mock check: Only the designated teacher of this class can start/join directly this way.
+      // In a real app, you'd also check if the user is a registered member.
+      if (user.uid === classroom.teacherId) {
+        router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Access Denied",
+          description: "Only the class teacher or registered members can start/join this meeting directly. Please wait for the teacher to start the meeting or provide a join link.",
+        });
+      }
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) { // Consider authLoading as well
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <Card className="w-full max-w-4xl p-8 rounded-xl shadow-xl border-border/50">
@@ -343,4 +379,6 @@ export default function ClassDetailsPage() {
     </div>
   );
 }
+    
+
     
