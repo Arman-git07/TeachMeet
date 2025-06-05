@@ -2,16 +2,14 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Users, MessageSquare as MessageSquareIcon } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare as MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation"; // Added useParams
 import { useState, useEffect, use, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"; // Removed CardDescription, CardTitle
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -21,10 +19,11 @@ interface ChatMessage {
   text: string;
   timestamp: Date;
   isMe: boolean;
+  isSystem?: boolean; // Added to differentiate system messages
 }
 
 export default function ClassChatPage({ params: paramsPromise }: { params: Promise<{ classId: string }> }) {
-  const resolvedParams = use(paramsPromise);
+  const resolvedParams = use(paramsPromise); // Use `use` hook for promises
   const { classId } = resolvedParams;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,11 +33,18 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
   const [inputValue, setInputValue] = useState("");
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // Initial system message
     setMessages([
-      { id: 'sys_join', senderName: 'System', text: `Welcome to the chat for ${className}.`, timestamp: new Date(), isMe: false }
+      { 
+        id: 'sys_join', 
+        senderName: 'System', 
+        text: `Welcome to the chat for "${className}". This is a public discussion forum for all class members.`, 
+        timestamp: new Date(), 
+        isMe: false,
+        isSystem: true 
+      }
     ]);
   }, [className]);
 
@@ -48,15 +54,23 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
     }
   }, [messages]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; // Reset height
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // Set to scroll height
+    }
+  }, [inputValue]);
+
+
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
-      senderName: 'You', // In a real app, get from auth.currentUser.displayName
-      text: inputValue,
+      senderName: 'You', 
+      text: inputValue.trim(),
       timestamp: new Date(),
       isMe: true,
-      // senderAvatar: auth.currentUser.photoURL || undefined // Example
+      // In a real app, fetch senderAvatar from auth user: auth.currentUser.photoURL || undefined
     };
     setMessages(prev => [...prev, newMessage]);
     setInputValue("");
@@ -66,12 +80,13 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
       const mockResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         senderName: 'Classmate AI (Mock)',
-        text: `Thinking about: "${newMessage.text.substring(0,30)}${newMessage.text.length > 30 ? '...' : ''}"`,
+        text: `Acknowledged your message: "${newMessage.text.substring(0,25)}${newMessage.text.length > 25 ? '...' : ''}"`,
         timestamp: new Date(),
         isMe: false,
+        senderAvatar: `https://placehold.co/40x40/FFD700/000000.png?text=AI` // Example AI avatar
       };
       setMessages(prev => [...prev, mockResponse]);
-    }, 1000 + Math.random() * 1000);
+    }, 1200 + Math.random() * 800);
   };
   
   const backToClassDetailsLink = `/dashboard/class/${classId}?name=${encodeURIComponent(className)}`;
@@ -80,28 +95,29 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
     <div className="flex flex-col h-screen bg-muted/30">
       <header className="flex-none p-3 border-b bg-background shadow-sm sticky top-0 z-20">
         <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <MessageSquareIcon className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground truncate" title={className}>
-              {className}
-            </h1>
-            <span className="text-sm text-muted-foreground"> (Class ID: {classId})</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <MessageSquareIcon className="h-7 w-7 text-primary flex-shrink-0" />
+            <div className="flex-grow min-w-0">
+              <h1 className="text-xl font-semibold text-foreground truncate" title={className}>
+                {className}
+              </h1>
+              <p className="text-xs text-muted-foreground">Class ID: {classId}</p>
+            </div>
           </div>
           <Link href={backToClassDetailsLink} passHref legacyBehavior>
-            <Button variant="outline" className="rounded-lg">
+            <Button variant="outline" className="rounded-lg flex-shrink-0">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Class Details
+              Back to Class
             </Button>
           </Link>
         </div>
       </header>
 
-      {/* Simplified: No tabs for now, just one public chat room */}
-      <main className="flex-grow flex flex-col overflow-hidden pt-[65px]"> {/* Adjust pt if header height changes */}
+      <main className="flex-grow flex flex-col overflow-hidden pt-[calc(65px+8px)]"> {/* Adjusted pt for header height + a bit of space */}
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
-              {messages.length === 0 ? (
+              {messages.length === 0 && !messages.some(m => m.isSystem) ? ( // Check if only system messages are not there
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <MessageSquareIcon className="w-16 h-16 mb-4" />
                   <p className="text-lg">No messages yet.</p>
@@ -110,6 +126,13 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
               ) : (
                 <div className="space-y-4">
                   {messages.map((msg) => (
+                    msg.isSystem ? (
+                      <div key={msg.id} className="text-center my-3">
+                        <span className="text-xs text-muted-foreground italic bg-muted/60 px-3 py-1 rounded-full">
+                          {msg.text}
+                        </span>
+                      </div>
+                    ) : (
                     <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
                       {!msg.isMe && (
                         <Avatar className="h-8 w-8 self-start">
@@ -122,23 +145,21 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
                           "max-w-[70%] p-3 rounded-xl shadow",
                           msg.isMe
                             ? "bg-primary text-primary-foreground rounded-br-none"
-                            : (msg.sender === 'System' 
-                                ? "bg-muted/80 text-muted-foreground text-xs italic text-center w-full rounded-md" 
-                                : "bg-card text-card-foreground rounded-bl-none")
+                            : "bg-card text-card-foreground rounded-bl-none"
                         )}
                       >
-                        {!msg.isMe && msg.sender !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                        {!msg.isMe && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
                         <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                        {msg.sender !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                        <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </div>
                       {msg.isMe && (
                         <Avatar className="h-8 w-8 self-start">
-                           <AvatarImage src={`https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
+                           <AvatarImage src={`https://placehold.co/40x40/7F00FF/FFFFFF.png?text=Y`} alt="You" data-ai-hint="avatar user"/> {/* Changed avatar color for "You" */}
                           <AvatarFallback>Y</AvatarFallback>
                         </Avatar>
                       )}
                     </div>
-                  ))}
+                  )))}
                 </div>
               )}
             </ScrollArea>
@@ -149,13 +170,14 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
                 e.preventDefault();
                 handleSendMessage();
               }}
-              className="flex w-full items-center gap-2"
+              className="flex w-full items-end gap-2" // items-end for better alignment with growing textarea
             >
               <Textarea
+                ref={textareaRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder={"Type your message..."}
-                className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px]"
+                className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px] resize-none overflow-y-auto" // Added resize-none and overflow-y-auto
                 rows={1}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -164,7 +186,7 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
                   }
                 }}
               />
-              <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
+              <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10 self-end" disabled={!inputValue.trim()}> {/* self-end */}
                 <Send className="h-5 w-5" />
                 <span className="sr-only">Send message</span>
               </Button>
@@ -173,8 +195,9 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
         </Card>
       </main>
        <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-        TeachMeet Class Chat - This is a local mock-up. Messages are not sent to a server.
+        TeachMeet Class Chat - Messages are local and not sent to a server.
       </footer>
     </div>
   );
 }
+
