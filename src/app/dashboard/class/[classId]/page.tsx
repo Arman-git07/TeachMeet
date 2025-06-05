@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
-    Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info 
+    Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info, Video
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -138,6 +138,13 @@ export default function ClassDetailsPage() {
     }
   };
 
+  const handleStartClassMeeting = () => {
+    if (classroom) {
+      // Use classId as meetingId and className as topic
+      router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
@@ -183,6 +190,9 @@ export default function ClassDetailsPage() {
       <div className="flex items-center justify-between mb-6">
         <Button onClick={() => router.push('/dashboard/classes')} variant="outline" className="rounded-lg">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Classes
+        </Button>
+        <Button onClick={handleStartClassMeeting} variant="default" size="lg" className="btn-gel rounded-lg">
+          <Video className="mr-2 h-5 w-5" /> Start/Join Class Meeting
         </Button>
       </div>
 

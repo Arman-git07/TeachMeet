@@ -35,7 +35,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Skeleton } from '@/components/ui/skeleton';
-// import { TranslateAndSpeakDialogContent } from '@/components/meeting/TranslateAndSpeakDialogContent';
 
 
 import {
@@ -58,14 +57,13 @@ import {
   StopCircle,
   Loader2,
   Share2,
-  // Languages, // Removed as TranslateAndSpeakDialog is removed
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc } from 'firebase/firestore';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 
@@ -238,7 +236,6 @@ export default function MeetingPage() {
   const localAudioStreamRef = useRef<MediaStream | null>(null);
   const currentLocalStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
-  // const audioPlayerRef = useRef<HTMLAudioElement>(null); // For playing synthesized audio - Removed
 
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
@@ -246,7 +243,6 @@ export default function MeetingPage() {
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-  // const [isTranslateAndSpeakDialogOpen, setIsTranslateAndSpeakDialogOpen] = useState(false); // Removed
 
 
   const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
@@ -425,47 +421,64 @@ export default function MeetingPage() {
       return;
     }
 
-    if (joinStatus === 'pending') {
+    const joinMeetingRoom = async () => {
       setJoinStatus('joining');
       console.log(`[MeetingPage] User ${currentUser.uid} attempting to join meeting ${meetingId}. Status: joining`);
 
-      const initialCameraOffFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
-      const initialMicMutedFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') === 'off' : false;
-      console.log(`[MeetingPage] Initial camera off from storage for Firestore: ${initialCameraOffFromStorage}`);
-      console.log(`[MeetingPage] Initial mic muted from storage for Firestore: ${initialMicMutedFromStorage}`);
+      const meetingDocRef = doc(db, "meetings", meetingId);
+      const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
 
-
-      const participantData = {
-        userId: currentUser.uid,
-        name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
-        photoURL: currentUser.photoURL,
-        isMicMuted: initialMicMutedFromStorage,
-        isCameraOff: initialCameraOffFromStorage,
-        isHandRaised: false,
-        isScreenSharing: false,
-        joinedAt: serverTimestamp(),
-      };
-
-      const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
-      console.log("[MeetingPage] Participant data to write to Firestore:", participantData);
-
-      setDoc(userDocRef, participantData, { merge: true })
-        .then(() => {
-          console.log("[MeetingPage] Successfully added/updated self in participant list in Firestore.");
-          setJoinStatus('joined');
-        })
-        .catch(error => {
-          console.error("[MeetingPage] CRITICAL: Failed to add self to participant list in Firestore:", error);
-          toast({
-            variant: "destructive",
-            title: "Failed to Register in Meeting Room",
-            description: `Could not register your presence: ${error.message}. Check console & Firestore rules.`,
-            duration: 10000,
+      try {
+        // Check if the main meeting document exists, create if not (e.g., for class meetings)
+        const meetingDocSnap = await getDoc(meetingDocRef);
+        if (!meetingDocSnap.exists()) {
+          console.log(`[MeetingPage] Main meeting document for ${meetingId} does not exist. Creating it.`);
+          const meetingTopicFromURL = searchParamsHook.get('topic') || `Meeting ${meetingId}`;
+          await setDoc(meetingDocRef, {
+            creatorId: currentUser.uid, // The first one to join effectively creates it
+            topic: meetingTopicFromURL,
+            createdAt: serverTimestamp(),
           });
-          setJoinStatus('failed');
+          console.log(`[MeetingPage] Successfully created main meeting document for ${meetingId}.`);
+        } else {
+          console.log(`[MeetingPage] Main meeting document for ${meetingId} already exists.`);
+        }
+
+        const initialCameraOffFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
+        const initialMicMutedFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') === 'off' : false;
+        
+        const participantData = {
+          userId: currentUser.uid,
+          name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
+          photoURL: currentUser.photoURL,
+          isMicMuted: initialMicMutedFromStorage,
+          isCameraOff: initialCameraOffFromStorage,
+          isHandRaised: false,
+          isScreenSharing: false,
+          joinedAt: serverTimestamp(),
+        };
+
+        console.log("[MeetingPage] Participant data to write to Firestore:", participantData);
+        await setDoc(participantDocRef, participantData, { merge: true });
+        console.log("[MeetingPage] Successfully added/updated self in participant list in Firestore.");
+        setJoinStatus('joined');
+
+      } catch (error) {
+        console.error("[MeetingPage] CRITICAL: Failed to ensure meeting document or add participant:", error);
+        toast({
+          variant: "destructive",
+          title: "Failed to Register in Meeting Room",
+          description: `Could not register your presence: ${(error as Error).message}. Check console & Firestore rules.`,
+          duration: 10000,
         });
+        setJoinStatus('failed');
+      }
+    };
+
+    if (joinStatus === 'pending') {
+      joinMeetingRoom();
     }
-  }, [currentUser, meetingId, toast, joinStatus]);
+  }, [currentUser, meetingId, db, toast, joinStatus, searchParamsHook]);
 
   useEffect(() => {
     if (joinStatus !== 'joined' || !meetingId || !db) return;
@@ -903,7 +916,6 @@ export default function MeetingPage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* <audio ref={audioPlayerRef} className="hidden" /> Removed audio player */}
       
       <main className="flex-1 p-4 flex flex-col">
         {hasCameraPermission === false && !isScreenSharingActive && (
@@ -990,23 +1002,6 @@ export default function MeetingPage() {
             {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
           </Button>
           
-          {/* Removed TranslateAndSpeakDialog Trigger
-          <Dialog open={isTranslateAndSpeakDialogOpen} onOpenChange={setIsTranslateAndSpeakDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="default"
-                size="lg"
-                className="rounded-full p-3 btn-gel"
-                aria-label="Translate and Speak"
-              >
-                <Languages className="h-5 w-5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg rounded-xl">
-              <TranslateAndSpeakDialogContent audioPlayerRef={audioPlayerRef} />
-            </DialogContent>
-          </Dialog>
-          */}
 
            <Button
             size="lg"
@@ -1054,3 +1049,4 @@ export default function MeetingPage() {
     </div>
   );
 }
+
