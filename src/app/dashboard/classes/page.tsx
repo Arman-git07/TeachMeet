@@ -40,6 +40,21 @@ const initialMockClassrooms: Classroom[] = [
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 
+const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string => {
+  if (!name || typeof name !== 'string') return defaultInitial;
+  const words = name.trim().split(/\s+/).filter(Boolean); // filter Boolean to remove empty strings from multiple spaces
+  if (words.length === 0) return defaultInitial;
+
+  if (words.length === 1) {
+    return words[0].substring(0, 2).toUpperCase() || defaultInitial;
+  } else {
+    const firstInitial = words[0][0];
+    const lastInitial = words[words.length - 1][0];
+    return (firstInitial + lastInitial).toUpperCase();
+  }
+};
+
+
 export default function ClassesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -162,7 +177,7 @@ export default function ClassesPage() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast.dismiss(toastId);
             toast({ title: "Image Uploaded!", description: `${imageFile.name} successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined });
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); // dataAiHint is undefined for real images
           } catch (getUrlError) {
              console.error("Error getting download URL for class image:", getUrlError);
              toast.dismiss(toastId);
@@ -185,35 +200,47 @@ export default function ClassesPage() {
       return;
     }
 
-    setIsUploadingClassImage(true);
-    let imageDetails = { thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "education general" };
+    setIsUploadingClassImage(true); // Set true even if not uploading image, for general processing state
+    
+    let imageDetails: { thumbnailUrl: string; dataAiHint?: string };
 
     if (newClassImageFile) {
       try {
         imageDetails = await uploadImage(newClassImageFile, user.uid, 'create');
       } catch (error) {
         setIsUploadingClassImage(false);
-        return;
+        return; // Stop if image upload fails
       }
+    } else {
+      // No image file, use initials of class name for thumbnail
+      const classNameInitials = getInitialsFromName(newClassName.trim(), "C");
+      imageDetails = { 
+        thumbnailUrl: `https://placehold.co/600x400.png?text=${classNameInitials}`, 
+        dataAiHint: "education general" // General hint for placeholder type
+      };
     }
+
+    // Teacher avatar initials
+    const teacherInitials = getInitialsFromName(user.displayName || "User", "U");
+    const teacherAvatarUrl = user.photoURL || `https://placehold.co/40x40.png?text=${teacherInitials}`;
 
     const newClass: Classroom = {
       id: `cl${Date.now()}`,
-      name: newClassName,
-      description: newClassDescription,
+      name: newClassName.trim(),
+      description: newClassDescription.trim(),
       teacherName: user.displayName || "Teacher",
       teacherId: user.uid,
-      teacherAvatar: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "T").charAt(0)}`,
+      teacherAvatar: teacherAvatarUrl,
       memberCount: 1,
-      ...imageDetails,
+      ...imageDetails, // Spreads thumbnailUrl and dataAiHint
     };
     setClassrooms(prev => [newClass, ...prev]);
     toast({
       title: "Class Created!",
-      description: `"${newClassName}" has been successfully created.`,
+      description: `"${newClassName.trim()}" has been successfully created.`,
     });
 
-    resetCreateClassDialog();
+    resetCreateClassDialog(); // This will also set isUploadingClassImage to false
   };
 
   const handleUpdateClass = async () => {
@@ -227,7 +254,10 @@ export default function ClassesPage() {
     }
 
     setIsUploadingEditClassImage(true);
-    let imageDetails = { thumbnailUrl: editingClass.thumbnailUrl, dataAiHint: editingClass.dataAiHint };
+    let imageDetails = { 
+      thumbnailUrl: editingClass.thumbnailUrl, 
+      dataAiHint: editingClass.dataAiHint 
+    };
 
     if (editClassImageFile) {
       try {
@@ -236,14 +266,22 @@ export default function ClassesPage() {
         setIsUploadingEditClassImage(false);
         return;
       }
+    } else if (editingClass.name !== editClassName.trim() && editingClass.thumbnailUrl.includes('placehold.co') && editingClass.thumbnailUrl.includes('?text=')) {
+      // If name changed AND current thumbnail is an initials placeholder, update initials placeholder
+      const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
+      imageDetails = {
+        thumbnailUrl: `https://placehold.co/600x400.png?text=${newClassNameInitials}`,
+        dataAiHint: editingClass.dataAiHint // Keep original hint for placeholder type
+      };
     }
+
 
     setClassrooms(prev => prev.map(cls =>
       cls.id === editingClass.id
         ? {
             ...cls,
-            name: editClassName,
-            description: editClassDescription,
+            name: editClassName.trim(),
+            description: editClassDescription.trim(),
             thumbnailUrl: imageDetails.thumbnailUrl,
             dataAiHint: imageDetails.dataAiHint,
           }
@@ -252,10 +290,10 @@ export default function ClassesPage() {
 
     toast({
       title: "Class Updated!",
-      description: `"${editClassName}" has been successfully updated.`,
+      description: `"${editClassName.trim()}" has been successfully updated.`,
     });
 
-    resetEditClassDialog();
+    resetEditClassDialog(); // This will also set isUploadingEditClassImage to false
   };
 
 
@@ -270,8 +308,8 @@ export default function ClassesPage() {
     setEditingClass(classToEdit);
     setEditClassName(classToEdit.name);
     setEditClassDescription(classToEdit.description);
-    setEditClassImagePreview(classToEdit.thumbnailUrl);
-    setEditClassImageFile(null);
+    setEditClassImagePreview(classToEdit.thumbnailUrl); // Show current image or placeholder
+    setEditClassImageFile(null); // Clear any previously selected file for editing
     setIsEditClassDialogOpen(true);
   };
 
@@ -287,6 +325,7 @@ export default function ClassesPage() {
   };
 
   useEffect(() => {
+    // Cleanup for blob URLs
     return () => {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(newClassImagePreview);
@@ -344,7 +383,7 @@ export default function ClassesPage() {
               <DialogClose asChild>
                 <Button type="button" variant="outline" className="rounded-lg" disabled={isUploadingClassImage}>Cancel</Button>
               </DialogClose>
-              <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage}>
+              <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage || !newClassName.trim()}>
                 {isUploadingClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {isUploadingClassImage ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
               </Button>
@@ -392,7 +431,7 @@ export default function ClassesPage() {
             <DialogClose asChild>
               <Button type="button" variant="outline" className="rounded-lg" disabled={isUploadingEditClassImage}>Cancel</Button>
             </DialogClose>
-            <Button type="button" onClick={handleUpdateClass} className="btn-gel rounded-lg" disabled={isUploadingEditClassImage}>
+            <Button type="button" onClick={handleUpdateClass} className="btn-gel rounded-lg" disabled={isUploadingEditClassImage || !editClassName.trim()}>
               {isUploadingEditClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               {isUploadingEditClassImage ? (editClassImageFile ? 'Uploading Image...' : 'Saving...') : 'Save Changes'}
             </Button>
@@ -425,7 +464,7 @@ export default function ClassesPage() {
                     layout="fill"
                     objectFit="cover"
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
-                    data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') ? classroom.dataAiHint || "education classroom" : undefined}
+                    data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"} // Hint only if not initials
                  />
               </div>
               <CardHeader className="pb-2 pt-4">
@@ -433,7 +472,7 @@ export default function ClassesPage() {
                 <div className="flex items-center pt-1">
                     <Avatar className="h-6 w-6 mr-2">
                         <AvatarImage src={classroom.teacherAvatar} alt={classroom.teacherName} data-ai-hint="teacher avatar"/>
-                        <AvatarFallback>{classroom.teacherName.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{getInitialsFromName(classroom.teacherName, "T")}</AvatarFallback>
                     </Avatar>
                     <CardDescription className="text-xs text-muted-foreground truncate">Taught by {classroom.teacherName}</CardDescription>
                 </div>
