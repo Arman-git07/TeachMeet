@@ -132,6 +132,12 @@ export default function ClassDetailsPage() {
     }
   }, [classId, classNameQuery]);
 
+  const handleJoinDiscussion = () => {
+    if (classroom) {
+      router.push(`/dashboard/class/${classroom.id}/chat?name=${encodeURIComponent(classroom.name)}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
@@ -317,8 +323,8 @@ export default function ClassDetailsPage() {
           </Card>
           
           <div className="mt-8 text-center">
-             <Button variant="default" size="lg" className="btn-gel rounded-lg py-3 px-8 text-base">
-                <MessageSquare className="mr-2 h-5 w-5"/> Join Class Discussion (Mock)
+             <Button variant="default" size="lg" className="btn-gel rounded-lg py-3 px-8 text-base" onClick={handleJoinDiscussion}>
+                <MessageSquare className="mr-2 h-5 w-5"/> Join Class Discussion
             </Button>
           </div>
 
