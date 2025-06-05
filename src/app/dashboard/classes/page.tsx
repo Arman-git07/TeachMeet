@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle } from "lucide-react"; // Added CheckCircle
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -39,6 +39,7 @@ const initialMockClassrooms: Classroom[] = [
 
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+const REQUESTED_CLASSES_KEY = 'teachmeet-requested-classes';
 
 const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string => {
   if (!name || typeof name !== 'string') return defaultInitial;
@@ -58,8 +59,9 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 export default function ClassesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
   const [classrooms, setClassrooms] = useState<Classroom[]>(initialMockClassrooms);
+  const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
 
   // Create Class Dialog State
   const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
@@ -77,6 +79,21 @@ export default function ClassesPage() {
   const [editClassImageFile, setEditClassImageFile] = useState<File | null>(null);
   const [editClassImagePreview, setEditClassImagePreview] = useState<string | null>(null);
   const [isUploadingEditClassImage, setIsUploadingEditClassImage] = useState(false);
+
+  useEffect(() => {
+    const storedRequests = localStorage.getItem(REQUESTED_CLASSES_KEY);
+    if (storedRequests) {
+      try {
+        const parsedRequests = JSON.parse(storedRequests);
+        if (Array.isArray(parsedRequests)) {
+          setRequestedClassIds(parsedRequests);
+        }
+      } catch (error) {
+        console.error("Error parsing requested classes from localStorage:", error);
+        localStorage.removeItem(REQUESTED_CLASSES_KEY);
+      }
+    }
+  }, []);
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
     const file = event.target.files?.[0];
@@ -200,7 +217,7 @@ export default function ClassesPage() {
       return;
     }
 
-    setIsUploadingClassImage(true); // Set true even if not uploading image, for general processing state
+    setIsUploadingClassImage(true); 
     
     let imageDetails: { thumbnailUrl: string; dataAiHint?: string };
 
@@ -209,18 +226,16 @@ export default function ClassesPage() {
         imageDetails = await uploadImage(newClassImageFile, user.uid, 'create');
       } catch (error) {
         setIsUploadingClassImage(false);
-        return; // Stop if image upload fails
+        return; 
       }
     } else {
-      // No image file, use initials of class name for thumbnail
       const classNameInitials = getInitialsFromName(newClassName.trim(), "C");
       imageDetails = { 
         thumbnailUrl: `https://placehold.co/600x400.png?text=${classNameInitials}`, 
-        dataAiHint: "education general" // General hint for placeholder type
+        dataAiHint: "education general" 
       };
     }
 
-    // Teacher avatar initials
     const teacherInitials = getInitialsFromName(user.displayName || "User", "U");
     const teacherAvatarUrl = user.photoURL || `https://placehold.co/40x40.png?text=${teacherInitials}`;
 
@@ -232,7 +247,7 @@ export default function ClassesPage() {
       teacherId: user.uid,
       teacherAvatar: teacherAvatarUrl,
       memberCount: 1,
-      ...imageDetails, // Spreads thumbnailUrl and dataAiHint
+      ...imageDetails, 
     };
     setClassrooms(prev => [newClass, ...prev]);
     toast({
@@ -240,7 +255,7 @@ export default function ClassesPage() {
       description: `"${newClassName.trim()}" has been successfully created.`,
     });
 
-    resetCreateClassDialog(); // This will also set isUploadingClassImage to false
+    resetCreateClassDialog(); 
   };
 
   const handleUpdateClass = async () => {
@@ -267,11 +282,10 @@ export default function ClassesPage() {
         return;
       }
     } else if (editingClass.name !== editClassName.trim() && editingClass.thumbnailUrl.includes('placehold.co') && editingClass.thumbnailUrl.includes('?text=')) {
-      // If name changed AND current thumbnail is an initials placeholder, update initials placeholder
       const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
       imageDetails = {
         thumbnailUrl: `https://placehold.co/600x400.png?text=${newClassNameInitials}`,
-        dataAiHint: editingClass.dataAiHint // Keep original hint for placeholder type
+        dataAiHint: editingClass.dataAiHint 
       };
     }
 
@@ -293,13 +307,25 @@ export default function ClassesPage() {
       description: `"${editClassName.trim()}" has been successfully updated.`,
     });
 
-    resetEditClassDialog(); // This will also set isUploadingEditClassImage to false
+    resetEditClassDialog(); 
   };
 
 
-  const handleRequestToJoin = (className: string) => {
+  const handleRequestToJoin = (classId: string, className: string) => {
+    if (requestedClassIds.includes(classId)) {
+      toast({
+        title: "Request Already Sent",
+        description: `You have already requested to join "${className}".`,
+      });
+      return;
+    }
+    
+    const newRequestedIds = [...requestedClassIds, classId];
+    setRequestedClassIds(newRequestedIds);
+    localStorage.setItem(REQUESTED_CLASSES_KEY, JSON.stringify(newRequestedIds));
+    
     toast({
-      title: "Request Sent (Mock)",
+      title: "Request Sent!",
       description: `Your request to join "${className}" has been sent to the teacher.`,
     });
   };
@@ -308,8 +334,8 @@ export default function ClassesPage() {
     setEditingClass(classToEdit);
     setEditClassName(classToEdit.name);
     setEditClassDescription(classToEdit.description);
-    setEditClassImagePreview(classToEdit.thumbnailUrl); // Show current image or placeholder
-    setEditClassImageFile(null); // Clear any previously selected file for editing
+    setEditClassImagePreview(classToEdit.thumbnailUrl); 
+    setEditClassImageFile(null); 
     setIsEditClassDialogOpen(true);
   };
 
@@ -325,7 +351,6 @@ export default function ClassesPage() {
   };
 
   useEffect(() => {
-    // Cleanup for blob URLs
     return () => {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(newClassImagePreview);
@@ -464,7 +489,7 @@ export default function ClassesPage() {
                     layout="fill"
                     objectFit="cover"
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
-                    data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"} // Hint only if not initials
+                    data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"} 
                  />
               </div>
               <CardHeader className="pb-2 pt-4">
@@ -489,9 +514,15 @@ export default function ClassesPage() {
                         <Edit className="mr-2 h-4 w-4" /> Manage Class
                     </Button>
                 ) : (
-                    <Button onClick={() => handleRequestToJoin(classroom.name)} className="w-full btn-gel rounded-lg text-sm">
+                  requestedClassIds.includes(classroom.id) ? (
+                    <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
+                        <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
+                    </Button>
+                  ) : (
+                    <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
                     </Button>
+                  )
                 )}
                  <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
                     View Details
@@ -505,3 +536,4 @@ export default function ClassesPage() {
   );
 }
     
+
