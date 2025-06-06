@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import {
@@ -17,7 +18,7 @@ import {
   ShieldQuestion,
   Users,
   ShieldAlert,
-  ClipboardCheck, // Added Exam icon
+  ClipboardCheck,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -217,7 +218,7 @@ export function AppSidebar() {
       <SidebarContent className="flex-grow p-4">
         {loading ? (
           <SidebarMenu className="space-y-2">
-            {[...Array(6)].map((_, i) => ( // Increased skeleton items for new nav link
+            {[...Array(5)].map((_, i) => ( 
               <SidebarMenuItem key={i}>
                 <Skeleton className="h-10 w-full rounded-lg" />
               </SidebarMenuItem>
@@ -233,7 +234,7 @@ export function AppSidebar() {
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
               <NavItem href="/dashboard/classes" icon={Users} currentPath={pathname}>Classes</NavItem>
-              <NavItem href="/dashboard/exams" icon={ClipboardCheck} currentPath={pathname}>Exams</NavItem>
+              {/* <NavItem href="/dashboard/exams" icon={ClipboardCheck} currentPath={pathname}>Exams</NavItem> Removed */}
             </>
           ) : (
             <>

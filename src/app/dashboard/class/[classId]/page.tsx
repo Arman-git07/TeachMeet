@@ -7,13 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
-    Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info, Video, PlusCircle
+    Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info, Video, PlusCircle,
+    ClipboardCheck as ExamIcon, Eye // Added ExamIcon and Eye
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useAuth } from '@/hooks/useAuth'; 
+import { useToast } from '@/hooks/use-toast'; 
+import { format } from 'date-fns';
 
 interface Announcement {
   title: string;
@@ -38,6 +40,13 @@ interface Material {
   description?: string;
 }
 
+interface ClassExam {
+  id: string;
+  title: string;
+  dueDate: string; // Simplified for mock
+  status: 'Upcoming' | 'Active' | 'Ended' | 'Graded';
+}
+
 interface ClassroomDetails {
   id: string;
   name: string;
@@ -49,9 +58,10 @@ interface ClassroomDetails {
   thumbnailUrl: string;
   announcements?: Announcement[];
   schedule?: { day: string; time: string }[];
-  scheduleLastUpdated?: string; // Added for schedule update date
+  scheduleLastUpdated?: string; 
   assignments?: Assignment[];
   materials?: Material[];
+  exams?: ClassExam[]; // Added exams
   feeDetails?: { totalFee: number; paidAmount: number; nextDueDate?: string };
 }
 
@@ -80,7 +90,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       { day: "Wednesday", time: "10:00 AM - 11:00 AM (Lab)" },
       { day: "Friday", time: "01:00 PM - 02:00 PM (Discussion)" },
     ],
-    scheduleLastUpdated: "2024-07-28", // Mock date for schedule update
+    scheduleLastUpdated: "2024-07-28",
     assignments: [
       { id: "assign1", title: "Introduction Essay", dueDate: "2024-08-10", status: "Graded", description: "A 500-word essay about your motivations for taking this course." },
       { id: "assign2", title: "Chapter 1 Problem Set", dueDate: "2024-08-17", status: "Pending", description: "Complete all odd-numbered problems from Chapter 1." },
@@ -93,6 +103,11 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       { id: "mat3", title: "Introductory Video Lecture", type: "video", url: "#", description: "A pre-recorded lecture covering the basics." },
       { id: "mat4", title: "Python Setup Guide", type: "file", fileName: "python_setup.md", description: "Instructions for setting up your Python environment." },
     ],
+    exams: [ // Mock exams for this class
+      { id: "exam_class_101", title: "Quiz 1: Basic Concepts", dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), status: "Upcoming" },
+      { id: "exam_class_102", title: "Mid-Term Practical", dueDate: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), status: "Upcoming" },
+      { id: "exam_class_100", title: "Diagnostic Test", dueDate: format(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), status: "Graded" },
+    ],
     feeDetails: {
       totalFee: 500,
       paidAmount: 250,
@@ -101,12 +116,15 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
   };
 };
 
-const getStatusColor = (status: Assignment['status']) => {
+const getStatusColor = (status: Assignment['status'] | ClassExam['status']) => {
   switch (status) {
     case 'Graded': return 'bg-green-500/20 text-green-700 border-green-500/50';
     case 'Submitted': return 'bg-blue-500/20 text-blue-700 border-blue-500/50';
     case 'Pending': return 'bg-yellow-500/20 text-yellow-700 border-yellow-500/50';
     case 'Overdue': return 'bg-red-500/20 text-red-700 border-red-500/50';
+    case 'Upcoming': return 'bg-blue-500/20 text-blue-700 border-blue-500/50'; // For exams
+    case 'Active': return 'bg-green-500/20 text-green-700 border-green-500/50'; // For exams
+    case 'Ended': return 'bg-gray-500/20 text-gray-700 border-gray-500/50'; // For exams
     default: return 'bg-muted text-muted-foreground border-border';
   }
 };
@@ -197,7 +215,7 @@ export default function ClassDetailsPage() {
     const newAnnouncement: Announcement = {
       title: title.trim(),
       content: content.trim(),
-      date: new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD
+      date: new Date().toISOString().split('T')[0], 
     };
 
     setClassroom(prev => {
@@ -228,7 +246,7 @@ export default function ClassDetailsPage() {
               <div className="h-4 bg-muted rounded w-5/6"></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              {[...Array(4)].map((_, i) => (
+              {[...Array(6)].map((_, i) => ( // Increased skeleton items for exams card
                 <div key={i} className="h-24 bg-muted rounded-lg"></div>
               ))}
             </div>
@@ -298,7 +316,6 @@ export default function ClassDetailsPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Section: Announcements */}
             <Card className="rounded-lg shadow-md border-border/30">
               <CardHeader>
                 <CardTitle className="flex items-center text-lg"><Megaphone className="mr-2 h-5 w-5 text-primary" />Announcements</CardTitle>
@@ -320,7 +337,6 @@ export default function ClassDetailsPage() {
               )}
             </Card>
 
-            {/* Section: Schedule & Timings */}
             <Card className="rounded-lg shadow-md border-border/30">
               <CardHeader>
                 <CardTitle className="flex items-center text-lg"><CalendarDays className="mr-2 h-5 w-5 text-primary" />Schedule & Timings</CardTitle>
@@ -344,13 +360,12 @@ export default function ClassDetailsPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Section: Assignments */}
             <Card className="rounded-lg shadow-md border-border/30">
               <CardHeader>
                 <CardTitle className="flex items-center text-lg"><ClipboardList className="mr-2 h-5 w-5 text-primary" />Assignments</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm max-h-72 overflow-y-auto">
-                {classroom.assignments?.length ? classroom.assignments.slice(0, 3).map((item) => ( // Show first 3
+                {classroom.assignments?.length ? classroom.assignments.slice(0, 3).map((item) => ( 
                   <div key={item.id} className="pb-3 border-b border-border/20 last:border-b-0">
                     <div className="flex justify-between items-start">
                         <p className="font-semibold text-foreground">{item.title}</p>
@@ -367,7 +382,6 @@ export default function ClassDetailsPage() {
               </CardFooter>
             </Card>
 
-            {/* Section: Class Materials */}
             <Card className="rounded-lg shadow-md border-border/30">
               <CardHeader>
                 <CardTitle className="flex items-center text-lg"><FileIcon className="mr-2 h-5 w-5 text-primary" />Class Materials</CardTitle>
@@ -392,7 +406,41 @@ export default function ClassDetailsPage() {
             </Card>
           </div>
           
-          {/* Section: Fees Payment */}
+          {/* New Exams Section */}
+          <Card className="rounded-lg shadow-md border-border/30">
+            <CardHeader>
+              <CardTitle className="flex items-center text-lg"><ExamIcon className="mr-2 h-5 w-5 text-primary" />Exams</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm max-h-72 overflow-y-auto">
+              {classroom.exams?.length ? classroom.exams.slice(0, 3).map((exam) => (
+                <div key={exam.id} className="pb-3 border-b border-border/20 last:border-b-0">
+                  <div className="flex justify-between items-start">
+                    <p className="font-semibold text-foreground">{exam.title}</p>
+                    <Badge variant="outline" className={`text-xs ml-2 ${getStatusColor(exam.status)} rounded-md`}>{exam.status}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Due: {format(new Date(exam.dueDate), "PP")}</p>
+                  <Button asChild variant="link" size="sm" className="p-0 h-auto text-accent text-xs mt-1">
+                    <Link href={`/dashboard/exam/${exam.id}?title=${encodeURIComponent(exam.title)}`}>View Exam</Link>
+                  </Button>
+                </div>
+              )) : <p className="text-muted-foreground">No exams scheduled for this class yet.</p>}
+            </CardContent>
+            <CardFooter className="flex flex-col sm:flex-row gap-2">
+              {isCurrentUserTeacher && (
+                <Button asChild variant="outline" className="w-full rounded-lg text-sm">
+                  <Link href="/dashboard/exams">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Exam for this Class
+                  </Link>
+                </Button>
+              )}
+              <Button asChild variant="outline" className="w-full rounded-lg text-sm">
+                 <Link href={`/dashboard/exams?classId=${classId}`}> 
+                    <Eye className="mr-2 h-4 w-4" /> View All Exams for this Class
+                 </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
           <Card className="rounded-lg shadow-md border-border/30">
             <CardHeader>
               <CardTitle className="flex items-center text-lg"><DollarSign className="mr-2 h-5 w-5 text-primary" />Fees & Payment</CardTitle>
