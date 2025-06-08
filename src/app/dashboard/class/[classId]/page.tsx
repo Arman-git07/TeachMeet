@@ -8,14 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
     Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth'; 
 import { useToast } from '@/hooks/use-toast'; 
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"; // Renamed DialogTitle to avoid conflict if CreateExamDialog exports one
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,12 @@ interface ClassExam {
   status: 'Upcoming' | 'Active' | 'Ended' | 'Graded';
 }
 
+interface FeeDetails {
+  totalFee: number;
+  paidAmount: number;
+  nextDueDate?: string;
+}
+
 interface ClassroomDetails {
   id: string;
   name: string;
@@ -67,7 +73,7 @@ interface ClassroomDetails {
   assignments?: Assignment[];
   materials?: Material[];
   exams?: ClassExam[];
-  feeDetails?: { totalFee: number; paidAmount: number; nextDueDate?: string };
+  feeDetails?: FeeDetails;
 }
 
 const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): ClassroomDetails | null => {
@@ -163,6 +169,13 @@ export default function ClassDetailsPage() {
   const [dialogAssignmentName, setDialogAssignmentName] = useState('');
   const [dialogAssignmentKeywords, setDialogAssignmentKeywords] = useState('');
 
+  const [isEditingFeeDetails, setIsEditingFeeDetails] = useState(false);
+  const [editableFeeDetails, setEditableFeeDetails] = useState<{
+    totalFee: string;
+    paidAmount: string;
+    nextDueDate: string;
+  } | null>(null);
+
 
   useEffect(() => {
     if (classId && !authLoading) { 
@@ -178,6 +191,15 @@ export default function ClassDetailsPage() {
           }
         }
         setClassroom(details);
+        if (details?.feeDetails) {
+          setEditableFeeDetails({
+            totalFee: String(details.feeDetails.totalFee),
+            paidAmount: String(details.feeDetails.paidAmount),
+            nextDueDate: details.feeDetails.nextDueDate || '',
+          });
+        } else {
+          setEditableFeeDetails(null);
+        }
         setLoading(false);
       }, 500);
     } else if (!classId) {
@@ -255,7 +277,7 @@ export default function ClassDetailsPage() {
 
   const handleTriggerAssignmentUploadDialog = () => {
     if (!classroom?.assignments || classroom.assignments.length === 0) {
-        toast({ variant: "destructive", title: "No Assignments", description: "There are no assignments listed for this class to submit against." });
+        toast({ variant: "info", title: "No Assignments", description: "There are no assignments listed for this class to submit against." });
         return;
     }
     setDialogAssignmentName('');
@@ -383,6 +405,46 @@ export default function ClassDetailsPage() {
     });
   };
 
+  const handleToggleEditFeeDetails = () => {
+    if (isEditingFeeDetails) { // If cancelling
+      if (classroom?.feeDetails) {
+        setEditableFeeDetails({
+          totalFee: String(classroom.feeDetails.totalFee),
+          paidAmount: String(classroom.feeDetails.paidAmount),
+          nextDueDate: classroom.feeDetails.nextDueDate || '',
+        });
+      }
+    }
+    setIsEditingFeeDetails(!isEditingFeeDetails);
+  };
+
+  const handleSaveFeeDetails = () => {
+    if (!editableFeeDetails || !classroom) return;
+
+    const newTotalFee = parseFloat(editableFeeDetails.totalFee);
+    const newPaidAmount = parseFloat(editableFeeDetails.paidAmount);
+
+    if (isNaN(newTotalFee) || newTotalFee < 0 || isNaN(newPaidAmount) || newPaidAmount < 0) {
+      toast({ variant: "destructive", title: "Invalid Input", description: "Fee amounts must be valid numbers." });
+      return;
+    }
+    if (newPaidAmount > newTotalFee) {
+      toast({ variant: "destructive", title: "Invalid Input", description: "Paid amount cannot exceed total fee." });
+      return;
+    }
+
+    const newFeeDetails: FeeDetails = {
+      totalFee: newTotalFee,
+      paidAmount: newPaidAmount,
+      nextDueDate: editableFeeDetails.nextDueDate.trim() ? editableFeeDetails.nextDueDate.trim() : undefined,
+    };
+
+    setClassroom(prev => prev ? { ...prev, feeDetails: newFeeDetails } : null);
+    toast({ title: "Fee Details Updated (Mock)", description: "Class fee information has been saved locally." });
+    setIsEditingFeeDetails(false);
+  };
+
+
   const isCurrentUserTeacher = user?.uid === classroom?.teacherId;
 
   if (loading || authLoading) { 
@@ -424,6 +486,13 @@ export default function ClassDetailsPage() {
       </div>
     );
   }
+  
+  const currentRemainingFee = editableFeeDetails
+    ? parseFloat(editableFeeDetails.totalFee || '0') - parseFloat(editableFeeDetails.paidAmount || '0')
+    : classroom?.feeDetails
+    ? classroom.feeDetails.totalFee - classroom.feeDetails.paidAmount
+    : 0;
+
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -669,24 +738,79 @@ export default function ClassDetailsPage() {
             <CardHeader>
               <CardTitle className="flex items-center text-lg"><DollarSign className="mr-2 h-5 w-5 text-primary" />Fees & Payment</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {classroom.feeDetails ? (
+            <CardContent className="space-y-3 text-sm">
+              {!classroom.feeDetails && !isEditingFeeDetails ? (
+                <p className="text-muted-foreground">Fee details not available.</p>
+              ) : isCurrentUserTeacher && isEditingFeeDetails && editableFeeDetails ? (
                 <>
-                  <p>Total Fee: <span className="font-semibold text-foreground">${classroom.feeDetails.totalFee}</span></p>
-                  <p>Amount Paid: <span className="font-semibold text-green-600">${classroom.feeDetails.paidAmount}</span></p>
-                  <p>Remaining: <span className="font-semibold text-destructive">${classroom.feeDetails.totalFee - classroom.feeDetails.paidAmount}</span></p>
-                  {classroom.feeDetails.nextDueDate && <p>Next Payment Due: {classroom.feeDetails.nextDueDate}</p>}
+                  <div className="space-y-1">
+                    <Label htmlFor="totalFee" className="text-xs">Total Fee ($)</Label>
+                    <Input
+                      id="totalFee"
+                      type="number"
+                      value={editableFeeDetails.totalFee}
+                      onChange={(e) => setEditableFeeDetails(prev => prev ? { ...prev, totalFee: e.target.value } : null)}
+                      className="rounded-lg h-9 text-sm"
+                      placeholder="e.g., 500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="paidAmount" className="text-xs">Amount Paid ($)</Label>
+                    <Input
+                      id="paidAmount"
+                      type="number"
+                      value={editableFeeDetails.paidAmount}
+                      onChange={(e) => setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: e.target.value } : null)}
+                      className="rounded-lg h-9 text-sm"
+                      placeholder="e.g., 250"
+                    />
+                  </div>
+                   <p>Remaining: <span className="font-semibold text-destructive">${isNaN(currentRemainingFee) ? 'N/A' : currentRemainingFee.toFixed(2)}</span></p>
+                  <div className="space-y-1">
+                    <Label htmlFor="nextDueDate" className="text-xs">Next Payment Due</Label>
+                    <Input
+                      id="nextDueDate"
+                      type="date"
+                      value={editableFeeDetails.nextDueDate}
+                      onChange={(e) => setEditableFeeDetails(prev => prev ? { ...prev, nextDueDate: e.target.value } : null)}
+                      className="rounded-lg h-9 text-sm"
+                    />
+                  </div>
                 </>
-              ) : <p className="text-muted-foreground">Fee details not available.</p>}
+              ) : classroom.feeDetails ? (
+                <>
+                  <p>Total Fee: <span className="font-semibold text-foreground">${classroom.feeDetails.totalFee.toFixed(2)}</span></p>
+                  <p>Amount Paid: <span className="font-semibold text-green-600">${classroom.feeDetails.paidAmount.toFixed(2)}</span></p>
+                  <p>Remaining: <span className="font-semibold text-destructive">${(classroom.feeDetails.totalFee - classroom.feeDetails.paidAmount).toFixed(2)}</span></p>
+                  {classroom.feeDetails.nextDueDate && (
+                    <p>Next Payment Due: {format(parseISO(classroom.feeDetails.nextDueDate), "PP")}</p>
+                  )}
+                </>
+              ) : (
+                 <p className="text-muted-foreground">Fee details not set up yet.</p>
+              )}
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex flex-col sm:flex-row gap-2">
+              {isCurrentUserTeacher && (
+                isEditingFeeDetails ? (
+                  <>
+                    <Button onClick={handleSaveFeeDetails} className="w-full btn-gel rounded-lg text-sm">Save Details</Button>
+                    <Button onClick={handleToggleEditFeeDetails} variant="outline" className="w-full rounded-lg text-sm">Cancel</Button>
+                  </>
+                ) : (
+                  <Button onClick={handleToggleEditFeeDetails} variant="outline" className="w-full rounded-lg text-sm">
+                    <Edit2 className="mr-2 h-4 w-4" /> Edit Fee Details
+                  </Button>
+                )
+              )}
+              {!isEditingFeeDetails && (
                 <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
                   <DialogTrigger asChild>
                     <Button 
                       className="w-full btn-gel rounded-lg text-sm" 
-                      disabled={!classroom.feeDetails || classroom.feeDetails.paidAmount === classroom.feeDetails.totalFee}
+                      disabled={!classroom.feeDetails || currentRemainingFee <= 0}
                     >
-                      {classroom.feeDetails && classroom.feeDetails.paidAmount === classroom.feeDetails.totalFee ? "Fully Paid" : "Make Payment"}
+                      {classroom.feeDetails && currentRemainingFee <= 0 ? "Fully Paid" : "Make Payment"}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md rounded-xl">
@@ -719,6 +843,7 @@ export default function ClassDetailsPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+              )}
             </CardFooter>
           </Card>
           
@@ -736,3 +861,4 @@ export default function ClassDetailsPage() {
     
 
     
+
