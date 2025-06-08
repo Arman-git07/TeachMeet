@@ -20,6 +20,7 @@ import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssig
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CreateExamDialog } from '@/components/exam/CreateExamDialog';
 
 interface Announcement {
   title: string;
@@ -373,6 +374,15 @@ export default function ClassDetailsPage() {
     setIsPaymentDialogOpen(false);
   };
 
+  const handleExamCreated = (newExam: any) => { // Replace 'any' with a proper Exam interface later
+    console.log("New exam created via dialog on class page:", newExam);
+    // Potentially update classroom.exams state here, or refetch
+     toast({
+      title: "Exam Scheduled (Class Context)",
+      description: `${newExam.title} has been scheduled for this class.`
+    });
+  };
+
   const isCurrentUserTeacher = user?.uid === classroom?.teacherId;
 
   if (loading || authLoading) { 
@@ -524,7 +534,7 @@ export default function ClassDetailsPage() {
               </CardContent>
                <CardFooter className="flex flex-col sm:flex-row gap-2">
                 <Button asChild variant="outline" className="w-full rounded-lg text-sm">
-                  <Link href="/dashboard/documents">
+                  <Link href={`/dashboard/assignments?classId=${classId}`}>
                     Check All Assignments
                   </Link>
                 </Button>
@@ -631,9 +641,21 @@ export default function ClassDetailsPage() {
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-2">
               {isCurrentUserTeacher && (
-                <Button onClick={() => setIsCreateExamDialogOpenForClass(true)} variant="outline" className="w-full rounded-lg text-sm">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Exam for this Class
-                </Button>
+                 <Dialog open={isCreateExamDialogOpenForClass} onOpenChange={setIsCreateExamDialogOpenForClass}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full rounded-lg text-sm">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Create New Exam for this Class
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg rounded-xl">
+                    <CreateExamDialog 
+                      isOpen={isCreateExamDialogOpenForClass} 
+                      onOpenChange={setIsCreateExamDialogOpenForClass}
+                      onExamCreated={handleExamCreated}
+                      classContext={{ classId: classroom.id, className: classroom.name }}
+                    />
+                  </DialogContent>
+                </Dialog>
               )}
               <Button asChild variant="outline" className="w-full rounded-lg text-sm">
                  <Link href={`/dashboard/exams?classId=${classId}`}> 
@@ -708,9 +730,16 @@ export default function ClassDetailsPage() {
 
         </CardContent>
       </Card>
+       <CreateExamDialog 
+        isOpen={isCreateExamDialogOpenForClass && isCurrentUserTeacher}
+        onOpenChange={setIsCreateExamDialogOpenForClass}
+        onExamCreated={handleExamCreated}
+        classContext={classroom ? { classId: classroom.id, className: classroom.name } : undefined}
+      />
     </div>
   );
 }
     
 
     
+
