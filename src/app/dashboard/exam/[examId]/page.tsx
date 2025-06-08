@@ -26,27 +26,29 @@ interface ExamDetails {
   totalMarks: number;
   questionPaperUrl?: string; // URL to the actual paper
   questionPaperFileName?: string; // Display name for the paper
+  directQuestions?: string; // For directly entered questions
   // Add student specific submission status later if needed
 }
 
 const getMockExamDetails = (examId: string, titleQueryParam?: string | null): ExamDetails | null => {
   if (!examId) return null;
-  // This would fetch from Firestore or an API
-  // For now, returning a static mock based on ID or a generic one
-  if (examId === "exam1") { // Corresponds to the "Midterm Mathematics Test" from exams/page.tsx mock
+  
+  if (examId === "exam1") { 
     return {
       id: "exam1",
       title: titleQueryParam || "Midterm Mathematics Test",
       description: "Covering chapters 1-5. Ensure you show all your work clearly. Each question carries specific marks as indicated. Good luck!",
       teacherName: "Dr. Elara Vance",
-      scheduledDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // Match mock from list
-      dueDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // Match mock
+      scheduledDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 
+      dueDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), 
       totalMarks: 100,
       questionPaperFileName: "math_midterm_questions.pdf",
-      questionPaperUrl: "#" // Mock URL
+      questionPaperUrl: "#" 
     };
   }
-  // Generic fallback mock
+  
+  // Generic fallback mock, including an example with direct questions
+  const isDirectQuestionExam = examId.includes("direct");
   return {
     id: examId,
     title: titleQueryParam || `Exam ${examId}`,
@@ -55,8 +57,11 @@ const getMockExamDetails = (examId: string, titleQueryParam?: string | null): Ex
     scheduledDateTime: new Date(),
     dueDateTime: new Date(Date.now() + 2 * 60 * 60 * 1000), // Due in 2 hours from now
     totalMarks: 100,
-    questionPaperFileName: "sample_question_paper.pdf",
-    questionPaperUrl: "#" // Mock URL
+    questionPaperFileName: isDirectQuestionExam ? "Directly Entered Questions" : "sample_question_paper.pdf",
+    questionPaperUrl: isDirectQuestionExam ? undefined : "#", 
+    directQuestions: isDirectQuestionExam 
+      ? "Q1. What is the capital of France?\nQ2. Explain the theory of relativity in simple terms (max 100 words).\nQ3. Solve for x: 2x + 5 = 15" 
+      : undefined,
   };
 };
 
@@ -84,7 +89,6 @@ export default function ExamTakingPage() {
   useEffect(() => {
     if (examId) {
       setLoading(true);
-      // Simulate fetching exam details
       setTimeout(() => {
         const details = getMockExamDetails(examId, titleQuery);
         setExamDetails(details);
@@ -135,7 +139,7 @@ export default function ExamTakingPage() {
         return;
       }
       setAnswerFile(file);
-      setSubmissionStatus('idle'); // Reset submission status if a new file is chosen
+      setSubmissionStatus('idle'); 
     } else {
       setAnswerFile(null);
     }
@@ -151,7 +155,6 @@ export default function ExamTakingPage() {
     setIsSubmitting(true);
     setSubmissionStatus('idle');
 
-    // Mock upload
     const toastId = `submit-answer-${Date.now()}`;
     toast({
       id: toastId,
@@ -160,26 +163,11 @@ export default function ExamTakingPage() {
       duration: Infinity,
     });
 
-    // Simulate network delay for upload
     await new Promise(resolve => setTimeout(resolve, 2500)); 
 
-    // Mock success/failure
-    const isSuccess = Math.random() > 0.1; // 90% success rate for mock
+    const isSuccess = Math.random() > 0.1; 
 
     if (isSuccess) {
-      // In a real app:
-      // const filePath = `exam_submissions/${examDetails.id}/${user.uid}/${answerFile.name}`;
-      // const fileRef = storageRef(storage, filePath);
-      // const uploadTask = uploadBytesResumable(fileRef, answerFile);
-      // await uploadTask;
-      // const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-      // await setDoc(doc(db, "exams", examDetails.id, "submissions", user.uid), {
-      //   studentId: user.uid,
-      //   studentName: user.displayName || "Anonymous",
-      //   answerSheetUrl: downloadURL,
-      //   submittedAt: serverTimestamp(),
-      //   fileName: answerFile.name,
-      // });
       toast.dismiss(toastId);
       toast({ title: "Submission Successful!", description: `${answerFile.name} submitted for "${examDetails.title}".` });
       setSubmissionStatus('submitted');
@@ -300,20 +288,29 @@ export default function ExamTakingPage() {
             <>
             <div>
                 <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><FileText className="mr-2 h-5 w-5 text-primary"/>Question Paper</h3>
-                {examDetails.questionPaperUrl && examDetails.questionPaperFileName ? (
+                {examDetails.questionPaperUrl && examDetails.questionPaperFileName && !examDetails.directQuestions ? (
                 <Button asChild variant="outline" className="rounded-lg">
                     <a href={examDetails.questionPaperUrl} target="_blank" rel="noopener noreferrer" download={examDetails.questionPaperFileName}>
                     Download: {examDetails.questionPaperFileName}
                     </a>
                 </Button>
+                ) : examDetails.directQuestions ? (
+                  <Card className="bg-muted/20 p-4 rounded-lg">
+                    <CardContent className="p-0">
+                        <pre className="whitespace-pre-wrap text-sm font-mono text-foreground">{examDetails.directQuestions}</pre>
+                    </CardContent>
+                  </Card>
                 ) : (
-                <p className="text-muted-foreground text-sm">Question paper not available for download currently.</p>
+                <p className="text-muted-foreground text-sm">Question paper not available for download or direct view currently.</p>
                 )}
-                <div className="mt-4 p-4 border rounded-lg bg-muted/20 min-h-[200px] flex items-center justify-center">
-                    <p className="text-muted-foreground italic">
-                        {isExamEnded ? "The exam has ended." : "Question paper content would be displayed here or linked above."}
-                    </p>
-                </div>
+
+                {(!examDetails.questionPaperUrl && !examDetails.directQuestions) && (
+                    <div className="mt-4 p-4 border rounded-lg bg-muted/20 min-h-[200px] flex items-center justify-center">
+                        <p className="text-muted-foreground italic">
+                            {isExamEnded ? "The exam has ended." : "Question paper content would be displayed here or linked above."}
+                        </p>
+                    </div>
+                )}
             </div>
 
             {!isExamEnded && submissionStatus !== 'submitted' && (
@@ -327,7 +324,7 @@ export default function ExamTakingPage() {
                         ref={answerFileInputRef}
                         id="answerSheetUpload"
                         type="file"
-                        accept=".pdf,.doc,.docx,.txt,image/*" // Common answer sheet formats
+                        accept=".pdf,.doc,.docx,.txt,image/*" 
                         onChange={handleAnswerFileChange}
                         className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                         disabled={isSubmitting}
@@ -380,3 +377,5 @@ export default function ExamTakingPage() {
     </div>
   );
 }
+
+    
