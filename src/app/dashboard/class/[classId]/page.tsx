@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
-    Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info, Video, PlusCircle,
+    Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
     ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown
 } from 'lucide-react';
 import Link from 'next/link';
@@ -134,7 +134,7 @@ const getStatusColor = (status: Assignment['status'] | ClassExam['status']) => {
 const MaterialIcon = ({ type }: { type: Material['type'] }) => {
   if (type === 'link') return <LinkIcon className="mr-2 h-5 w-5 text-primary" />;
   if (type === 'file') return <FileIcon className="mr-2 h-5 w-5 text-primary" />;
-  if (type === 'video') return <VideoIcon className="mr-2 h-5 w-5 text-primary" />;
+  if (type === 'video') return <VideoIconLucide className="mr-2 h-5 w-5 text-primary" />;
   return <Info className="mr-2 h-5 w-5 text-primary" />;
 };
 
@@ -149,6 +149,11 @@ export default function ClassDetailsPage() {
 
   const [classroom, setClassroom] = useState<ClassroomDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCreateExamDialogOpenForClass, setIsCreateExamDialogOpenForClass] = useState(false);
+
+  const assignmentFileRef = useRef<HTMLInputElement>(null);
+  const [selectedAssignmentTitleForUpload, setSelectedAssignmentTitleForUpload] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (classId && !authLoading) { 
@@ -239,63 +244,98 @@ export default function ClassDetailsPage() {
     });
   };
 
-  const handleMockAssignmentUpload = async () => {
+  const handleTriggerAssignmentUpload = async () => {
     if (!classroom?.assignments || classroom.assignments.length === 0) {
         toast({ variant: "destructive", title: "No Assignments", description: "There are no assignments to submit for in this class." });
         return;
     }
 
     const assignmentTitles = classroom.assignments.map(a => a.title).join('\n - ');
-    const selectedAssignmentTitle = window.prompt(`Which assignment are you submitting for?\nAvailable assignments:\n - ${assignmentTitles}\n\nEnter the full title:`);
+    const selectedTitle = window.prompt(`Which assignment are you submitting for?\nAvailable assignments:\n - ${assignmentTitles}\n\nEnter the full title:`);
 
-    if (!selectedAssignmentTitle || !selectedAssignmentTitle.trim()) {
+    if (!selectedTitle || !selectedTitle.trim()) {
         toast({ variant: "destructive", title: "No Title", description: "You must specify an assignment title." });
         return;
     }
+    setSelectedAssignmentTitleForUpload(selectedTitle.trim());
+    assignmentFileRef.current?.click();
+  };
 
-    const studentAssignmentText = window.prompt("Please paste a short snippet of your assignment text (max 200 chars for this mock):");
-    if (!studentAssignmentText || !studentAssignmentText.trim()) {
-        toast({ variant: "destructive", title: "No Text", description: "Assignment text cannot be empty." });
+  const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (event.target) { 
+        event.target.value = "";
+    }
+
+    if (!file) {
+        toast({ variant: "info", title: "File Selection Cancelled", description: "No file was selected for upload." });
+        setSelectedAssignmentTitleForUpload(null);
         return;
     }
 
-    // Mock teacher's rubric for the AI
-    const mockTeacherRubric = "The assignment should clearly explain the core concepts discussed in Chapter 1 and apply them to at least two real-world examples. Ensure proper citation and a conclusion summarizing the findings.";
-
-    const input: AutoCheckAssignmentInput = {
-        studentAssignmentText: studentAssignmentText.substring(0, 200), // Limit for mock
-        teacherRubricText: mockTeacherRubric,
-        assignmentTitle: selectedAssignmentTitle.trim(),
-        // assignmentKeywords: "mock, demo" // Optional
-    };
-
-    toast({ title: "Processing Submission...", description: "Your assignment is being checked by the AI (mock)." });
-
-    try {
-        const result: AutoCheckAssignmentOutput = await autoCheckAssignment(input); // This uses the mock implementation from the flow file
-        
-        let feedbackMessage = `Feedback for "${result.overallFeedback ? input.assignmentTitle : 'your assignment'}":\n`;
-        feedbackMessage += `${result.overallFeedback}\n`;
-        if (result.similarityScore) {
-            feedbackMessage += `Similarity Score: ${result.similarityScore}%\n`;
-        }
-        if (result.isPlagiarized) {
-            feedbackMessage += `Plagiarism Check: Potential issues detected.\n`;
-        }
-        // For brevity, not including all specific points in the toast
-        
-        toast({
-            title: "AI Feedback Received (Mock)",
-            description: <pre className="whitespace-pre-wrap text-xs">{feedbackMessage}</pre>,
-            duration: 15000, // Longer duration for feedback
-        });
-
-    } catch (error) {
-        console.error("Error during mock AI check:", error);
-        toast({ variant: "destructive", title: "AI Check Error", description: "Could not get feedback from the AI assistant." });
+    if (file.type !== "text/plain") {
+        toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file for this mock submission." });
+        setSelectedAssignmentTitleForUpload(null);
+        return;
     }
-  };
+    
+    if (!selectedAssignmentTitleForUpload) {
+        console.error("No assignment title was selected prior to file upload. This shouldn't happen.");
+        toast({ variant: "destructive", title: "Internal Error", description: "Assignment title was missing." });
+        return;
+    }
 
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const studentAssignmentText = e.target?.result as string;
+
+        if (!studentAssignmentText || !studentAssignmentText.trim()) {
+            toast({ variant: "destructive", title: "Empty File", description: "The selected file is empty or could not be read." });
+            setSelectedAssignmentTitleForUpload(null);
+            return;
+        }
+        
+        const mockTeacherRubric = "The assignment should clearly explain the core concepts discussed in Chapter 1 and apply them to at least two real-world examples. Ensure proper citation and a conclusion summarizing the findings.";
+
+        const input: AutoCheckAssignmentInput = {
+            studentAssignmentText: studentAssignmentText.substring(0, 5000), 
+            teacherRubricText: mockTeacherRubric,
+            assignmentTitle: selectedAssignmentTitleForUpload,
+        };
+
+        toast({ title: "Processing Submission...", description: "Your assignment is being checked by the AI (mock)." });
+
+        try {
+            const result: AutoCheckAssignmentOutput = await autoCheckAssignment(input);
+            
+            let feedbackMessage = `Feedback for "${input.assignmentTitle}":\n`;
+            feedbackMessage += `${result.overallFeedback}\n`;
+            if (result.similarityScore) {
+                feedbackMessage += `Similarity Score: ${result.similarityScore}%\n`;
+            }
+            if (result.isPlagiarized) {
+                feedbackMessage += `Plagiarism Check: Potential issues detected.\n`;
+            }
+            
+            toast({
+                title: "AI Feedback Received (Mock)",
+                description: <pre className="whitespace-pre-wrap text-xs">{feedbackMessage}</pre>,
+                duration: 15000,
+            });
+
+        } catch (error) {
+            console.error("Error during mock AI check:", error);
+            toast({ variant: "destructive", title: "AI Check Error", description: "Could not get feedback from the AI assistant." });
+        } finally {
+            setSelectedAssignmentTitleForUpload(null);
+        }
+    };
+    reader.onerror = () => {
+        toast({ variant: "destructive", title: "File Read Error", description: "Could not read the selected file." });
+        setSelectedAssignmentTitleForUpload(null);
+    };
+    reader.readAsText(file);
+  };
 
   const isCurrentUserTeacher = user?.uid === classroom?.teacherId;
 
@@ -341,6 +381,7 @@ export default function ClassDetailsPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
+      <input type="file" ref={assignmentFileRef} onChange={handleFileSelectedForAssignment} accept=".txt" style={{ display: 'none' }} />
       <div className="flex items-center justify-between mb-6">
         <Button onClick={() => router.push('/dashboard/classes')} variant="outline" className="rounded-lg">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Classes
@@ -447,7 +488,7 @@ export default function ClassDetailsPage() {
               </CardContent>
                <CardFooter className="flex flex-col sm:flex-row gap-2">
                 <Button variant="outline" className="w-full rounded-lg text-sm">Check All Assignments</Button>
-                 <Button onClick={handleMockAssignmentUpload} variant="default" className="w-full rounded-lg text-sm btn-gel">
+                 <Button onClick={handleTriggerAssignmentUpload} variant="default" className="w-full rounded-lg text-sm btn-gel">
                     <ChevronsUpDown className="mr-2 h-4 w-4" /> Upload & Check (Mock AI)
                 </Button>
               </CardFooter>
@@ -506,10 +547,8 @@ export default function ClassDetailsPage() {
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-2">
               {isCurrentUserTeacher && (
-                <Button asChild variant="outline" className="w-full rounded-lg text-sm">
-                  <Link href={`/dashboard/exams?classId=${classId}&className=${encodeURIComponent(classroom.name)}&action=create`}>
+                <Button onClick={() => setIsCreateExamDialogOpenForClass(true)} variant="outline" className="w-full rounded-lg text-sm">
                     <PlusCircle className="mr-2 h-4 w-4" /> Create New Exam for this Class
-                  </Link>
                 </Button>
               )}
               <Button asChild variant="outline" className="w-full rounded-lg text-sm">
