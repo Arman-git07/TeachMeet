@@ -30,7 +30,7 @@ export default function RootLayout({
       <body className={cn(
         geistSansFont.variable,
         geistMonoFont.variable,
-        'font-sans antialiased flex flex-col min-h-screen'
+        'font-sans antialiased min-h-screen' // Removed flex flex-col
       )}>
         <ThemeProvider
           attribute="class"
@@ -40,14 +40,12 @@ export default function RootLayout({
         >
           <AuthProvider>
             <SidebarProvider defaultOpen={false}>
-              <React.Fragment>
-                <div className="flex h-screen bg-background">
-                  <AppSidebar />
-                  <SidebarInset>
-                    {children}
-                  </SidebarInset>
-                </div>
-              </React.Fragment>
+              <div className="flex flex-1 bg-background"> {/* Changed h-screen to flex-1 */}
+                <AppSidebar />
+                <SidebarInset>
+                  {children}
+                </SidebarInset>
+              </div>
             </SidebarProvider>
           </AuthProvider>
           <Toaster />
