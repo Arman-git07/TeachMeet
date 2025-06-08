@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
     Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye // Added ExamIcon and Eye
+    ClipboardCheck as ExamIcon, Eye
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -43,7 +43,7 @@ interface Material {
 interface ClassExam {
   id: string;
   title: string;
-  dueDate: string; // Simplified for mock
+  dueDate: string; 
   status: 'Upcoming' | 'Active' | 'Ended' | 'Graded';
 }
 
@@ -61,7 +61,7 @@ interface ClassroomDetails {
   scheduleLastUpdated?: string; 
   assignments?: Assignment[];
   materials?: Material[];
-  exams?: ClassExam[]; // Added exams
+  exams?: ClassExam[];
   feeDetails?: { totalFee: number; paidAmount: number; nextDueDate?: string };
 }
 
@@ -103,7 +103,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       { id: "mat3", title: "Introductory Video Lecture", type: "video", url: "#", description: "A pre-recorded lecture covering the basics." },
       { id: "mat4", title: "Python Setup Guide", type: "file", fileName: "python_setup.md", description: "Instructions for setting up your Python environment." },
     ],
-    exams: [ // Mock exams for this class
+    exams: [ 
       { id: "exam_class_101", title: "Quiz 1: Basic Concepts", dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), status: "Upcoming" },
       { id: "exam_class_102", title: "Mid-Term Practical", dueDate: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), status: "Upcoming" },
       { id: "exam_class_100", title: "Diagnostic Test", dueDate: format(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), status: "Graded" },
@@ -122,9 +122,9 @@ const getStatusColor = (status: Assignment['status'] | ClassExam['status']) => {
     case 'Submitted': return 'bg-blue-500/20 text-blue-700 border-blue-500/50';
     case 'Pending': return 'bg-yellow-500/20 text-yellow-700 border-yellow-500/50';
     case 'Overdue': return 'bg-red-500/20 text-red-700 border-red-500/50';
-    case 'Upcoming': return 'bg-blue-500/20 text-blue-700 border-blue-500/50'; // For exams
-    case 'Active': return 'bg-green-500/20 text-green-700 border-green-500/50'; // For exams
-    case 'Ended': return 'bg-gray-500/20 text-gray-700 border-gray-500/50'; // For exams
+    case 'Upcoming': return 'bg-blue-500/20 text-blue-700 border-blue-500/50'; 
+    case 'Active': return 'bg-green-500/20 text-green-700 border-green-500/50'; 
+    case 'Ended': return 'bg-gray-500/20 text-gray-700 border-gray-500/50'; 
     default: return 'bg-muted text-muted-foreground border-border';
   }
 };
@@ -246,7 +246,7 @@ export default function ClassDetailsPage() {
               <div className="h-4 bg-muted rounded w-5/6"></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              {[...Array(6)].map((_, i) => ( // Increased skeleton items for exams card
+              {[...Array(6)].map((_, i) => (
                 <div key={i} className="h-24 bg-muted rounded-lg"></div>
               ))}
             </div>
@@ -406,7 +406,6 @@ export default function ClassDetailsPage() {
             </Card>
           </div>
           
-          {/* New Exams Section */}
           <Card className="rounded-lg shadow-md border-border/30">
             <CardHeader>
               <CardTitle className="flex items-center text-lg"><ExamIcon className="mr-2 h-5 w-5 text-primary" />Exams</CardTitle>
@@ -473,4 +472,6 @@ export default function ClassDetailsPage() {
     </div>
   );
 }
+    
+
     
