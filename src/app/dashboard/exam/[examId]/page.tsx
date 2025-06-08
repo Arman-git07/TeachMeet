@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 // Mock interface, in a real app, this would come from your data source
 interface ExamDetails {
@@ -112,7 +113,7 @@ export default function ExamTakingPage() {
         const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((distance % (1000 * 60)) / 1000);
         
-        lettimeLeftString = "";
+        let timeLeftString = "";
         if (days > 0) timeLeftString += `${days}d `;
         if (hours > 0 || days > 0) timeLeftString += `${hours}h `;
         timeLeftString += `${minutes}m ${seconds}s`;
