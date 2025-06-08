@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
     Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -153,6 +153,7 @@ export default function ClassDetailsPage() {
   const [classroom, setClassroom] = useState<ClassroomDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateExamDialogOpenForClass, setIsCreateExamDialogOpenForClass] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
   const assignmentFileRef = useRef<HTMLInputElement>(null);
   const [selectedAssignmentTitleForUpload, setSelectedAssignmentTitleForUpload] = useState<string | null>(null);
@@ -256,7 +257,6 @@ export default function ClassDetailsPage() {
         toast({ variant: "destructive", title: "No Assignments", description: "There are no assignments listed for this class to submit against." });
         return;
     }
-    // Reset dialog fields when opening
     setDialogAssignmentName('');
     setDialogAssignmentKeywords('');
     setIsAssignmentUploadDialogOpen(true);
@@ -270,21 +270,20 @@ export default function ClassDetailsPage() {
     setSelectedAssignmentTitleForUpload(dialogAssignmentName.trim());
     setSelectedStudentKeywords(dialogAssignmentKeywords.trim() || undefined);
     assignmentFileRef.current?.click();
-    // Dialog will be closed by handleFileSelectedForAssignment or if file selection is cancelled
   };
 
 
   const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (event.target) { 
-        event.target.value = ""; // Reset file input to allow re-selection of the same file
+        event.target.value = ""; 
     }
 
     if (!file) {
         toast({ variant: "info", title: "File Selection Cancelled", description: "No file was selected for upload." });
         setSelectedAssignmentTitleForUpload(null);
         setSelectedStudentKeywords(undefined);
-        setIsAssignmentUploadDialogOpen(false); // Close dialog if file selection cancelled
+        setIsAssignmentUploadDialogOpen(false); 
         return;
     }
 
@@ -292,7 +291,6 @@ export default function ClassDetailsPage() {
         toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file for this mock submission." });
         setSelectedAssignmentTitleForUpload(null);
         setSelectedStudentKeywords(undefined);
-        // Keep dialog open for user to try again or cancel
         return;
     }
     
@@ -315,7 +313,6 @@ export default function ClassDetailsPage() {
             return;
         }
         
-        // Use a more specific or teacher-provided rubric if available in the future.
         const mockTeacherRubric = `The assignment titled "${selectedAssignmentTitleForUpload}" should clearly explain relevant concepts, provide supporting examples, and demonstrate understanding of the topic. If keywords were provided by the student (${selectedStudentKeywords || 'none'}), consider their relevance.`;
 
         const input: AutoCheckAssignmentInput = {
@@ -326,7 +323,7 @@ export default function ClassDetailsPage() {
         };
 
         toast({ title: "Processing Submission...", description: "Your assignment is being checked by the AI (mock)." });
-        setIsAssignmentUploadDialogOpen(false); // Close dialog as processing starts
+        setIsAssignmentUploadDialogOpen(false); 
 
         try {
             const result: AutoCheckAssignmentOutput = await autoCheckAssignment(input);
@@ -347,7 +344,7 @@ export default function ClassDetailsPage() {
             toast({
                 title: "AI Feedback Received (Mock)",
                 description: <pre className="whitespace-pre-wrap text-xs max-h-60 overflow-y-auto">{feedbackMessage}</pre>,
-                duration: 20000, // Increased duration for longer feedback
+                duration: 20000, 
             });
 
         } catch (error) {
@@ -365,6 +362,15 @@ export default function ClassDetailsPage() {
         setIsAssignmentUploadDialogOpen(false);
     };
     reader.readAsText(file);
+  };
+  
+  const handleMockPayment = (method: string) => {
+    toast({
+      title: `Processing with ${method} (Mock)`,
+      description: "Payment integration is a planned feature. No actual transaction will occur.",
+      duration: 4000,
+    });
+    setIsPaymentDialogOpen(false);
   };
 
   const isCurrentUserTeacher = user?.uid === classroom?.teacherId;
@@ -648,9 +654,45 @@ export default function ClassDetailsPage() {
               ) : <p className="text-muted-foreground">Fee details not available.</p>}
             </CardContent>
             <CardFooter>
-              <Button className="w-full btn-gel rounded-lg text-sm" disabled={!classroom.feeDetails || classroom.feeDetails.paidAmount === classroom.feeDetails.totalFee}>
-                {classroom.feeDetails && classroom.feeDetails.paidAmount === classroom.feeDetails.totalFee ? "Fully Paid" : "Make Payment"}
-              </Button>
+                <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      className="w-full btn-gel rounded-lg text-sm" 
+                      disabled={!classroom.feeDetails || classroom.feeDetails.paidAmount === classroom.feeDetails.totalFee}
+                    >
+                      {classroom.feeDetails && classroom.feeDetails.paidAmount === classroom.feeDetails.totalFee ? "Fully Paid" : "Make Payment"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md rounded-xl">
+                    <DialogHeader>
+                      <DialogTitle>Choose Payment Method</DialogTitle>
+                      <DialogDescription>
+                        Select your preferred payment option. (Mock Interface)
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 py-4">
+                      <Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("Google Pay / UPI")}>
+                        <Smartphone className="mr-3 h-5 w-5 text-blue-500" /> Google Pay / UPI
+                      </Button>
+                      <Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("PhonePe")}>
+                        <Smartphone className="mr-3 h-5 w-5 text-purple-600" /> PhonePe
+                      </Button>
+                       <Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("Net Banking")}>
+                        <Banknote className="mr-3 h-5 w-5 text-green-600" /> Net Banking
+                      </Button>
+                      <Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("Credit/Debit Card")}>
+                        <CreditCard className="mr-3 h-5 w-5 text-orange-500" /> Credit/Debit Card
+                      </Button>
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline" className="rounded-lg">
+                          Cancel
+                        </Button>
+                      </DialogClose>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
             </CardFooter>
           </Card>
           
@@ -665,4 +707,6 @@ export default function ClassDetailsPage() {
     </div>
   );
 }
+    
+
     
