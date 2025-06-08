@@ -17,6 +17,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast'; 
 import { format } from 'date-fns';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface Announcement {
   title: string;
@@ -153,6 +156,10 @@ export default function ClassDetailsPage() {
 
   const assignmentFileRef = useRef<HTMLInputElement>(null);
   const [selectedAssignmentTitleForUpload, setSelectedAssignmentTitleForUpload] = useState<string | null>(null);
+  const [selectedStudentKeywords, setSelectedStudentKeywords] = useState<string | undefined>(undefined);
+  const [isAssignmentUploadDialogOpen, setIsAssignmentUploadDialogOpen] = useState(false);
+  const [dialogAssignmentName, setDialogAssignmentName] = useState('');
+  const [dialogAssignmentKeywords, setDialogAssignmentKeywords] = useState('');
 
 
   useEffect(() => {
@@ -244,44 +251,55 @@ export default function ClassDetailsPage() {
     });
   };
 
-  const handleTriggerAssignmentUpload = async () => {
+  const handleTriggerAssignmentUploadDialog = () => {
     if (!classroom?.assignments || classroom.assignments.length === 0) {
-        toast({ variant: "destructive", title: "No Assignments", description: "There are no assignments to submit for in this class." });
+        toast({ variant: "destructive", title: "No Assignments", description: "There are no assignments listed for this class to submit against." });
         return;
     }
-
-    const assignmentTitles = classroom.assignments.map(a => a.title).join('\n - ');
-    const selectedTitle = window.prompt(`Which assignment are you submitting for?\nAvailable assignments:\n - ${assignmentTitles}\n\nEnter the full title:`);
-
-    if (!selectedTitle || !selectedTitle.trim()) {
-        toast({ variant: "destructive", title: "No Title", description: "You must specify an assignment title." });
-        return;
-    }
-    setSelectedAssignmentTitleForUpload(selectedTitle.trim());
-    assignmentFileRef.current?.click();
+    // Reset dialog fields when opening
+    setDialogAssignmentName('');
+    setDialogAssignmentKeywords('');
+    setIsAssignmentUploadDialogOpen(true);
   };
+
+  const handleDialogSubmitAndChooseFile = () => {
+    if (!dialogAssignmentName.trim()) {
+        toast({ variant: "destructive", title: "Assignment Name Required", description: "Please enter the name of the assignment you are submitting for." });
+        return;
+    }
+    setSelectedAssignmentTitleForUpload(dialogAssignmentName.trim());
+    setSelectedStudentKeywords(dialogAssignmentKeywords.trim() || undefined);
+    assignmentFileRef.current?.click();
+    // Dialog will be closed by handleFileSelectedForAssignment or if file selection is cancelled
+  };
+
 
   const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (event.target) { 
-        event.target.value = "";
+        event.target.value = ""; // Reset file input to allow re-selection of the same file
     }
 
     if (!file) {
         toast({ variant: "info", title: "File Selection Cancelled", description: "No file was selected for upload." });
         setSelectedAssignmentTitleForUpload(null);
+        setSelectedStudentKeywords(undefined);
+        setIsAssignmentUploadDialogOpen(false); // Close dialog if file selection cancelled
         return;
     }
 
     if (file.type !== "text/plain") {
         toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file for this mock submission." });
         setSelectedAssignmentTitleForUpload(null);
+        setSelectedStudentKeywords(undefined);
+        // Keep dialog open for user to try again or cancel
         return;
     }
     
     if (!selectedAssignmentTitleForUpload) {
-        console.error("No assignment title was selected prior to file upload. This shouldn't happen.");
-        toast({ variant: "destructive", title: "Internal Error", description: "Assignment title was missing." });
+        console.error("No assignment title was selected prior to file upload. This shouldn't happen if dialog logic is correct.");
+        toast({ variant: "destructive", title: "Internal Error", description: "Assignment title was missing. Please try again." });
+        setIsAssignmentUploadDialogOpen(false);
         return;
     }
 
@@ -292,18 +310,23 @@ export default function ClassDetailsPage() {
         if (!studentAssignmentText || !studentAssignmentText.trim()) {
             toast({ variant: "destructive", title: "Empty File", description: "The selected file is empty or could not be read." });
             setSelectedAssignmentTitleForUpload(null);
+            setSelectedStudentKeywords(undefined);
+            setIsAssignmentUploadDialogOpen(false);
             return;
         }
         
-        const mockTeacherRubric = "The assignment should clearly explain the core concepts discussed in Chapter 1 and apply them to at least two real-world examples. Ensure proper citation and a conclusion summarizing the findings.";
+        // Use a more specific or teacher-provided rubric if available in the future.
+        const mockTeacherRubric = `The assignment titled "${selectedAssignmentTitleForUpload}" should clearly explain relevant concepts, provide supporting examples, and demonstrate understanding of the topic. If keywords were provided by the student (${selectedStudentKeywords || 'none'}), consider their relevance.`;
 
         const input: AutoCheckAssignmentInput = {
             studentAssignmentText: studentAssignmentText.substring(0, 5000), 
             teacherRubricText: mockTeacherRubric,
             assignmentTitle: selectedAssignmentTitleForUpload,
+            assignmentKeywords: selectedStudentKeywords,
         };
 
         toast({ title: "Processing Submission...", description: "Your assignment is being checked by the AI (mock)." });
+        setIsAssignmentUploadDialogOpen(false); // Close dialog as processing starts
 
         try {
             const result: AutoCheckAssignmentOutput = await autoCheckAssignment(input);
@@ -316,11 +339,15 @@ export default function ClassDetailsPage() {
             if (result.isPlagiarized) {
                 feedbackMessage += `Plagiarism Check: Potential issues detected.\n`;
             }
+             result.specificPoints.forEach(point => {
+                feedbackMessage += `\n- ${point.point}: ${point.assessment}`;
+                if(point.studentExtract) feedbackMessage += ` (e.g., "${point.studentExtract}")`;
+            });
             
             toast({
                 title: "AI Feedback Received (Mock)",
-                description: <pre className="whitespace-pre-wrap text-xs">{feedbackMessage}</pre>,
-                duration: 15000,
+                description: <pre className="whitespace-pre-wrap text-xs max-h-60 overflow-y-auto">{feedbackMessage}</pre>,
+                duration: 20000, // Increased duration for longer feedback
             });
 
         } catch (error) {
@@ -328,11 +355,14 @@ export default function ClassDetailsPage() {
             toast({ variant: "destructive", title: "AI Check Error", description: "Could not get feedback from the AI assistant." });
         } finally {
             setSelectedAssignmentTitleForUpload(null);
+            setSelectedStudentKeywords(undefined);
         }
     };
     reader.onerror = () => {
         toast({ variant: "destructive", title: "File Read Error", description: "Could not read the selected file." });
         setSelectedAssignmentTitleForUpload(null);
+        setSelectedStudentKeywords(undefined);
+        setIsAssignmentUploadDialogOpen(false);
     };
     reader.readAsText(file);
   };
@@ -488,9 +518,53 @@ export default function ClassDetailsPage() {
               </CardContent>
                <CardFooter className="flex flex-col sm:flex-row gap-2">
                 <Button variant="outline" className="w-full rounded-lg text-sm">Check All Assignments</Button>
-                 <Button onClick={handleTriggerAssignmentUpload} variant="default" className="w-full rounded-lg text-sm btn-gel">
-                    <ChevronsUpDown className="mr-2 h-4 w-4" /> Upload & Check (Mock AI)
-                </Button>
+                <Dialog open={isAssignmentUploadDialogOpen} onOpenChange={setIsAssignmentUploadDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" className="w-full rounded-lg text-sm btn-gel" onClick={handleTriggerAssignmentUploadDialog}>
+                        <ChevronsUpDown className="mr-2 h-4 w-4" /> Upload & Check (Mock AI)
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md rounded-xl">
+                    <DialogHeader>
+                      <DialogTitle>Submit Assignment</DialogTitle>
+                      <DialogDescription>
+                        Enter the assignment details and upload your .txt file.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="dialogAssignmentName">Assignment Name (you are submitting for)</Label>
+                        <Input
+                          id="dialogAssignmentName"
+                          value={dialogAssignmentName}
+                          onChange={(e) => setDialogAssignmentName(e.target.value)}
+                          placeholder="e.g., Introduction Essay"
+                          className="rounded-lg"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="dialogAssignmentKeywords">Keywords (optional, for your submission)</Label>
+                        <Input
+                          id="dialogAssignmentKeywords"
+                          value={dialogAssignmentKeywords}
+                          onChange={(e) => setDialogAssignmentKeywords(e.target.value)}
+                          placeholder="e.g., quantum physics, relativity"
+                          className="rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline" className="rounded-lg">
+                          Cancel
+                        </Button>
+                      </DialogClose>
+                      <Button type="button" onClick={handleDialogSubmitAndChooseFile} className="btn-gel rounded-lg">
+                        Choose File & Submit
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardFooter>
             </Card>
 
