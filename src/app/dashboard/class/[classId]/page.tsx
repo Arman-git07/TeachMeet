@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
     Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye
+    ClipboardCheck as ExamIcon, Eye, UploadCloud
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -98,6 +98,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       { id: "assign0", title: "Pre-course Survey", dueDate: "2024-07-30", status: "Overdue", description: "Complete this survey before the first class." },
     ],
     materials: [
+      { id: "mat_meeting_link", title: "Join Live Class Session Now!", type: "link", url: `/dashboard/meeting/${id}/wait?topic=${encodeURIComponent(className)}`, description: "Click here to join the ongoing class meeting." },
       { id: "mat1", title: "Course Syllabus", type: "file", fileName: "syllabus_fall2024.pdf", description: "Detailed course outline, grading policy, and schedule." },
       { id: "mat2", title: "Recommended Reading List", type: "link", url: "#", description: "A list of external articles and books." },
       { id: "mat3", title: "Introductory Video Lecture", type: "video", url: "#", description: "A pre-recorded lecture covering the basics." },
@@ -227,6 +228,15 @@ export default function ClassDetailsPage() {
     });
 
     toast({ title: "Announcement Posted", description: `"${newAnnouncement.title}" has been posted.` });
+  };
+
+  const handleUploadMaterial = () => {
+    toast({
+      title: "Upload Material (Mock)",
+      description: "Feature to upload class materials is planned for implementation.",
+      duration: 3000,
+    });
+    // In a real app, this would open a file dialog or a form to add links/videos.
   };
 
   const isCurrentUserTeacher = user?.uid === classroom?.teacherId;
@@ -394,13 +404,22 @@ export default function ClassDetailsPage() {
                         <p className="font-semibold text-foreground flex-grow truncate" title={item.title}>{item.title}</p>
                     </div>
                     {item.description && <p className="text-muted-foreground mt-0.5 text-xs ml-7">{item.description}</p>}
-                    <Button variant="link" size="sm" className="p-0 h-auto text-accent text-xs mt-1 ml-7">
-                        {item.type === 'link' || item.type === 'video' ? 'Open Link' : 'Download File'}
+                    <Button asChild variant="link" size="sm" className="p-0 h-auto text-accent text-xs mt-1 ml-7">
+                        {item.url ? (
+                          <Link href={item.url} target={item.url.startsWith('/') ? '_self' : '_blank'} rel="noopener noreferrer">
+                            {item.type === 'link' || item.type === 'video' ? 'Open Link' : 'Download File'}
+                          </Link>
+                        ) : (
+                           <span>{item.type === 'link' || item.type === 'video' ? 'Open Link' : 'Download File'}</span>
+                        )}
                     </Button>
                   </div>
                 )) : <p className="text-muted-foreground">No materials uploaded yet.</p>}
               </CardContent>
-               <CardFooter>
+               <CardFooter className="flex flex-col sm:flex-row gap-2">
+                <Button onClick={handleUploadMaterial} variant="outline" className="w-full rounded-lg text-sm">
+                    <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material (Mock)
+                </Button>
                 <Button variant="outline" className="w-full rounded-lg text-sm">Browse All Materials</Button>
               </CardFooter>
             </Card>
