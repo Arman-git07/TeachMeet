@@ -534,7 +534,7 @@ export default function ClassDetailsPage() {
               </CardContent>
                <CardFooter className="flex flex-col sm:flex-row gap-2">
                 <Button asChild variant="outline" className="w-full rounded-lg text-sm">
-                  <Link href={`/dashboard/assignments?classId=${classId}`}>
+                  <Link href="/dashboard/assignments">
                     Check All Assignments
                   </Link>
                 </Button>
@@ -742,4 +742,3 @@ export default function ClassDetailsPage() {
     
 
     
-
