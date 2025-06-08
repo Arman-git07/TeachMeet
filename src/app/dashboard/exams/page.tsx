@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Edit, ArrowRight, UploadCloud, Loader2, ClipboardCheck, CalendarClock, Percent, Eye, FileText, Send } from "lucide-react";
+import { PlusCircle, Edit, ArrowRight, UploadCloud, Loader2, ClipboardCheck, CalendarClock, Percent, Eye, FileText, Link as LinkIcon } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface Exam {
   id: string;
@@ -31,7 +32,7 @@ interface Exam {
   scheduledDateTime: Date;
   dueDateTime: Date;
   totalMarks: number;
-  questionPaperUrl?: string; // URL to the uploaded question paper
+  questionPaperUrl?: string; // URL to the uploaded question paper or link
   questionPaperFileName?: string;
   status: 'Upcoming' | 'Active' | 'Ended' | 'Graded';
 }
@@ -61,8 +62,12 @@ export default function ExamsPage() {
   const [newExamDueDate, setNewExamDueDate] = useState<Date | undefined>(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Default to next day
   const [newExamDueTime, setNewExamDueTime] = useState<string>("17:00");
   const [newExamTotalMarks, setNewExamTotalMarks] = useState<number | string>(100);
+  
+  const [newExamQuestionMode, setNewExamQuestionMode] = useState<'upload' | 'link'>('upload');
   const [newExamPaperFile, setNewExamPaperFile] = useState<File | null>(null);
-  const [isUploadingPaper, setIsUploadingPaper] = useState(false);
+  const [newExamQuestionLink, setNewExamQuestionLink] = useState<string>('');
+
+  const [isUploadingPaper, setIsUploadingPaper] = useState(false); // This state now also covers "Processing..." for link mode
   const questionPaperInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -100,19 +105,20 @@ export default function ExamsPage() {
     setNewExamDueDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
     setNewExamDueTime("17:00");
     setNewExamTotalMarks(100);
+    setNewExamQuestionMode('upload');
     setNewExamPaperFile(null);
+    setNewExamQuestionLink('');
     if (questionPaperInputRef.current) questionPaperInputRef.current.value = "";
     setIsUploadingPaper(false);
     setIsCreateExamDialogOpen(false);
   };
 
-  const uploadQuestionPaper = async (paperFile: File, userId: string, examId: string): Promise<{ url: string; fileName: string }> => {
-    setIsUploadingPaper(true);
+  const uploadQuestionPaperFile = async (paperFile: File, userId: string, examId: string): Promise<{ url: string; fileName: string }> => {
+    // setIsUploadingPaper(true); // Moved to handleCreateExam
     const fileName = `${Date.now()}_${paperFile.name.replace(/\s+/g, '_')}`;
     const filePath = `exam_papers/${userId}/${examId}/${fileName}`;
     const fileRef = storageRef(storage, filePath);
 
-    // Mock upload for now
     return new Promise((resolve, reject) => {
         const toastId = `upload-exam-paper-${Date.now()}`;
         toast({
@@ -122,27 +128,20 @@ export default function ExamsPage() {
             duration: Infinity,
         });
 
-        // Simulate upload delay
-        setTimeout(async () => {
+        setTimeout(async () => { // Simulating upload
             try {
-                 // In a real scenario, use uploadBytesResumable and getDownloadURL
-                // const uploadTask = uploadBytesResumable(fileRef, paperFile);
-                // await uploadTask;
-                // const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                const mockDownloadURL = `https://mockstorage.example.com/${filePath}`; // Mock URL
-                
+                const mockDownloadURL = `https://mockstorage.example.com/${filePath}`;
                 toast.dismiss(toastId);
-                toast({ title: "Question Paper Uploaded!", description: `${paperFile.name} mock-uploaded.` });
+                toast({ title: "Question Paper Uploaded!", description: `${paperFile.name} (mock) uploaded.` });
                 resolve({ url: mockDownloadURL, fileName: paperFile.name });
             } catch (error) {
                 console.error("Paper Upload Error (Mock):", error);
                 toast.dismiss(toastId);
                 toast({ variant: "destructive", title: "Upload Failed", description: "Could not upload paper." });
                 reject(error);
-            } finally {
-                setIsUploadingPaper(false);
             }
-        }, 2000); // 2 second delay
+            // setIsUploadingPaper(false); // Moved to handleCreateExam finally block
+        }, 1500);
     });
   };
 
@@ -169,52 +168,77 @@ export default function ExamsPage() {
       return;
     }
 
-    setIsUploadingPaper(true); // Indicate process has started
+    if (newExamQuestionMode === 'link' && !newExamQuestionLink.trim()) {
+        toast({ variant: "destructive", title: "Missing Link", description: "Please provide a link for the online questions."});
+        return;
+    }
+    if (newExamQuestionMode === 'link' && newExamQuestionLink.trim()) {
+        try {
+            new URL(newExamQuestionLink.trim());
+        } catch (_) {
+            toast({ variant: "destructive", title: "Invalid Link", description: "The provided link for online questions is not a valid URL."});
+            return;
+        }
+    }
+    // No file required if link mode is chosen and link is provided.
+    // If upload mode is chosen, file is optional based on current UI (can be made mandatory if needed).
+
+    setIsUploadingPaper(true); 
     
     let paperDetails: { url?: string; fileName?: string } = {};
     const examId = `exam${Date.now()}`;
 
-    if (newExamPaperFile) {
-      try {
-        const uploadedPaper = await uploadQuestionPaper(newExamPaperFile, user.uid, examId);
-        paperDetails = { url: uploadedPaper.url, fileName: uploadedPaper.fileName };
-      } catch (error) {
-        setIsUploadingPaper(false);
-        // Error is already toasted by uploadQuestionPaper
-        return; 
+    try {
+      if (newExamQuestionMode === 'upload' && newExamPaperFile) {
+        paperDetails = await uploadQuestionPaperFile(newExamPaperFile, user.uid, examId);
+      } else if (newExamQuestionMode === 'link' && newExamQuestionLink.trim()) {
+        paperDetails = {
+          url: newExamQuestionLink.trim(),
+          fileName: "Online Questions (Link)"
+        };
+        // Simulate a short processing time for link mode
+        await new Promise(resolve => setTimeout(resolve, 500));
+        toast({ title: "Question Link Processed", description: "Link to online questions has been saved." });
+      } else {
+        // No paper uploaded and no link provided (if paper is optional)
+        paperDetails = { fileName: "No paper attached/linked" };
       }
+
+      const newExam: Exam = {
+        id: examId,
+        title: newExamTitle.trim(),
+        description: newExamDescription.trim(),
+        teacherId: user.uid,
+        teacherName: user.displayName || "Teacher",
+        scheduledDateTime: scheduledDateTime,
+        dueDateTime: dueDateTime,
+        totalMarks: Number(newExamTotalMarks),
+        questionPaperUrl: paperDetails.url,
+        questionPaperFileName: paperDetails.fileName,
+        status: "Upcoming", 
+      };
+
+      setExams(prev => [newExam, ...prev]);
+      toast({
+        title: "Exam Created!",
+        description: `"${newExam.title}" has been scheduled.`,
+      });
+
+      resetCreateExamDialog();
+    } catch (error) {
+      // Error is usually toasted by uploadQuestionPaperFile or handled by initial checks
+      console.error("Error during exam creation finalization:", error);
+    } finally {
+      setIsUploadingPaper(false);
     }
-
-    const newExam: Exam = {
-      id: examId,
-      title: newExamTitle.trim(),
-      description: newExamDescription.trim(),
-      teacherId: user.uid,
-      teacherName: user.displayName || "Teacher",
-      scheduledDateTime: scheduledDateTime,
-      dueDateTime: dueDateTime,
-      totalMarks: Number(newExamTotalMarks),
-      questionPaperUrl: paperDetails.url,
-      questionPaperFileName: paperDetails.fileName,
-      status: "Upcoming", // Default status for new exams
-    };
-
-    // In a real app, save to Firestore: await setDoc(doc(db, "exams", newExam.id), newExam);
-    setExams(prev => [newExam, ...prev]);
-    toast({
-      title: "Exam Created!",
-      description: `"${newExam.title}" has been scheduled.`,
-    });
-
-    resetCreateExamDialog(); 
   };
   
   const getStatusVariant = (status: Exam['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch(status) {
-        case "Upcoming": return "default"; // Blueish (Primary by default)
-        case "Active": return "secondary"; // Greenish (Secondary by default)
-        case "Ended": return "outline"; // Greyish
-        case "Graded": return "default"; // Could use a different success color if available
+        case "Upcoming": return "default"; 
+        case "Active": return "secondary"; 
+        case "Ended": return "outline"; 
+        case "Graded": return "default"; 
         default: return "default";
     }
   };
@@ -239,7 +263,7 @@ export default function ExamsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Exams & Tests</h1>
           <p className="text-muted-foreground">Manage upcoming and past assessments.</p>
         </div>
-        {user && ( // Only show Create button if user is logged in (mock teacher)
+        {user && ( 
           <Dialog open={isCreateExamDialogOpen} onOpenChange={(isOpen) => {
               if (!isOpen) resetCreateExamDialog();
               setIsCreateExamDialogOpen(isOpen);
@@ -317,11 +341,56 @@ export default function ExamsPage() {
                   <Label htmlFor="totalMarks">Total Marks</Label>
                   <Input id="totalMarks" type="number" value={newExamTotalMarks} onChange={(e) => setNewExamTotalMarks(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g., 100" className="rounded-lg" disabled={isUploadingPaper}/>
                 </div>
+                
                 <div className="grid gap-2">
-                  <Label htmlFor="questionPaper">Question Paper (Optional, Max {MAX_FILE_SIZE_MB}MB)</Label>
-                  <Input ref={questionPaperInputRef} id="questionPaper" type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleQuestionPaperFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingPaper}/>
-                  {newExamPaperFile && <p className="text-xs text-muted-foreground">Selected: {newExamPaperFile.name}</p>}
+                  <Label>Question Paper Options</Label>
+                  <RadioGroup 
+                    value={newExamQuestionMode} 
+                    onValueChange={(value: 'upload' | 'link') => {
+                      setNewExamQuestionMode(value);
+                      if (value === 'upload') setNewExamQuestionLink(''); else setNewExamPaperFile(null);
+                    }} 
+                    className="grid grid-cols-2 gap-x-3 gap-y-2"
+                    disabled={isUploadingPaper}
+                  >
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" 
+                         onClick={() => !isUploadingPaper && setNewExamQuestionMode('upload')}>
+                      <RadioGroupItem value="upload" id="q-upload" />
+                      <Label htmlFor="q-upload" className="cursor-pointer text-sm">Upload File</Label>
+                    </div>
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" 
+                         onClick={() => !isUploadingPaper && setNewExamQuestionMode('link')}>
+                      <RadioGroupItem value="link" id="q-link" />
+                      <Label htmlFor="q-link" className="cursor-pointer text-sm">Link Online</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
+
+                {newExamQuestionMode === 'upload' && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="questionPaperFile">Upload File (Optional, Max {MAX_FILE_SIZE_MB}MB)</Label>
+                    <Input ref={questionPaperInputRef} id="questionPaperFile" type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleQuestionPaperFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingPaper}/>
+                    {newExamPaperFile && <p className="text-xs text-muted-foreground">Selected: {newExamPaperFile.name}</p>}
+                  </div>
+                )}
+
+                {newExamQuestionMode === 'link' && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="questionPaperLink">Link to Online Questions (e.g., Google Doc, Quiz URL)</Label>
+                    <div className="relative">
+                        <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                        <Input 
+                            id="questionPaperLink" 
+                            type="url" 
+                            value={newExamQuestionLink} 
+                            onChange={(e) => setNewExamQuestionLink(e.target.value)} 
+                            placeholder="https://docs.google.com/..." 
+                            className="rounded-lg pl-10" 
+                            disabled={isUploadingPaper}
+                        />
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <DialogClose asChild>
@@ -329,7 +398,7 @@ export default function ExamsPage() {
                 </DialogClose>
                 <Button type="button" onClick={handleCreateExam} className="btn-gel rounded-lg" disabled={isUploadingPaper || !newExamTitle.trim() || !newExamScheduledDate || !newExamDueDate}>
                   {isUploadingPaper ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isUploadingPaper ? (newExamPaperFile ? 'Uploading Paper...' : 'Creating...') : 'Create Exam'}
+                  {isUploadingPaper ? (newExamQuestionMode === 'upload' && newExamPaperFile ? 'Uploading...' : 'Processing...') : 'Create Exam'}
                 </Button>
               </DialogFooter>
             </DialogContent>
