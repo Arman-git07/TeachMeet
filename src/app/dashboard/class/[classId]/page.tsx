@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
     Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIcon, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth'; 
 import { useToast } from '@/hooks/use-toast'; 
 import { format } from 'date-fns';
+import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
 
 interface Announcement {
   title: string;
@@ -236,8 +237,65 @@ export default function ClassDetailsPage() {
       description: "Feature to upload class materials is planned for implementation.",
       duration: 3000,
     });
-    // In a real app, this would open a file dialog or a form to add links/videos.
   };
+
+  const handleMockAssignmentUpload = async () => {
+    if (!classroom?.assignments || classroom.assignments.length === 0) {
+        toast({ variant: "destructive", title: "No Assignments", description: "There are no assignments to submit for in this class." });
+        return;
+    }
+
+    const assignmentTitles = classroom.assignments.map(a => a.title).join('\n - ');
+    const selectedAssignmentTitle = window.prompt(`Which assignment are you submitting for?\nAvailable assignments:\n - ${assignmentTitles}\n\nEnter the full title:`);
+
+    if (!selectedAssignmentTitle || !selectedAssignmentTitle.trim()) {
+        toast({ variant: "destructive", title: "No Title", description: "You must specify an assignment title." });
+        return;
+    }
+
+    const studentAssignmentText = window.prompt("Please paste a short snippet of your assignment text (max 200 chars for this mock):");
+    if (!studentAssignmentText || !studentAssignmentText.trim()) {
+        toast({ variant: "destructive", title: "No Text", description: "Assignment text cannot be empty." });
+        return;
+    }
+
+    // Mock teacher's rubric for the AI
+    const mockTeacherRubric = "The assignment should clearly explain the core concepts discussed in Chapter 1 and apply them to at least two real-world examples. Ensure proper citation and a conclusion summarizing the findings.";
+
+    const input: AutoCheckAssignmentInput = {
+        studentAssignmentText: studentAssignmentText.substring(0, 200), // Limit for mock
+        teacherRubricText: mockTeacherRubric,
+        assignmentTitle: selectedAssignmentTitle.trim(),
+        // assignmentKeywords: "mock, demo" // Optional
+    };
+
+    toast({ title: "Processing Submission...", description: "Your assignment is being checked by the AI (mock)." });
+
+    try {
+        const result: AutoCheckAssignmentOutput = await autoCheckAssignment(input); // This uses the mock implementation from the flow file
+        
+        let feedbackMessage = `Feedback for "${result.overallFeedback ? input.assignmentTitle : 'your assignment'}":\n`;
+        feedbackMessage += `${result.overallFeedback}\n`;
+        if (result.similarityScore) {
+            feedbackMessage += `Similarity Score: ${result.similarityScore}%\n`;
+        }
+        if (result.isPlagiarized) {
+            feedbackMessage += `Plagiarism Check: Potential issues detected.\n`;
+        }
+        // For brevity, not including all specific points in the toast
+        
+        toast({
+            title: "AI Feedback Received (Mock)",
+            description: <pre className="whitespace-pre-wrap text-xs">{feedbackMessage}</pre>,
+            duration: 15000, // Longer duration for feedback
+        });
+
+    } catch (error) {
+        console.error("Error during mock AI check:", error);
+        toast({ variant: "destructive", title: "AI Check Error", description: "Could not get feedback from the AI assistant." });
+    }
+  };
+
 
   const isCurrentUserTeacher = user?.uid === classroom?.teacherId;
 
@@ -387,8 +445,11 @@ export default function ClassDetailsPage() {
                   </div>
                 )) : <p className="text-muted-foreground">No assignments posted yet.</p>}
               </CardContent>
-               <CardFooter>
+               <CardFooter className="flex flex-col sm:flex-row gap-2">
                 <Button variant="outline" className="w-full rounded-lg text-sm">Check All Assignments</Button>
+                 <Button onClick={handleMockAssignmentUpload} variant="default" className="w-full rounded-lg text-sm btn-gel">
+                    <ChevronsUpDown className="mr-2 h-4 w-4" /> Upload & Check (Mock AI)
+                </Button>
               </CardFooter>
             </Card>
 
@@ -446,7 +507,7 @@ export default function ClassDetailsPage() {
             <CardFooter className="flex flex-col sm:flex-row gap-2">
               {isCurrentUserTeacher && (
                 <Button asChild variant="outline" className="w-full rounded-lg text-sm">
-                  <Link href="/dashboard/exams">
+                  <Link href={`/dashboard/exams?classId=${classId}&className=${encodeURIComponent(classroom.name)}&action=create`}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Create New Exam for this Class
                   </Link>
                 </Button>
@@ -491,6 +552,4 @@ export default function ClassDetailsPage() {
     </div>
   );
 }
-    
-
     
