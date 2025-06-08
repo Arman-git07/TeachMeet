@@ -523,7 +523,11 @@ export default function ClassDetailsPage() {
                 )) : <p className="text-muted-foreground">No assignments posted yet.</p>}
               </CardContent>
                <CardFooter className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" className="w-full rounded-lg text-sm">Check All Assignments</Button>
+                <Button asChild variant="outline" className="w-full rounded-lg text-sm">
+                  <Link href="/dashboard/documents">
+                    Check All Assignments
+                  </Link>
+                </Button>
                 <Dialog open={isAssignmentUploadDialogOpen} onOpenChange={setIsAssignmentUploadDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="default" className="w-full rounded-lg text-sm btn-gel" onClick={handleTriggerAssignmentUploadDialog}>
