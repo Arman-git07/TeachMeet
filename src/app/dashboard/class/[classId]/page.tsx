@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast'; 
 import { format } from 'date-fns';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"; // Renamed DialogTitle to avoid conflict if CreateExamDialog exports one
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CreateExamDialog } from '@/components/exam/CreateExamDialog';
@@ -546,7 +546,7 @@ export default function ClassDetailsPage() {
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md rounded-xl">
                     <DialogHeader>
-                      <DialogTitle>Submit Assignment</DialogTitle>
+                      <ShadDialogTitle>Submit Assignment</ShadDialogTitle>
                       <DialogDescription>
                         Enter the assignment details and upload your .txt file.
                       </DialogDescription>
@@ -652,7 +652,7 @@ export default function ClassDetailsPage() {
                       isOpen={isCreateExamDialogOpenForClass} 
                       onOpenChange={setIsCreateExamDialogOpenForClass}
                       onExamCreated={handleExamCreated}
-                      classContext={{ classId: classroom.id, className: classroom.name }}
+                      classContext={classroom ? { classId: classroom.id, className: classroom.name } : undefined}
                     />
                   </DialogContent>
                 </Dialog>
@@ -691,7 +691,7 @@ export default function ClassDetailsPage() {
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md rounded-xl">
                     <DialogHeader>
-                      <DialogTitle>Choose Payment Method</DialogTitle>
+                      <ShadDialogTitle>Choose Payment Method</ShadDialogTitle>
                       <DialogDescription>
                         Select your preferred payment option. (Mock Interface)
                       </DialogDescription>
@@ -730,12 +730,6 @@ export default function ClassDetailsPage() {
 
         </CardContent>
       </Card>
-       <CreateExamDialog 
-        isOpen={isCreateExamDialogOpenForClass && isCurrentUserTeacher}
-        onOpenChange={setIsCreateExamDialogOpenForClass}
-        onExamCreated={handleExamCreated}
-        classContext={classroom ? { classId: classroom.id, className: classroom.name } : undefined}
-      />
     </div>
   );
 }
