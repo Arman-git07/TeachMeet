@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
     Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,12 +18,15 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CreateExamDialog } from '@/components/exam/CreateExamDialog';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 interface Announcement {
+  id: string;
   title: string;
   content: string;
   date: string;
@@ -93,9 +96,9 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
     memberCount: Math.floor(Math.random() * 25) + 10,
     thumbnailUrl: `https://placehold.co/800x400.png`,
     announcements: [
-      { title: "Welcome to the Course!", content: "We're excited to start this journey together. Please familiarize yourself with the syllabus and course materials.", date: "2024-08-01" },
-      { title: "Reminder: Office Hours Changed", content: "Office hours for this week are moved to Thursday, 3-4 PM.", date: "2024-08-05" },
-      { title: "Mid-term Project Guidelines", content: "The guidelines for the mid-term project have been uploaded to the materials section.", date: "2024-08-10" },
+      { id: "anno1", title: "Welcome to the Course!", content: "We're excited to start this journey together. Please familiarize yourself with the syllabus and course materials.", date: "2024-08-01" },
+      { id: "anno2", title: "Reminder: Office Hours Changed", content: "Office hours for this week are moved to Thursday, 3-4 PM.", date: "2024-08-05" },
+      { id: "anno3", title: "Mid-term Project Guidelines", content: "The guidelines for the mid-term project have been uploaded to the materials section.", date: "2024-08-10" },
     ],
     schedule: [
       { day: "Monday", time: "10:00 AM - 11:30 AM (Lecture)" },
@@ -177,9 +180,18 @@ export default function ClassDetailsPage() {
     nextDueDate: string;
   } | null>(null);
   
-  const [isAnnouncementDialogOpen, setIsAnnouncementDialogOpen] = useState(false);
-  const [announcementTitleInput, setAnnouncementTitleInput] = useState('');
-  const [announcementContentInput, setAnnouncementContentInput] = useState('');
+  // Announcement States
+  const [isPostAnnouncementDialogOpen, setIsPostAnnouncementDialogOpen] = useState(false);
+  const [postAnnouncementTitleInput, setPostAnnouncementTitleInput] = useState('');
+  const [postAnnouncementContentInput, setPostAnnouncementContentInput] = useState('');
+
+  const [isEditAnnouncementDialogOpen, setIsEditAnnouncementDialogOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [editAnnouncementTitleInput, setEditAnnouncementTitleInput] = useState('');
+  const [editAnnouncementContentInput, setEditAnnouncementContentInput] = useState('');
+
+  const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
+  const [announcementIdToDelete, setAnnouncementIdToDelete] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -241,14 +253,15 @@ export default function ClassDetailsPage() {
   };
   
   const handleDialogPostAnnouncement = () => {
-    if (!announcementTitleInput.trim() || !announcementContentInput.trim()) {
+    if (!postAnnouncementTitleInput.trim() || !postAnnouncementContentInput.trim()) {
       toast({ variant: "destructive", title: "Missing Information", description: "Both title and content are required for an announcement." });
       return;
     }
 
     const newAnnouncement: Announcement = {
-      title: announcementTitleInput.trim(),
-      content: announcementContentInput.trim(),
+      id: Date.now().toString(), // Ensure unique ID
+      title: postAnnouncementTitleInput.trim(),
+      content: postAnnouncementContentInput.trim(),
       date: new Date().toISOString().split('T')[0],
     };
 
@@ -261,9 +274,51 @@ export default function ClassDetailsPage() {
     });
 
     toast({ title: "Announcement Posted", description: `"${newAnnouncement.title}" has been posted.` });
-    setIsAnnouncementDialogOpen(false);
-    setAnnouncementTitleInput('');
-    setAnnouncementContentInput('');
+    setIsPostAnnouncementDialogOpen(false);
+    setPostAnnouncementTitleInput('');
+    setPostAnnouncementContentInput('');
+  };
+
+  const handleOpenEditAnnouncementDialog = (announcement: Announcement) => {
+    setEditingAnnouncement(announcement);
+    setEditAnnouncementTitleInput(announcement.title);
+    setEditAnnouncementContentInput(announcement.content);
+    setIsEditAnnouncementDialogOpen(true);
+  };
+
+  const handleDialogUpdateAnnouncement = () => {
+    if (!editingAnnouncement || !editAnnouncementTitleInput.trim() || !editAnnouncementContentInput.trim()) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Both title and content are required." });
+      return;
+    }
+    setClassroom(prev => {
+      if (!prev || !prev.announcements) return prev;
+      const updatedAnnouncements = prev.announcements.map(anno => 
+        anno.id === editingAnnouncement.id 
+        ? { ...anno, title: editAnnouncementTitleInput.trim(), content: editAnnouncementContentInput.trim(), date: new Date().toISOString().split('T')[0] } 
+        : anno
+      );
+      return { ...prev, announcements: updatedAnnouncements };
+    });
+    toast({ title: "Announcement Updated", description: `"${editAnnouncementTitleInput.trim()}" has been updated.` });
+    setIsEditAnnouncementDialogOpen(false);
+    setEditingAnnouncement(null);
+  };
+
+  const handleOpenDeleteConfirmDialog = (announcementId: string) => {
+    setAnnouncementIdToDelete(announcementId);
+    setIsDeleteConfirmDialogOpen(true);
+  };
+
+  const handleConfirmDeleteAnnouncement = () => {
+    if (!announcementIdToDelete) return;
+    setClassroom(prev => {
+      if (!prev || !prev.announcements) return prev;
+      return { ...prev, announcements: prev.announcements.filter(anno => anno.id !== announcementIdToDelete) };
+    });
+    toast({ title: "Announcement Deleted" });
+    setIsDeleteConfirmDialogOpen(false);
+    setAnnouncementIdToDelete(null);
   };
 
 
@@ -545,21 +600,33 @@ export default function ClassDetailsPage() {
                 <CardTitle className="flex items-center text-lg"><Megaphone className="mr-2 h-5 w-5 text-primary" />Announcements</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm max-h-72 overflow-y-auto">
-                {classroom.announcements?.length ? classroom.announcements.map((item, index) => (
-                  <div key={index} className="pb-3 border-b border-border/20 last:border-b-0">
-                    <p className="font-semibold text-foreground">{item.title} <span className="text-xs text-muted-foreground">({item.date})</span></p>
+                {classroom.announcements?.length ? classroom.announcements.map((item) => (
+                  <div key={item.id} className="pb-3 border-b border-border/20 last:border-b-0 group">
+                    <div className="flex justify-between items-start">
+                        <p className="font-semibold text-foreground flex-grow">{item.title} <span className="text-xs text-muted-foreground">({format(parseISO(item.date), "MMM d, yyyy")})</span></p>
+                        {isCurrentUserTeacher && (
+                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => handleOpenEditAnnouncementDialog(item)}>
+                                    <Edit2 className="h-4 w-4 text-blue-500" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md" onClick={() => handleOpenDeleteConfirmDialog(item.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                     <p className="text-muted-foreground mt-0.5">{item.content}</p>
                   </div>
                 )) : <p className="text-muted-foreground">No announcements posted yet.</p>}
               </CardContent>
               {isCurrentUserTeacher && (
                 <CardFooter>
-                  <Dialog open={isAnnouncementDialogOpen} onOpenChange={(isOpen) => {
-                      if (!isOpen) { // Reset on close
-                          setAnnouncementTitleInput('');
-                          setAnnouncementContentInput('');
+                  <Dialog open={isPostAnnouncementDialogOpen} onOpenChange={(isOpen) => {
+                      if (!isOpen) { 
+                          setPostAnnouncementTitleInput('');
+                          setPostAnnouncementContentInput('');
                       }
-                      setIsAnnouncementDialogOpen(isOpen);
+                      setIsPostAnnouncementDialogOpen(isOpen);
                   }}>
                     <DialogTrigger asChild>
                       <Button variant="outline" className="w-full rounded-lg text-sm">
@@ -575,21 +642,21 @@ export default function ClassDetailsPage() {
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                          <Label htmlFor="announcementTitle">Title</Label>
+                          <Label htmlFor="postAnnouncementTitle">Title</Label>
                           <Input
-                            id="announcementTitle"
-                            value={announcementTitleInput}
-                            onChange={(e) => setAnnouncementTitleInput(e.target.value)}
+                            id="postAnnouncementTitle"
+                            value={postAnnouncementTitleInput}
+                            onChange={(e) => setPostAnnouncementTitleInput(e.target.value)}
                             placeholder="e.g., Upcoming Test"
                             className="rounded-lg"
                           />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="announcementContent">Content</Label>
+                          <Label htmlFor="postAnnouncementContent">Content</Label>
                           <Textarea
-                            id="announcementContent"
-                            value={announcementContentInput}
-                            onChange={(e) => setAnnouncementContentInput(e.target.value)}
+                            id="postAnnouncementContent"
+                            value={postAnnouncementContentInput}
+                            onChange={(e) => setPostAnnouncementContentInput(e.target.value)}
                             placeholder="Enter the details of your announcement here..."
                             className="rounded-lg min-h-[100px]"
                           />
@@ -905,11 +972,74 @@ export default function ClassDetailsPage() {
 
         </CardContent>
       </Card>
+
+      {/* Edit Announcement Dialog */}
+      <Dialog open={isEditAnnouncementDialogOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) setEditingAnnouncement(null); // Reset on close
+          setIsEditAnnouncementDialogOpen(isOpen);
+      }}>
+        <DialogContent className="sm:max-w-lg rounded-xl">
+          <DialogHeader>
+            <ShadDialogTitle>Edit Announcement</ShadDialogTitle>
+            <DialogDescription>
+              Modify the title and content of your announcement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editAnnouncementTitle">Title</Label>
+              <Input
+                id="editAnnouncementTitle"
+                value={editAnnouncementTitleInput}
+                onChange={(e) => setEditAnnouncementTitleInput(e.target.value)}
+                className="rounded-lg"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editAnnouncementContent">Content</Label>
+              <Textarea
+                id="editAnnouncementContent"
+                value={editAnnouncementContentInput}
+                onChange={(e) => setEditAnnouncementContentInput(e.target.value)}
+                className="rounded-lg min-h-[100px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-lg">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={handleDialogUpdateAnnouncement} className="btn-gel rounded-lg">
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Announcement Confirmation Dialog */}
+      <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={setIsDeleteConfirmDialogOpen}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <ShadAlertDialogTitle>Confirm Deletion</ShadAlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this announcement? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg" onClick={() => setAnnouncementIdToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteAnnouncement} className={cn(Button({variant: "destructive", className: "rounded-lg"}))}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
     
 
     
+
 
 
