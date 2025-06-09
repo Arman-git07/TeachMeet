@@ -17,10 +17,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast'; 
 import { format, parseISO } from 'date-fns';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"; // Renamed DialogTitle to avoid conflict if CreateExamDialog exports one
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CreateExamDialog } from '@/components/exam/CreateExamDialog';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Announcement {
   title: string;
@@ -175,6 +176,10 @@ export default function ClassDetailsPage() {
     paidAmount: string;
     nextDueDate: string;
   } | null>(null);
+  
+  const [isAnnouncementDialogOpen, setIsAnnouncementDialogOpen] = useState(false);
+  const [announcementTitleInput, setAnnouncementTitleInput] = useState('');
+  const [announcementContentInput, setAnnouncementContentInput] = useState('');
 
 
   useEffect(() => {
@@ -235,25 +240,16 @@ export default function ClassDetailsPage() {
     }
   };
   
-  const handlePostAnnouncement = () => {
-    if (!classroom || user?.uid !== classroom.teacherId) return;
-
-    const title = window.prompt("Enter announcement title:");
-    if (!title || title.trim() === "") {
-      toast({ variant: "destructive", title: "Title Required", description: "Announcement title cannot be empty." });
-      return;
-    }
-
-    const content = window.prompt("Enter announcement content:");
-    if (!content || content.trim() === "") {
-      toast({ variant: "destructive", title: "Content Required", description: "Announcement content cannot be empty." });
+  const handleDialogPostAnnouncement = () => {
+    if (!announcementTitleInput.trim() || !announcementContentInput.trim()) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Both title and content are required for an announcement." });
       return;
     }
 
     const newAnnouncement: Announcement = {
-      title: title.trim(),
-      content: content.trim(),
-      date: new Date().toISOString().split('T')[0], 
+      title: announcementTitleInput.trim(),
+      content: announcementContentInput.trim(),
+      date: new Date().toISOString().split('T')[0],
     };
 
     setClassroom(prev => {
@@ -265,7 +261,11 @@ export default function ClassDetailsPage() {
     });
 
     toast({ title: "Announcement Posted", description: `"${newAnnouncement.title}" has been posted.` });
+    setIsAnnouncementDialogOpen(false);
+    setAnnouncementTitleInput('');
+    setAnnouncementContentInput('');
   };
+
 
   const handleUploadMaterial = () => {
     toast({
@@ -554,9 +554,59 @@ export default function ClassDetailsPage() {
               </CardContent>
               {isCurrentUserTeacher && (
                 <CardFooter>
-                  <Button onClick={handlePostAnnouncement} variant="outline" className="w-full rounded-lg text-sm">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Post New Announcement
-                  </Button>
+                  <Dialog open={isAnnouncementDialogOpen} onOpenChange={(isOpen) => {
+                      if (!isOpen) { // Reset on close
+                          setAnnouncementTitleInput('');
+                          setAnnouncementContentInput('');
+                      }
+                      setIsAnnouncementDialogOpen(isOpen);
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full rounded-lg text-sm">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Post New Announcement
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-lg rounded-xl">
+                      <DialogHeader>
+                        <ShadDialogTitle>Create New Announcement</ShadDialogTitle>
+                        <DialogDescription>
+                          Share important updates with your class.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="announcementTitle">Title</Label>
+                          <Input
+                            id="announcementTitle"
+                            value={announcementTitleInput}
+                            onChange={(e) => setAnnouncementTitleInput(e.target.value)}
+                            placeholder="e.g., Upcoming Test"
+                            className="rounded-lg"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="announcementContent">Content</Label>
+                          <Textarea
+                            id="announcementContent"
+                            value={announcementContentInput}
+                            onChange={(e) => setAnnouncementContentInput(e.target.value)}
+                            placeholder="Enter the details of your announcement here..."
+                            className="rounded-lg min-h-[100px]"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline" className="rounded-lg">
+                            Cancel
+                          </Button>
+                        </DialogClose>
+                        <Button type="button" onClick={handleDialogPostAnnouncement} className="btn-gel rounded-lg">
+                          Post Announcement
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardFooter>
               )}
             </Card>
@@ -861,4 +911,5 @@ export default function ClassDetailsPage() {
     
 
     
+
 
