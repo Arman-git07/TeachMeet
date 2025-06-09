@@ -66,6 +66,7 @@ interface ScheduleItem {
   id: string;
   day: string;
   time: string;
+  topic?: string; 
 }
 
 interface ClassroomDetails {
@@ -107,9 +108,9 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       { id: "anno3", title: "Mid-term Project Guidelines", content: "The guidelines for the mid-term project have been uploaded to the materials section.", date: "2024-08-10" },
     ],
     schedule: [
-      { id: "sched_mon", day: "Monday", time: "10:00 AM - 11:30 AM (Lecture)" },
-      { id: "sched_wed", day: "Wednesday", time: "10:00 AM - 11:00 AM (Lab)" },
-      { id: "sched_fri", day: "Friday", time: "01:00 PM - 02:00 PM (Discussion)" },
+      { id: "sched_mon", day: "Monday", time: "10:00 AM - 11:30 AM", topic: "Lecture" },
+      { id: "sched_wed", day: "Wednesday", time: "10:00 AM - 11:00 AM", topic: "Lab Session" },
+      { id: "sched_fri", day: "Friday", time: "01:00 PM - 02:00 PM", topic: "Discussion Group" },
     ],
     scheduleLastUpdated: "2024-07-28",
     assignments: [
@@ -203,6 +204,7 @@ export default function ClassDetailsPage() {
   const [editingScheduleItems, setEditingScheduleItems] = useState<ScheduleItem[]>([]);
   const [newScheduleDayInput, setNewScheduleDayInput] = useState('');
   const [newScheduleTimeInput, setNewScheduleTimeInput] = useState('');
+  const [newScheduleTopicInput, setNewScheduleTopicInput] = useState('');
 
 
   useEffect(() => {
@@ -336,6 +338,7 @@ export default function ClassDetailsPage() {
     setEditingScheduleItems(classroom?.schedule ? [...classroom.schedule] : []);
     setNewScheduleDayInput('');
     setNewScheduleTimeInput('');
+    setNewScheduleTopicInput('');
     setIsEditScheduleDialogOpen(true);
   };
 
@@ -348,10 +351,12 @@ export default function ClassDetailsPage() {
       id: `sched_${Date.now()}`,
       day: newScheduleDayInput.trim(),
       time: newScheduleTimeInput.trim(),
+      topic: newScheduleTopicInput.trim() || undefined,
     };
     setEditingScheduleItems(prev => [...prev, newItem]);
     setNewScheduleDayInput('');
     setNewScheduleTimeInput('');
+    setNewScheduleTopicInput('');
   };
 
   const handleRemoveScheduleItemInDialog = (itemId: string) => {
@@ -735,7 +740,7 @@ export default function ClassDetailsPage() {
                 {classroom.schedule?.length ? classroom.schedule.map((item) => (
                   <div key={item.id} className="flex justify-between py-1 border-b border-border/10 last:border-b-0">
                     <span className="text-foreground font-medium">{item.day}:</span>
-                    <span className="text-muted-foreground">{item.time}</span>
+                    <span className="text-muted-foreground">{item.time}{item.topic ? ` (${item.topic})` : ''}</span>
                   </div>
                 )) : <p className="text-muted-foreground">Schedule not available.</p>}
                 {isCurrentUserTeacher && (
@@ -1104,8 +1109,8 @@ export default function ClassDetailsPage() {
               editingScheduleItems.map((item, index) => (
                 <div key={item.id || index} className="flex items-center justify-between gap-2 p-2 border rounded-lg">
                   <div className="flex-grow">
-                    <p className="text-sm font-medium">{item.day}</p>
-                    <p className="text-xs text-muted-foreground">{item.time}</p>
+                    <p className="text-sm font-medium">{item.day} - {item.time}</p>
+                    {item.topic && <p className="text-xs text-muted-foreground">{item.topic}</p>}
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => handleRemoveScheduleItemInDialog(item.id)} className="text-destructive h-8 w-8 rounded-md">
                     <Trash2 className="h-4 w-4" />
@@ -1116,8 +1121,8 @@ export default function ClassDetailsPage() {
               <p className="text-sm text-muted-foreground text-center py-4">No schedule entries yet.</p>
             )}
             <div className="pt-4 border-t">
-              <Label className="text-sm font-medium">Add New Entry</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+              <Label className="text-sm font-medium block mb-2">Add New Entry</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
                   value={newScheduleDayInput}
                   onChange={(e) => setNewScheduleDayInput(e.target.value)}
@@ -1127,10 +1132,16 @@ export default function ClassDetailsPage() {
                 <Input
                   value={newScheduleTimeInput}
                   onChange={(e) => setNewScheduleTimeInput(e.target.value)}
-                  placeholder="Time (e.g., 2:00 PM - 3:00 PM)"
+                  placeholder="Time (e.g., 2 PM - 3 PM)"
                   className="rounded-lg"
                 />
               </div>
+              <Input
+                  value={newScheduleTopicInput}
+                  onChange={(e) => setNewScheduleTopicInput(e.target.value)}
+                  placeholder="Topic (e.g., Lecture, Lab)"
+                  className="rounded-lg mt-3"
+              />
               <Button onClick={handleAddScheduleItemInDialog} className="w-full mt-3 btn-gel rounded-lg text-sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Schedule Entry
               </Button>
