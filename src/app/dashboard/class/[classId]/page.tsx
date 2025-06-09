@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
@@ -1085,7 +1085,7 @@ export default function ClassDetailsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-lg" onClick={() => setAnnouncementIdToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDeleteAnnouncement} className={cn(Button({variant: "destructive", className: "rounded-lg"}))}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmDeleteAnnouncement} className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
