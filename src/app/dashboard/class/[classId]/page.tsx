@@ -62,6 +62,12 @@ interface FeeDetails {
   nextDueDate?: string;
 }
 
+interface ScheduleItem {
+  id: string;
+  day: string;
+  time: string;
+}
+
 interface ClassroomDetails {
   id: string;
   name: string;
@@ -72,7 +78,7 @@ interface ClassroomDetails {
   memberCount: number;
   thumbnailUrl: string;
   announcements?: Announcement[];
-  schedule?: { day: string; time: string }[];
+  schedule?: ScheduleItem[];
   scheduleLastUpdated?: string; 
   assignments?: Assignment[];
   materials?: Material[];
@@ -101,9 +107,9 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       { id: "anno3", title: "Mid-term Project Guidelines", content: "The guidelines for the mid-term project have been uploaded to the materials section.", date: "2024-08-10" },
     ],
     schedule: [
-      { day: "Monday", time: "10:00 AM - 11:30 AM (Lecture)" },
-      { day: "Wednesday", time: "10:00 AM - 11:00 AM (Lab)" },
-      { day: "Friday", time: "01:00 PM - 02:00 PM (Discussion)" },
+      { id: "sched_mon", day: "Monday", time: "10:00 AM - 11:30 AM (Lecture)" },
+      { id: "sched_wed", day: "Wednesday", time: "10:00 AM - 11:00 AM (Lab)" },
+      { id: "sched_fri", day: "Friday", time: "01:00 PM - 02:00 PM (Discussion)" },
     ],
     scheduleLastUpdated: "2024-07-28",
     assignments: [
@@ -180,7 +186,6 @@ export default function ClassDetailsPage() {
     nextDueDate: string;
   } | null>(null);
   
-  // Announcement States
   const [isPostAnnouncementDialogOpen, setIsPostAnnouncementDialogOpen] = useState(false);
   const [postAnnouncementTitleInput, setPostAnnouncementTitleInput] = useState('');
   const [postAnnouncementContentInput, setPostAnnouncementContentInput] = useState('');
@@ -192,6 +197,12 @@ export default function ClassDetailsPage() {
 
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
   const [announcementIdToDelete, setAnnouncementIdToDelete] = useState<string | null>(null);
+
+  // Schedule Edit State
+  const [isEditScheduleDialogOpen, setIsEditScheduleDialogOpen] = useState(false);
+  const [editingScheduleItems, setEditingScheduleItems] = useState<ScheduleItem[]>([]);
+  const [newScheduleDayInput, setNewScheduleDayInput] = useState('');
+  const [newScheduleTimeInput, setNewScheduleTimeInput] = useState('');
 
 
   useEffect(() => {
@@ -259,7 +270,7 @@ export default function ClassDetailsPage() {
     }
 
     const newAnnouncement: Announcement = {
-      id: Date.now().toString(), // Ensure unique ID
+      id: `anno_${Date.now()}`, 
       title: postAnnouncementTitleInput.trim(),
       content: postAnnouncementContentInput.trim(),
       date: new Date().toISOString().split('T')[0],
@@ -319,6 +330,45 @@ export default function ClassDetailsPage() {
     toast({ title: "Announcement Deleted" });
     setIsDeleteConfirmDialogOpen(false);
     setAnnouncementIdToDelete(null);
+  };
+
+  const handleOpenEditScheduleDialog = () => {
+    setEditingScheduleItems(classroom?.schedule ? [...classroom.schedule] : []);
+    setNewScheduleDayInput('');
+    setNewScheduleTimeInput('');
+    setIsEditScheduleDialogOpen(true);
+  };
+
+  const handleAddScheduleItemInDialog = () => {
+    if (!newScheduleDayInput.trim() || !newScheduleTimeInput.trim()) {
+      toast({ variant: "destructive", title: "Missing Day/Time", description: "Please enter both day and time for the new schedule entry." });
+      return;
+    }
+    const newItem: ScheduleItem = {
+      id: `sched_${Date.now()}`,
+      day: newScheduleDayInput.trim(),
+      time: newScheduleTimeInput.trim(),
+    };
+    setEditingScheduleItems(prev => [...prev, newItem]);
+    setNewScheduleDayInput('');
+    setNewScheduleTimeInput('');
+  };
+
+  const handleRemoveScheduleItemInDialog = (itemId: string) => {
+    setEditingScheduleItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const handleSaveChangesToSchedule = () => {
+    setClassroom(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        schedule: editingScheduleItems,
+        scheduleLastUpdated: format(new Date(), "yyyy-MM-dd"),
+      };
+    });
+    toast({ title: "Schedule Updated", description: "The class schedule has been successfully updated." });
+    setIsEditScheduleDialogOpen(false);
   };
 
 
@@ -451,9 +501,8 @@ export default function ClassDetailsPage() {
     setIsPaymentDialogOpen(false);
   };
 
-  const handleExamCreated = (newExam: any) => { // Replace 'any' with a proper Exam interface later
+  const handleExamCreated = (newExam: any) => { 
     console.log("New exam created via dialog on class page:", newExam);
-    // Potentially update classroom.exams state here, or refetch
      toast({
       title: "Exam Scheduled (Class Context)",
       description: `${newExam.title} has been scheduled for this class.`
@@ -461,7 +510,7 @@ export default function ClassDetailsPage() {
   };
 
   const handleToggleEditFeeDetails = () => {
-    if (isEditingFeeDetails) { // If cancelling
+    if (isEditingFeeDetails) { 
       if (classroom?.feeDetails) {
         setEditableFeeDetails({
           totalFee: String(classroom.feeDetails.totalFee),
@@ -680,20 +729,27 @@ export default function ClassDetailsPage() {
 
             <Card className="rounded-lg shadow-md border-border/30">
               <CardHeader>
-                <CardTitle className="flex items-center text-lg"><CalendarDays className="mr-2 h-5 w-5 text-primary" />Schedule & Timings</CardTitle>
+                <CardTitle className="flex items-center text-lg"><CalendarDays className="mr-2 h-5 w-5 text-primary" />Schedule &amp; Timings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                {classroom.schedule?.length ? classroom.schedule.map((item, index) => (
-                  <div key={index} className="flex justify-between py-1 border-b border-border/10 last:border-b-0">
+                {classroom.schedule?.length ? classroom.schedule.map((item) => (
+                  <div key={item.id} className="flex justify-between py-1 border-b border-border/10 last:border-b-0">
                     <span className="text-foreground font-medium">{item.day}:</span>
                     <span className="text-muted-foreground">{item.time}</span>
                   </div>
                 )) : <p className="text-muted-foreground">Schedule not available.</p>}
+                {isCurrentUserTeacher && (
+                    <div className="mt-4">
+                        <Button variant="outline" className="w-full rounded-lg text-sm" onClick={handleOpenEditScheduleDialog}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Edit Schedule
+                        </Button>
+                    </div>
+                )}
               </CardContent>
               {classroom.scheduleLastUpdated && (
                 <CardFooter className="border-t pt-3">
                   <p className="text-xs text-muted-foreground">
-                    Schedule last updated: {new Date(classroom.scheduleLastUpdated).toLocaleDateString()}
+                    Schedule last updated: {format(parseISO(classroom.scheduleLastUpdated), "PP")}
                   </p>
                 </CardFooter>
               )}
@@ -727,7 +783,7 @@ export default function ClassDetailsPage() {
                 <Dialog open={isAssignmentUploadDialogOpen} onOpenChange={setIsAssignmentUploadDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="default" className="w-full rounded-lg text-sm btn-gel" onClick={handleTriggerAssignmentUploadDialog}>
-                        <ChevronsUpDown className="mr-2 h-4 w-4" /> Upload & Check (Mock AI)
+                        <ChevronsUpDown className="mr-2 h-4 w-4" /> Upload &amp; Check (Mock AI)
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md rounded-xl">
@@ -766,7 +822,7 @@ export default function ClassDetailsPage() {
                         </Button>
                       </DialogClose>
                       <Button type="button" onClick={handleDialogSubmitAndChooseFile} className="btn-gel rounded-lg">
-                        Choose File & Submit
+                        Choose File &amp; Submit
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -853,7 +909,7 @@ export default function ClassDetailsPage() {
 
           <Card className="rounded-lg shadow-md border-border/30">
             <CardHeader>
-              <CardTitle className="flex items-center text-lg"><DollarSign className="mr-2 h-5 w-5 text-primary" />Fees & Payment</CardTitle>
+              <CardTitle className="flex items-center text-lg"><DollarSign className="mr-2 h-5 w-5 text-primary" />Fees &amp; Payment</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               {!classroom.feeDetails && !isEditingFeeDetails ? (
@@ -975,7 +1031,7 @@ export default function ClassDetailsPage() {
 
       {/* Edit Announcement Dialog */}
       <Dialog open={isEditAnnouncementDialogOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) setEditingAnnouncement(null); // Reset on close
+          if (!isOpen) setEditingAnnouncement(null); 
           setIsEditAnnouncementDialogOpen(isOpen);
       }}>
         <DialogContent className="sm:max-w-lg rounded-xl">
@@ -1034,12 +1090,68 @@ export default function ClassDetailsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Edit Schedule Dialog */}
+      <Dialog open={isEditScheduleDialogOpen} onOpenChange={setIsEditScheduleDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-xl">
+          <DialogHeader>
+            <ShadDialogTitle>Edit Class Schedule</ShadDialogTitle>
+            <DialogDescription>
+              Add, remove, or modify schedule entries for this class.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {editingScheduleItems.length > 0 ? (
+              editingScheduleItems.map((item, index) => (
+                <div key={item.id || index} className="flex items-center justify-between gap-2 p-2 border rounded-lg">
+                  <div className="flex-grow">
+                    <p className="text-sm font-medium">{item.day}</p>
+                    <p className="text-xs text-muted-foreground">{item.time}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => handleRemoveScheduleItemInDialog(item.id)} className="text-destructive h-8 w-8 rounded-md">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No schedule entries yet.</p>
+            )}
+            <div className="pt-4 border-t">
+              <Label className="text-sm font-medium">Add New Entry</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                <Input
+                  value={newScheduleDayInput}
+                  onChange={(e) => setNewScheduleDayInput(e.target.value)}
+                  placeholder="Day (e.g., Monday)"
+                  className="rounded-lg"
+                />
+                <Input
+                  value={newScheduleTimeInput}
+                  onChange={(e) => setNewScheduleTimeInput(e.target.value)}
+                  placeholder="Time (e.g., 2:00 PM - 3:00 PM)"
+                  className="rounded-lg"
+                />
+              </div>
+              <Button onClick={handleAddScheduleItemInDialog} className="w-full mt-3 btn-gel rounded-lg text-sm">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Schedule Entry
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-lg">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={handleSaveChangesToSchedule} className="btn-gel rounded-lg">
+              Save Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
     
-
     
-
-
-
+    
+    
