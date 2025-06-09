@@ -229,8 +229,12 @@ export function AppSidebar() {
           {isAuthenticated ? (
             <>
               <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem>
-              <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme asDialogTrigger>Start New Meeting</NavItem>
-              <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
+              {pathname === '/' && (
+                <>
+                  <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme asDialogTrigger>Start New Meeting</NavItem>
+                  <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
+                </>
+              )}
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
               <NavItem href="/dashboard/classes" icon={Users} currentPath={pathname}>Classes</NavItem>
