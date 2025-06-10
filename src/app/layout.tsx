@@ -1,3 +1,4 @@
+'use client'; // Added this directive
 
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
