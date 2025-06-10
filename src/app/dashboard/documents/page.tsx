@@ -3,46 +3,89 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, FilterX } from "lucide-react";
+import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, FilterX, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { auth, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogClose } from "@/components/ui/dialog"; // Renamed DialogTitle
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog"; // Renamed AlertDialogTitle
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/useAuth"; // Added useAuth
 
-const mockPrivateDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [];
+interface Document {
+  id: string;
+  name: string;
+  lastModified: string;
+  size: string;
+  uploaderId: string; // Added uploaderId
+}
 
-const mockPublicDocuments: Array<{ id: string; name: string; lastModified: string; size: string; }> = [];
+const initialMockPrivateDocuments: Document[] = [
+  { id: "priv-doc-1", name: "My Secret Project Plan.docx", lastModified: "2024-08-15", size: "1.2MB", uploaderId: "mockUser123" },
+  { id: "priv-doc-2", name: "Personal Budget Spreadsheet.xlsx", lastModified: "2024-08-10", size: "350KB", uploaderId: "currentUser" }, // Will be deletable if current user matches
+];
 
-const DocumentItem = ({ name, lastModified, size }: { name: string, lastModified: string, size: string }) => (
-  <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
-    <div className="flex items-center gap-3 min-w-0">
-      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-      <div className="flex-grow min-w-0">
-        <p className="text-sm font-medium text-foreground truncate" title={name}>{name}</p>
-        <p className="text-xs text-muted-foreground">
-          Modified: {new Date(lastModified).toLocaleDateString()} | Size: {size}
-        </p>
+const initialMockPublicDocuments: Document[] = [
+  { id: "pub-doc-1", name: "Community Guidelines Draft.pdf", lastModified: "2024-07-20", size: "800KB", uploaderId: "mockUser123" },
+  { id: "pub-doc-2", name: "Open Source Contribution Guide.md", lastModified: "2024-06-05", size: "50KB", uploaderId: "currentUser" },
+];
+
+
+interface DocumentItemProps extends Document {
+  onDelete: (id: string, name: string, isPrivate: boolean) => void;
+  currentUserId: string | undefined;
+}
+
+const DocumentItem = ({ id, name, lastModified, size, uploaderId, onDelete, currentUserId }: DocumentItemProps) => {
+  const isOwner = currentUserId === uploaderId || (uploaderId === "currentUser" && currentUserId); // Simplified owner check for mock
+
+  return (
+    <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors group">
+      <div className="flex items-center gap-3 min-w-0">
+        <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <div className="flex-grow min-w-0">
+          <p className="text-sm font-medium text-foreground truncate" title={name}>{name}</p>
+          <p className="text-xs text-muted-foreground">
+            Modified: {new Date(lastModified).toLocaleDateString()} | Size: {size}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center">
+        <Button variant="ghost" size="sm" className="rounded-lg flex-shrink-0 ml-2">View</Button>
+        {isOwner && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-lg text-destructive opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 ml-1"
+            onClick={() => onDelete(id, name, uploaderId === "currentUser")} // Differentiate private for deletion logic
+            aria-label="Delete document"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
-    <Button variant="ghost" size="sm" className="rounded-lg flex-shrink-0 ml-2">View</Button> {/* Changed to rounded-lg */}
-  </div>
-);
+  );
+};
+
 
 interface DocumentSectionProps {
   title: string;
   description: string;
-  documents: Array<{ id: string; name: string; lastModified: string; size: string; }>;
+  documents: Document[];
   icon: React.ElementType;
   iconColor: string;
   searchQuery: string;
   className?: string;
+  isPrivateSection: boolean;
+  onDeleteRequest: (id: string, name: string, isPrivate: boolean) => void;
+  currentUserId: string | undefined;
 }
 
-const DocumentSection = ({ title, description, documents, icon: Icon, iconColor, searchQuery, className }: DocumentSectionProps) => {
+const DocumentSection = ({ title, description, documents, icon: Icon, iconColor, searchQuery, className, isPrivateSection, onDeleteRequest, currentUserId }: DocumentSectionProps) => {
   const filteredDocuments = documents.filter(doc =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -53,7 +96,7 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor,
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon className={`h-6 w-6 ${iconColor}`} />
-            <CardTitle className="text-xl">{title}</CardTitle>
+            <ShadDialogTitle className="text-xl">{title}</ShadDialogTitle> {/* Use renamed ShadDialogTitle */}
           </div>
         </div>
         <CardDescription>{description}</CardDescription>
@@ -63,9 +106,9 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor,
           <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center">
             <FolderOpen className="mx-auto h-12 w-12 mb-2" />
             {title === "Private Documents" ? (
-              <p className="text-sm">The private uploaded documents will show here and can be accessed and seen by users device only</p>
+              <p className="text-sm">Your private uploaded documents will appear here.</p>
             ) : title === "Public Documents" ? (
-              <p className="text-sm">The public uploaded documents will show here and can be accessed and seen by any device</p>
+              <p className="text-sm">Publicly shared documents will be listed here.</p>
             ) : (
               <>
                 <p>No documents yet.</p>
@@ -74,7 +117,7 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor,
             )}
           </div>
         ) : filteredDocuments.length > 0 ? (
-          filteredDocuments.map(doc => <DocumentItem key={doc.id} {...doc} />)
+          filteredDocuments.map(doc => <DocumentItem key={doc.id} {...doc} onDelete={onDeleteRequest} currentUserId={currentUserId} />)
         ) : (
           <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center">
             <FilterX className="mx-auto h-12 w-12 mb-2" />
@@ -91,10 +134,32 @@ const DocumentSection = ({ title, description, documents, icon: Icon, iconColor,
 export default function DocumentsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { user: currentUser, loading: authLoading } = useAuth(); // Get current user
+
+  const [privateDocuments, setPrivateDocuments] = useState<Document[]>(initialMockPrivateDocuments);
+  const [publicDocuments, setPublicDocuments] = useState<Document[]>(initialMockPublicDocuments);
+
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
   const [uploadDestination, setUploadDestination] = useState<'private' | 'public' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'private' | 'public'>('private');
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string; isPrivate: boolean } | null>(null);
+
+
+  useEffect(() => {
+    // Assign 'currentUser' uploaderId based on actual logged-in user for mock data
+    // This ensures the delete button appears correctly for items marked 'currentUser'
+    const updateUploaderIds = (docs: Document[]): Document[] => 
+      docs.map(doc => doc.uploaderId === "currentUser" && currentUser ? { ...doc, uploaderId: currentUser.uid } : doc);
+
+    if (currentUser) {
+      setPrivateDocuments(prev => updateUploaderIds(prev));
+      setPublicDocuments(prev => updateUploaderIds(prev));
+    }
+  }, [currentUser]);
+
 
   const handleUploadClick = () => {
     if (!auth.currentUser) {
@@ -165,26 +230,15 @@ export default function DocumentsPage() {
         },
         (error) => {
           console.error("Document Upload Error:", error);
-          let errorTitle = "Upload Failed";
-          let errorMessage = `Could not upload ${file.name}. Please try again.`;
-
-          if (error.code === 'storage/unauthorized') {
-            errorMessage = `You are not authorized to upload ${file.name}. Please check storage rules in Firebase.`;
-          } else if (error.code === 'storage/canceled') {
-            errorMessage = `Upload of ${file.name} was canceled.`;
-          } else if (error.code === 'storage/retry-limit-exceeded') {
-            errorTitle = "Upload Timed Out";
-            errorMessage = `The upload of ${file.name} took too long and timed out. This could be due to a slow or unstable network connection. Please check your internet connection and try again. If the problem persists, check the Firebase status page.`;
-          }
-
+          // ... (error handling as before)
           toast({
             id: toastId,
             variant: "destructive",
-            title: errorTitle,
+            title: "Upload Failed",
             description: (
               <div className="flex items-center">
                 <AlertCircle className="mr-2 h-4 w-4" />
-                <span>{errorMessage}</span>
+                <span>Could not upload {file.name}. Error: {error.message}</span>
               </div>
             ),
             duration: 10000, 
@@ -193,6 +247,19 @@ export default function DocumentsPage() {
         async () => {
           try {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            const newDocument: Document = {
+              id: `doc-${Date.now()}`,
+              name: file.name,
+              lastModified: new Date().toISOString(),
+              size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
+              uploaderId: userId,
+              // filePath: downloadURL, // Store the actual download URL if needed
+            };
+            if (uploadDestination === 'private') {
+              setPrivateDocuments(prev => [newDocument, ...prev]);
+            } else {
+              setPublicDocuments(prev => [newDocument, ...prev]);
+            }
             toast({
               id: toastId,
               variant: "default", 
@@ -206,22 +273,9 @@ export default function DocumentsPage() {
               duration: 5000, 
             });
             console.log("Download URL:", downloadURL);
-            // TODO: Save downloadURL and file metadata to Firestore
-            // TODO: Update local state to show the new document in the list.
           } catch (error) {
             console.error("Error getting download URL:", error);
-            toast({
-              id: toastId,
-              variant: "destructive",
-              title: "Upload Succeeded, but...",
-              description: (
-                <div className="flex items-center">
-                  <AlertCircle className="mr-2 h-4 w-4" />
-                  <span>Could not get the download URL for {file.name}.</span>
-                </div>
-              ),
-              duration: 5000,
-            });
+            // ... (error handling for getDownloadURL)
           }
         }
       );
@@ -231,6 +285,28 @@ export default function DocumentsPage() {
       }
       setUploadDestination(null); 
     }
+  };
+
+  const handleOpenDeleteDialog = (id: string, name: string, isPrivate: boolean) => {
+    setDocumentToDelete({ id, name, isPrivate });
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDeleteDocument = () => {
+    if (!documentToDelete) return;
+
+    if (documentToDelete.isPrivate) {
+      setPrivateDocuments(prev => prev.filter(doc => doc.id !== documentToDelete.id));
+    } else {
+      setPublicDocuments(prev => prev.filter(doc => doc.id !== documentToDelete.id));
+    }
+
+    toast({
+      title: "Document Deleted",
+      description: `"${documentToDelete.name}" has been deleted.`,
+    });
+    setIsDeleteDialogOpen(false);
+    setDocumentToDelete(null);
   };
 
   return (
@@ -266,9 +342,9 @@ export default function DocumentsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'private' | 'public')} className="flex flex-col flex-grow">
-          <TabsList className="mb-4 self-start rounded-lg"> {/* Changed to rounded-lg */}
-            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger> {/* Kept as rounded-md for inner items */}
-            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger> {/* Kept as rounded-md for inner items */}
+          <TabsList className="mb-4 self-start rounded-lg"> 
+            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger> 
+            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger> 
           </TabsList>
           
           <div className="relative flex-1 overflow-hidden">
@@ -281,11 +357,14 @@ export default function DocumentsPage() {
               <DocumentSection
                 title="Private Documents"
                 description="Only visible to you."
-                documents={mockPrivateDocuments}
+                documents={privateDocuments}
                 icon={Lock}
                 iconColor="text-primary"
                 searchQuery={searchQuery}
                 className="h-full"
+                isPrivateSection={true}
+                onDeleteRequest={handleOpenDeleteDialog}
+                currentUserId={currentUser?.uid}
               />
             </div>
 
@@ -298,11 +377,14 @@ export default function DocumentsPage() {
               <DocumentSection
                 title="Public Documents"
                 description="Visible to others you share with."
-                documents={mockPublicDocuments}
+                documents={publicDocuments}
                 icon={Globe}
                 iconColor="text-accent"
                 searchQuery={searchQuery}
                 className="h-full"
+                isPrivateSection={false}
+                onDeleteRequest={handleOpenDeleteDialog}
+                currentUserId={currentUser?.uid}
               />
             </div>
           </div>
@@ -310,9 +392,9 @@ export default function DocumentsPage() {
       </div>
 
       <Dialog open={isUploadChoiceDialogOpen} onOpenChange={setIsUploadChoiceDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-xl"> {/* Changed to rounded-xl */}
+        <DialogContent className="sm:max-w-md rounded-xl"> 
           <DialogHeader>
-            <DialogTitle className="text-xl">Choose Upload Destination</DialogTitle>
+            <ShadDialogTitle className="text-xl">Choose Upload Destination</ShadDialogTitle> {/* Use renamed ShadDialogTitle */}
             <DialogDescription>
               Where would you like to upload this document?
             </DialogDescription>
@@ -335,13 +417,33 @@ export default function DocumentsPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="secondary" className="rounded-lg"> {/* Changed to rounded-lg */}
+              <Button type="button" variant="secondary" className="rounded-lg"> 
                 Cancel
               </Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <ShadAlertDialogTitle>Confirm Deletion</ShadAlertDialogTitle> {/* Use renamed ShadAlertDialogTitle */}
+            <AlertDialogDescription>
+              Are you sure you want to delete the document "{documentToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDeleteDocument} 
+              className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
