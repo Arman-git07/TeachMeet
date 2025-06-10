@@ -25,10 +25,52 @@ interface Recording {
   filePath?: string; // Assuming you might store a path to the actual file for download/manual upload
 }
 
-const mockPrivateRecordings: Recording[] = [];
-const mockPublicRecordings: Recording[] = [];
+const mockPrivateRecordings: Recording[] = [ // Added one private for testing
+  {
+    id: "priv-rec-1",
+    name: "My Private Brainstorm Session",
+    date: "2024-08-01",
+    duration: "30:15",
+    size: "150MB",
+    thumbnailUrl: `https://placehold.co/300x180.png?text=Private+Notes`,
+    filePath: "/mock-path/private-brainstorm.mp4", // Private can also have filePath
+  }
+];
+const mockPublicRecordings: Recording[] = [
+  {
+    id: "pub-rec-1",
+    name: "Community Q&A - July",
+    date: "2024-07-28",
+    duration: "45:12",
+    size: "250MB",
+    thumbnailUrl: `https://placehold.co/300x180.png?text=Public+Q&A`,
+    filePath: "/mock-path/public-q&a-july.mp4",
+  },
+  {
+    id: "pub-rec-2",
+    name: "Guest Lecture: Intro to AI",
+    date: "2024-07-15",
+    duration: "01:12:30",
+    size: "400MB",
+    thumbnailUrl: `https://placehold.co/300x180.png?text=AI+Lecture`,
+    filePath: "/mock-path/guest-lecture-ai.mp4",
+  },
+  {
+    id: "pub-rec-3",
+    name: "Product Update Showcase",
+    date: "2024-06-30",
+    duration: "22:05",
+    size: "120MB",
+    // No thumbnailUrl, will show placeholder icon
+    filePath: "/mock-path/product-update.mp4",
+  }
+];
 
-const RecordingItem = ({ name, date, duration, size, thumbnailUrl, filePath }: Recording) => {
+interface RecordingItemProps extends Recording {
+  isPublic: boolean;
+}
+
+const RecordingItem = ({ name, date, duration, size, thumbnailUrl, filePath, isPublic }: RecordingItemProps) => {
   const { toast } = useToast();
 
   const handleShareToYouTube = () => {
@@ -72,16 +114,18 @@ const RecordingItem = ({ name, date, duration, size, thumbnailUrl, filePath }: R
       <CardContent className="p-3 space-y-1">
         <p className="text-sm font-medium text-foreground truncate" title={name}>{name}</p>
         <p className="text-xs text-muted-foreground">
-          Date: {new Date(date).toLocaleDateString()} | Size: {size}
+          Date: {new Date(date).toLocaleDateString()} | Size: {size} {isPublic && <Globe className="inline h-3 w-3 ml-1 text-accent" />}
         </p>
       </CardContent>
       <CardFooter className="p-3 border-t grid grid-cols-3 gap-2"> {/* Changed to grid-cols-3 */}
         <Button variant="default" size="sm" className="rounded-lg btn-gel text-xs" onClick={handlePlay}>
           <PlayCircle className="mr-1.5 h-4 w-4" /> Play
         </Button>
-        <Button variant="outline" size="sm" className="rounded-lg text-xs" onClick={handleDownload}>
-          <Download className="mr-1.5 h-4 w-4" /> Download
-        </Button>
+        {isPublic && filePath ? (
+          <Button variant="outline" size="sm" className="rounded-lg text-xs" onClick={handleDownload}>
+            <Download className="mr-1.5 h-4 w-4" /> Download
+          </Button>
+        ) : <div /> /* Placeholder for grid alignment if button not shown */}
         <Button variant="outline" size="sm" className="rounded-lg text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:text-red-700" onClick={handleShareToYouTube}> {/* Custom style for YouTube button */}
           <Youtube className="mr-1.5 h-4 w-4" /> YT (Manual)
         </Button>
@@ -98,10 +142,11 @@ interface RecordingSectionProps {
   icon: React.ElementType;
   iconColor: string;
   searchQuery: string;
+  isPublicSection: boolean; // New prop
   className?: string;
 }
 
-const RecordingSection = ({ title, description, recordings, icon: Icon, iconColor, searchQuery, className }: RecordingSectionProps) => {
+const RecordingSection = ({ title, description, recordings, icon: Icon, iconColor, searchQuery, isPublicSection, className }: RecordingSectionProps) => {
   const filteredRecordings = recordings.filter(rec =>
     rec.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -130,7 +175,7 @@ const RecordingSection = ({ title, description, recordings, icon: Icon, iconColo
           </div>
         ) : filteredRecordings.length > 0 ? (
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredRecordings.map(rec => <RecordingItem key={rec.id} {...rec} />)}
+            {filteredRecordings.map(rec => <RecordingItem key={rec.id} {...rec} isPublic={isPublicSection} />)}
           </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center h-full">
@@ -343,6 +388,7 @@ export default function RecordingsPage() {
                 icon={Lock}
                 iconColor="text-primary"
                 searchQuery={searchQuery}
+                isPublicSection={false}
                 className="h-full"
               />
             </div>
@@ -360,6 +406,7 @@ export default function RecordingsPage() {
                 icon={Globe}
                 iconColor="text-accent"
                 searchQuery={searchQuery}
+                isPublicSection={true}
                 className="h-full"
               />
             </div>
