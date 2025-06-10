@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Video as VideoIcon, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, FilterX, PlayCircle, Download, Settings } from "lucide-react";
+import { Video as VideoIcon, Lock, Globe, FolderOpen, Search, UploadCloud, CheckCircle, AlertCircle, FilterX, PlayCircle, Download, Settings, Youtube } from "lucide-react"; // Added Youtube icon
 import { Input } from "@/components/ui/input";
 import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -22,41 +22,73 @@ interface Recording {
   duration: string;
   size: string;
   thumbnailUrl?: string;
+  filePath?: string; // Assuming you might store a path to the actual file for download/manual upload
 }
 
 const mockPrivateRecordings: Recording[] = [];
 const mockPublicRecordings: Recording[] = [];
 
-const RecordingItem = ({ name, date, duration, size, thumbnailUrl }: Recording) => (
-  <Card className="rounded-xl shadow-lg hover:shadow-xl transition-shadow border-border/50 overflow-hidden"> {/* Changed to rounded-xl, shadow-lg, border-border/50 */}
-    <div className="relative h-32 sm:h-36 bg-muted/30">
-      {thumbnailUrl ? (
-        <Image src={thumbnailUrl} alt={`Thumbnail for ${name}`} layout="fill" objectFit="cover" data-ai-hint="video thumbnail"/>
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <VideoIcon className="h-12 w-12 text-muted-foreground/50" />
+const RecordingItem = ({ name, date, duration, size, thumbnailUrl, filePath }: Recording) => {
+  const { toast } = useToast();
+
+  const handleShareToYouTube = () => {
+    toast({
+      title: "Manual YouTube Upload",
+      description: `This is a placeholder. In a real app, "${name}" would be processed for upload. Please upload the file manually to YouTube Studio.`,
+      duration: 8000,
+    });
+    window.open('https://studio.youtube.com/', '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownload = () => {
+    // This is a mock download. In a real app, you'd use filePath or a download URL.
+    if (filePath) {
+      toast({ title: "Downloading (Mock)", description: `Would download: ${name}` });
+      // window.open(filePath, '_blank'); // Example for direct link
+    } else {
+      toast({ variant: "destructive", title: "Download Not Available", description: "No file path specified for this recording." });
+    }
+  };
+  
+  const handlePlay = () => {
+     toast({ title: "Playing (Mock)", description: `Would play: ${name}` });
+     // In a real app, this would open a video player with the recording
+  }
+
+  return (
+    <Card className="rounded-xl shadow-lg hover:shadow-xl transition-shadow border-border/50 overflow-hidden">
+      <div className="relative h-32 sm:h-36 bg-muted/30">
+        {thumbnailUrl ? (
+          <Image src={thumbnailUrl} alt={`Thumbnail for ${name}`} layout="fill" objectFit="cover" data-ai-hint="video thumbnail"/>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <VideoIcon className="h-12 w-12 text-muted-foreground/50" />
+          </div>
+        )}
+        <div className="absolute top-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs backdrop-blur-sm">
+          {duration}
         </div>
-      )}
-      <div className="absolute top-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs backdrop-blur-sm">
-        {duration}
       </div>
-    </div>
-    <CardContent className="p-3 space-y-1">
-      <p className="text-sm font-medium text-foreground truncate" title={name}>{name}</p>
-      <p className="text-xs text-muted-foreground">
-        Date: {new Date(date).toLocaleDateString()} | Size: {size}
-      </p>
-    </CardContent>
-    <CardFooter className="p-3 border-t grid grid-cols-2 gap-2">
-      <Button variant="default" size="sm" className="rounded-lg btn-gel text-xs"> {/* Changed to rounded-lg */}
-        <PlayCircle className="mr-1.5 h-4 w-4" /> Play
-      </Button>
-      <Button variant="outline" size="sm" className="rounded-lg text-xs"> {/* Changed to rounded-lg */}
-        <Download className="mr-1.5 h-4 w-4" /> Download
-      </Button>
-    </CardFooter>
-  </Card>
-);
+      <CardContent className="p-3 space-y-1">
+        <p className="text-sm font-medium text-foreground truncate" title={name}>{name}</p>
+        <p className="text-xs text-muted-foreground">
+          Date: {new Date(date).toLocaleDateString()} | Size: {size}
+        </p>
+      </CardContent>
+      <CardFooter className="p-3 border-t grid grid-cols-3 gap-2"> {/* Changed to grid-cols-3 */}
+        <Button variant="default" size="sm" className="rounded-lg btn-gel text-xs" onClick={handlePlay}>
+          <PlayCircle className="mr-1.5 h-4 w-4" /> Play
+        </Button>
+        <Button variant="outline" size="sm" className="rounded-lg text-xs" onClick={handleDownload}>
+          <Download className="mr-1.5 h-4 w-4" /> Download
+        </Button>
+        <Button variant="outline" size="sm" className="rounded-lg text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:text-red-700" onClick={handleShareToYouTube}> {/* Custom style for YouTube button */}
+          <Youtube className="mr-1.5 h-4 w-4" /> YT (Manual)
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};
 
 
 interface RecordingSectionProps {
@@ -88,14 +120,13 @@ const RecordingSection = ({ title, description, recordings, icon: Icon, iconColo
       <CardContent className="flex-grow p-4 overflow-y-auto space-y-0">
         {filteredRecordings.length === 0 && searchQuery === '' && recordings.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground flex-grow flex flex-col justify-center items-center h-full">
-            <FolderOpen className="mx-auto h-16 w-16 mb-4" /> {/* Made icon larger */}
+            <FolderOpen className="mx-auto h-16 w-16 mb-4" />
             <p className="text-base mb-1">{title === "Private Recordings" ? "No Private Recordings Yet." : "No Public Recordings Yet."}</p>
             <p className="text-sm text-muted-foreground">
                 {title === "Private Recordings" 
                     ? "Your private recordings will appear here once uploaded." 
                     : "Publicly shared recordings will be listed here."}
             </p>
-            {/* Consider adding an upload button/hint here if desired */}
           </div>
         ) : filteredRecordings.length > 0 ? (
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -293,9 +324,9 @@ export default function RecordingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'private' | 'public')} className="flex flex-col flex-grow">
-          <TabsList className="mb-4 self-start rounded-lg"> {/* Changed to rounded-lg */}
-            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger> {/* Kept as rounded-md */}
-            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger> {/* Kept as rounded-md */}
+          <TabsList className="mb-4 self-start rounded-lg">
+            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger>
+            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger>
           </TabsList>
           
           <div className="relative flex-1 overflow-hidden">
@@ -337,7 +368,7 @@ export default function RecordingsPage() {
       </div>
 
       <Dialog open={isUploadChoiceDialogOpen} onOpenChange={setIsUploadChoiceDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-xl"> {/* Changed to rounded-xl */}
+        <DialogContent className="sm:max-w-md rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Choose Upload Destination</DialogTitle>
             <DialogDescription>
@@ -362,7 +393,7 @@ export default function RecordingsPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="secondary" className="rounded-lg"> {/* Changed to rounded-lg */}
+              <Button type="button" variant="secondary" className="rounded-lg">
                 Cancel
               </Button>
             </DialogClose>
