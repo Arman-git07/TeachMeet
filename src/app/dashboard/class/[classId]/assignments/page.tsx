@@ -64,10 +64,8 @@ export default function ClassAssignmentsPage() {
 
   const assignmentFileRef = useRef<HTMLInputElement>(null);
   const [selectedAssignmentTitleForUpload, setSelectedAssignmentTitleForUpload] = useState<string | null>(null);
-  const [selectedStudentKeywords, setSelectedStudentKeywords] = useState<string | undefined>(undefined);
   const [isAssignmentUploadDialogOpen, setIsAssignmentUploadDialogOpen] = useState(false);
   const [dialogAssignmentName, setDialogAssignmentName] = useState(''); // For the dialog input
-  const [dialogAssignmentKeywords, setDialogAssignmentKeywords] = useState(''); // For the dialog input
 
   useEffect(() => {
     if (classId) {
@@ -84,22 +82,15 @@ export default function ClassAssignmentsPage() {
   const handleTriggerAssignmentUploadDialog = (assignmentTitle: string) => {
     // Pre-fill dialog with the assignment name clicked, but allow user to change if they misclicked.
     setDialogAssignmentName(assignmentTitle);
-    setDialogAssignmentKeywords(''); // Reset keywords
     setSelectedAssignmentTitleForUpload(assignmentTitle); // This is the actual assignment being submitted
     setIsAssignmentUploadDialogOpen(true);
   };
 
   const handleDialogSubmitAndChooseFile = () => {
-    // The assignment name to check against should be `selectedAssignmentTitleForUpload`
-    // which was set when the "Submit Assignment" button for a specific assignment was clicked.
-    // `dialogAssignmentName` is just what's in the input field, could be different if user typed.
-    // For this mock, we assume the user confirmed the assignment by clicking its button.
     if (!selectedAssignmentTitleForUpload) {
         toast({ variant: "destructive", title: "Internal Error", description: "No assignment selected for submission. Please try again." });
         return;
     }
-    // `dialogAssignmentKeywords` is fine to use as it's explicitly entered for this submission.
-    setSelectedStudentKeywords(dialogAssignmentKeywords.trim() || undefined);
     assignmentFileRef.current?.click();
   };
 
@@ -112,15 +103,12 @@ export default function ClassAssignmentsPage() {
     if (!file) {
         toast({ variant: "info", title: "File Selection Cancelled" });
         setSelectedAssignmentTitleForUpload(null); // Clear the specific assignment title
-        setSelectedStudentKeywords(undefined);
         setIsAssignmentUploadDialogOpen(false);
         return;
     }
 
     if (file.type !== "text/plain") {
         toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file." });
-        // Keep dialog open if file type is wrong? Or close? For now, we just don't proceed.
-        // Clearing selectedAssignmentTitleForUpload might be too aggressive here if they want to try again.
         return;
     }
     
@@ -139,13 +127,12 @@ export default function ClassAssignmentsPage() {
             return;
         }
         
-        const mockTeacherRubric = `Rubric for "${selectedAssignmentTitleForUpload}": Check for clarity, examples, and understanding. Student keywords: ${selectedStudentKeywords || 'none'}.`;
+        const mockTeacherRubric = `Rubric for "${selectedAssignmentTitleForUpload}": Check for clarity, examples, and understanding.`;
 
         const input: AutoCheckAssignmentInput = {
             studentAssignmentText: studentAssignmentText.substring(0, 5000),
             teacherRubricText: mockTeacherRubric,
             assignmentTitle: selectedAssignmentTitleForUpload,
-            assignmentKeywords: selectedStudentKeywords,
         };
 
         toast({ title: "Processing Submission...", description: "Checking with AI (mock)." });
@@ -171,7 +158,6 @@ export default function ClassAssignmentsPage() {
             toast({ variant: "destructive", title: "AI Check Error", description: "Could not get AI feedback." });
         } finally {
             setSelectedAssignmentTitleForUpload(null);
-            setSelectedStudentKeywords(undefined);
         }
     };
     reader.onerror = () => {
@@ -241,7 +227,7 @@ export default function ClassAssignmentsPage() {
                     onClick={() => handleTriggerAssignmentUploadDialog(assignment.title)}
                     disabled={assignment.status === 'Graded' || assignment.status === 'Submitted'}
                   >
-                    <ChevronsUpDown className="mr-2 h-4 w-4" />
+                    <UploadCloud className="mr-2 h-4 w-4" />
                     {assignment.status === 'Graded' ? 'Graded' : assignment.status === 'Submitted' ? 'Submitted' : 'Submit Assignment'}
                   </Button>
                 </CardFooter>
@@ -256,30 +242,18 @@ export default function ClassAssignmentsPage() {
           <DialogHeader>
             <ShadDialogTitle>Submit: {selectedAssignmentTitleForUpload || "Assignment"}</ShadDialogTitle>
             <DialogDescription>
-              Upload your .txt file. You can add optional keywords related to your submission.
+              Upload your .txt file for the selected assignment.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {/* The input for assignment name is pre-filled but can be illustrative,
-                the actual assignment title is `selectedAssignmentTitleForUpload` */}
             <div className="grid gap-2">
                 <Label htmlFor="dialogCurrentAssignmentName">Submitting for Assignment</Label>
                 <Input
                     id="dialogCurrentAssignmentName"
-                    value={selectedAssignmentTitleForUpload || dialogAssignmentName} // Show the confirmed title
-                    readOnly // Make it read-only to avoid confusion, submission target is fixed
+                    value={selectedAssignmentTitleForUpload || dialogAssignmentName} 
+                    readOnly 
                     className="rounded-lg bg-muted/50"
                 />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="dialogAssignmentKeywords">Your Submission Keywords (optional)</Label>
-              <Input
-                id="dialogAssignmentKeywords"
-                value={dialogAssignmentKeywords}
-                onChange={(e) => setDialogAssignmentKeywords(e.target.value)}
-                placeholder="e.g., essay, chapter 1, research"
-                className="rounded-lg"
-              />
             </div>
           </div>
           <DialogFooter>
@@ -301,3 +275,5 @@ export default function ClassAssignmentsPage() {
     </div>
   );
 }
+
+    

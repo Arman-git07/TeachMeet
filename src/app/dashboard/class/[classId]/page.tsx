@@ -16,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth'; 
 import { useToast } from '@/hooks/use-toast'; 
 import { format, parseISO } from 'date-fns';
-// Removed: import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
@@ -175,10 +174,8 @@ export default function ClassDetailsPage() {
 
   const assignmentFileRef = useRef<HTMLInputElement>(null);
   const [selectedAssignmentTitleForUpload, setSelectedAssignmentTitleForUpload] = useState<string | null>(null);
-  const [selectedStudentKeywords, setSelectedStudentKeywords] = useState<string | undefined>(undefined);
   const [isAssignmentUploadDialogOpen, setIsAssignmentUploadDialogOpen] = useState(false);
   const [dialogAssignmentName, setDialogAssignmentName] = useState('');
-  const [dialogAssignmentKeywords, setDialogAssignmentKeywords] = useState('');
 
   const [isEditingFeeDetails, setIsEditingFeeDetails] = useState(false);
   const [editableFeeDetails, setEditableFeeDetails] = useState<{
@@ -391,7 +388,6 @@ export default function ClassDetailsPage() {
         return;
     }
     setDialogAssignmentName('');
-    setDialogAssignmentKeywords('');
     setIsAssignmentUploadDialogOpen(true);
   };
 
@@ -401,7 +397,6 @@ export default function ClassDetailsPage() {
         return;
     }
     setSelectedAssignmentTitleForUpload(dialogAssignmentName.trim());
-    setSelectedStudentKeywords(dialogAssignmentKeywords.trim() || undefined);
     assignmentFileRef.current?.click();
   };
 
@@ -415,14 +410,12 @@ export default function ClassDetailsPage() {
     if (!file) {
         toast({ variant: "info", title: "File Selection Cancelled", description: "No file was selected for upload." });
         setSelectedAssignmentTitleForUpload(null);
-        setSelectedStudentKeywords(undefined);
         setIsAssignmentUploadDialogOpen(false); 
         return;
     }
 
     if (file.type !== "text/plain") {
         toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file for this mock submission." });
-        // Not clearing selectedAssignmentTitleForUpload here to allow retry with same dialog context
         return;
     }
     
@@ -440,7 +433,6 @@ export default function ClassDetailsPage() {
         if (!studentAssignmentText || !studentAssignmentText.trim()) {
             toast({ variant: "destructive", title: "Empty File", description: "The selected file is empty or could not be read." });
             setSelectedAssignmentTitleForUpload(null);
-            setSelectedStudentKeywords(undefined);
             setIsAssignmentUploadDialogOpen(false);
             return;
         }
@@ -448,7 +440,6 @@ export default function ClassDetailsPage() {
         toast({ title: "Uploading Assignment...", description: `Simulating upload for "${selectedAssignmentTitleForUpload}".` });
         setIsAssignmentUploadDialogOpen(false); 
 
-        // Simulate upload delay
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         toast({
@@ -458,12 +449,10 @@ export default function ClassDetailsPage() {
         });
 
         setSelectedAssignmentTitleForUpload(null);
-        setSelectedStudentKeywords(undefined);
     };
     reader.onerror = () => {
         toast({ variant: "destructive", title: "File Read Error", description: "Could not read the selected file." });
         setSelectedAssignmentTitleForUpload(null);
-        setSelectedStudentKeywords(undefined);
         setIsAssignmentUploadDialogOpen(false);
     };
     reader.readAsText(file);
@@ -767,7 +756,7 @@ export default function ClassDetailsPage() {
                     <DialogHeader>
                       <ShadDialogTitle>Submit Assignment</ShadDialogTitle>
                       <DialogDescription>
-                        Enter the assignment details and upload your .txt file.
+                        Enter the assignment name and upload your .txt file.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -778,16 +767,6 @@ export default function ClassDetailsPage() {
                           value={dialogAssignmentName}
                           onChange={(e) => setDialogAssignmentName(e.target.value)}
                           placeholder="e.g., Introduction Essay"
-                          className="rounded-lg"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="dialogAssignmentKeywords">Keywords (optional, for your submission)</Label>
-                        <Input
-                          id="dialogAssignmentKeywords"
-                          value={dialogAssignmentKeywords}
-                          onChange={(e) => setDialogAssignmentKeywords(e.target.value)}
-                          placeholder="e.g., quantum physics, relativity"
                           className="rounded-lg"
                         />
                       </div>
@@ -1134,8 +1113,5 @@ export default function ClassDetailsPage() {
     </div>
   );
 }
-    
-    
-    
-    
 
+    
