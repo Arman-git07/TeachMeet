@@ -7,16 +7,16 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { 
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle, 
-    Megaphone, ClipboardList, Link as LinkIcon, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
+    Megaphone, ClipboardList, Link as LinkIconLucide, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
     ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2
-} from 'lucide-react';
+} from 'lucide-react'; // Renamed LinkIcon to LinkIconLucide to avoid conflict with NextLink
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth'; 
 import { useToast } from '@/hooks/use-toast'; 
 import { format, parseISO } from 'date-fns';
-import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
+// Removed: import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
@@ -153,7 +153,7 @@ const getStatusColor = (status: Assignment['status'] | ClassExam['status']) => {
 };
 
 const MaterialIcon = ({ type }: { type: Material['type'] }) => {
-  if (type === 'link') return <LinkIcon className="mr-2 h-5 w-5 text-primary" />;
+  if (type === 'link') return <LinkIconLucide className="mr-2 h-5 w-5 text-primary" />;
   if (type === 'file') return <FileIcon className="mr-2 h-5 w-5 text-primary" />;
   if (type === 'video') return <VideoIconLucide className="mr-2 h-5 w-5 text-primary" />;
   return <Info className="mr-2 h-5 w-5 text-primary" />;
@@ -422,8 +422,7 @@ export default function ClassDetailsPage() {
 
     if (file.type !== "text/plain") {
         toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file for this mock submission." });
-        setSelectedAssignmentTitleForUpload(null);
-        setSelectedStudentKeywords(undefined);
+        // Not clearing selectedAssignmentTitleForUpload here to allow retry with same dialog context
         return;
     }
     
@@ -446,47 +445,20 @@ export default function ClassDetailsPage() {
             return;
         }
         
-        const mockTeacherRubric = `The assignment titled "${selectedAssignmentTitleForUpload}" should clearly explain relevant concepts, provide supporting examples, and demonstrate understanding of the topic. If keywords were provided by the student (${selectedStudentKeywords || 'none'}), consider their relevance.`;
-
-        const input: AutoCheckAssignmentInput = {
-            studentAssignmentText: studentAssignmentText.substring(0, 5000), 
-            teacherRubricText: mockTeacherRubric,
-            assignmentTitle: selectedAssignmentTitleForUpload,
-            assignmentKeywords: selectedStudentKeywords,
-        };
-
-        toast({ title: "Processing Submission...", description: "Your assignment is being checked by the AI (mock)." });
+        toast({ title: "Uploading Assignment...", description: `Simulating upload for "${selectedAssignmentTitleForUpload}".` });
         setIsAssignmentUploadDialogOpen(false); 
 
-        try {
-            const result: AutoCheckAssignmentOutput = await autoCheckAssignment(input);
-            
-            let feedbackMessage = `Feedback for "${input.assignmentTitle}":\n`;
-            feedbackMessage += `${result.overallFeedback}\n`;
-            if (result.similarityScore) {
-                feedbackMessage += `Similarity Score: ${result.similarityScore}%\n`;
-            }
-            if (result.isPlagiarized) {
-                feedbackMessage += `Plagiarism Check: Potential issues detected.\n`;
-            }
-             result.specificPoints.forEach(point => {
-                feedbackMessage += `\n- ${point.point}: ${point.assessment}`;
-                if(point.studentExtract) feedbackMessage += ` (e.g., "${point.studentExtract}")`;
-            });
-            
-            toast({
-                title: "AI Feedback Received (Mock)",
-                description: <pre className="whitespace-pre-wrap text-xs max-h-60 overflow-y-auto">{feedbackMessage}</pre>,
-                duration: 20000, 
-            });
+        // Simulate upload delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        toast({
+            title: "Assignment Uploaded (Mock)",
+            description: `"${selectedAssignmentTitleForUpload}" has been uploaded. File content: ${studentAssignmentText.substring(0,50)}...`,
+            duration: 5000, 
+        });
 
-        } catch (error) {
-            console.error("Error during mock AI check:", error);
-            toast({ variant: "destructive", title: "AI Check Error", description: "Could not get feedback from the AI assistant." });
-        } finally {
-            setSelectedAssignmentTitleForUpload(null);
-            setSelectedStudentKeywords(undefined);
-        }
+        setSelectedAssignmentTitleForUpload(null);
+        setSelectedStudentKeywords(undefined);
     };
     reader.onerror = () => {
         toast({ variant: "destructive", title: "File Read Error", description: "Could not read the selected file." });
@@ -788,7 +760,7 @@ export default function ClassDetailsPage() {
                 <Dialog open={isAssignmentUploadDialogOpen} onOpenChange={setIsAssignmentUploadDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="default" className="w-full rounded-lg text-sm btn-gel" onClick={handleTriggerAssignmentUploadDialog}>
-                        <ChevronsUpDown className="mr-2 h-4 w-4" /> Upload &amp; Check (Mock AI)
+                        <UploadCloud className="mr-2 h-4 w-4" /> Upload Assignment
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md rounded-xl">
@@ -1166,3 +1138,4 @@ export default function ClassDetailsPage() {
     
     
     
+
