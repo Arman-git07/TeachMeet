@@ -12,8 +12,25 @@ import { DynamicHeaderProvider, useDynamicHeader } from '@/contexts/DynamicHeade
 // New component to render the header content dynamically
 function DashboardHeaderContentInternal() {
   const { headerContent } = useDynamicHeader();
-  // const { toggleSidebar } = useSidebar(); // toggleSidebar is available via SidebarTrigger directly
 
+  if (!headerContent) { // If no specific header content is provided by the page
+    return (
+      // Minimal header: just the sidebar toggle, less height, no prominent styling
+      <header className="sticky top-0 z-40 w-full"> {/* Removed border-b, bg for minimal version */}
+        <div className="container mx-auto flex h-12 items-center px-4 sm:px-6 lg:px-8"> {/* Reduced height to h-12 */}
+          <div className="flex items-center"> {/* Removed gap, container will handle positioning */}
+            <SidebarTrigger className="md:hidden">
+              <PanelLeftOpen className="h-6 w-6" />
+            </SidebarTrigger>
+            <SidebarTrigger className="hidden md:flex" />
+          </div>
+          {/* No flex-grow content area or right-aligned placeholder in minimal version */}
+        </div>
+      </header>
+    );
+  }
+
+  // Full header when headerContent is provided
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
