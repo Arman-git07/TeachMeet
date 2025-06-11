@@ -1,7 +1,7 @@
 'use client'; // Added this directive
 
 import React from 'react';
-import type { Metadata, Viewport } from 'next';
+// import type { Metadata, Viewport } from 'next'; // Metadata was removed
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
@@ -16,10 +16,7 @@ import { cn } from '@/lib/utils'; // Import cn
 const geistSansFont = GeistSans;
 const geistMonoFont = GeistMono;
 
-export const metadata: Metadata = {
-  title: 'TeachMeet',
-  description: 'A study meeting app.',
-};
+// Metadata was removed from here
 
 export default function RootLayout({
   children,
@@ -31,7 +28,7 @@ export default function RootLayout({
       <body className={cn(
         geistSansFont.variable,
         geistMonoFont.variable,
-        'font-sans antialiased min-h-screen' // Removed flex flex-col
+        'font-sans antialiased min-h-screen flex flex-col' // Re-added flex flex-col
       )}>
         <ThemeProvider
           attribute="class"
@@ -41,7 +38,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <SidebarProvider defaultOpen={false}>
-              <div className="flex flex-1 bg-background"> {/* Changed h-screen to flex-1 */}
+              <div className="flex flex-1 bg-background"> {/* This div will be a flex item and a flex container */}
                 <AppSidebar />
                 <SidebarInset>
                   {children}
