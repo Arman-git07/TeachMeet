@@ -20,6 +20,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebas
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Classroom {
   id: string;
@@ -40,6 +41,8 @@ const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'tea
   { id: "cl2", name: "Advanced JavaScript Techniques", description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
   { id: "cl3", name: "Creative Writing Workshop", description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", memberCount: 12, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
   { id: "cl4", name: "Beginner's Yoga & Mindfulness", description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", memberCount: 30, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "yoga meditation" },
+  { id: "cl5", name: "Data Science Bootcamp Prep", description: "A foundational course covering basic statistics, Python programming, and data visualization to prepare for a data science bootcamp.", memberCount: 22, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "data science" },
+  { id: "cl6", name: "The Art of Digital Painting", description: "From basic sketching to advanced rendering techniques, learn to create stunning digital artwork using popular software.", memberCount: 15, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "digital art" },
 ];
 
 const defaultTeacherDetailsMap = {
@@ -47,6 +50,8 @@ const defaultTeacherDetailsMap = {
   cl2: { name: "Mr. Kenji Tanaka", initial: "KT", placeholderId: "teacher2_placeholder_uid" },
   cl3: { name: "Ms. Aisha Khan", initial: "AK", placeholderId: "teacher3_placeholder_uid" },
   cl4: { name: "Sara Chen", initial: "SC", placeholderId: "user1_placeholder_uid" },
+  cl5: { name: "Dr. Ben Carter", initial: "BC", placeholderId: "teacher4_placeholder_uid" },
+  cl6: { name: "Lena Petrova", initial: "LP", placeholderId: "teacher5_placeholder_uid" },
 };
 
 
@@ -87,6 +92,7 @@ export default function ClassesPage() {
   const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
   const [currentSortOption, setCurrentSortOption] = useState<string>("default");
+  const [initialLoading, setInitialLoading] = useState(true);
 
 
   // Create Class Dialog State
@@ -122,16 +128,15 @@ export default function ClassesPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading) return;
-
+    // Initialize classrooms from base data, assign dynamic teacher for cl1 if user is logged in.
     const processedMocks = baseMockClassroomsData.map((baseCls, index) => {
       let finalTeacherId: string;
       let finalTeacherName: string;
       let finalTeacherAvatar: string;
-
+      
       const defaultDetails = defaultTeacherDetailsMap[baseCls.id as keyof typeof defaultTeacherDetailsMap] || { name: "Mock Teacher", initial: "M", placeholderId: `teacher_mock_${baseCls.id}`};
 
-      if (baseCls.id === "cl1" && user) { 
+      if (baseCls.id === "cl1" && user && !authLoading) { 
         finalTeacherId = user.uid;
         finalTeacherName = user.displayName || "My Class Teacher";
         finalTeacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${getInitialsFromName(finalTeacherName, "M")}`;
@@ -146,16 +151,18 @@ export default function ClassesPage() {
         teacherId: finalTeacherId,
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.random() * 5 + 1)), // Stagger creation dates
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 15) + 1)), // Stagger creation dates more
       };
     });
     setClassrooms(processedMocks);
-
+    if (!authLoading) {
+      setInitialLoading(false);
+    }
   }, [user, authLoading]);
 
 
   useEffect(() => {
-    if (authLoading && classrooms.length === 0) { 
+    if (initialLoading) { 
       setDisplayClassrooms([]); 
       return;
     }
@@ -171,10 +178,8 @@ export default function ClassesPage() {
       }
     });
 
-    // Sort pending internally (e.g., by creation date - newest first for requests)
     pending.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 
-    // Sort 'taughtAndOther' based on currentSortOption
     switch (currentSortOption) {
       case "newest":
         taughtAndOther.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
@@ -183,10 +188,10 @@ export default function ClassesPage() {
         taughtAndOther.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
         break;
       case "nameAsc":
-        taughtAndOther.sort((a, b) => a.name.localeCompare(b.name));
+        taughtAndOther.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
         break;
       case "nameDesc":
-        taughtAndOther.sort((a, b) => b.name.localeCompare(a.name));
+        taughtAndOther.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
         break;
       case "membersDesc":
         taughtAndOther.sort((a, b) => b.memberCount - a.memberCount);
@@ -205,14 +210,14 @@ export default function ClassesPage() {
                 others.push(cls);
             }
         });
-        myClasses.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0)); // My classes by oldest
-        others.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));   // Others by oldest
+        myClasses.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0)); 
+        others.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));   
         taughtAndOther = [...myClasses, ...others];
         break;
     }
     setDisplayClassrooms([...pending, ...taughtAndOther]);
 
-  }, [classrooms, user, requestedClassIds, authLoading, currentSortOption]);
+  }, [classrooms, user, requestedClassIds, authLoading, currentSortOption, initialLoading]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
@@ -366,8 +371,8 @@ export default function ClassesPage() {
       teacherName: user.displayName || "Teacher",
       teacherId: user.uid,
       teacherAvatar: teacherAvatarUrl,
-      memberCount: 1,
-      createdAt: new Date(), // Set creation date
+      memberCount: 1, 
+      createdAt: new Date(),
       ...imageDetails, 
     };
     setClassrooms(prev => [newClass, ...prev]);
@@ -403,6 +408,7 @@ export default function ClassesPage() {
         return;
       }
     } else if (editingClass.name !== editClassName.trim() && editingClass.thumbnailUrl.includes('placehold.co') && editingClass.thumbnailUrl.includes('?text=')) {
+      // Update placeholder text if name changed and it's a placeholder image
       const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
       imageDetails = {
         thumbnailUrl: `https://placehold.co/600x400.png?text=${newClassNameInitials}`,
@@ -419,7 +425,6 @@ export default function ClassesPage() {
             description: editClassDescription.trim(),
             thumbnailUrl: imageDetails.thumbnailUrl,
             dataAiHint: imageDetails.dataAiHint,
-            // Note: createdAt should not be updated on edit
           }
         : cls
     ));
@@ -473,6 +478,7 @@ export default function ClassesPage() {
   };
 
   useEffect(() => {
+    // Cleanup for blob URLs
     return () => {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(newClassImagePreview);
@@ -608,7 +614,30 @@ export default function ClassesPage() {
       </Dialog>
 
 
-      {displayClassrooms.length === 0 && !authLoading ? (
+      {initialLoading ? ( 
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
+              <Skeleton className="h-40 w-full rounded-t-xl" />
+              <CardHeader className="pb-2 pt-4">
+                <Skeleton className="h-5 w-3/4 mb-1 rounded-md" />
+                <div className="flex items-center pt-1">
+                  <Skeleton className="h-6 w-6 mr-2 rounded-full" />
+                  <Skeleton className="h-4 w-1/2 rounded-md" />
+                </div>
+              </CardHeader>
+              <CardContent className="flex-grow min-h-[60px]">
+                <Skeleton className="h-4 w-full mb-1 rounded-md" />
+                <Skeleton className="h-4 w-5/6 rounded-md" />
+              </CardContent>
+              <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
+                <Skeleton className="h-9 w-full rounded-lg" />
+                <Skeleton className="h-9 w-full rounded-lg" />
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : displayClassrooms.length === 0 ? (
         <Card className="text-center py-12 rounded-xl shadow-lg border-border/50 flex-grow flex flex-col justify-center items-center">
           <CardHeader>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -621,29 +650,6 @@ export default function ClassesPage() {
             </Button>
           </CardContent>
         </Card>
-      ) : authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0) ? ( 
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
-              <div className="relative h-40 w-full bg-muted rounded-t-xl"></div>
-              <CardHeader className="pb-2 pt-4">
-                <div className="h-5 w-3/4 bg-muted rounded mb-1"></div>
-                <div className="flex items-center pt-1">
-                  <div className="h-6 w-6 mr-2 bg-muted rounded-full"></div>
-                  <div className="h-4 w-1/2 bg-muted rounded"></div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-grow min-h-[60px]">
-                <div className="h-4 w-full bg-muted rounded mb-1"></div>
-                <div className="h-4 w-5/6 bg-muted rounded"></div>
-              </CardContent>
-              <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
-                <div className="h-9 w-full bg-muted rounded-lg"></div>
-                <div className="h-9 w-full bg-muted rounded-lg"></div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {displayClassrooms.map(classroom => (
