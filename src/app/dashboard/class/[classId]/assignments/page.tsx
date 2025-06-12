@@ -10,23 +10,30 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, ClipboardList, FileText, Loader2, UploadCloud } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
+
+import { ArrowLeft, ClipboardList, FileText, Loader2, UploadCloud, Eye, Trash2, RotateCcw, Info } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
 import { format, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface Assignment {
   id: string;
   title: string;
   dueDate: string;
-  status: 'Pending' | 'Submitted' | 'Graded' | 'Overdue';
+  status: 'Pending' | 'Submitted' | 'Graded' | 'Overdue' | 'Awaiting Feedback';
   description?: string;
+  submittedFileName?: string;
+  submittedFileContent?: string; // Store student's actual submission text
+  feedback?: AutoCheckAssignmentOutput | null; // Store AI feedback
 }
 
 const getMockAssignmentsForClass = (classId: string): Assignment[] => {
   return [
-    { id: `assign1-${classId}`, title: "Introduction Essay", dueDate: "2024-08-10", status: "Graded", description: "A 500-word essay about your motivations for taking this course." },
+    { id: `assign1-${classId}`, title: "Introduction Essay", dueDate: "2024-08-10", status: "Graded", description: "A 500-word essay about your motivations for taking this course.", feedback: { overallFeedback: "Good effort, but try to expand more on your future goals.", similarityScore: 75, specificPoints: [{point: "Clarity", assessment: "Mostly clear", studentExtract: "I want to learn..."}], isPlagiarized: false}, submittedFileName: "intro_essay.txt", submittedFileContent: "This is my introduction essay. I am motivated by learning new things and this course seems very interesting. I hope to gain skills that will help me in my future career. Specifically, I want to learn about quantum entanglement." },
     { id: `assign2-${classId}`, title: "Chapter 1 Problem Set", dueDate: "2024-08-17", status: "Pending", description: "Complete all odd-numbered problems from Chapter 1." },
     { id: `assign3-${classId}`, title: "Research Proposal", dueDate: "2024-08-24", status: "Pending", description: "Submit a one-page proposal for your mid-term project." },
     { id: `assign4-${classId}`, title: "Mid-Term Presentation Outline", dueDate: "2024-09-05", status: "Pending", description: "Submit a detailed outline for your mid-term presentation." },
@@ -40,10 +47,77 @@ const getStatusColor = (status: Assignment['status']) => {
     case 'Graded': return 'bg-green-500/20 text-green-700 border-green-500/50';
     case 'Submitted': return 'bg-blue-500/20 text-blue-700 border-blue-500/50';
     case 'Pending': return 'bg-yellow-500/20 text-yellow-700 border-yellow-500/50';
+    case 'Awaiting Feedback': return 'bg-purple-500/20 text-purple-700 border-purple-500/50';
     case 'Overdue': return 'bg-red-500/20 text-red-700 border-red-500/50';
     default: return 'bg-muted text-muted-foreground border-border';
   }
 };
+
+const FeedbackDialogContent = ({ assignment }: { assignment: Assignment }) => {
+  if (!assignment.feedback && !assignment.submittedFileContent) {
+    return (
+        <div className="flex flex-col items-center justify-center text-center p-6 space-y-3">
+            <Info className="w-12 h-12 text-muted-foreground" />
+            <p className="text-lg font-medium">No Feedback or Submission Details</p>
+            <p className="text-sm text-muted-foreground">
+              It seems feedback hasn't been generated yet, or no submission details are available for this assignment.
+            </p>
+        </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="max-h-[70vh]">
+        <div className="space-y-6 p-1">
+            {assignment.submittedFileName && (
+                <div>
+                    <h4 className="font-semibold text-md mb-1 text-foreground">Your Submission:</h4>
+                    <p className="text-sm text-muted-foreground mb-1">File: <span className="font-medium text-accent">{assignment.submittedFileName}</span></p>
+                    {assignment.submittedFileContent && (
+                        <Textarea
+                            value={assignment.submittedFileContent}
+                            readOnly
+                            className="mt-1 rounded-lg h-40 text-xs bg-muted/30 border-border/50"
+                            placeholder="Your submitted content..."
+                        />
+                    )}
+                </div>
+            )}
+
+            {assignment.feedback ? (
+                <div>
+                    <h4 className="font-semibold text-md mb-2 text-foreground">AI Feedback:</h4>
+                    <div className="space-y-3 text-sm p-3 bg-muted/30 rounded-lg border border-border/50">
+                        <p><span className="font-medium">Overall:</span> {assignment.feedback.overallFeedback}</p>
+                        {assignment.feedback.similarityScore !== undefined && (
+                            <p><span className="font-medium">Similarity Score:</span> {assignment.feedback.similarityScore}%</p>
+                        )}
+                        {assignment.feedback.isPlagiarized !== undefined && (
+                            <p><span className="font-medium">Plagiarism Check:</span> {assignment.feedback.isPlagiarized ? "Potential issues detected." : "Looks original."}</p>
+                        )}
+                        {assignment.feedback.specificPoints && assignment.feedback.specificPoints.length > 0 && (
+                            <div>
+                                <p className="font-medium mb-1">Specific Points:</p>
+                                <ul className="list-disc space-y-1 pl-5">
+                                    {assignment.feedback.specificPoints.map((point, index) => (
+                                    <li key={index}>
+                                        <strong>{point.point}:</strong> {point.assessment}
+                                        {point.studentExtract && <span className="text-xs italic text-muted-foreground ml-1">(e.g., "{point.studentExtract}")</span>}
+                                    </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                 <p className="text-sm text-muted-foreground italic">AI feedback is not available for this submission yet.</p>
+            )}
+        </div>
+    </ScrollArea>
+  );
+};
+
 
 export default function ClassAssignmentsPage() {
   const params = useParams();
@@ -65,6 +139,12 @@ export default function ClassAssignmentsPage() {
   const [currentAssignmentForSubmission, setCurrentAssignmentForSubmission] = useState<Assignment | null>(null);
   const [uploadedRubricText, setUploadedRubricText] = useState<string | null>(null);
 
+  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  const [selectedAssignmentForFeedback, setSelectedAssignmentForFeedback] = useState<Assignment | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
+
+
   useEffect(() => {
     if (classId) {
       setLoading(true);
@@ -77,14 +157,14 @@ export default function ClassAssignmentsPage() {
   }, [classId]);
 
   const handleInitiateSubmission = (assignment: Assignment) => {
-    if (assignment.status === 'Graded' || assignment.status === 'Submitted') {
-      toast({title: "Already Processed", description: `This assignment (${assignment.title}) is already ${assignment.status.toLowerCase()}.`});
+    if (assignment.status === 'Graded' || assignment.status === 'Awaiting Feedback') {
+      toast({title: "Already Processed", description: `This assignment (${assignment.title}) is already ${assignment.status.toLowerCase()}. You can view feedback or resubmit if allowed.`});
       return;
     }
     setCurrentAssignmentForRubricUpload(assignment);
     toast({
       title: "Step 1: Select Rubric",
-      description: `Please select the teacher's rubric/model answer file (.txt) for "${assignment.title}".`,
+      description: `Please select the teacher's rubric/model answer file (.txt) for "${assignment.title}". This is for AI comparison.`,
       duration: 10000,
     });
     rubricFileRef.current?.click();
@@ -92,7 +172,7 @@ export default function ClassAssignmentsPage() {
 
   const handleRubricFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (event.target) event.target.value = ""; // Reset file input
+    if (event.target) event.target.value = ""; 
 
     if (!file) {
       toast({ variant: "info", title: "Rubric Selection Cancelled" });
@@ -136,7 +216,7 @@ export default function ClassAssignmentsPage() {
 
   const handleStudentSubmissionFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (event.target) event.target.value = ""; // Reset file input
+    if (event.target) event.target.value = ""; 
 
     if (!file) {
       toast({ variant: "info", title: "Submission File Selection Cancelled" });
@@ -166,34 +246,39 @@ export default function ClassAssignmentsPage() {
       }
 
       const input: AutoCheckAssignmentInput = {
-        studentAssignmentText: studentAssignmentText.substring(0, 15000), // Limiting student text
-        teacherRubricText: uploadedRubricText.substring(0, 10000), // Limiting rubric text
+        studentAssignmentText: studentAssignmentText.substring(0, 15000), 
+        teacherRubricText: uploadedRubricText.substring(0, 10000), 
         assignmentTitle: currentAssignmentForSubmission.title,
       };
 
+      setAssignments(prev => prev.map(a => a.id === currentAssignmentForSubmission!.id ? {...a, status: 'Awaiting Feedback'} : a));
       toast({ title: "Processing Submission...", description: "Checking with AI. This may take a moment." });
 
       try {
         const result = await autoCheckAssignment(input);
-        let feedbackMessage = `AI Feedback for "${input.assignmentTitle}":\n${result.overallFeedback}\n`;
-        if (result.similarityScore) feedbackMessage += `Similarity: ${result.similarityScore}%\n`;
-        if (result.isPlagiarized !== undefined) feedbackMessage += `Plagiarism Check: ${result.isPlagiarized ? "Potential issues detected." : "Looks original."}\n`;
-        result.specificPoints.forEach(p => {
-          feedbackMessage += `\n- ${p.point}: ${p.assessment}`;
-          if(p.studentExtract) feedbackMessage += ` (e.g., "${p.studentExtract}")`;
-        });
+        
+        setAssignments(prev => prev.map(a =>
+          a.id === currentAssignmentForSubmission!.id
+            ? {
+                ...a,
+                status: 'Submitted',
+                feedback: result,
+                submittedFileName: file.name,
+                submittedFileContent: studentAssignmentText,
+              }
+            : a
+        ));
         
         toast({
           title: "AI Feedback Received",
-          description: <pre className="whitespace-pre-wrap text-xs max-h-60 overflow-y-auto">{feedbackMessage}</pre>,
-          duration: 30000, // Increased duration for reading feedback
+          description: `Feedback for "${input.assignmentTitle}" is ready. Click "View Feedback" to see details.`,
+          duration: 10000,
         });
-        // Optionally update assignment status in UI
-        setAssignments(prev => prev.map(a => a.id === currentAssignmentForSubmission!.id ? {...a, status: 'Submitted'} : a));
 
       } catch (error) {
         console.error("Error during AI check:", error);
         toast({ variant: "destructive", title: "AI Check Error", description: "Could not get AI feedback. " + (error instanceof Error ? error.message : "Please try again.") });
+        setAssignments(prev => prev.map(a => a.id === currentAssignmentForSubmission!.id ? {...a, status: 'Pending', feedback: null, submittedFileName: undefined, submittedFileContent: undefined } : a));
       } finally {
         setCurrentAssignmentForSubmission(null);
         setUploadedRubricText(null);
@@ -206,6 +291,30 @@ export default function ClassAssignmentsPage() {
     };
     reader.readAsText(file);
   };
+
+  const handleViewFeedback = (assignment: Assignment) => {
+    setSelectedAssignmentForFeedback(assignment);
+    setIsFeedbackDialogOpen(true);
+  };
+
+  const handleDeleteSubmission = (assignment: Assignment) => {
+    setAssignmentToDelete(assignment);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteSubmission = () => {
+    if (assignmentToDelete) {
+      setAssignments(prev => prev.map(a =>
+        a.id === assignmentToDelete.id
+          ? { ...a, status: 'Pending', feedback: null, submittedFileName: undefined, submittedFileContent: undefined }
+          : a
+      ));
+      toast({ title: "Submission Deleted", description: `Your submission for "${assignmentToDelete.title}" has been removed.` });
+    }
+    setIsDeleteConfirmOpen(false);
+    setAssignmentToDelete(null);
+  };
+
 
   if (loading || authLoading) {
     return (
@@ -261,16 +370,48 @@ export default function ClassAssignmentsPage() {
                     {assignment.description || "No description provided."}
                   </p>
                 </CardContent>
-                <CardFooter>
-                  <Button 
-                    variant="default" 
-                    className="w-full btn-gel rounded-lg text-sm" 
-                    onClick={() => handleInitiateSubmission(assignment)}
-                    disabled={assignment.status === 'Graded' || assignment.status === 'Submitted'}
-                  >
-                    <UploadCloud className="mr-2 h-4 w-4" />
-                    {assignment.status === 'Graded' ? 'Graded' : assignment.status === 'Submitted' ? 'Submitted' : 'Submit Assignment'}
-                  </Button>
+                <CardFooter className="grid grid-cols-1 gap-2">
+                  {assignment.status === 'Pending' || assignment.status === 'Overdue' ? (
+                    <Button 
+                      variant="default" 
+                      className="w-full btn-gel rounded-lg text-sm" 
+                      onClick={() => handleInitiateSubmission(assignment)}
+                    >
+                      <UploadCloud className="mr-2 h-4 w-4" /> Submit Assignment
+                    </Button>
+                  ) : assignment.status === 'Awaiting Feedback' ? (
+                     <Button variant="outline" className="w-full rounded-lg text-sm" disabled>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Awaiting Feedback
+                    </Button>
+                  ) : ( // Submitted or Graded
+                    <>
+                      <Button 
+                        variant="outline" 
+                        className="w-full rounded-lg text-sm" 
+                        onClick={() => handleViewFeedback(assignment)}
+                      >
+                        <Eye className="mr-2 h-4 w-4" /> View Feedback
+                      </Button>
+                      {assignment.status === 'Submitted' && (
+                        <div className="grid grid-cols-2 gap-2">
+                           <Button 
+                            variant="secondary" 
+                            className="w-full rounded-lg text-sm" 
+                            onClick={() => handleInitiateSubmission(assignment)}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" /> Resubmit
+                          </Button>
+                           <Button 
+                            variant="destructive" 
+                            className="w-full rounded-lg text-sm" 
+                            onClick={() => handleDeleteSubmission(assignment)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </CardFooter>
               </Card>
             ))}
@@ -279,8 +420,42 @@ export default function ClassAssignmentsPage() {
       )}
 
       <footer className="flex-none py-2 text-center text-xs text-muted-foreground border-t bg-background">
-        Submit assignments and get AI-powered feedback (requires teacher rubric upload).
+        Submit assignments by providing a teacher rubric and your work. Get AI-powered feedback.
       </footer>
+
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-xl">
+          <DialogHeader>
+            <ShadDialogTitle>Feedback for: {selectedAssignmentForFeedback?.title}</ShadDialogTitle>
+            <DialogDescription>
+              Review your submission and the AI-generated feedback.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAssignmentForFeedback && <FeedbackDialogContent assignment={selectedAssignmentForFeedback} />}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-lg">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <ShadAlertDialogTitle>Confirm Delete Submission</ShadAlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete your submission for "{assignmentToDelete?.title}"? This action cannot be undone, but you can submit again if the due date has not passed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {setIsDeleteConfirmOpen(false); setAssignmentToDelete(null);}} className="rounded-lg">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteSubmission} className={cn(buttonVariants({ variant: "destructive", className:"rounded-lg"}))}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
+
