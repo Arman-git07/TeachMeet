@@ -31,7 +31,7 @@ interface Classroom {
   memberCount: number;
   thumbnailUrl: string;
   dataAiHint?: string;
-  createdAt: Date; // Added createdAt
+  createdAt: Date;
 }
 
 // Base structure for mock classrooms, teacher details will be filled dynamically for some.
