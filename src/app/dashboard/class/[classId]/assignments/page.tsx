@@ -6,13 +6,13 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+// Dialog imports removed as it's no longer used
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+// Label import removed as it's no longer used
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, ClipboardList, ChevronsUpDown, FileText, Loader2, AlertTriangle, UploadCloud } from 'lucide-react';
+import { ArrowLeft, ClipboardList, FileText, Loader2, UploadCloud } from 'lucide-react'; // Removed AlertTriangle, ChevronsUpDown
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
@@ -64,8 +64,7 @@ export default function ClassAssignmentsPage() {
 
   const assignmentFileRef = useRef<HTMLInputElement>(null);
   const [selectedAssignmentTitleForUpload, setSelectedAssignmentTitleForUpload] = useState<string | null>(null);
-  const [isAssignmentUploadDialogOpen, setIsAssignmentUploadDialogOpen] = useState(false);
-  const [dialogAssignmentName, setDialogAssignmentName] = useState(''); // For the dialog input
+  // Removed isAssignmentUploadDialogOpen and dialogAssignmentName as dialog is removed
 
   useEffect(() => {
     if (classId) {
@@ -79,21 +78,6 @@ export default function ClassAssignmentsPage() {
     }
   }, [classId]);
 
-  const handleTriggerAssignmentUploadDialog = (assignmentTitle: string) => {
-    // Pre-fill dialog with the assignment name clicked, but allow user to change if they misclicked.
-    setDialogAssignmentName(assignmentTitle);
-    setSelectedAssignmentTitleForUpload(assignmentTitle); // This is the actual assignment being submitted
-    setIsAssignmentUploadDialogOpen(true);
-  };
-
-  const handleDialogSubmitAndChooseFile = () => {
-    if (!selectedAssignmentTitleForUpload) {
-        toast({ variant: "destructive", title: "Internal Error", description: "No assignment selected for submission. Please try again." });
-        return;
-    }
-    assignmentFileRef.current?.click();
-  };
-
   const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (event.target) {
@@ -102,19 +86,18 @@ export default function ClassAssignmentsPage() {
 
     if (!file) {
         toast({ variant: "info", title: "File Selection Cancelled" });
-        setSelectedAssignmentTitleForUpload(null); // Clear the specific assignment title
-        setIsAssignmentUploadDialogOpen(false);
+        setSelectedAssignmentTitleForUpload(null); 
         return;
     }
 
     if (file.type !== "text/plain") {
         toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file." });
+        setSelectedAssignmentTitleForUpload(null);
         return;
     }
     
     if (!selectedAssignmentTitleForUpload) {
         toast({ variant: "destructive", title: "Internal Error", description: "Assignment title missing. Please try again." });
-        setIsAssignmentUploadDialogOpen(false);
         return;
     }
 
@@ -123,7 +106,7 @@ export default function ClassAssignmentsPage() {
         const studentAssignmentText = e.target?.result as string;
         if (!studentAssignmentText?.trim()) {
             toast({ variant: "destructive", title: "Empty File", description: "The selected file is empty." });
-            setIsAssignmentUploadDialogOpen(false);
+            setSelectedAssignmentTitleForUpload(null);
             return;
         }
         
@@ -136,7 +119,6 @@ export default function ClassAssignmentsPage() {
         };
 
         toast({ title: "Processing Submission...", description: "Checking with AI (mock)." });
-        setIsAssignmentUploadDialogOpen(false);
 
         try {
             const result = await autoCheckAssignment(input);
@@ -162,7 +144,7 @@ export default function ClassAssignmentsPage() {
     };
     reader.onerror = () => {
         toast({ variant: "destructive", title: "File Read Error" });
-        setIsAssignmentUploadDialogOpen(false);
+        setSelectedAssignmentTitleForUpload(null);
     };
     reader.readAsText(file);
   };
@@ -224,7 +206,12 @@ export default function ClassAssignmentsPage() {
                   <Button 
                     variant="default" 
                     className="w-full btn-gel rounded-lg text-sm" 
-                    onClick={() => handleTriggerAssignmentUploadDialog(assignment.title)}
+                    onClick={() => {
+                      setSelectedAssignmentTitleForUpload(assignment.title);
+                      if (assignmentFileRef.current) {
+                        assignmentFileRef.current.click();
+                      }
+                    }}
                     disabled={assignment.status === 'Graded' || assignment.status === 'Submitted'}
                   >
                     <UploadCloud className="mr-2 h-4 w-4" />
@@ -237,37 +224,7 @@ export default function ClassAssignmentsPage() {
         </ScrollArea>
       )}
 
-      <Dialog open={isAssignmentUploadDialogOpen} onOpenChange={setIsAssignmentUploadDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-xl">
-          <DialogHeader>
-            <ShadDialogTitle>Submit: {selectedAssignmentTitleForUpload || "Assignment"}</ShadDialogTitle>
-            <DialogDescription>
-              Upload your .txt file for the selected assignment.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-                <Label htmlFor="dialogCurrentAssignmentName">Submitting for Assignment</Label>
-                <Input
-                    id="dialogCurrentAssignmentName"
-                    value={selectedAssignmentTitleForUpload || dialogAssignmentName} 
-                    readOnly 
-                    className="rounded-lg bg-muted/50"
-                />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" className="rounded-lg" onClick={() => setSelectedAssignmentTitleForUpload(null)}>
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="button" onClick={handleDialogSubmitAndChooseFile} className="btn-gel rounded-lg">
-              <UploadCloud className="mr-2 h-4 w-4" /> Choose File &amp; Submit
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Dialog removed */}
 
       <footer className="flex-none py-2 text-center text-xs text-muted-foreground border-t bg-background">
         View and submit your assignments for {className}.
@@ -275,5 +232,3 @@ export default function ClassAssignmentsPage() {
     </div>
   );
 }
-
-    
