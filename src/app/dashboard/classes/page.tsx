@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Classroom {
   id: string;
@@ -92,6 +93,7 @@ export default function ClassesPage() {
   const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
   const [currentSortOption, setCurrentSortOption] = useState<string>("default");
+  const [activeFilter, setActiveFilter] = useState<string>("all");
   const [initialLoading, setInitialLoading] = useState(true);
 
 
@@ -151,11 +153,11 @@ export default function ClassesPage() {
         teacherId: finalTeacherId,
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 15) + 1)), // Stagger creation dates more
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 30) + 1)), // Stagger creation dates more
       };
     });
     setClassrooms(processedMocks);
-    if (!authLoading) {
+    if (!authLoading) { // If auth is done, initial data setup is done
       setInitialLoading(false);
     }
   }, [user, authLoading]);
@@ -167,57 +169,74 @@ export default function ClassesPage() {
       return;
     }
     
+    let filteredClassrooms = classrooms;
+
+    if (activeFilter === 'teaching') {
+      filteredClassrooms = classrooms.filter(cls => user && cls.teacherId === user.uid);
+    } else if (activeFilter === 'requested') {
+      filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id));
+    }
+
     const pending: Classroom[] = [];
-    let taughtAndOther: Classroom[] = [];
+    let sortablePortion: Classroom[] = [];
 
-    classrooms.forEach(cls => {
-      if (requestedClassIds.includes(cls.id)) {
-        pending.push(cls);
-      } else {
-        taughtAndOther.push(cls);
-      }
-    });
-
+    if (activeFilter === 'all' || activeFilter === 'requested') {
+      filteredClassrooms.forEach(cls => {
+        if (requestedClassIds.includes(cls.id)) {
+          pending.push(cls);
+        } else {
+          sortablePortion.push(cls);
+        }
+      });
+    } else { // For 'teaching' filter, all items go to sortablePortion
+      sortablePortion = [...filteredClassrooms];
+    }
+    
     pending.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+
 
     switch (currentSortOption) {
       case "newest":
-        taughtAndOther.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+        sortablePortion.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
         break;
       case "oldest":
-        taughtAndOther.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+        sortablePortion.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
         break;
       case "nameAsc":
-        taughtAndOther.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+        sortablePortion.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
         break;
       case "nameDesc":
-        taughtAndOther.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
+        sortablePortion.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
         break;
       case "membersDesc":
-        taughtAndOther.sort((a, b) => b.memberCount - a.memberCount);
+        sortablePortion.sort((a, b) => b.memberCount - a.memberCount);
         break;
       case "membersAsc":
-        taughtAndOther.sort((a, b) => a.memberCount - b.memberCount);
+        sortablePortion.sort((a, b) => a.memberCount - b.memberCount);
         break;
       case "default":
       default:
-        const myClasses: Classroom[] = [];
-        const others: Classroom[] = [];
-        taughtAndOther.forEach(cls => {
-            if (user && user.uid === cls.teacherId) {
-                myClasses.push(cls);
-            } else {
-                others.push(cls);
-            }
-        });
-        myClasses.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0)); 
-        others.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));   
-        taughtAndOther = [...myClasses, ...others];
+        if (activeFilter === 'all') {
+            const myClasses: Classroom[] = [];
+            const others: Classroom[] = [];
+            sortablePortion.forEach(cls => { // sortablePortion here excludes 'pending'
+                if (user && user.uid === cls.teacherId) {
+                    myClasses.push(cls);
+                } else {
+                    others.push(cls);
+                }
+            });
+            myClasses.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0)); 
+            others.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));   
+            sortablePortion = [...myClasses, ...others];
+        } else { // For 'teaching' or 'requested' filters, default sort is by creation date (oldest)
+            sortablePortion.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+        }
         break;
     }
-    setDisplayClassrooms([...pending, ...taughtAndOther]);
+    setDisplayClassrooms([...pending, ...sortablePortion]);
 
-  }, [classrooms, user, requestedClassIds, authLoading, currentSortOption, initialLoading]);
+  }, [classrooms, user, requestedClassIds, authLoading, currentSortOption, initialLoading, activeFilter]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
@@ -566,6 +585,14 @@ export default function ClassesPage() {
         </div>
       </div>
 
+      <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full">
+        <TabsList className="mb-4 rounded-lg grid w-full grid-cols-1 sm:grid-cols-3 sm:max-w-md mx-auto">
+          <TabsTrigger value="all" className="rounded-md">All Classes</TabsTrigger>
+          <TabsTrigger value="teaching" className="rounded-md">My Teaching</TabsTrigger>
+          <TabsTrigger value="requested" className="rounded-md">My Requests</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) resetEditClassDialog();
           setIsEditClassDialogOpen(isOpen);
@@ -641,13 +668,28 @@ export default function ClassesPage() {
         <Card className="text-center py-12 rounded-xl shadow-lg border-border/50 flex-grow flex flex-col justify-center items-center">
           <CardHeader>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <CardTitle className="text-2xl">No Classes Available</CardTitle>
-            <CardDescription>There are no classes listed right now. Be the first to create one!</CardDescription>
+            <CardTitle className="text-2xl">
+              {activeFilter === 'teaching' && "No Classes Taught"}
+              {activeFilter === 'requested' && "No Pending Requests"}
+              {activeFilter === 'all' && "No Classes Available"}
+            </CardTitle>
+            <CardDescription>
+              {activeFilter === 'teaching' && "You haven't created any classes yet. Start one now!"}
+              {activeFilter === 'requested' && "You haven't requested to join any classes, or your requests have been processed."}
+              {activeFilter === 'all' && "There are no classes listed right now. Be the first to create one!"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => setIsCreateClassDialogOpen(true)} size="lg" className="btn-gel rounded-lg">
-              Create a Class
-            </Button>
+            {(activeFilter === 'all' || activeFilter === 'teaching') && (
+                <Button onClick={() => setIsCreateClassDialogOpen(true)} size="lg" className="btn-gel rounded-lg">
+                Create a Class
+                </Button>
+            )}
+            {activeFilter === 'requested' && (
+                 <Button onClick={() => setActiveFilter('all')} size="lg" variant="outline" className="rounded-lg">
+                    View All Classes
+                </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
