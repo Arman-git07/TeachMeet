@@ -17,6 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { Badge } from '@/components/ui/badge'; // Import Badge
+import { cn } from '@/lib/utils'; // Import cn for conditional classNames
 
 interface Classroom {
   id: string;
@@ -43,7 +45,7 @@ const REQUESTED_CLASSES_KEY = 'teachmeet-requested-classes';
 
 const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string => {
   if (!name || typeof name !== 'string') return defaultInitial;
-  const words = name.trim().split(/\s+/).filter(Boolean); // filter Boolean to remove empty strings from multiple spaces
+  const words = name.trim().split(/\s+/).filter(Boolean); 
   if (words.length === 0) return defaultInitial;
 
   if (words.length === 1) {
@@ -58,10 +60,12 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 
 export default function ClassesPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth(); // Added authLoading
   const router = useRouter();
   const [classrooms, setClassrooms] = useState<Classroom[]>(initialMockClassrooms);
   const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
+  const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]); // New state for sorted classrooms
+
 
   // Create Class Dialog State
   const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
@@ -94,6 +98,36 @@ export default function ClassesPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return; // Wait for auth state to be resolved
+
+    let sortedClassrooms: Classroom[] = [];
+    const pending: Classroom[] = [];
+    const taught: Classroom[] = [];
+    const others: Classroom[] = [];
+
+    classrooms.forEach(cls => {
+      if (requestedClassIds.includes(cls.id)) {
+        pending.push(cls);
+      } else if (user && user.uid === cls.teacherId) {
+        taught.push(cls);
+      } else {
+        others.push(cls);
+      }
+    });
+
+    // Ensure unique entries if a class is both taught and requested (should not happen)
+    const pendingIds = new Set(pending.map(p => p.id));
+    const uniqueTaught = taught.filter(t => !pendingIds.has(t.id));
+    const taughtIds = new Set(uniqueTaught.map(t => t.id));
+    const uniqueOthers = others.filter(o => !pendingIds.has(o.id) && !taughtIds.has(o.id));
+
+    sortedClassrooms = [...pending, ...uniqueTaught, ...uniqueOthers];
+    setDisplayClassrooms(sortedClassrooms);
+
+  }, [classrooms, user, requestedClassIds, authLoading]);
+
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
     const file = event.target.files?.[0];
@@ -194,7 +228,7 @@ export default function ClassesPage() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast.dismiss(toastId);
             toast({ title: "Image Uploaded!", description: `${imageFile.name} successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); // dataAiHint is undefined for real images
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); 
           } catch (getUrlError) {
              console.error("Error getting download URL for class image:", getUrlError);
              toast.dismiss(toastId);
@@ -465,7 +499,7 @@ export default function ClassesPage() {
       </Dialog>
 
 
-      {classrooms.length === 0 ? (
+      {displayClassrooms.length === 0 && !authLoading ? ( // Check authLoading here too
         <Card className="text-center py-12 rounded-xl shadow-lg border-border/50 flex-grow flex flex-col justify-center items-center">
           <CardHeader>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -478,10 +512,33 @@ export default function ClassesPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : authLoading ? (
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
+              <div className="relative h-40 w-full bg-muted rounded-t-xl"></div>
+              <CardHeader className="pb-2 pt-4">
+                <div className="h-5 w-3/4 bg-muted rounded mb-1"></div>
+                <div className="flex items-center pt-1">
+                  <div className="h-6 w-6 mr-2 bg-muted rounded-full"></div>
+                  <div className="h-4 w-1/2 bg-muted rounded"></div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-grow min-h-[60px]">
+                <div className="h-4 w-full bg-muted rounded mb-1"></div>
+                <div className="h-4 w-5/6 bg-muted rounded"></div>
+              </CardContent>
+              <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
+                <div className="h-9 w-full bg-muted rounded-lg"></div>
+                <div className="h-9 w-full bg-muted rounded-lg"></div>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
-          {classrooms.map(classroom => (
-            <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50">
+          {displayClassrooms.map(classroom => (
+            <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50 relative">
               <div className="relative h-40 w-full">
                  <Image
                     src={classroom.thumbnailUrl}
@@ -491,6 +548,15 @@ export default function ClassesPage() {
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
                     data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"} 
                  />
+                {requestedClassIds.includes(classroom.id) ? (
+                    <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
+                    Pending Request
+                    </Badge>
+                ) : user && user.uid === classroom.teacherId ? (
+                    <Badge variant="secondary" className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
+                    My Class
+                    </Badge>
+                ) : null}
               </div>
               <CardHeader className="pb-2 pt-4">
                 <CardTitle className="text-lg truncate leading-tight" title={classroom.name}>{classroom.name}</CardTitle>
@@ -536,4 +602,3 @@ export default function ClassesPage() {
   );
 }
     
-
