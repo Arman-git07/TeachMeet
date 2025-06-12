@@ -53,13 +53,13 @@ export function SignInForm() {
         'auth/wrong-password', 
         'auth/invalid-credential', 
         'auth/invalid-email', 
-        'auth/too-many-requests'
+        'auth/too-many-requests',
+        'auth/visibility-check-was-unavailable.-please-retry-the-request-and-contact-support-if-the-problem-persists'
       ];
 
       if (!knownErrorCodes.includes(error.code)) {
         console.error("Unexpected Sign In Error:", error);
       } else {
-        // Log handled errors as info to reduce console noise, or remove if not needed
         console.info(`Handled Sign In Error: ${error.code}`);
       }
 
@@ -70,7 +70,10 @@ export function SignInForm() {
         errorMessage = "The email address is not valid.";
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
+      } else if (error.code === 'auth/visibility-check-was-unavailable.-please-retry-the-request-and-contact-support-if-the-problem-persists') {
+        errorMessage = "There was a temporary issue with the authentication service. Please try signing in again in a moment. If the problem continues, check your network connection or browser settings.";
       }
+      
       toast({
         variant: "destructive",
         title: "Sign In Failed",
