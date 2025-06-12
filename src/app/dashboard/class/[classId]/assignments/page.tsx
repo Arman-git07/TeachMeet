@@ -6,17 +6,15 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-// Dialog imports removed as it's no longer used
 import { Input } from '@/components/ui/input';
-// Label import removed as it's no longer used
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, ClipboardList, FileText, Loader2, UploadCloud } from 'lucide-react'; // Removed AlertTriangle, ChevronsUpDown
+import { ArrowLeft, ClipboardList, FileText, Loader2, UploadCloud } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
-import { format, parseISO } from 'date-fns'; // For date display if needed
+import { format, parseISO } from 'date-fns';
 
 interface Assignment {
   id: string;
@@ -26,9 +24,7 @@ interface Assignment {
   description?: string;
 }
 
-// Mock data specifically for this page
 const getMockAssignmentsForClass = (classId: string): Assignment[] => {
-  // In a real app, fetch assignments for classId
   return [
     { id: `assign1-${classId}`, title: "Introduction Essay", dueDate: "2024-08-10", status: "Graded", description: "A 500-word essay about your motivations for taking this course." },
     { id: `assign2-${classId}`, title: "Chapter 1 Problem Set", dueDate: "2024-08-17", status: "Pending", description: "Complete all odd-numbered problems from Chapter 1." },
@@ -62,14 +58,16 @@ export default function ClassAssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const assignmentFileRef = useRef<HTMLInputElement>(null);
-  const [selectedAssignmentTitleForUpload, setSelectedAssignmentTitleForUpload] = useState<string | null>(null);
-  // Removed isAssignmentUploadDialogOpen and dialogAssignmentName as dialog is removed
+  const rubricFileRef = useRef<HTMLInputElement>(null);
+  const studentSubmissionFileRef = useRef<HTMLInputElement>(null);
+
+  const [currentAssignmentForRubricUpload, setCurrentAssignmentForRubricUpload] = useState<Assignment | null>(null);
+  const [currentAssignmentForSubmission, setCurrentAssignmentForSubmission] = useState<Assignment | null>(null);
+  const [uploadedRubricText, setUploadedRubricText] = useState<string | null>(null);
 
   useEffect(() => {
     if (classId) {
       setLoading(true);
-      // Simulate fetching assignments
       setTimeout(() => {
         const fetchedAssignments = getMockAssignmentsForClass(classId);
         setAssignments(fetchedAssignments);
@@ -78,73 +76,133 @@ export default function ClassAssignmentsPage() {
     }
   }, [classId]);
 
-  const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (event.target) {
-        event.target.value = ""; // Reset file input
+  const handleInitiateSubmission = (assignment: Assignment) => {
+    if (assignment.status === 'Graded' || assignment.status === 'Submitted') {
+      toast({title: "Already Processed", description: `This assignment (${assignment.title}) is already ${assignment.status.toLowerCase()}.`});
+      return;
     }
+    setCurrentAssignmentForRubricUpload(assignment);
+    toast({
+      title: "Step 1: Select Rubric",
+      description: `Please select the teacher's rubric/model answer file (.txt) for "${assignment.title}".`,
+      duration: 10000,
+    });
+    rubricFileRef.current?.click();
+  };
+
+  const handleRubricFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (event.target) event.target.value = ""; // Reset file input
 
     if (!file) {
-        toast({ variant: "info", title: "File Selection Cancelled" });
-        setSelectedAssignmentTitleForUpload(null); 
-        return;
+      toast({ variant: "info", title: "Rubric Selection Cancelled" });
+      setCurrentAssignmentForRubricUpload(null);
+      return;
     }
-
     if (file.type !== "text/plain") {
-        toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt file." });
-        setSelectedAssignmentTitleForUpload(null);
-        return;
+      toast({ variant: "destructive", title: "Invalid Rubric File Type", description: "Please upload a .txt file for the rubric." });
+      setCurrentAssignmentForRubricUpload(null);
+      return;
     }
-    
-    if (!selectedAssignmentTitleForUpload) {
-        toast({ variant: "destructive", title: "Internal Error", description: "Assignment title missing. Please try again." });
-        return;
+    if (!currentAssignmentForRubricUpload) {
+      toast({ variant: "destructive", title: "Internal Error", description: "Assignment context lost. Please try again." });
+      return;
     }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-        const studentAssignmentText = e.target?.result as string;
-        if (!studentAssignmentText?.trim()) {
-            toast({ variant: "destructive", title: "Empty File", description: "The selected file is empty." });
-            setSelectedAssignmentTitleForUpload(null);
-            return;
-        }
-        
-        const mockTeacherRubric = `Rubric for "${selectedAssignmentTitleForUpload}": Check for clarity, examples, and understanding.`;
-
-        const input: AutoCheckAssignmentInput = {
-            studentAssignmentText: studentAssignmentText.substring(0, 5000),
-            teacherRubricText: mockTeacherRubric,
-            assignmentTitle: selectedAssignmentTitleForUpload,
-        };
-
-        toast({ title: "Processing Submission...", description: "Checking with AI (mock)." });
-
-        try {
-            const result = await autoCheckAssignment(input);
-            let feedbackMessage = `Feedback for "${input.assignmentTitle}":\n${result.overallFeedback}\n`;
-            if (result.similarityScore) feedbackMessage += `Similarity: ${result.similarityScore}%\n`;
-            if (result.isPlagiarized) feedbackMessage += `Plagiarism Check: Potential issues.\n`;
-            result.specificPoints.forEach(p => {
-                feedbackMessage += `\n- ${p.point}: ${p.assessment}`;
-                if(p.studentExtract) feedbackMessage += ` (e.g., "${p.studentExtract}")`;
-            });
-            
-            toast({
-                title: "AI Feedback (Mock)",
-                description: <pre className="whitespace-pre-wrap text-xs max-h-60 overflow-y-auto">{feedbackMessage}</pre>,
-                duration: 20000,
-            });
-        } catch (error) {
-            console.error("Error during AI check:", error);
-            toast({ variant: "destructive", title: "AI Check Error", description: "Could not get AI feedback." });
-        } finally {
-            setSelectedAssignmentTitleForUpload(null);
-        }
+      const rubricText = e.target?.result as string;
+      if (!rubricText?.trim()) {
+        toast({ variant: "destructive", title: "Empty Rubric File", description: "The selected rubric file is empty." });
+        setCurrentAssignmentForRubricUpload(null);
+        return;
+      }
+      setUploadedRubricText(rubricText);
+      setCurrentAssignmentForSubmission(currentAssignmentForRubricUpload);
+      setCurrentAssignmentForRubricUpload(null);
+      toast({
+        title: "Step 2: Select Your Submission",
+        description: `Rubric for "${currentAssignmentForRubricUpload.title}" loaded. Now, please select your assignment file (.txt).`,
+        duration: 10000,
+      });
+      studentSubmissionFileRef.current?.click();
     };
     reader.onerror = () => {
-        toast({ variant: "destructive", title: "File Read Error" });
-        setSelectedAssignmentTitleForUpload(null);
+      toast({ variant: "destructive", title: "Rubric File Read Error" });
+      setCurrentAssignmentForRubricUpload(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleStudentSubmissionFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (event.target) event.target.value = ""; // Reset file input
+
+    if (!file) {
+      toast({ variant: "info", title: "Submission File Selection Cancelled" });
+      setCurrentAssignmentForSubmission(null);
+      setUploadedRubricText(null);
+      return;
+    }
+    if (file.type !== "text/plain") {
+      toast({ variant: "destructive", title: "Invalid Submission File Type", description: "Please upload a .txt file for your assignment." });
+      setCurrentAssignmentForSubmission(null);
+      setUploadedRubricText(null);
+      return;
+    }
+    if (!currentAssignmentForSubmission || !uploadedRubricText) {
+      toast({ variant: "destructive", title: "Internal Error", description: "Missing rubric or assignment context. Please restart submission." });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const studentAssignmentText = e.target?.result as string;
+      if (!studentAssignmentText?.trim()) {
+        toast({ variant: "destructive", title: "Empty Submission File", description: "Your assignment file is empty." });
+        setCurrentAssignmentForSubmission(null);
+        setUploadedRubricText(null);
+        return;
+      }
+
+      const input: AutoCheckAssignmentInput = {
+        studentAssignmentText: studentAssignmentText.substring(0, 15000), // Limiting student text
+        teacherRubricText: uploadedRubricText.substring(0, 10000), // Limiting rubric text
+        assignmentTitle: currentAssignmentForSubmission.title,
+      };
+
+      toast({ title: "Processing Submission...", description: "Checking with AI. This may take a moment." });
+
+      try {
+        const result = await autoCheckAssignment(input);
+        let feedbackMessage = `AI Feedback for "${input.assignmentTitle}":\n${result.overallFeedback}\n`;
+        if (result.similarityScore) feedbackMessage += `Similarity: ${result.similarityScore}%\n`;
+        if (result.isPlagiarized !== undefined) feedbackMessage += `Plagiarism Check: ${result.isPlagiarized ? "Potential issues detected." : "Looks original."}\n`;
+        result.specificPoints.forEach(p => {
+          feedbackMessage += `\n- ${p.point}: ${p.assessment}`;
+          if(p.studentExtract) feedbackMessage += ` (e.g., "${p.studentExtract}")`;
+        });
+        
+        toast({
+          title: "AI Feedback Received",
+          description: <pre className="whitespace-pre-wrap text-xs max-h-60 overflow-y-auto">{feedbackMessage}</pre>,
+          duration: 30000, // Increased duration for reading feedback
+        });
+        // Optionally update assignment status in UI
+        setAssignments(prev => prev.map(a => a.id === currentAssignmentForSubmission!.id ? {...a, status: 'Submitted'} : a));
+
+      } catch (error) {
+        console.error("Error during AI check:", error);
+        toast({ variant: "destructive", title: "AI Check Error", description: "Could not get AI feedback. " + (error instanceof Error ? error.message : "Please try again.") });
+      } finally {
+        setCurrentAssignmentForSubmission(null);
+        setUploadedRubricText(null);
+      }
+    };
+    reader.onerror = () => {
+      toast({ variant: "destructive", title: "Submission File Read Error" });
+      setCurrentAssignmentForSubmission(null);
+      setUploadedRubricText(null);
     };
     reader.readAsText(file);
   };
@@ -160,7 +218,8 @@ export default function ClassAssignmentsPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-8 h-full flex flex-col">
-      <input type="file" ref={assignmentFileRef} onChange={handleFileSelectedForAssignment} accept=".txt" style={{ display: 'none' }} />
+      <input type="file" ref={rubricFileRef} onChange={handleRubricFileSelected} accept=".txt" style={{ display: 'none' }} />
+      <input type="file" ref={studentSubmissionFileRef} onChange={handleStudentSubmissionFileSelected} accept=".txt" style={{ display: 'none' }} />
       
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -206,12 +265,7 @@ export default function ClassAssignmentsPage() {
                   <Button 
                     variant="default" 
                     className="w-full btn-gel rounded-lg text-sm" 
-                    onClick={() => {
-                      setSelectedAssignmentTitleForUpload(assignment.title);
-                      if (assignmentFileRef.current) {
-                        assignmentFileRef.current.click();
-                      }
-                    }}
+                    onClick={() => handleInitiateSubmission(assignment)}
                     disabled={assignment.status === 'Graded' || assignment.status === 'Submitted'}
                   >
                     <UploadCloud className="mr-2 h-4 w-4" />
@@ -224,10 +278,8 @@ export default function ClassAssignmentsPage() {
         </ScrollArea>
       )}
 
-      {/* Dialog removed */}
-
       <footer className="flex-none py-2 text-center text-xs text-muted-foreground border-t bg-background">
-        View and submit your assignments for {className}.
+        Submit assignments and get AI-powered feedback (requires teacher rubric upload).
       </footer>
     </div>
   );

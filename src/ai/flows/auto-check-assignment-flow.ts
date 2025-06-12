@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI flow for automatically checking student assignments against a teacher's rubric.
@@ -30,36 +31,9 @@ export const AutoCheckAssignmentOutputSchema = z.object({
 });
 export type AutoCheckAssignmentOutput = z.infer<typeof AutoCheckAssignmentOutputSchema>;
 
-// This is a conceptual function. In a real application, you would call the defined flow.
 export async function autoCheckAssignment(input: AutoCheckAssignmentInput): Promise<AutoCheckAssignmentOutput> {
-  // For now, this is a mock implementation.
-  // In a real scenario, you would invoke the 'autoCheckAssignmentFlow'.
-  console.log("Simulating AI assignment check for:", input.assignmentTitle);
-  
-  // Mocked response
-  const mockOutput: AutoCheckAssignmentOutput = {
-    overallFeedback: `The submission for "${input.assignmentTitle}" shows a good understanding of the core concepts. However, there are a few areas for improvement, particularly in relation to the application of [example concept from rubric].`,
-    similarityScore: Math.floor(Math.random() * 30) + 70, // Random score between 70-100
-    specificPoints: [
-      {
-        point: "Understanding of Topic X",
-        assessment: "The student demonstrates a clear understanding.",
-        studentExtract: input.studentAssignmentText.substring(0, 50) + "..." // Example extract
-      },
-      {
-        point: "Application of Concept Y",
-        assessment: "Could be more detailed. Consider providing more specific examples.",
-      }
-    ],
-    isPlagiarized: Math.random() > 0.9 ? true : false, // 10% chance of mock plagiarism
-  };
-
-  // Simulating a delay as if an AI call was made
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // To use the actual AI flow, you would uncomment the next line and remove/comment the mockOutput return.
-  // return autoCheckAssignmentFlow(input); 
-  return mockOutput;
+  // Call the actual Genkit flow
+  return autoCheckAssignmentFlow(input);
 }
 
 const autoCheckAssignmentPrompt = ai.definePrompt({
