@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, ArrowUpDown } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +19,7 @@ import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Classroom {
   id: string;
@@ -30,10 +31,11 @@ interface Classroom {
   memberCount: number;
   thumbnailUrl: string;
   dataAiHint?: string;
+  createdAt: Date; // Added createdAt
 }
 
 // Base structure for mock classrooms, teacher details will be filled dynamically for some.
-const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'teacherAvatar'>[] = [
+const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'teacherAvatar' | 'createdAt'>[] = [
   { id: "cl1", name: "Introduction to Quantum Physics", description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", memberCount: 25, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
   { id: "cl2", name: "Advanced JavaScript Techniques", description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
   { id: "cl3", name: "Creative Writing Workshop", description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", memberCount: 12, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
@@ -66,6 +68,16 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
   }
 };
 
+const sortOptions = [
+    { value: "default", label: "Default" },
+    { value: "newest", label: "Newest First" },
+    { value: "oldest", label: "Oldest First" },
+    { value: "nameAsc", label: "Name (A-Z)" },
+    { value: "nameDesc", label: "Name (Z-A)" },
+    { value: "membersDesc", label: "Most Members" },
+    { value: "membersAsc", label: "Fewest Members" },
+];
+
 
 export default function ClassesPage() {
   const { toast } = useToast();
@@ -74,6 +86,7 @@ export default function ClassesPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
+  const [currentSortOption, setCurrentSortOption] = useState<string>("default");
 
 
   // Create Class Dialog State
@@ -109,16 +122,16 @@ export default function ClassesPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth state to be resolved
+    if (authLoading) return;
 
-    const processedMocks = baseMockClassroomsData.map(baseCls => {
+    const processedMocks = baseMockClassroomsData.map((baseCls, index) => {
       let finalTeacherId: string;
       let finalTeacherName: string;
       let finalTeacherAvatar: string;
 
       const defaultDetails = defaultTeacherDetailsMap[baseCls.id as keyof typeof defaultTeacherDetailsMap] || { name: "Mock Teacher", initial: "M", placeholderId: `teacher_mock_${baseCls.id}`};
 
-      if (baseCls.id === "cl1" && user) { // Designate cl1 as the current user's class if logged in
+      if (baseCls.id === "cl1" && user) { 
         finalTeacherId = user.uid;
         finalTeacherName = user.displayName || "My Class Teacher";
         finalTeacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${getInitialsFromName(finalTeacherName, "M")}`;
@@ -133,6 +146,7 @@ export default function ClassesPage() {
         teacherId: finalTeacherId,
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.random() * 5 + 1)), // Stagger creation dates
       };
     });
     setClassrooms(processedMocks);
@@ -142,43 +156,63 @@ export default function ClassesPage() {
 
   useEffect(() => {
     if (authLoading && classrooms.length === 0) { 
-      setDisplayClassrooms([]); // Show skeletons or empty if still loading auth and no classrooms yet
+      setDisplayClassrooms([]); 
       return;
     }
-    if (!authLoading && classrooms.length === 0 && baseMockClassroomsData.length > 0) {
-      // This means auth is done, but classrooms array is still empty, maybe the effect above hasn't run or resulted in empty
-      // This case should ideally be handled by the classrooms state update itself.
-      // For safety, if classrooms is empty but shouldn't be, we can re-trigger or wait.
-      // However, the dependency on `classrooms` below should handle this.
-    }
-
-
-    let sortedClassrooms: Classroom[] = [];
+    
     const pending: Classroom[] = [];
-    const taught: Classroom[] = [];
-    const others: Classroom[] = [];
+    let taughtAndOther: Classroom[] = [];
 
     classrooms.forEach(cls => {
       if (requestedClassIds.includes(cls.id)) {
         pending.push(cls);
-      } else if (user && user.uid === cls.teacherId) {
-        taught.push(cls);
       } else {
-        others.push(cls);
+        taughtAndOther.push(cls);
       }
     });
 
-    const pendingIds = new Set(pending.map(p => p.id));
-    const uniqueTaught = taught.filter(t => !pendingIds.has(t.id));
-    
-    const taughtOrRequestedIds = new Set([...pending.map(p => p.id), ...uniqueTaught.map(t => t.id)]);
-    const uniqueOthers = others.filter(o => !taughtOrRequestedIds.has(o.id));
+    // Sort pending internally (e.g., by creation date - newest first for requests)
+    pending.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 
+    // Sort 'taughtAndOther' based on currentSortOption
+    switch (currentSortOption) {
+      case "newest":
+        taughtAndOther.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+        break;
+      case "oldest":
+        taughtAndOther.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+        break;
+      case "nameAsc":
+        taughtAndOther.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "nameDesc":
+        taughtAndOther.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case "membersDesc":
+        taughtAndOther.sort((a, b) => b.memberCount - a.memberCount);
+        break;
+      case "membersAsc":
+        taughtAndOther.sort((a, b) => a.memberCount - b.memberCount);
+        break;
+      case "default":
+      default:
+        const myClasses: Classroom[] = [];
+        const others: Classroom[] = [];
+        taughtAndOther.forEach(cls => {
+            if (user && user.uid === cls.teacherId) {
+                myClasses.push(cls);
+            } else {
+                others.push(cls);
+            }
+        });
+        myClasses.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0)); // My classes by oldest
+        others.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));   // Others by oldest
+        taughtAndOther = [...myClasses, ...others];
+        break;
+    }
+    setDisplayClassrooms([...pending, ...taughtAndOther]);
 
-    sortedClassrooms = [...pending, ...uniqueTaught, ...uniqueOthers];
-    setDisplayClassrooms(sortedClassrooms);
-
-  }, [classrooms, user, requestedClassIds, authLoading]);
+  }, [classrooms, user, requestedClassIds, authLoading, currentSortOption]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
@@ -333,9 +367,10 @@ export default function ClassesPage() {
       teacherId: user.uid,
       teacherAvatar: teacherAvatarUrl,
       memberCount: 1,
+      createdAt: new Date(), // Set creation date
       ...imageDetails, 
     };
-    setClassrooms(prev => [newClass, ...prev]); // This will trigger the sorting useEffect
+    setClassrooms(prev => [newClass, ...prev]);
     toast({
       title: "Class Created!",
       description: `"${newClassName.trim()}" has been successfully created.`,
@@ -384,9 +419,10 @@ export default function ClassesPage() {
             description: editClassDescription.trim(),
             thumbnailUrl: imageDetails.thumbnailUrl,
             dataAiHint: imageDetails.dataAiHint,
+            // Note: createdAt should not be updated on edit
           }
         : cls
-    )); // This will trigger the sorting useEffect
+    ));
 
     toast({
       title: "Class Updated!",
@@ -414,7 +450,6 @@ export default function ClassesPage() {
       title: "Request Sent!",
       description: `Your request to join "${className}" has been sent to the teacher.`,
     });
-    // The sorting useEffect will pick this up and re-sort displayClassrooms
   };
 
   const handleOpenEditDialog = (classToEdit: Classroom) => {
@@ -448,6 +483,7 @@ export default function ClassesPage() {
     };
   }, [newClassImagePreview, editClassImagePreview]);
 
+  const activeSortLabel = sortOptions.find(opt => opt.value === currentSortOption)?.label || "Default";
 
   return (
     <div className="space-y-8 p-4 md:p-8 h-full flex flex-col">
@@ -456,52 +492,72 @@ export default function ClassesPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Explore Classes</h1>
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
-        <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
-            if (!isOpen) resetCreateClassDialog();
-            setIsCreateClassDialogOpen(isOpen);
-        }}>
-          <DialogTrigger asChild>
-            <Button className="btn-gel rounded-lg">
-              <PlusCircle className="mr-2 h-5 w-5" /> Create New Class
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[520px] rounded-xl">
-            <DialogHeader>
-              <DialogTitle className="text-xl">Create a New Classroom</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to set up your new class.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-              <div className="grid gap-2">
-                <Label htmlFor="className">Class Name</Label>
-                <Input id="className" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Math 101" className="rounded-lg" disabled={isUploadingClassImage}/>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="classDescription">Description</Label>
-                <Textarea id="classDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="A brief overview of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingClassImage}/>
-              </div>
-               <div className="grid gap-2">
-                <Label htmlFor="classImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                <Input id="classImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'create')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
-                {newClassImagePreview && (
-                  <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
-                    <Image src={newClassImagePreview} alt="Selected class image preview" layout="fill" objectFit="cover" />
-                  </div>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" className="rounded-lg" disabled={isUploadingClassImage}>Cancel</Button>
-              </DialogClose>
-              <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage || !newClassName.trim()}>
-                {isUploadingClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isUploadingClassImage ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="rounded-lg min-w-[160px]">
+                        <ArrowUpDown className="mr-2 h-4 w-4" /> Sort by: {activeSortLabel}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                    {sortOptions.map(option => (
+                        <DropdownMenuItem
+                            key={option.value}
+                            onClick={() => setCurrentSortOption(option.value)}
+                            className={cn("cursor-pointer rounded-md", currentSortOption === option.value && "bg-accent text-accent-foreground")}
+                        >
+                            {option.label}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
+                if (!isOpen) resetCreateClassDialog();
+                setIsCreateClassDialogOpen(isOpen);
+            }}>
+            <DialogTrigger asChild>
+                <Button className="btn-gel rounded-lg">
+                <PlusCircle className="mr-2 h-5 w-5" /> Create New Class
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[520px] rounded-xl">
+                <DialogHeader>
+                <DialogTitle className="text-xl">Create a New Classroom</DialogTitle>
+                <DialogDescription>
+                    Fill in the details below to set up your new class.
+                </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+                <div className="grid gap-2">
+                    <Label htmlFor="className">Class Name</Label>
+                    <Input id="className" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Math 101" className="rounded-lg" disabled={isUploadingClassImage}/>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="classDescription">Description</Label>
+                    <Textarea id="classDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="A brief overview of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingClassImage}/>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="classImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
+                    <Input id="classImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'create')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
+                    {newClassImagePreview && (
+                    <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
+                        <Image src={newClassImagePreview} alt="Selected class image preview" layout="fill" objectFit="cover" />
+                    </div>
+                    )}
+                </div>
+                </div>
+                <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="outline" className="rounded-lg" disabled={isUploadingClassImage}>Cancel</Button>
+                </DialogClose>
+                <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage || !newClassName.trim()}>
+                    {isUploadingClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isUploadingClassImage ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
+                </Button>
+                </DialogFooter>
+            </DialogContent>
+            </Dialog>
+        </div>
       </div>
 
       <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
@@ -565,7 +621,7 @@ export default function ClassesPage() {
             </Button>
           </CardContent>
         </Card>
-      ) : authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0) ? ( // Show skeletons if auth is loading OR if classrooms array is empty but base data exists (means processing is happening)
+      ) : authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0) ? ( 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
@@ -627,6 +683,7 @@ export default function ClassesPage() {
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span className="flex items-center"><Users className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
+                    {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{classroom.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </div>
                 {user && user.uid === classroom.teacherId ? (
                     <Button onClick={() => handleOpenEditDialog(classroom)} className="w-full btn-gel rounded-lg text-sm">
