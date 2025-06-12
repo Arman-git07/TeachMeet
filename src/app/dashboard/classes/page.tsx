@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,14 +11,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle } from "lucide-react"; // Added CheckCircle
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { Badge } from '@/components/ui/badge'; // Import Badge
-import { cn } from '@/lib/utils'; // Import cn for conditional classNames
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface Classroom {
   id: string;
@@ -32,12 +32,21 @@ interface Classroom {
   dataAiHint?: string;
 }
 
-const initialMockClassrooms: Classroom[] = [
-  { id: "cl1", name: "Introduction to Quantum Physics", teacherName: "Dr. Evelyn Reed", teacherId: "teacher1_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=ER`, description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", memberCount: 25, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
-  { id: "cl2", name: "Advanced JavaScript Techniques", teacherName: "Mr. Kenji Tanaka", teacherId: "teacher2_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=KT`, description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
-  { id: "cl3", name: "Creative Writing Workshop", teacherName: "Ms. Aisha Khan", teacherId: "teacher3_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=AK`, description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", memberCount: 12, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
-  { id: "cl4", name: "Beginner's Yoga & Mindfulness", teacherName: "Sara Chen", teacherId: "user1_placeholder_uid", teacherAvatar: `https://placehold.co/40x40.png?text=SC`, description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", memberCount: 30, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "yoga meditation" },
+// Base structure for mock classrooms, teacher details will be filled dynamically for some.
+const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'teacherAvatar'>[] = [
+  { id: "cl1", name: "Introduction to Quantum Physics", description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", memberCount: 25, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
+  { id: "cl2", name: "Advanced JavaScript Techniques", description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
+  { id: "cl3", name: "Creative Writing Workshop", description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", memberCount: 12, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
+  { id: "cl4", name: "Beginner's Yoga & Mindfulness", description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", memberCount: 30, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "yoga meditation" },
 ];
+
+const defaultTeacherDetailsMap = {
+  cl1: { name: "Dr. Evelyn Reed", initial: "ER", placeholderId: "teacher1_placeholder_uid" },
+  cl2: { name: "Mr. Kenji Tanaka", initial: "KT", placeholderId: "teacher2_placeholder_uid" },
+  cl3: { name: "Ms. Aisha Khan", initial: "AK", placeholderId: "teacher3_placeholder_uid" },
+  cl4: { name: "Sara Chen", initial: "SC", placeholderId: "user1_placeholder_uid" },
+};
+
 
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
@@ -60,11 +69,11 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 
 export default function ClassesPage() {
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth(); // Added authLoading
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [classrooms, setClassrooms] = useState<Classroom[]>(initialMockClassrooms);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
-  const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]); // New state for sorted classrooms
+  const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
 
 
   // Create Class Dialog State
@@ -102,6 +111,48 @@ export default function ClassesPage() {
   useEffect(() => {
     if (authLoading) return; // Wait for auth state to be resolved
 
+    const processedMocks = baseMockClassroomsData.map(baseCls => {
+      let finalTeacherId: string;
+      let finalTeacherName: string;
+      let finalTeacherAvatar: string;
+
+      const defaultDetails = defaultTeacherDetailsMap[baseCls.id as keyof typeof defaultTeacherDetailsMap] || { name: "Mock Teacher", initial: "M", placeholderId: `teacher_mock_${baseCls.id}`};
+
+      if (baseCls.id === "cl1" && user) { // Designate cl1 as the current user's class if logged in
+        finalTeacherId = user.uid;
+        finalTeacherName = user.displayName || "My Class Teacher";
+        finalTeacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${getInitialsFromName(finalTeacherName, "M")}`;
+      } else {
+        finalTeacherId = defaultDetails.placeholderId;
+        finalTeacherName = defaultDetails.name;
+        finalTeacherAvatar = `https://placehold.co/40x40.png?text=${defaultDetails.initial}`;
+      }
+      
+      return {
+        ...baseCls,
+        teacherId: finalTeacherId,
+        teacherName: finalTeacherName,
+        teacherAvatar: finalTeacherAvatar,
+      };
+    });
+    setClassrooms(processedMocks);
+
+  }, [user, authLoading]);
+
+
+  useEffect(() => {
+    if (authLoading && classrooms.length === 0) { 
+      setDisplayClassrooms([]); // Show skeletons or empty if still loading auth and no classrooms yet
+      return;
+    }
+    if (!authLoading && classrooms.length === 0 && baseMockClassroomsData.length > 0) {
+      // This means auth is done, but classrooms array is still empty, maybe the effect above hasn't run or resulted in empty
+      // This case should ideally be handled by the classrooms state update itself.
+      // For safety, if classrooms is empty but shouldn't be, we can re-trigger or wait.
+      // However, the dependency on `classrooms` below should handle this.
+    }
+
+
     let sortedClassrooms: Classroom[] = [];
     const pending: Classroom[] = [];
     const taught: Classroom[] = [];
@@ -117,11 +168,12 @@ export default function ClassesPage() {
       }
     });
 
-    // Ensure unique entries if a class is both taught and requested (should not happen)
     const pendingIds = new Set(pending.map(p => p.id));
     const uniqueTaught = taught.filter(t => !pendingIds.has(t.id));
-    const taughtIds = new Set(uniqueTaught.map(t => t.id));
-    const uniqueOthers = others.filter(o => !pendingIds.has(o.id) && !taughtIds.has(o.id));
+    
+    const taughtOrRequestedIds = new Set([...pending.map(p => p.id), ...uniqueTaught.map(t => t.id)]);
+    const uniqueOthers = others.filter(o => !taughtOrRequestedIds.has(o.id));
+
 
     sortedClassrooms = [...pending, ...uniqueTaught, ...uniqueOthers];
     setDisplayClassrooms(sortedClassrooms);
@@ -283,7 +335,7 @@ export default function ClassesPage() {
       memberCount: 1,
       ...imageDetails, 
     };
-    setClassrooms(prev => [newClass, ...prev]);
+    setClassrooms(prev => [newClass, ...prev]); // This will trigger the sorting useEffect
     toast({
       title: "Class Created!",
       description: `"${newClassName.trim()}" has been successfully created.`,
@@ -334,7 +386,7 @@ export default function ClassesPage() {
             dataAiHint: imageDetails.dataAiHint,
           }
         : cls
-    ));
+    )); // This will trigger the sorting useEffect
 
     toast({
       title: "Class Updated!",
@@ -362,6 +414,7 @@ export default function ClassesPage() {
       title: "Request Sent!",
       description: `Your request to join "${className}" has been sent to the teacher.`,
     });
+    // The sorting useEffect will pick this up and re-sort displayClassrooms
   };
 
   const handleOpenEditDialog = (classToEdit: Classroom) => {
@@ -499,7 +552,7 @@ export default function ClassesPage() {
       </Dialog>
 
 
-      {displayClassrooms.length === 0 && !authLoading ? ( // Check authLoading here too
+      {displayClassrooms.length === 0 && !authLoading ? (
         <Card className="text-center py-12 rounded-xl shadow-lg border-border/50 flex-grow flex flex-col justify-center items-center">
           <CardHeader>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -512,7 +565,7 @@ export default function ClassesPage() {
             </Button>
           </CardContent>
         </Card>
-      ) : authLoading ? (
+      ) : authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0) ? ( // Show skeletons if auth is loading OR if classrooms array is empty but base data exists (means processing is happening)
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
