@@ -159,7 +159,7 @@ export default function ClassesPage() {
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
         memberCount: Math.floor(Math.random() * 25) + 10,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)), // Wider date range
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 90) + 1)), // Wider date range
       };
     });
     setClassrooms(processedMocks);
@@ -173,58 +173,34 @@ export default function ClassesPage() {
       return;
     }
 
-    let baseFiltered: Classroom[] = [];
-    let pendingRequests: Classroom[] = [];
-    let taughtByCurrentUser: Classroom[] = [];
-    let others: Classroom[] = [];
-
-    classrooms.forEach(cls => {
-      if (requestedClassIds.includes(cls.id)) {
-        pendingRequests.push(cls);
-      }
-      if (user && cls.teacherId === user.uid) {
-        taughtByCurrentUser.push(cls);
-      }
-      // All classes initially go into 'others' before specific filter logic.
-      // We will re-filter based on `activeFilter` *after* this initial separation.
-      others.push(cls);
-    });
-    
-    pendingRequests.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-    taughtByCurrentUser.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-    // others.sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)); // Default sort for others if not specified
+    let filteredByActiveRole: Classroom[] = [];
 
     if (activeFilter === 'teaching') {
-      baseFiltered = taughtByCurrentUser;
+        filteredByActiveRole = user ? classrooms.filter(cls => cls.teacherId === user.uid) : [];
     } else if (activeFilter === 'requested') {
-      baseFiltered = pendingRequests;
+        filteredByActiveRole = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     } else if (activeFilter === 'joined') {
-        baseFiltered = pendingRequests.filter(cls => !user || cls.teacherId !== user.uid);
+        // "Joined" means requested AND not taught by current user
+        filteredByActiveRole = classrooms.filter(cls => 
+            requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid)
+        );
     } else { // 'all'
-        // For 'all', start with all classrooms, then sort with pending and taught at top
-        const allProcessed = classrooms.slice(); // Create a copy to sort
-        allProcessed.sort((a, b) => {
-            const aIsPending = requestedClassIds.includes(a.id);
-            const bIsPending = requestedClassIds.includes(b.id);
-            const aIsTaught = user && a.teacherId === user.uid;
-            const bIsTaught = user && b.teacherId === user.uid;
-
-            if (aIsPending && !bIsPending) return -1;
-            if (!aIsPending && bIsPending) return 1;
-            
-            // If both are pending or neither is pending, sort by taught status
-            if (aIsPending === bIsPending) {
-                if (aIsTaught && !bIsTaught) return -1;
-                if (!aIsTaught && bIsTaught) return 1;
-            }
-            
-            // Finally, sort by creation date if all other conditions are equal
-            return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
-        });
-        baseFiltered = allProcessed;
+        filteredByActiveRole = classrooms.slice();
     }
     
-    setDisplayClassrooms(baseFiltered);
+    // Default sort: Pending first, then by creation date (newest first) for the filtered list
+    filteredByActiveRole.sort((a, b) => {
+        const aIsPending = requestedClassIds.includes(a.id);
+        const bIsPending = requestedClassIds.includes(b.id);
+        
+        if (aIsPending && !bIsPending) return -1;
+        if (!aIsPending && bIsPending) return 1;
+        
+        // If both are pending or neither is pending, sort by creation date
+        return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+    });
+    
+    setDisplayClassrooms(filteredByActiveRole);
 
   }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
@@ -478,11 +454,12 @@ export default function ClassesPage() {
     router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
   };
 
-  const handleManageMembers = (className: string) => {
-    toast({
-        title: "Manage Members (Mock)",
-        description: `Member management for "${className}" is a planned feature.`,
-    });
+  const handleManageMembers = (classId: string, className: string) => {
+    if (!classId) {
+      toast({ variant: "destructive", title: "Error", description: "Class ID is missing."});
+      return;
+    }
+    router.push(`/dashboard/class/${classId}/manage-members?name=${encodeURIComponent(className)}`);
   };
 
   useEffect(() => {
@@ -582,8 +559,8 @@ export default function ClassesPage() {
               )}
             </div>
              <div className="grid gap-2 pt-2">
-                <Button variant="outline" className="rounded-lg" onClick={() => handleManageMembers(editingClass?.name || 'this class')} disabled={isUploadingEditClassImage}>
-                    <UsersIcon className="mr-2 h-4 w-4" /> Manage Members (Mock)
+                <Button variant="outline" className="rounded-lg" onClick={() => editingClass && handleManageMembers(editingClass.id, editingClass.name)} disabled={isUploadingEditClassImage || !editingClass}>
+                    <UsersIcon className="mr-2 h-4 w-4" /> Manage Members
                 </Button>
             </div>
           </div>
