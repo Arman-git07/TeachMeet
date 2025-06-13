@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"; // Added DialogHeader, DialogTitle, DialogDescription
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Added DialogFooter
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -165,35 +165,46 @@ export default function ClassesPage() {
       return;
     }
 
-    let baseFilteredList: Classroom[] = [];
+    let filteredClassrooms: Classroom[] = [];
 
     if (activeFilter === 'teaching') {
-      baseFilteredList = classrooms.filter(cls => user && cls.teacherId === user.uid);
+      filteredClassrooms = classrooms.filter(cls => user && cls.teacherId === user.uid);
     } else if (activeFilter === 'requested') {
-      baseFilteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id));
+      filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     } else if (activeFilter === 'joined') {
-        baseFilteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid));
+      // Show classes user requested to join, but is not teaching
+      filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid));
     } else { // 'all' or any other default
-      baseFilteredList = [...classrooms];
+      filteredClassrooms = [...classrooms];
     }
 
     const pendingInFilter: Classroom[] = [];
     const nonPendingInFilter: Classroom[] = [];
 
-    baseFilteredList.forEach(cls => {
+    filteredClassrooms.forEach(cls => {
       if (requestedClassIds.includes(cls.id)) {
         pendingInFilter.push(cls);
       } else {
         nonPendingInFilter.push(cls);
       }
     });
+    
+    const sortFn = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
 
-    const sortByDateDesc = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+    pendingInFilter.sort(sortFn);
+    nonPendingInFilter.sort(sortFn);
+    
+    let finalSortedList: Classroom[] = [];
 
-    pendingInFilter.sort(sortByDateDesc);
-    nonPendingInFilter.sort(sortByDateDesc);
-
-    setDisplayClassrooms([...pendingInFilter, ...nonPendingInFilter]);
+    if (activeFilter === 'all') {
+      const taughtByUser = nonPendingInFilter.filter(cls => user && cls.teacherId === user.uid);
+      const others = nonPendingInFilter.filter(cls => !user || cls.teacherId !== user.uid);
+      finalSortedList = [...pendingInFilter, ...taughtByUser, ...others];
+    } else {
+      finalSortedList = [...pendingInFilter, ...nonPendingInFilter];
+    }
+    
+    setDisplayClassrooms(finalSortedList);
 
   }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
@@ -495,7 +506,7 @@ export default function ClassesPage() {
         <DropdownMenu open={isFilterDropdownOpen} onOpenChange={setIsFilterDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="rounded-lg text-sm">
-              {filterOptions.find(opt => opt.value === activeFilter)?.label || "Filter Classes"}
+              {activeFilterLabel}
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -568,7 +579,7 @@ export default function ClassesPage() {
         </DialogContent>
       </Dialog>
 
-      {initialLoading || authLoading || (classrooms.length === 0 && initialMockClassroomsData.length > 0) ? (
+      {initialLoading || authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0) ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
@@ -597,14 +608,12 @@ export default function ClassesPage() {
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <CardTitle className="text-2xl">
               {activeFilter === 'teaching' && "No Classes Taught"}
-              {activeFilter === 'requested' && "No Pending Requests"}
-              {activeFilter === 'joined' && "No Joined Classes"}
+              {(activeFilter === 'requested' || activeFilter === 'joined') && "No Matching Classes"}
               {activeFilter === 'all' && "No Classes Available"}
             </CardTitle>
             <CardDescription>
               {activeFilter === 'teaching' && "You haven't created any classes yet. Start one now!"}
-              {activeFilter === 'requested' && "You haven't requested to join any classes, or your requests have been processed."}
-              {activeFilter === 'joined' && "You haven't joined any classes yet. Explore and send requests!"}
+              {(activeFilter === 'requested' || activeFilter === 'joined') && `You haven't ${activeFilter === 'requested' ? 'requested to join' : 'joined'} any classes that match this filter, or your requests have been processed.`}
               {activeFilter === 'all' && "There are no classes listed right now. Be the first to create one!"}
             </CardDescription>
           </CardHeader>
@@ -688,3 +697,4 @@ export default function ClassesPage() {
     </div>
   );
 }
+
