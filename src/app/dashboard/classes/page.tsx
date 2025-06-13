@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -35,20 +35,20 @@ interface Classroom {
   createdAt: Date;
 }
 
-const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'teacherAvatar' | 'createdAt'>[] = [
-  { id: "cl1", name: "Introduction to Quantum Physics", description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", memberCount: 25, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
-  { id: "cl2", name: "Advanced JavaScript Techniques", description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
-  { id: "cl3", name: "Creative Writing Workshop", description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", memberCount: 12, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
-  { id: "cl4", name: "Beginner's Yoga & Mindfulness", description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", memberCount: 30, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "yoga meditation" },
-  { id: "cl5", name: "Data Science Bootcamp Prep", description: "A foundational course covering basic statistics, Python programming, and data visualization to prepare for a data science bootcamp.", memberCount: 22, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "data science" },
-  { id: "cl6", name: "The Art of Digital Painting", description: "From basic sketching to advanced rendering techniques, learn to create stunning digital artwork using popular software.", memberCount: 15, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "digital art" },
+const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'teacherAvatar' | 'createdAt' | 'memberCount'>[] = [
+  { id: "cl1", name: "Introduction to Quantum Physics", description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
+  { id: "cl2", name: "Advanced JavaScript Techniques", description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
+  { id: "cl3", name: "Creative Writing Workshop", description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
+  { id: "cl4", name: "Beginner's Yoga & Mindfulness", description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "yoga meditation" },
+  { id: "cl5", name: "Data Science Bootcamp Prep", description: "A foundational course covering basic statistics, Python programming, and data visualization to prepare for a data science bootcamp.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "data science" },
+  { id: "cl6", name: "The Art of Digital Painting", description: "From basic sketching to advanced rendering techniques, learn to create stunning digital artwork using popular software.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "digital art" },
 ];
 
-const defaultTeacherDetailsMap = {
+const defaultTeacherDetailsMap: Record<string, { name: string; initial: string; placeholderId: string }> = {
   cl1: { name: "Dr. Evelyn Reed", initial: "ER", placeholderId: "teacher1_placeholder_uid" },
   cl2: { name: "Mr. Kenji Tanaka", initial: "KT", placeholderId: "teacher2_placeholder_uid" },
   cl3: { name: "Ms. Aisha Khan", initial: "AK", placeholderId: "teacher3_placeholder_uid" },
-  cl4: { name: "Sara Chen", initial: "SC", placeholderId: "user1_placeholder_uid" },
+  cl4: { name: "Sara Chen", initial: "SC", placeholderId: "user1_placeholder_uid" }, // Could be a user who created a class
   cl5: { name: "Dr. Ben Carter", initial: "BC", placeholderId: "teacher4_placeholder_uid" },
   cl6: { name: "Lena Petrova", initial: "LP", placeholderId: "teacher5_placeholder_uid" },
 };
@@ -73,8 +73,9 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 };
 
 const filterOptions = [
-    { value: "all", label: "All Classes" },
+    { value: "all", label: "Explore All Classes" },
     { value: "teaching", label: "My Teaching" },
+    { value: "joined", label: "My Joined Classes" },
     { value: "requested", label: "My Requests" },
 ];
 
@@ -88,7 +89,6 @@ export default function ClassesPage() {
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [initialLoading, setInitialLoading] = useState(true);
-
 
   // Create Class Dialog State
   const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
@@ -145,64 +145,53 @@ export default function ClassesPage() {
         teacherId: finalTeacherId,
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
+        memberCount: Math.floor(Math.random() * 25) + 10,
         createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)), 
       };
     });
     setClassrooms(processedMocks);
-    if (!authLoading && classrooms.length === 0 && baseMockClassroomsData.length > 0) { 
-        setInitialLoading(false);
-    } else if (!authLoading) {
-        setInitialLoading(false);
-    }
+    setInitialLoading(false);
   }, [user, authLoading]);
 
 
-  useEffect(() => {
+ useEffect(() => {
     if (authLoading || initialLoading) {
-        setDisplayClassrooms([]); // Show skeletons or empty if still loading
-        return;
+      setDisplayClassrooms([]);
+      return;
     }
-    
-    let filteredBase = [...classrooms];
+
+    let filteredList: Classroom[] = [];
 
     if (activeFilter === 'teaching') {
-      filteredBase = classrooms.filter(cls => user && cls.teacherId === user.uid);
+      filteredList = classrooms.filter(cls => user && cls.teacherId === user.uid);
     } else if (activeFilter === 'requested') {
-      filteredBase = classrooms.filter(cls => requestedClassIds.includes(cls.id));
+      filteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id));
+    } else if (activeFilter === 'joined') {
+      // "My Joined Classes": Requested classes, excluding those taught by the user (if they also requested to join their own class somehow)
+      filteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid));
+    } else { // 'all'
+      filteredList = [...classrooms];
     }
-    // 'all' filter uses all classrooms
+    
+    // Default sort: Pending requests first, then by creation date (newest first)
+    // This sorting is applied AFTER the primary filter
+    const pendingInFilter: Classroom[] = [];
+    const nonPendingInFilter: Classroom[] = [];
 
-    const pendingRequests: Classroom[] = [];
-    const taughtByMe: Classroom[] = [];
-    const others: Classroom[] = [];
-
-    filteredBase.forEach(cls => {
-        if (requestedClassIds.includes(cls.id) && (activeFilter === 'all' || activeFilter === 'requested')) {
-            pendingRequests.push(cls);
-        } else if (user && user.uid === cls.teacherId && (activeFilter === 'all' || activeFilter === 'teaching')) {
-            taughtByMe.push(cls);
-        } else if (activeFilter === 'all' && !requestedClassIds.includes(cls.id) && (!user || user.uid !== cls.teacherId) ) {
-            others.push(cls);
-        }
+    filteredList.forEach(cls => {
+      if (requestedClassIds.includes(cls.id)) {
+        pendingInFilter.push(cls);
+      } else {
+        nonPendingInFilter.push(cls);
+      }
     });
-    
-    const defaultSort = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
-    
-    pendingRequests.sort(defaultSort);
-    taughtByMe.sort(defaultSort);
-    others.sort(defaultSort);
 
-    let finalSortedList: Classroom[] = [];
-
-    if (activeFilter === 'all') {
-        finalSortedList = [...pendingRequests, ...taughtByMe, ...others];
-    } else if (activeFilter === 'teaching') {
-        finalSortedList = taughtByMe;
-    } else if (activeFilter === 'requested') {
-        finalSortedList = pendingRequests;
-    }
+    const sortByDateDesc = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
     
-    setDisplayClassrooms(finalSortedList);
+    pendingInFilter.sort(sortByDateDesc);
+    nonPendingInFilter.sort(sortByDateDesc);
+
+    setDisplayClassrooms([...pendingInFilter, ...nonPendingInFilter]);
 
   }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
@@ -362,7 +351,7 @@ export default function ClassesPage() {
       createdAt: new Date(),
       ...imageDetails, 
     };
-    setClassrooms(prev => [newClass, ...prev]);
+    setClassrooms(prev => [newClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
     toast({
       title: "Class Created!",
       description: `"${newClassName.trim()}" has been successfully created.`,
@@ -474,7 +463,7 @@ export default function ClassesPage() {
     };
   }, [newClassImagePreview, editClassImagePreview]);
 
-  const activeFilterLabel = filterOptions.find(opt => opt.value === activeFilter)?.label || "All Classes";
+  const activeFilterLabel = filterOptions.find(opt => opt.value === activeFilter)?.label || "Explore All Classes";
 
   return (
     <div className="space-y-8 p-4 md:p-8 h-full flex flex-col">
@@ -484,7 +473,7 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <div className="flex items-center gap-2">
-            <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
+             <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
                 if (!isOpen) resetCreateClassDialog();
                 setIsCreateClassDialogOpen(isOpen);
             }}>
@@ -559,7 +548,6 @@ export default function ClassesPage() {
         </DropdownMenu>
       </div>
 
-
       <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) resetEditClassDialog();
           setIsEditClassDialogOpen(isOpen);
@@ -607,7 +595,6 @@ export default function ClassesPage() {
         </DialogContent>
       </Dialog>
 
-
       {initialLoading || authLoading ? ( 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
@@ -638,11 +625,13 @@ export default function ClassesPage() {
             <CardTitle className="text-2xl">
               {activeFilter === 'teaching' && "No Classes Taught"}
               {activeFilter === 'requested' && "No Pending Requests"}
+              {activeFilter === 'joined' && "No Joined Classes"}
               {activeFilter === 'all' && "No Classes Available"}
             </CardTitle>
             <CardDescription>
               {activeFilter === 'teaching' && "You haven't created any classes yet. Start one now!"}
               {activeFilter === 'requested' && "You haven't requested to join any classes, or your requests have been processed."}
+              {activeFilter === 'joined' && "You haven't joined any classes yet. Explore and send requests!"}
               {activeFilter === 'all' && "There are no classes listed right now. Be the first to create one!"}
             </CardDescription>
           </CardHeader>
@@ -652,7 +641,7 @@ export default function ClassesPage() {
                 Create a Class
                 </Button>
             )}
-            {activeFilter === 'requested' && (
+            {(activeFilter === 'requested' || activeFilter === 'joined') && (
                  <Button onClick={() => setActiveFilter('all')} size="lg" variant="outline" className="rounded-lg">
                     View All Classes
                 </Button>
