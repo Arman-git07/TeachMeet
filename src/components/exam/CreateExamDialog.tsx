@@ -261,6 +261,51 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
     }
   };
 
+  const handleDirectQuestionsChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNewExamDirectQuestions(event.target.value);
+  };
+
+  const handleDirectQuestionsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        const textarea = event.currentTarget;
+        const currentText = textarea.value;
+        const selectionStart = textarea.selectionStart;
+
+        let lastQuestionNumber = 0;
+        const questionPattern = /^Q(\d+)\.\s*/i;
+        
+        // Scan all lines before the cursor to find the highest question number
+        currentText.substring(0, selectionStart).split('\n').forEach(line => {
+            const match = line.match(questionPattern);
+            if (match && match[1]) {
+                const num = parseInt(match[1], 10);
+                if (num > lastQuestionNumber) {
+                    lastQuestionNumber = num;
+                }
+            }
+        });
+        
+        const nextQuestionNumber = lastQuestionNumber + 1;
+        const newQuestionText = `\nQ${nextQuestionNumber}. `;
+
+        const newText = 
+            currentText.substring(0, selectionStart) + 
+            newQuestionText + 
+            currentText.substring(textarea.selectionEnd);
+        
+        setNewExamDirectQuestions(newText);
+
+        // Set cursor position after the inserted text
+        setTimeout(() => {
+            const newCursorPosition = selectionStart + newQuestionText.length;
+            textarea.focus();
+            textarea.selectionStart = newCursorPosition;
+            textarea.selectionEnd = newCursorPosition;
+        }, 0);
+    }
+  };
+
   return (
     <>
       <DialogHeader>
@@ -401,9 +446,10 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
             <Textarea
               id="directQuestions"
               value={newExamDirectQuestions}
-              onChange={(e) => setNewExamDirectQuestions(e.target.value)}
-              placeholder="Enter your exam questions here. You can use Markdown for basic formatting if your display supports it."
-              className="rounded-lg min-h-[150px] text-sm"
+              onChange={handleDirectQuestionsChange}
+              onKeyDown={handleDirectQuestionsKeyDown}
+              placeholder="E.g.:\nQ1. What is the capital of France?\nQ2. Explain..."
+              className="rounded-lg min-h-[150px] text-sm font-mono"
               disabled={isProcessing}
             />
           </div>
