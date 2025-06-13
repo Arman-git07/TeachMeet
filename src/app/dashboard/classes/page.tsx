@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, ArrowUpDown, MoreVertical, Filter } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, MoreVertical, Filter } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -72,16 +72,6 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
   }
 };
 
-const sortOptions = [
-    { value: "default", label: "Default" },
-    { value: "newest", label: "Newest First" },
-    { value: "oldest", label: "Oldest First" },
-    { value: "nameAsc", label: "Name (A-Z)" },
-    { value: "nameDesc", label: "Name (Z-A)" },
-    { value: "membersDesc", label: "Most Members" },
-    { value: "membersAsc", label: "Fewest Members" },
-];
-
 const filterOptions = [
     { value: "all", label: "All Classes" },
     { value: "teaching", label: "My Teaching" },
@@ -96,7 +86,6 @@ export default function ClassesPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
-  const [currentSortOption, setCurrentSortOption] = useState<string>("default");
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -156,11 +145,11 @@ export default function ClassesPage() {
         teacherId: finalTeacherId,
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 30) + 1)), // Stagger creation dates more
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)), // Stagger creation dates more
       };
     });
     setClassrooms(processedMocks);
-    if (!authLoading && classrooms.length === 0 && baseMockClassroomsData.length > 0) { // Ensure initial load only if classrooms is empty but base data exists
+    if (!authLoading && classrooms.length === 0 && baseMockClassroomsData.length > 0) { 
         setInitialLoading(false);
     } else if (!authLoading) {
         setInitialLoading(false);
@@ -169,82 +158,51 @@ export default function ClassesPage() {
 
 
   useEffect(() => {
-    if (initialLoading && classrooms.length === 0) { 
+    if (initialLoading && classrooms.length === 0 && !authLoading) { 
       setDisplayClassrooms([]); 
       return;
     }
+    if (authLoading || initialLoading) return;
     
-    let filteredClassrooms = [...classrooms]; // Create a mutable copy
+    let filteredClassrooms = [...classrooms];
 
     if (activeFilter === 'teaching') {
       filteredClassrooms = classrooms.filter(cls => user && cls.teacherId === user.uid);
     } else if (activeFilter === 'requested') {
       filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     }
-    // 'all' filter uses all classrooms initially
-
-    const pending: Classroom[] = [];
-    let sortablePortion: Classroom[] = [];
-
-    // Separate pending requests only if the filter is 'all' or 'requested'
-    if (activeFilter === 'all' || activeFilter === 'requested') {
-      filteredClassrooms.forEach(cls => {
-        if (requestedClassIds.includes(cls.id)) {
-          pending.push(cls);
-        } else {
-          sortablePortion.push(cls);
-        }
-      });
-    } else { // For 'teaching' filter, all items go to sortablePortion
-      sortablePortion = [...filteredClassrooms];
-    }
     
-    // Sort pending classes by creation date (newest first) - this might be less relevant if they are always on top
-    pending.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    const pendingRequests: Classroom[] = [];
+    const taughtByMe: Classroom[] = [];
+    const others: Classroom[] = [];
 
-    // Now sort the `sortablePortion` based on `currentSortOption`
-    switch (currentSortOption) {
-      case "newest":
-        sortablePortion.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-        break;
-      case "oldest":
-        sortablePortion.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
-        break;
-      case "nameAsc":
-        sortablePortion.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-        break;
-      case "nameDesc":
-        sortablePortion.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
-        break;
-      case "membersDesc":
-        sortablePortion.sort((a, b) => b.memberCount - a.memberCount);
-        break;
-      case "membersAsc":
-        sortablePortion.sort((a, b) => a.memberCount - b.memberCount);
-        break;
-      case "default":
-      default:
-        if (activeFilter === 'all') { // Default sort for "All" - My Classes first, then others
-            const myClasses: Classroom[] = [];
-            const others: Classroom[] = [];
-            sortablePortion.forEach(cls => {
-                if (user && user.uid === cls.teacherId) {
-                    myClasses.push(cls);
-                } else {
-                    others.push(cls);
-                }
-            });
-            myClasses.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0)); 
-            others.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));   
-            sortablePortion = [...myClasses, ...others];
-        } else { // For 'teaching' or 'requested' filters, default sort is by creation date (oldest)
-            sortablePortion.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+    filteredClassrooms.forEach(cls => {
+        if (requestedClassIds.includes(cls.id)) {
+            pendingRequests.push(cls);
+        } else if (user && user.uid === cls.teacherId) {
+            taughtByMe.push(cls);
+        } else {
+            others.push(cls);
         }
-        break;
-    }
-    setDisplayClassrooms([...pending, ...sortablePortion]);
+    });
+    
+    // Default sort: newest first for all categories
+    const sortByNewest = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+    
+    pendingRequests.sort(sortByNewest);
+    taughtByMe.sort(sortByNewest);
+    others.sort(sortByNewest);
 
-  }, [classrooms, user, requestedClassIds, authLoading, currentSortOption, initialLoading, activeFilter]);
+    if (activeFilter === 'all') {
+        setDisplayClassrooms([...pendingRequests, ...taughtByMe, ...others]);
+    } else if (activeFilter === 'teaching') {
+        setDisplayClassrooms(taughtByMe); // Pending requests are not relevant here unless they overlap
+    } else if (activeFilter === 'requested') {
+        setDisplayClassrooms(pendingRequests);
+    }
+
+
+  }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
@@ -514,7 +472,6 @@ export default function ClassesPage() {
     };
   }, [newClassImagePreview, editClassImagePreview]);
 
-  const activeSortLabel = sortOptions.find(opt => opt.value === currentSortOption)?.label || "Default";
   const activeFilterLabel = filterOptions.find(opt => opt.value === activeFilter)?.label || "All Classes";
 
   return (
@@ -525,24 +482,6 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <div className="flex items-center gap-2">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="rounded-lg min-w-[160px]">
-                        <ArrowUpDown className="mr-2 h-4 w-4" /> Sort by: {activeSortLabel}
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                    {sortOptions.map(option => (
-                        <DropdownMenuItem
-                            key={option.value}
-                            onClick={() => setCurrentSortOption(option.value)}
-                            className={cn("cursor-pointer rounded-md", currentSortOption === option.value && "bg-accent text-accent-foreground")}
-                        >
-                            {option.label}
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="rounded-lg">
@@ -551,7 +490,6 @@ export default function ClassesPage() {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                    <DropdownMenuSeparator />
                     {filterOptions.map(option => (
                         <DropdownMenuItem
                             key={option.value}
