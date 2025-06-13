@@ -938,7 +938,11 @@ export default function ClassDetailsPage() {
                     </DialogContent>
                   </Dialog>
                 )}
-                <Button variant="outline" className="w-full rounded-lg text-sm">Browse All Materials</Button>
+                <Button asChild variant="outline" className="w-full rounded-lg text-sm">
+                   <Link href={`/dashboard/class/${classId}/materials?name=${encodeURIComponent(classroom.name)}`}>
+                    Browse All Materials
+                  </Link>
+                </Button>
               </CardFooter>
             </Card>
           </div>
