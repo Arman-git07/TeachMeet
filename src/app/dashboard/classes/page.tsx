@@ -76,7 +76,7 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 
 const filterOptions = [
     { value: "all", label: "Explore All Classes", icon: Filter },
-    // "My Teaching" is added conditionally below
+    // "My Teaching" is added conditionally
     { value: "joined", label: "My Joined Classes", icon: UsersIcon },
     { value: "requested", label: "My Requests", icon: UserCheck },
 ];
@@ -159,7 +159,7 @@ export default function ClassesPage() {
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
         memberCount: Math.floor(Math.random() * 25) + 10,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 90) + 1)), // Wider date range
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 180) + 1)), // Wider date range
       };
     });
     setClassrooms(processedMocks);
@@ -180,7 +180,6 @@ export default function ClassesPage() {
     } else if (activeFilter === 'requested') {
         filteredByActiveRole = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     } else if (activeFilter === 'joined') {
-        // "Joined" means requested AND not taught by current user
         filteredByActiveRole = classrooms.filter(cls => 
             requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid)
         );
@@ -196,7 +195,6 @@ export default function ClassesPage() {
         if (aIsPending && !bIsPending) return -1;
         if (!aIsPending && bIsPending) return 1;
         
-        // If both are pending or neither is pending, sort by creation date
         return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
     });
     
@@ -423,7 +421,9 @@ export default function ClassesPage() {
 
 
   const handleRequestToJoin = (classId: string, className: string) => {
-    if (requestedClassIds.includes(classId)) {
+    const alreadyRequested = requestedClassIds.includes(classId);
+
+    if (alreadyRequested && activeFilter !== 'requested') {
       toast({
         title: "Request Already Sent",
         description: `You have already requested to join "${className}".`,
@@ -431,14 +431,21 @@ export default function ClassesPage() {
       return;
     }
 
-    const newRequestedIds = [...requestedClassIds, classId];
+    const newRequestedIds = [...new Set([...requestedClassIds, classId])];
     setRequestedClassIds(newRequestedIds);
     localStorage.setItem(REQUESTED_CLASSES_KEY, JSON.stringify(newRequestedIds));
 
-    toast({
-      title: "Request Sent!",
-      description: `Your request to join "${className}" has been sent to the teacher.`,
-    });
+    if (alreadyRequested && activeFilter === 'requested') {
+        toast({
+            title: "Request Resent",
+            description: `Your request to join "${className}" has been (notionally) resent.`,
+        });
+    } else {
+        toast({
+            title: "Request Sent!",
+            description: `Your request to join "${className}" has been sent to the teacher.`,
+        });
+    }
   };
 
   const handleOpenEditDialog = (classToEdit: Classroom) => {
@@ -499,7 +506,7 @@ export default function ClassesPage() {
         </div>
       </div>
 
-       <div className="my-4 flex items-center gap-2">
+      <div className="my-4 flex items-center gap-2">
         <DropdownMenu open={isFilterDropdownOpen} onOpenChange={setIsFilterDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="rounded-lg text-sm">
@@ -639,7 +646,38 @@ export default function ClassesPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
-          {displayClassrooms.map(classroom => (
+          {displayClassrooms.map(classroom => {
+            const isTeacher = user && user.uid === classroom.teacherId;
+            const isRequested = requestedClassIds.includes(classroom.id);
+            let actionButton;
+
+            if (isTeacher) {
+                actionButton = (
+                    <Button onClick={() => handleOpenEditDialog(classroom)} className="w-full btn-gel rounded-lg text-sm">
+                        <Edit className="mr-2 h-4 w-4" /> Manage Class
+                    </Button>
+                );
+            } else if (activeFilter === 'requested' && isRequested) {
+                actionButton = (
+                    <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
+                        <ArrowRight className="mr-2 h-4 w-4" /> Resend Request
+                    </Button>
+                );
+            } else if (isRequested) {
+                actionButton = (
+                    <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
+                        <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
+                    </Button>
+                );
+            } else {
+                actionButton = (
+                    <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
+                         <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
+                    </Button>
+                );
+            }
+
+            return (
             <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50 relative">
               <div className="relative h-40 w-full">
                  <Image
@@ -650,11 +688,11 @@ export default function ClassesPage() {
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
                     data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"}
                  />
-                {requestedClassIds.includes(classroom.id) ? (
+                {isRequested && !isTeacher ? ( // Show pending only if requested and not the teacher
                     <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     Pending Request
                     </Badge>
-                ) : user && user.uid === classroom.teacherId ? (
+                ) : isTeacher ? (
                     <Badge variant="secondary" className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     My Class
                     </Badge>
@@ -678,27 +716,14 @@ export default function ClassesPage() {
                     <span className="flex items-center"><UsersIcon className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
                     {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{classroom.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </div>
-                {user && user.uid === classroom.teacherId ? (
-                    <Button onClick={() => handleOpenEditDialog(classroom)} className="w-full btn-gel rounded-lg text-sm">
-                        <Edit className="mr-2 h-4 w-4" /> Manage Class
-                    </Button>
-                ) : (
-                  requestedClassIds.includes(classroom.id) ? (
-                    <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
-                        <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
-                    </Button>
-                  ) : (
-                    <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
-                         <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
-                    </Button>
-                  )
-                )}
+                {actionButton}
                  <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
                     View Details
                 </Button>
               </CardFooter>
             </Card>
-          ))}
+          );
+        })}
         </div>
       )}
     </div>
