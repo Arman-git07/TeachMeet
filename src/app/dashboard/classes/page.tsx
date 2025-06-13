@@ -7,12 +7,12 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"; // Added DialogHeader, DialogTitle, DialogDescription
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, ArrowUpDown } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -50,7 +50,7 @@ const defaultTeacherDetailsMap: Record<string, { name: string; initial: string; 
   cl1: { name: "Dr. Evelyn Reed", initial: "ER", placeholderId: "teacher1_placeholder_uid" },
   cl2: { name: "Mr. Kenji Tanaka", initial: "KT", placeholderId: "teacher2_placeholder_uid" },
   cl3: { name: "Ms. Aisha Khan", initial: "AK", placeholderId: "teacher3_placeholder_uid" },
-  cl4: { name: "Sara Chen", initial: "SC", placeholderId: "user1_placeholder_uid" }, 
+  cl4: { name: "Sara Chen", initial: "SC", placeholderId: "user1_placeholder_uid" },
   cl5: { name: "Dr. Ben Carter", initial: "BC", placeholderId: "teacher4_placeholder_uid" },
   cl6: { name: "Lena Petrova", initial: "LP", placeholderId: "teacher5_placeholder_uid" },
 };
@@ -62,7 +62,7 @@ const REQUESTED_CLASSES_KEY = 'teachmeet-requested-classes';
 
 const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string => {
   if (!name || typeof name !== 'string') return defaultInitial;
-  const words = name.trim().split(/\s+/).filter(Boolean); 
+  const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return defaultInitial;
 
   if (words.length === 1) {
@@ -89,9 +89,9 @@ export default function ClassesPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
-  
+
   const [activeFilter, setActiveFilter] = useState<string>("all");
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false); // Added for explicit dropdown control
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -132,10 +132,10 @@ export default function ClassesPage() {
       let finalTeacherId: string;
       let finalTeacherName: string;
       let finalTeacherAvatar: string;
-      
+
       const defaultDetails = defaultTeacherDetailsMap[baseCls.id as keyof typeof defaultTeacherDetailsMap] || { name: "Mock Teacher", initial: "M", placeholderId: `teacher_mock_${baseCls.id}`};
 
-      if (baseCls.id === "cl1" && user && !authLoading) { 
+      if (baseCls.id === "cl1" && user && !authLoading) {
         finalTeacherId = user.uid;
         finalTeacherName = user.displayName || "My Class Teacher";
         finalTeacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${getInitialsFromName(finalTeacherName, "M")}`;
@@ -144,14 +144,14 @@ export default function ClassesPage() {
         finalTeacherName = defaultDetails.name;
         finalTeacherAvatar = `https://placehold.co/40x40.png?text=${defaultDetails.initial}`;
       }
-      
+
       return {
         ...baseCls,
         teacherId: finalTeacherId,
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
         memberCount: Math.floor(Math.random() * 25) + 10,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)), 
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)),
       };
     });
     setClassrooms(processedMocks);
@@ -160,35 +160,36 @@ export default function ClassesPage() {
 
 
  useEffect(() => {
-    if (authLoading || initialLoading) {
+    if (authLoading || initialLoading || classrooms.length === 0) {
       setDisplayClassrooms([]);
       return;
     }
 
-    let filteredList: Classroom[] = [];
+    let baseFilteredList: Classroom[] = [];
+
     if (activeFilter === 'teaching') {
-      filteredList = classrooms.filter(cls => user && cls.teacherId === user.uid);
+      baseFilteredList = classrooms.filter(cls => user && cls.teacherId === user.uid);
     } else if (activeFilter === 'requested') {
-      filteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id));
+      baseFilteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     } else if (activeFilter === 'joined') {
-      filteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid));
-    } else { // 'all'
-      filteredList = [...classrooms];
+        baseFilteredList = classrooms.filter(cls => requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid));
+    } else { // 'all' or any other default
+      baseFilteredList = [...classrooms];
     }
-    
+
     const pendingInFilter: Classroom[] = [];
     const nonPendingInFilter: Classroom[] = [];
 
-    filteredList.forEach(cls => {
-      if (requestedClassIds.includes(cls.id) && (activeFilter === 'all' || activeFilter === 'requested' || activeFilter === 'joined')) {
+    baseFilteredList.forEach(cls => {
+      if (requestedClassIds.includes(cls.id)) {
         pendingInFilter.push(cls);
       } else {
         nonPendingInFilter.push(cls);
       }
     });
-    
+
     const sortByDateDesc = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
-    
+
     pendingInFilter.sort(sortByDateDesc);
     nonPendingInFilter.sort(sortByDateDesc);
 
@@ -296,7 +297,7 @@ export default function ClassesPage() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast.dismiss(toastId);
             toast({ title: "Image Uploaded!", description: `${imageFile.name} successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); 
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined });
           } catch (getUrlError) {
              console.error("Error getting download URL for class image:", getUrlError);
              toast.dismiss(toastId);
@@ -319,8 +320,8 @@ export default function ClassesPage() {
       return;
     }
 
-    setIsUploadingClassImage(true); 
-    
+    setIsUploadingClassImage(true);
+
     let imageDetails: { thumbnailUrl: string; dataAiHint?: string };
 
     if (newClassImageFile) {
@@ -328,13 +329,13 @@ export default function ClassesPage() {
         imageDetails = await uploadImage(newClassImageFile, user.uid, 'create');
       } catch (error) {
         setIsUploadingClassImage(false);
-        return; 
+        return;
       }
     } else {
       const classNameInitials = getInitialsFromName(newClassName.trim(), "C");
-      imageDetails = { 
-        thumbnailUrl: `https://placehold.co/600x400.png?text=${classNameInitials}`, 
-        dataAiHint: "education general" 
+      imageDetails = {
+        thumbnailUrl: `https://placehold.co/600x400.png?text=${classNameInitials}`,
+        dataAiHint: "education general"
       };
     }
 
@@ -348,9 +349,9 @@ export default function ClassesPage() {
       teacherName: user.displayName || "Teacher",
       teacherId: user.uid,
       teacherAvatar: teacherAvatarUrl,
-      memberCount: 1, 
+      memberCount: 1,
       createdAt: new Date(),
-      ...imageDetails, 
+      ...imageDetails,
     };
     setClassrooms(prev => [newClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
     toast({
@@ -358,7 +359,7 @@ export default function ClassesPage() {
       description: `"${newClassName.trim()}" has been successfully created.`,
     });
 
-    resetCreateClassDialog(); 
+    resetCreateClassDialog();
   };
 
   const handleUpdateClass = async () => {
@@ -372,9 +373,9 @@ export default function ClassesPage() {
     }
 
     setIsUploadingEditClassImage(true);
-    let imageDetails = { 
-      thumbnailUrl: editingClass.thumbnailUrl, 
-      dataAiHint: editingClass.dataAiHint 
+    let imageDetails = {
+      thumbnailUrl: editingClass.thumbnailUrl,
+      dataAiHint: editingClass.dataAiHint
     };
 
     if (editClassImageFile) {
@@ -388,7 +389,7 @@ export default function ClassesPage() {
       const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
       imageDetails = {
         thumbnailUrl: `https://placehold.co/600x400.png?text=${newClassNameInitials}`,
-        dataAiHint: editingClass.dataAiHint 
+        dataAiHint: editingClass.dataAiHint
       };
     }
 
@@ -410,7 +411,7 @@ export default function ClassesPage() {
       description: `"${editClassName.trim()}" has been successfully updated.`,
     });
 
-    resetEditClassDialog(); 
+    resetEditClassDialog();
   };
 
 
@@ -422,11 +423,11 @@ export default function ClassesPage() {
       });
       return;
     }
-    
+
     const newRequestedIds = [...requestedClassIds, classId];
     setRequestedClassIds(newRequestedIds);
     localStorage.setItem(REQUESTED_CLASSES_KEY, JSON.stringify(newRequestedIds));
-    
+
     toast({
       title: "Request Sent!",
       description: `Your request to join "${className}" has been sent to the teacher.`,
@@ -437,8 +438,8 @@ export default function ClassesPage() {
     setEditingClass(classToEdit);
     setEditClassName(classToEdit.name);
     setEditClassDescription(classToEdit.description);
-    setEditClassImagePreview(classToEdit.thumbnailUrl); 
-    setEditClassImageFile(null); 
+    setEditClassImagePreview(classToEdit.thumbnailUrl);
+    setEditClassImageFile(null);
     setIsEditClassDialogOpen(true);
   };
 
@@ -490,11 +491,11 @@ export default function ClassesPage() {
         </div>
       </div>
 
-      <div className="my-4">
+       <div className="my-4">
         <DropdownMenu open={isFilterDropdownOpen} onOpenChange={setIsFilterDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="rounded-lg text-sm">
-              {activeFilterLabel}
+              {filterOptions.find(opt => opt.value === activeFilter)?.label || "Filter Classes"}
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -504,7 +505,7 @@ export default function ClassesPage() {
                 key={option.value}
                 onClick={() => {
                     setActiveFilter(option.value);
-                    setIsFilterDropdownOpen(false); // Close dropdown on selection
+                    setIsFilterDropdownOpen(false);
                 }}
                 className={cn(
                   "cursor-pointer rounded-md",
@@ -518,6 +519,7 @@ export default function ClassesPage() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
 
       <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) resetEditClassDialog();
@@ -566,7 +568,7 @@ export default function ClassesPage() {
         </DialogContent>
       </Dialog>
 
-      {initialLoading || authLoading ? ( 
+      {initialLoading || authLoading || (classrooms.length === 0 && initialMockClassroomsData.length > 0) ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
@@ -613,8 +615,8 @@ export default function ClassesPage() {
                 </Button>
             )}
             {(activeFilter === 'requested' || activeFilter === 'joined') && (
-                 <Button onClick={() => setActiveFilter('all')} size="lg" variant="outline" className="rounded-lg">
-                    View All Classes
+                 <Button onClick={() => { setActiveFilter('all'); setIsFilterDropdownOpen(false); }} size="lg" variant="outline" className="rounded-lg">
+                    Explore All Classes
                 </Button>
             )}
           </CardContent>
@@ -630,7 +632,7 @@ export default function ClassesPage() {
                     layout="fill"
                     objectFit="cover"
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
-                    data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"} 
+                    data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"}
                  />
                 {requestedClassIds.includes(classroom.id) ? (
                     <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
@@ -686,6 +688,3 @@ export default function ClassesPage() {
     </div>
   );
 }
-    
-
-    
