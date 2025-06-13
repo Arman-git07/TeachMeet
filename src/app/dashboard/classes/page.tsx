@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, ArrowUpDown } from "lucide-react";
+import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, ArrowUpDown, UserCheck } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -75,10 +75,10 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 };
 
 const filterOptions = [
-    { value: "all", label: "Explore All Classes" },
-    { value: "teaching", label: "My Teaching" },
-    { value: "joined", label: "My Joined Classes" },
-    { value: "requested", label: "My Requests" },
+    { value: "all", label: "Explore All Classes", icon: Filter },
+    // "My Teaching" is added conditionally below
+    { value: "joined", label: "My Joined Classes", icon: UsersIcon },
+    { value: "requested", label: "My Requests", icon: UserCheck },
 ];
 
 
@@ -112,6 +112,13 @@ export default function ClassesPage() {
   const [editClassImagePreview, setEditClassImagePreview] = useState<string | null>(null);
   const [isUploadingEditClassImage, setIsUploadingEditClassImage] = useState(false);
 
+  const currentFilterOptions = [
+    { value: "all", label: "Explore All Classes", icon: Filter },
+    ...(isAuthenticated ? [{ value: "teaching", label: "My Teaching", icon: UsersIcon }] : []),
+    { value: "joined", label: "My Joined Classes", icon: UsersIcon },
+    { value: "requested", label: "My Requests", icon: UserCheck },
+  ];
+
   useEffect(() => {
     const storedRequests = localStorage.getItem(REQUESTED_CLASSES_KEY);
     if (storedRequests) {
@@ -128,6 +135,7 @@ export default function ClassesPage() {
   }, []);
 
   useEffect(() => {
+    setInitialLoading(true);
     const processedMocks = baseMockClassroomsData.map((baseCls, index) => {
       let finalTeacherId: string;
       let finalTeacherName: string;
@@ -151,7 +159,7 @@ export default function ClassesPage() {
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
         memberCount: Math.floor(Math.random() * 25) + 10,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 30) + 1)),
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)), // Wider date range
       };
     });
     setClassrooms(processedMocks);
@@ -165,7 +173,7 @@ export default function ClassesPage() {
       return;
     }
 
-    let filteredClassrooms: Classroom[] = [];
+    let baseFiltered: Classroom[] = [];
     let pendingRequests: Classroom[] = [];
     let taughtByCurrentUser: Classroom[] = [];
     let others: Classroom[] = [];
@@ -173,29 +181,50 @@ export default function ClassesPage() {
     classrooms.forEach(cls => {
       if (requestedClassIds.includes(cls.id)) {
         pendingRequests.push(cls);
-      } else if (user && cls.teacherId === user.uid) {
-        taughtByCurrentUser.push(cls);
-      } else {
-        others.push(cls);
       }
+      if (user && cls.teacherId === user.uid) {
+        taughtByCurrentUser.push(cls);
+      }
+      // All classes initially go into 'others' before specific filter logic.
+      // We will re-filter based on `activeFilter` *after* this initial separation.
+      others.push(cls);
     });
-
+    
     pendingRequests.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
     taughtByCurrentUser.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-    others.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    // others.sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)); // Default sort for others if not specified
 
     if (activeFilter === 'teaching') {
-      filteredClassrooms = taughtByCurrentUser;
+      baseFiltered = taughtByCurrentUser;
     } else if (activeFilter === 'requested') {
-      filteredClassrooms = pendingRequests;
+      baseFiltered = pendingRequests;
     } else if (activeFilter === 'joined') {
-        // "Joined" means requested AND not taught by current user
-        filteredClassrooms = pendingRequests.filter(cls => !user || cls.teacherId !== user.uid);
+        baseFiltered = pendingRequests.filter(cls => !user || cls.teacherId !== user.uid);
     } else { // 'all'
-      filteredClassrooms = [...pendingRequests, ...taughtByCurrentUser, ...others];
+        // For 'all', start with all classrooms, then sort with pending and taught at top
+        const allProcessed = classrooms.slice(); // Create a copy to sort
+        allProcessed.sort((a, b) => {
+            const aIsPending = requestedClassIds.includes(a.id);
+            const bIsPending = requestedClassIds.includes(b.id);
+            const aIsTaught = user && a.teacherId === user.uid;
+            const bIsTaught = user && b.teacherId === user.uid;
+
+            if (aIsPending && !bIsPending) return -1;
+            if (!aIsPending && bIsPending) return 1;
+            
+            // If both are pending or neither is pending, sort by taught status
+            if (aIsPending === bIsPending) {
+                if (aIsTaught && !bIsTaught) return -1;
+                if (!aIsTaught && bIsTaught) return 1;
+            }
+            
+            // Finally, sort by creation date if all other conditions are equal
+            return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+        });
+        baseFiltered = allProcessed;
     }
     
-    setDisplayClassrooms(filteredClassrooms);
+    setDisplayClassrooms(baseFiltered);
 
   }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
@@ -467,7 +496,7 @@ export default function ClassesPage() {
     };
   }, [newClassImagePreview, editClassImagePreview]);
 
-  const activeFilterLabel = filterOptions.find(opt => opt.value === activeFilter)?.label || "Explore All Classes";
+  const activeFilterLabel = currentFilterOptions.find(opt => opt.value === activeFilter)?.label || "Explore All Classes";
 
   return (
     <div className="space-y-8 p-4 md:p-8 h-full flex flex-col">
@@ -477,7 +506,7 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <div className="flex items-center gap-2">
-             <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
+            <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
                 if (!isOpen) resetCreateClassDialog();
                 setIsCreateClassDialogOpen(isOpen);
             }}>
@@ -501,12 +530,8 @@ export default function ClassesPage() {
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 rounded-xl">
-            {filterOptions.map(option => {
-               if (option.value === 'teaching' && !isAuthenticated) {
-                return null; // Don't render "My Teaching" if not authenticated
-              }
-              return (
+          <DropdownMenuContent align="start" className="w-60 rounded-xl">
+            {currentFilterOptions.map(option => (
               <DropdownMenuItem
                 key={option.value}
                 onClick={() => {
@@ -514,15 +539,14 @@ export default function ClassesPage() {
                     setIsFilterDropdownOpen(false);
                 }}
                 className={cn(
-                  "cursor-pointer rounded-md",
+                  "cursor-pointer rounded-md p-2 text-sm",
                   activeFilter === option.value && "bg-accent text-accent-foreground"
                 )}
               >
-                <Filter className="mr-2 h-4 w-4 opacity-70" />
+                <option.icon className="mr-2 h-4 w-4 opacity-70" />
                 {option.label}
               </DropdownMenuItem>
-            );
-            })}
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -559,7 +583,7 @@ export default function ClassesPage() {
             </div>
              <div className="grid gap-2 pt-2">
                 <Button variant="outline" className="rounded-lg" onClick={() => handleManageMembers(editingClass?.name || 'this class')} disabled={isUploadingEditClassImage}>
-                    <Users className="mr-2 h-4 w-4" /> Manage Members (Mock)
+                    <UsersIcon className="mr-2 h-4 w-4" /> Manage Members (Mock)
                 </Button>
             </div>
           </div>
@@ -599,7 +623,7 @@ export default function ClassesPage() {
       ) : displayClassrooms.length === 0 ? (
         <Card className="text-center py-12 rounded-xl shadow-lg border-border/50 flex-grow flex flex-col justify-center items-center">
           <CardHeader>
-            <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+            <UsersIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <CardTitle className="text-2xl">
               {activeFilter === 'teaching' && "No Classes Taught"}
               {(activeFilter === 'requested' || activeFilter === 'joined') && "No Matching Classes"}
@@ -674,7 +698,7 @@ export default function ClassesPage() {
               </CardContent>
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                    <span className="flex items-center"><Users className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
+                    <span className="flex items-center"><UsersIcon className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
                     {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{classroom.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </div>
                 {user && user.uid === classroom.teacherId ? (
