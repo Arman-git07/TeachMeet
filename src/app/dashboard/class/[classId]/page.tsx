@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, use } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle,
     Megaphone, ClipboardList, Link as LinkIconLucide, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp
 } from 'lucide-react'; // Renamed LinkIcon to LinkIconLucide to avoid conflict with NextLink
 import Link from 'next/link';
 import Image from 'next/image';
@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { CreateExamDialog } from '@/components/exam/CreateExamDialog';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface Announcement {
   id: string;
@@ -203,6 +204,16 @@ export default function ClassDetailsPage() {
   const [newScheduleTimeInput, setNewScheduleTimeInput] = useState('');
   const [newScheduleTopicInput, setNewScheduleTopicInput] = useState('');
 
+  // Upload Material State
+  const [isUploadMaterialDialogOpen, setIsUploadMaterialDialogOpen] = useState(false);
+  const [newMaterialTitle, setNewMaterialTitle] = useState('');
+  const [newMaterialDescription, setNewMaterialDescription] = useState('');
+  const [newMaterialType, setNewMaterialType] = useState<'link' | 'file'>('link');
+  const [newMaterialUrl, setNewMaterialUrl] = useState('');
+  const [newMaterialFile, setNewMaterialFile] = useState<File | null>(null);
+  const materialFileRef = useRef<HTMLInputElement>(null);
+  const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
+
 
   useEffect(() => {
     if (classId && !authLoading) {
@@ -373,25 +384,81 @@ export default function ClassDetailsPage() {
     setIsEditScheduleDialogOpen(false);
   };
 
-
-  const handleUploadMaterial = () => {
-    toast({
-      title: "Upload Material (Mock)",
-      description: "Feature to upload class materials is planned for implementation.",
-      duration: 3000,
-    });
+  const handleMaterialFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Add size validation if needed
+      setNewMaterialFile(file);
+    } else {
+      setNewMaterialFile(null);
+    }
   };
 
+  const resetUploadMaterialDialog = () => {
+    setNewMaterialTitle('');
+    setNewMaterialDescription('');
+    setNewMaterialType('link');
+    setNewMaterialUrl('');
+    setNewMaterialFile(null);
+    if (materialFileRef.current) materialFileRef.current.value = '';
+    setIsUploadingMaterial(false);
+  };
+
+  const handleAddMaterial = async () => {
+    if (!newMaterialTitle.trim()) {
+      toast({ variant: 'destructive', title: 'Missing Title', description: 'Please provide a title for the material.' });
+      return;
+    }
+    if (newMaterialType === 'link' && !newMaterialUrl.trim()) {
+      toast({ variant: 'destructive', title: 'Missing URL', description: 'Please provide a URL for the link material.' });
+      return;
+    }
+    if (newMaterialType === 'file' && !newMaterialFile) {
+      toast({ variant: 'destructive', title: 'No File Selected', description: 'Please select a file to upload.' });
+      return;
+    }
+
+    setIsUploadingMaterial(true);
+    let newMaterial: Material;
+
+    if (newMaterialType === 'file' && newMaterialFile) {
+      // Simulate file upload
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      newMaterial = {
+        id: `mat_${Date.now()}`,
+        title: newMaterialTitle.trim(),
+        description: newMaterialDescription.trim() || undefined,
+        type: 'file',
+        fileName: newMaterialFile.name,
+      };
+      toast({ title: "File Material Added (Mock)", description: `"${newMaterial.title}" has been added.` });
+    } else if (newMaterialType === 'link') {
+      newMaterial = {
+        id: `mat_${Date.now()}`,
+        title: newMaterialTitle.trim(),
+        description: newMaterialDescription.trim() || undefined,
+        type: 'link',
+        url: newMaterialUrl.trim(),
+      };
+      toast({ title: "Link Material Added", description: `"${newMaterial.title}" has been added.` });
+    } else {
+      setIsUploadingMaterial(false);
+      return; // Should not happen
+    }
+
+    setClassroom(prev => prev ? { ...prev, materials: [...(prev.materials || []), newMaterial] } : null);
+    setIsUploadMaterialDialogOpen(false);
+    resetUploadMaterialDialog();
+  };
+
+
   const handleTriggerAssignmentUploadDialog = () => {
-    // This function is now specifically for teachers (or those who see the button)
-    // to potentially upload assignment details/files.
-    // The previous student-facing dialog for selecting an assignment by name is removed.
-    setDialogAssignmentName(''); // This might be repurposed for teacher's use, e.g., assignment title
+    setDialogAssignmentName(''); 
     setIsAssignmentUploadDialogOpen(true);
   };
 
   const handleDialogSubmitAndChooseFile = () => {
-    if (!dialogAssignmentName.trim()) { // This might be 'Assignment Title' for the teacher
+    if (!dialogAssignmentName.trim()) { 
         toast({ variant: "destructive", title: "Assignment Title Required", description: "Please enter a title for the assignment materials you are uploading." });
         return;
     }
@@ -413,12 +480,6 @@ export default function ClassDetailsPage() {
         return;
     }
 
-    // For teacher uploading, might allow various file types. For now, keep it simple.
-    // if (file.type !== "text/plain" && !file.type.startsWith("application/pdf")) {
-    //     toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a .txt or .pdf file." });
-    //     return;
-    // }
-
     if (!selectedAssignmentTitleForUpload) {
         console.error("No assignment title was selected prior to file upload.");
         toast({ variant: "destructive", title: "Internal Error", description: "Assignment title was missing. Please try again." });
@@ -429,14 +490,12 @@ export default function ClassDetailsPage() {
     toast({ title: "Uploading Assignment Materials...", description: `Simulating upload for "${selectedAssignmentTitleForUpload}".` });
     setIsAssignmentUploadDialogOpen(false);
 
-    // Simulate upload & adding to classroom.materials or classroom.assignments
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Mock adding to classroom.assignments
     const newAssignmentEntry: Assignment = {
         id: `assign_teacher_${Date.now()}`,
         title: selectedAssignmentTitleForUpload,
-        dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), // Default due date: 1 week
+        dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), 
         status: "Pending",
         description: `Materials uploaded by teacher for "${selectedAssignmentTitleForUpload}". File: ${file.name}`
     };
@@ -457,7 +516,7 @@ export default function ClassDetailsPage() {
     });
 
     setSelectedAssignmentTitleForUpload(null);
-    setDialogAssignmentName(''); // Reset dialog name
+    setDialogAssignmentName('');
   };
 
   const handleMockPayment = (method: string) => {
@@ -815,9 +874,70 @@ export default function ClassDetailsPage() {
                 )) : <p className="text-muted-foreground">No materials uploaded yet.</p>}
               </CardContent>
                <CardFooter className="flex flex-col sm:flex-row gap-2">
-                <Button onClick={handleUploadMaterial} variant="outline" className="w-full rounded-lg text-sm">
-                    <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material (Mock)
-                </Button>
+                {isCurrentUserTeacher && (
+                  <Dialog open={isUploadMaterialDialogOpen} onOpenChange={(isOpen) => {
+                    if (!isOpen) resetUploadMaterialDialog();
+                    setIsUploadMaterialDialogOpen(isOpen);
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="default" className="w-full rounded-lg text-sm btn-gel">
+                        <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-lg rounded-xl">
+                      <DialogHeader>
+                        <ShadDialogTitle>Upload New Class Material</ShadDialogTitle>
+                        <DialogDescription>
+                          Add a link or file for your students.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
+                        <div className="grid gap-2">
+                          <Label htmlFor="newMaterialTitle">Title*</Label>
+                          <Input id="newMaterialTitle" value={newMaterialTitle} onChange={(e) => setNewMaterialTitle(e.target.value)} placeholder="e.g., Lecture Slides - Week 1" className="rounded-lg" disabled={isUploadingMaterial}/>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="newMaterialDescription">Description (Optional)</Label>
+                          <Textarea id="newMaterialDescription" value={newMaterialDescription} onChange={(e) => setNewMaterialDescription(e.target.value)} placeholder="Briefly describe the material..." className="rounded-lg min-h-[70px]" disabled={isUploadingMaterial}/>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Material Type*</Label>
+                            <RadioGroup value={newMaterialType} onValueChange={(value: 'link' | 'file') => setNewMaterialType(value)} className="flex gap-4" disabled={isUploadingMaterial}>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="link" id="type-link" />
+                                    <Label htmlFor="type-link" className="font-normal flex items-center"><Link2 className="mr-1 h-4 w-4"/>Link</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="file" id="type-file" />
+                                    <Label htmlFor="type-file" className="font-normal flex items-center"><FileUp className="mr-1 h-4 w-4"/>File</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                        {newMaterialType === 'link' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="newMaterialUrl">URL*</Label>
+                                <Input id="newMaterialUrl" type="url" value={newMaterialUrl} onChange={(e) => setNewMaterialUrl(e.target.value)} placeholder="https://example.com/resource" className="rounded-lg" disabled={isUploadingMaterial}/>
+                            </div>
+                        )}
+                        {newMaterialType === 'file' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="newMaterialFile">File*</Label>
+                                <Input ref={materialFileRef} id="newMaterialFile" type="file" onChange={handleMaterialFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingMaterial}/>
+                                {newMaterialFile && <p className="text-xs text-muted-foreground">Selected: {newMaterialFile.name}</p>}
+                            </div>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline" className="rounded-lg" disabled={isUploadingMaterial}>Cancel</Button>
+                        </DialogClose>
+                        <Button type="button" onClick={handleAddMaterial} className="btn-gel rounded-lg" disabled={isUploadingMaterial}>
+                          {isUploadingMaterial ? "Adding..." : "Add Material"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
                 <Button variant="outline" className="w-full rounded-lg text-sm">Browse All Materials</Button>
               </CardFooter>
             </Card>
@@ -1117,3 +1237,4 @@ export default function ClassDetailsPage() {
     </div>
   );
 }
+
