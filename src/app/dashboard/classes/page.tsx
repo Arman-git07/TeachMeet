@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, ArrowUpDown } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, ArrowUpDown, MoreVertical, Filter } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -19,9 +20,7 @@ import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Classroom {
   id: string;
@@ -36,7 +35,6 @@ interface Classroom {
   createdAt: Date;
 }
 
-// Base structure for mock classrooms, teacher details will be filled dynamically for some.
 const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'teacherAvatar' | 'createdAt'>[] = [
   { id: "cl1", name: "Introduction to Quantum Physics", description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", memberCount: 25, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
   { id: "cl2", name: "Advanced JavaScript Techniques", description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", memberCount: 18, thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
@@ -82,6 +80,12 @@ const sortOptions = [
     { value: "nameDesc", label: "Name (Z-A)" },
     { value: "membersDesc", label: "Most Members" },
     { value: "membersAsc", label: "Fewest Members" },
+];
+
+const filterOptions = [
+    { value: "all", label: "All Classes" },
+    { value: "teaching", label: "My Teaching" },
+    { value: "requested", label: "My Requests" },
 ];
 
 
@@ -130,7 +134,6 @@ export default function ClassesPage() {
   }, []);
 
   useEffect(() => {
-    // Initialize classrooms from base data, assign dynamic teacher for cl1 if user is logged in.
     const processedMocks = baseMockClassroomsData.map((baseCls, index) => {
       let finalTeacherId: string;
       let finalTeacherName: string;
@@ -157,29 +160,33 @@ export default function ClassesPage() {
       };
     });
     setClassrooms(processedMocks);
-    if (!authLoading) { // If auth is done, initial data setup is done
-      setInitialLoading(false);
+    if (!authLoading && classrooms.length === 0 && baseMockClassroomsData.length > 0) { // Ensure initial load only if classrooms is empty but base data exists
+        setInitialLoading(false);
+    } else if (!authLoading) {
+        setInitialLoading(false);
     }
   }, [user, authLoading]);
 
 
   useEffect(() => {
-    if (initialLoading) { 
+    if (initialLoading && classrooms.length === 0) { 
       setDisplayClassrooms([]); 
       return;
     }
     
-    let filteredClassrooms = classrooms;
+    let filteredClassrooms = [...classrooms]; // Create a mutable copy
 
     if (activeFilter === 'teaching') {
       filteredClassrooms = classrooms.filter(cls => user && cls.teacherId === user.uid);
     } else if (activeFilter === 'requested') {
       filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     }
+    // 'all' filter uses all classrooms initially
 
     const pending: Classroom[] = [];
     let sortablePortion: Classroom[] = [];
 
+    // Separate pending requests only if the filter is 'all' or 'requested'
     if (activeFilter === 'all' || activeFilter === 'requested') {
       filteredClassrooms.forEach(cls => {
         if (requestedClassIds.includes(cls.id)) {
@@ -192,9 +199,10 @@ export default function ClassesPage() {
       sortablePortion = [...filteredClassrooms];
     }
     
+    // Sort pending classes by creation date (newest first) - this might be less relevant if they are always on top
     pending.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 
-
+    // Now sort the `sortablePortion` based on `currentSortOption`
     switch (currentSortOption) {
       case "newest":
         sortablePortion.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
@@ -216,10 +224,10 @@ export default function ClassesPage() {
         break;
       case "default":
       default:
-        if (activeFilter === 'all') {
+        if (activeFilter === 'all') { // Default sort for "All" - My Classes first, then others
             const myClasses: Classroom[] = [];
             const others: Classroom[] = [];
-            sortablePortion.forEach(cls => { // sortablePortion here excludes 'pending'
+            sortablePortion.forEach(cls => {
                 if (user && user.uid === cls.teacherId) {
                     myClasses.push(cls);
                 } else {
@@ -427,7 +435,6 @@ export default function ClassesPage() {
         return;
       }
     } else if (editingClass.name !== editClassName.trim() && editingClass.thumbnailUrl.includes('placehold.co') && editingClass.thumbnailUrl.includes('?text=')) {
-      // Update placeholder text if name changed and it's a placeholder image
       const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
       imageDetails = {
         thumbnailUrl: `https://placehold.co/600x400.png?text=${newClassNameInitials}`,
@@ -497,7 +504,6 @@ export default function ClassesPage() {
   };
 
   useEffect(() => {
-    // Cleanup for blob URLs
     return () => {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(newClassImagePreview);
@@ -509,6 +515,7 @@ export default function ClassesPage() {
   }, [newClassImagePreview, editClassImagePreview]);
 
   const activeSortLabel = sortOptions.find(opt => opt.value === currentSortOption)?.label || "Default";
+  const activeFilterLabel = filterOptions.find(opt => opt.value === activeFilter)?.label || "All Classes";
 
   return (
     <div className="space-y-8 p-4 md:p-8 h-full flex flex-col">
@@ -531,6 +538,27 @@ export default function ClassesPage() {
                             onClick={() => setCurrentSortOption(option.value)}
                             className={cn("cursor-pointer rounded-md", currentSortOption === option.value && "bg-accent text-accent-foreground")}
                         >
+                            {option.label}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-lg">
+                        <MoreVertical className="h-5 w-5" />
+                         <span className="sr-only">Filter classes</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                    <DropdownMenuSeparator />
+                    {filterOptions.map(option => (
+                        <DropdownMenuItem
+                            key={option.value}
+                            onClick={() => setActiveFilter(option.value)}
+                            className={cn("cursor-pointer rounded-md", activeFilter === option.value && "bg-accent text-accent-foreground")}
+                        >
+                            <Filter className="mr-2 h-4 w-4 opacity-70"/>
                             {option.label}
                         </DropdownMenuItem>
                     ))}
@@ -585,13 +613,10 @@ export default function ClassesPage() {
         </div>
       </div>
 
-      <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full">
-        <TabsList className="mb-4 rounded-lg grid w-full grid-cols-1 sm:grid-cols-3 sm:max-w-md mx-auto">
-          <TabsTrigger value="all" className="rounded-md">All Classes</TabsTrigger>
-          <TabsTrigger value="teaching" className="rounded-md">My Teaching</TabsTrigger>
-          <TabsTrigger value="requested" className="rounded-md">My Requests</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="my-4 text-sm text-muted-foreground">
+        Showing: <span className="font-semibold text-foreground">{activeFilterLabel}</span>
+      </div>
+
 
       <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) resetEditClassDialog();
