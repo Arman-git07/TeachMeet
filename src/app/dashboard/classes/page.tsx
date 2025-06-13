@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Added DialogFooter
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog"; // Added DialogTrigger
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -151,7 +151,7 @@ export default function ClassesPage() {
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
         memberCount: Math.floor(Math.random() * 25) + 10,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)),
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 30) + 1)),
       };
     });
     setClassrooms(processedMocks);
@@ -172,39 +172,28 @@ export default function ClassesPage() {
     } else if (activeFilter === 'requested') {
       filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     } else if (activeFilter === 'joined') {
-      // Show classes user requested to join, but is not teaching
-      filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid));
+        filteredClassrooms = classrooms.filter(cls => 
+            requestedClassIds.includes(cls.id) && 
+            (!user || cls.teacherId !== user.uid)
+        );
     } else { // 'all' or any other default
       filteredClassrooms = [...classrooms];
     }
+    
+    // Default sort: pending requests first, then by creation date (newest first)
+    // If a more complex "Default" sort (e.g. My Classes after Pending) is needed for 'all', it can be added here.
+    filteredClassrooms.sort((a, b) => {
+        const aIsRequested = requestedClassIds.includes(a.id);
+        const bIsRequested = requestedClassIds.includes(b.id);
 
-    const pendingInFilter: Classroom[] = [];
-    const nonPendingInFilter: Classroom[] = [];
-
-    filteredClassrooms.forEach(cls => {
-      if (requestedClassIds.includes(cls.id)) {
-        pendingInFilter.push(cls);
-      } else {
-        nonPendingInFilter.push(cls);
-      }
+        if (aIsRequested && !bIsRequested) return -1;
+        if (!aIsRequested && bIsRequested) return 1;
+        
+        // Both requested or both not, sort by date
+        return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
     });
     
-    const sortFn = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
-
-    pendingInFilter.sort(sortFn);
-    nonPendingInFilter.sort(sortFn);
-    
-    let finalSortedList: Classroom[] = [];
-
-    if (activeFilter === 'all') {
-      const taughtByUser = nonPendingInFilter.filter(cls => user && cls.teacherId === user.uid);
-      const others = nonPendingInFilter.filter(cls => !user || cls.teacherId !== user.uid);
-      finalSortedList = [...pendingInFilter, ...taughtByUser, ...others];
-    } else {
-      finalSortedList = [...pendingInFilter, ...nonPendingInFilter];
-    }
-    
-    setDisplayClassrooms(finalSortedList);
+    setDisplayClassrooms(filteredClassrooms);
 
   }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
@@ -568,9 +557,7 @@ export default function ClassesPage() {
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" className="rounded-lg" disabled={isUploadingEditClassImage}>Cancel</Button>
-            </DialogClose>
+            <Button type="button" variant="outline" className="rounded-lg" onClick={resetEditClassDialog} disabled={isUploadingEditClassImage}>Cancel</Button>
             <Button type="button" onClick={handleUpdateClass} className="btn-gel rounded-lg" disabled={isUploadingEditClassImage || !editClassName.trim()}>
               {isUploadingEditClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               {isUploadingEditClassImage ? (editClassImageFile ? 'Uploading Image...' : 'Saving...') : 'Save Changes'}
@@ -579,7 +566,7 @@ export default function ClassesPage() {
         </DialogContent>
       </Dialog>
 
-      {initialLoading || authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0) ? (
+      {(initialLoading || authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0)) ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
@@ -619,9 +606,19 @@ export default function ClassesPage() {
           </CardHeader>
           <CardContent>
             {(activeFilter === 'all' || activeFilter === 'teaching') && (
-                <Button onClick={() => setIsCreateClassDialogOpen(true)} size="lg" className="btn-gel rounded-lg">
-                Create a Class
-                </Button>
+                <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
+                  if (!isOpen) resetCreateClassDialog();
+                  setIsCreateClassDialogOpen(isOpen);
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="lg" className="btn-gel rounded-lg">
+                      Create a Class
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[520px] rounded-xl">
+                    <StartMeetingDialogContent />
+                  </DialogContent>
+                </Dialog>
             )}
             {(activeFilter === 'requested' || activeFilter === 'joined') && (
                  <Button onClick={() => { setActiveFilter('all'); setIsFilterDropdownOpen(false); }} size="lg" variant="outline" className="rounded-lg">
