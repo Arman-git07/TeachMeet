@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, MoreVertical, Filter } from "lucide-react";
+import { PlusCircle, Users, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -145,7 +145,7 @@ export default function ClassesPage() {
         teacherId: finalTeacherId,
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)), // Stagger creation dates more
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 60) + 1)), 
       };
     });
     setClassrooms(processedMocks);
@@ -158,49 +158,51 @@ export default function ClassesPage() {
 
 
   useEffect(() => {
-    if (initialLoading && classrooms.length === 0 && !authLoading) { 
-      setDisplayClassrooms([]); 
-      return;
+    if (authLoading || initialLoading) {
+        setDisplayClassrooms([]); // Show skeletons or empty if still loading
+        return;
     }
-    if (authLoading || initialLoading) return;
     
-    let filteredClassrooms = [...classrooms];
+    let filteredBase = [...classrooms];
 
     if (activeFilter === 'teaching') {
-      filteredClassrooms = classrooms.filter(cls => user && cls.teacherId === user.uid);
+      filteredBase = classrooms.filter(cls => user && cls.teacherId === user.uid);
     } else if (activeFilter === 'requested') {
-      filteredClassrooms = classrooms.filter(cls => requestedClassIds.includes(cls.id));
+      filteredBase = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     }
-    
+    // 'all' filter uses all classrooms
+
     const pendingRequests: Classroom[] = [];
     const taughtByMe: Classroom[] = [];
     const others: Classroom[] = [];
 
-    filteredClassrooms.forEach(cls => {
-        if (requestedClassIds.includes(cls.id)) {
+    filteredBase.forEach(cls => {
+        if (requestedClassIds.includes(cls.id) && (activeFilter === 'all' || activeFilter === 'requested')) {
             pendingRequests.push(cls);
-        } else if (user && user.uid === cls.teacherId) {
+        } else if (user && user.uid === cls.teacherId && (activeFilter === 'all' || activeFilter === 'teaching')) {
             taughtByMe.push(cls);
-        } else {
+        } else if (activeFilter === 'all' && !requestedClassIds.includes(cls.id) && (!user || user.uid !== cls.teacherId) ) {
             others.push(cls);
         }
     });
     
-    // Default sort: newest first for all categories
-    const sortByNewest = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+    const defaultSort = (a: Classroom, b: Classroom) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
     
-    pendingRequests.sort(sortByNewest);
-    taughtByMe.sort(sortByNewest);
-    others.sort(sortByNewest);
+    pendingRequests.sort(defaultSort);
+    taughtByMe.sort(defaultSort);
+    others.sort(defaultSort);
+
+    let finalSortedList: Classroom[] = [];
 
     if (activeFilter === 'all') {
-        setDisplayClassrooms([...pendingRequests, ...taughtByMe, ...others]);
+        finalSortedList = [...pendingRequests, ...taughtByMe, ...others];
     } else if (activeFilter === 'teaching') {
-        setDisplayClassrooms(taughtByMe); // Pending requests are not relevant here unless they overlap
+        finalSortedList = taughtByMe;
     } else if (activeFilter === 'requested') {
-        setDisplayClassrooms(pendingRequests);
+        finalSortedList = pendingRequests;
     }
-
+    
+    setDisplayClassrooms(finalSortedList);
 
   }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
@@ -482,26 +484,6 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <div className="flex items-center gap-2">
-             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-lg">
-                        <MoreVertical className="h-5 w-5" />
-                         <span className="sr-only">Filter classes</span>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                    {filterOptions.map(option => (
-                        <DropdownMenuItem
-                            key={option.value}
-                            onClick={() => setActiveFilter(option.value)}
-                            className={cn("cursor-pointer rounded-md", activeFilter === option.value && "bg-accent text-accent-foreground")}
-                        >
-                            <Filter className="mr-2 h-4 w-4 opacity-70"/>
-                            {option.label}
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
             <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
                 if (!isOpen) resetCreateClassDialog();
                 setIsCreateClassDialogOpen(isOpen);
@@ -551,8 +533,30 @@ export default function ClassesPage() {
         </div>
       </div>
 
-      <div className="my-4 text-sm text-muted-foreground">
-        Showing: <span className="font-semibold text-foreground">{activeFilterLabel}</span>
+      <div className="my-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="rounded-lg text-sm">
+              {activeFilterLabel}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56 rounded-xl">
+            {filterOptions.map(option => (
+              <DropdownMenuItem
+                key={option.value}
+                onClick={() => setActiveFilter(option.value)}
+                className={cn(
+                  "cursor-pointer rounded-md",
+                  activeFilter === option.value && "bg-accent text-accent-foreground"
+                )}
+              >
+                <Filter className="mr-2 h-4 w-4 opacity-70" />
+                {option.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
 
@@ -604,7 +608,7 @@ export default function ClassesPage() {
       </Dialog>
 
 
-      {initialLoading ? ( 
+      {initialLoading || authLoading ? ( 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
