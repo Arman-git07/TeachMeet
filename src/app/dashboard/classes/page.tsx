@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, ArrowUpDown, UserCheck } from "lucide-react";
+import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -77,6 +77,7 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 const filterOptions = [
     { value: "all", label: "Explore All Classes", icon: Filter },
     // "My Teaching" is added conditionally
+    { value: "teaching", label: "My Teaching", icon: UsersIcon },
     { value: "joined", label: "My Joined Classes", icon: UsersIcon },
     { value: "requested", label: "My Requests", icon: UserCheck },
 ];
@@ -159,7 +160,7 @@ export default function ClassesPage() {
         teacherName: finalTeacherName,
         teacherAvatar: finalTeacherAvatar,
         memberCount: Math.floor(Math.random() * 25) + 10,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 180) + 1)), // Wider date range
+        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 180) + 1)), 
       };
     });
     setClassrooms(processedMocks);
@@ -180,20 +181,32 @@ export default function ClassesPage() {
     } else if (activeFilter === 'requested') {
         filteredByActiveRole = classrooms.filter(cls => requestedClassIds.includes(cls.id));
     } else if (activeFilter === 'joined') {
-        filteredByActiveRole = classrooms.filter(cls => 
-            requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid)
-        );
+        // For "My Joined Classes", show classes they requested AND are not teaching
+        filteredByActiveRole = user 
+            ? classrooms.filter(cls => requestedClassIds.includes(cls.id) && cls.teacherId !== user.uid)
+            : classrooms.filter(cls => requestedClassIds.includes(cls.id)); // if not authed, same as requested for demo
     } else { // 'all'
         filteredByActiveRole = classrooms.slice();
     }
     
-    // Default sort: Pending first, then by creation date (newest first) for the filtered list
+    // Default sort: Pending first (unless filter is 'joined'), then by creation date (newest first)
     filteredByActiveRole.sort((a, b) => {
-        const aIsPending = requestedClassIds.includes(a.id);
-        const bIsPending = requestedClassIds.includes(b.id);
+        const aIsTeacher = user && a.teacherId === user.uid;
+        const bIsTeacher = user && b.teacherId === user.uid;
+        const aIsRequested = requestedClassIds.includes(a.id);
+        const bIsRequested = requestedClassIds.includes(b.id);
+
+        // Prioritize "Pending Request" unless filter is 'joined'
+        if (activeFilter !== 'joined') {
+            if (aIsRequested && !aIsTeacher && !(bIsRequested && !bIsTeacher)) return -1;
+            if (!(aIsRequested && !aIsTeacher) && bIsRequested && !bIsTeacher) return 1;
+        }
         
-        if (aIsPending && !bIsPending) return -1;
-        if (!aIsPending && bIsPending) return 1;
+        // Then "My Class" (if user is authenticated)
+        if (user) {
+            if (aIsTeacher && !bIsTeacher) return -1;
+            if (!aIsTeacher && bIsTeacher) return 1;
+        }
         
         return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
     });
@@ -515,22 +528,25 @@ export default function ClassesPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-60 rounded-xl">
-            {currentFilterOptions.map(option => (
-              <DropdownMenuItem
-                key={option.value}
-                onClick={() => {
-                    setActiveFilter(option.value);
-                    setIsFilterDropdownOpen(false);
-                }}
-                className={cn(
-                  "cursor-pointer rounded-md p-2 text-sm",
-                  activeFilter === option.value && "bg-accent text-accent-foreground"
-                )}
-              >
-                <option.icon className="mr-2 h-4 w-4 opacity-70" />
-                {option.label}
-              </DropdownMenuItem>
-            ))}
+            {currentFilterOptions.map(option => {
+                if (option.value === 'teaching' && !isAuthenticated) return null;
+                return (
+                    <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => {
+                            setActiveFilter(option.value);
+                            setIsFilterDropdownOpen(false);
+                        }}
+                        className={cn(
+                        "cursor-pointer rounded-md p-2 text-sm",
+                        activeFilter === option.value && "bg-accent text-accent-foreground"
+                        )}
+                    >
+                        <option.icon className="mr-2 h-4 w-4 opacity-70" />
+                        {option.label}
+                    </DropdownMenuItem>
+                );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -650,11 +666,19 @@ export default function ClassesPage() {
             const isTeacher = user && user.uid === classroom.teacherId;
             const isRequested = requestedClassIds.includes(classroom.id);
             let actionButton;
+            const showPendingBadge = isRequested && !isTeacher && activeFilter !== 'joined';
+
 
             if (isTeacher) {
                 actionButton = (
                     <Button onClick={() => handleOpenEditDialog(classroom)} className="w-full btn-gel rounded-lg text-sm">
                         <Edit className="mr-2 h-4 w-4" /> Manage Class
+                    </Button>
+                );
+            } else if (activeFilter === 'joined' && isRequested) {
+                actionButton = (
+                    <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
+                         <ArrowRight className="mr-2 h-4 w-4" /> View Class
                     </Button>
                 );
             } else if (activeFilter === 'requested' && isRequested) {
@@ -663,13 +687,13 @@ export default function ClassesPage() {
                         <ArrowRight className="mr-2 h-4 w-4" /> Resend Request
                     </Button>
                 );
-            } else if (isRequested) {
+            } else if (isRequested) { // Covers 'all' filter where request was sent
                 actionButton = (
                     <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
                         <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
                     </Button>
                 );
-            } else {
+            } else { // Not a teacher, not requested yet (or not in 'joined'/'requested' filter)
                 actionButton = (
                     <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
@@ -688,7 +712,7 @@ export default function ClassesPage() {
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
                     data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"}
                  />
-                {isRequested && !isTeacher ? ( // Show pending only if requested and not the teacher
+                {showPendingBadge ? (
                     <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     Pending Request
                     </Badge>
