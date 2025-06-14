@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { CreateExamDialog } from '@/components/exam/CreateExamDialog'; // Import the dialog
+
+// Dynamically import CreateExamDialog to avoid hydration issues with the dialog state
+const CreateExamDialog = dynamic(() => import('@/components/exam/CreateExamDialog'), { ssr: false });
 
 // This interface should ideally be in a shared types file
 interface Exam {
@@ -40,10 +43,9 @@ const initialMockExams: Exam[] = [
 export default function ExamsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const router = useRouter();
-  const [exams, setExams] = useState<Exam[]>(initialMockExams);
-  const [isCreateExamDialogOpen, setIsCreateExamDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter(); 
+  const isTeacher = user?.role === 'teacher'; // Assuming user object has a 'role' property
+  const [exams, setExams] = useState<Exam[]>(initialMockExams);  const [isLoading, setIsLoading] = useState(true);
 
 
   useEffect(() => {
@@ -138,10 +140,8 @@ export default function ExamsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Exams & Tests</h1>
           <p className="text-muted-foreground">Manage upcoming and past assessments.</p>
         </div>
-        {user && ( 
-            <Button onClick={() => setIsCreateExamDialogOpen(true)} className="btn-gel rounded-lg">
-              <PlusCircle className="mr-2 h-5 w-5" /> Create New Exam
-            </Button>
+        {isTeacher && (
+          <CreateExamDialog onExamCreated={handleExamCreated} />
         )}
       </div>
 
@@ -153,11 +153,10 @@ export default function ExamsPage() {
             <CardDescription>There are no exams listed yet. {user ? "Create one to get started!" : "Check back later."}</CardDescription>
           </CardHeader>
           {user && (
-            <CardContent>
-                <Button onClick={() => setIsCreateExamDialogOpen(true)} size="lg" className="btn-gel rounded-lg">
-                  Create First Exam
-                </Button>
+            <CardContent>                
+              {isTeacher && <CreateExamDialog onExamCreated={handleExamCreated} />}
             </CardContent>
+           
           )}
         </Card>
       ) : (
@@ -165,7 +164,6 @@ export default function ExamsPage() {
           {exams.map(exam => {
             const isTeacher = user?.uid === exam.teacherId;
             // Status should now be correctly set from useEffect or initial data
-            const currentStatus = exam.status; 
             const now = new Date(); // For enabling/disabling the "View Paper" button
 
             return (
@@ -173,7 +171,7 @@ export default function ExamsPage() {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                     <CardTitle className="text-lg truncate flex-grow mr-2" title={exam.title}>{exam.title}</CardTitle>
-                    <Badge variant={getStatusVariant(currentStatus)} className="text-xs rounded-md flex-shrink-0">{currentStatus}</Badge>
+                    <Badge variant={getStatusVariant(exam.status)} className="text-xs rounded-md flex-shrink-0">{exam.status}</Badge>
                 </div>
                 <CardDescription className="text-xs text-muted-foreground">By {exam.teacherName}</CardDescription>
               </CardHeader>
@@ -204,9 +202,9 @@ export default function ExamsPage() {
                   <Button 
                     onClick={() => handleViewExam(exam)} 
                     className="w-full btn-gel rounded-lg text-sm"
-                    disabled={currentStatus === "Upcoming" && now < exam.scheduledDateTime}
+                    disabled={exam.status === "Upcoming" && now < exam.scheduledDateTime}
                   >
-                    {currentStatus === "Upcoming" && now < exam.scheduledDateTime 
+                    {exam.status === "Upcoming" && now < exam.scheduledDateTime 
                         ? <><CalendarClock className="mr-2 h-4 w-4" /> Not Yet Active</>
                         : <><FileText className="mr-2 h-4 w-4" /> View Paper & Submit</>
                     }
@@ -217,14 +215,8 @@ export default function ExamsPage() {
           );
         })}
         </div>
-      )}
-      <CreateExamDialog
-        isOpen={isCreateExamDialogOpen}
-        onOpenChange={setIsCreateExamDialogOpen}
-        onExamCreated={handleExamCreated}
       />
     </div>
   );
 }
-
     

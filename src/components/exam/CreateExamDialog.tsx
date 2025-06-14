@@ -1,25 +1,24 @@
 
 'use client';
 
+import React, { useState, useEffect, useRef } from "react"; // Added React import
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input} from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
-import { storage } from '@/lib/firebase'; // Assuming db is also exported if needed for Firestore operations
+import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
-import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog"; // Added DialogContent & DialogTrigger
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { CalendarClock, UploadCloud, Link as LinkIcon, Loader2, Edit2Icon } from "lucide-react";
+import { CalendarClock, UploadCloud, Link as LinkIcon, Loader2, Edit2Icon, PlusCircle } from "lucide-react";
 
-// This interface should ideally be in a shared types file
 interface Exam {
   id: string;
   title: string;
@@ -31,9 +30,8 @@ interface Exam {
   totalMarks: number;
   questionPaperUrl?: string;
   questionPaperFileName?: string;
-  directQuestions?: string; // Added for directly written questions
+  directQuestions?: string;
   status: 'Upcoming' | 'Active' | 'Ended' | 'Graded';
-  // Add classId if exams are to be associated with specific classes
   classId?: string;
 }
 
@@ -41,16 +39,28 @@ const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 interface CreateExamDialogProps {
-    isOpen: boolean;
-    onOpenChange: (isOpen: boolean) => void;
-    onExamCreated?: (newExam: Exam) => void; // Callback after exam creation
-    classContext?: { classId: string; className?: string }; // Optional context
+    isOpen?: boolean; // Made optional for uncontrolled mode
+    onOpenChange?: (isOpen: boolean) => void; // Made optional
+    onExamCreated?: (newExam: Exam) => void;
+    classContext?: { classId: string; className?: string };
 }
 
-export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classContext }: CreateExamDialogProps) {
+const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: externalIsOpen, onOpenChange: externalOnOpenChange, onExamCreated, classContext }) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const router = useRouter();
+
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isControlled = externalIsOpen !== undefined && externalOnOpenChange !== undefined;
+  const isOpen = isControlled ? externalIsOpen : internalIsOpen;
+  
+  const setIsOpen = (open: boolean) => {
+    if (isControlled) {
+      externalOnOpenChange!(open);
+    } else {
+      setInternalIsOpen(open);
+    }
+  };
 
   const [newExamTitle, setNewExamTitle] = useState('');
   const [newExamDescription, setNewExamDescription] = useState('');
@@ -69,7 +79,6 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
   const [newExamQuestionLink, setNewExamQuestionLink] = useState<string>('');
   const [newExamDirectQuestions, setNewExamDirectQuestions] = useState<string>('');
 
-
   const [isProcessing, setIsProcessing] = useState(false);
   const questionPaperInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,8 +88,8 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
     newDate.setHours(hours, minutes, 0, 0);
     return newDate;
   };
-
-  const resetCreateExamDialog = () => {
+  
+  const resetCreateExamDialog = React.useCallback(() => {
     setNewExamTitle('');
     setNewExamDescription('');
     setNewExamScheduledDate(new Date());
@@ -96,13 +105,20 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
     setNewExamDirectQuestions('');
     if (questionPaperInputRef.current) questionPaperInputRef.current.value = "";
     setIsProcessing(false);
-  };
+  }, []); // Add dependencies if any setters rely on external scope that changes
   
   useEffect(() => {
     if (!isOpen) {
       resetCreateExamDialog();
     }
-  }, [isOpen]);
+  }, [isOpen, resetCreateExamDialog]);
+
+  const handleOpenChange = (openState: boolean) => {
+    setIsOpen(openState);
+    if (!openState) {
+      resetCreateExamDialog();
+    }
+  };
 
   const handleQuestionPaperFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -133,12 +149,9 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
             duration: Infinity,
         });
 
-        // Simulate upload for now, replace with actual Firebase upload if needed
         setTimeout(async () => {
             try {
-                // const uploadTask = await uploadBytesResumable(fileRef, paperFile); // Real upload
-                // const downloadURL = await getDownloadURL(uploadTask.ref); // Real URL
-                const mockDownloadURL = `https://mockstorage.example.com/${filePath}`; // Mock URL
+                const mockDownloadURL = `https://mockstorage.example.com/${filePath}`;
                 console.log("Mock upload complete, URL:", mockDownloadURL);
                 toast.dismiss(toastId);
                 toast({ title: "Question Paper Uploaded!", description: `${paperFile.name} (mock) uploaded.` });
@@ -149,7 +162,7 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
                 toast({ variant: "destructive", title: "Upload Failed", description: "Could not upload paper." });
                 reject(error);
             }
-        }, 1500); // Simulate 1.5s upload
+        }, 1500); 
     });
   };
 
@@ -191,9 +204,7 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
         return;
     }
 
-
     setIsProcessing(true); 
-    
     let paperDetails: { url?: string; fileName?: string; directQuestions?: string } = {};
     const examId = `exam_${Date.now()}_${classContext?.classId || 'global'}`;
 
@@ -202,21 +213,14 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
         const { url, fileName } = await uploadQuestionPaperFile(newExamPaperFile, user.uid, examId);
         paperDetails = { url, fileName };
       } else if (newExamQuestionMode === 'link' && newExamQuestionLink.trim()) {
-        paperDetails = {
-          url: newExamQuestionLink.trim(),
-          fileName: "Online Questions (External Link)"
-        };
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate link processing
+        paperDetails = { url: newExamQuestionLink.trim(), fileName: "Online Questions (External Link)" };
+        await new Promise(resolve => setTimeout(resolve, 500));
         toast({ title: "Question Link Processed", description: "Link to online questions has been saved." });
       } else if (newExamQuestionMode === 'editor' && newExamDirectQuestions.trim()) {
-        paperDetails = {
-          directQuestions: newExamDirectQuestions.trim(),
-          fileName: "Directly Entered Questions"
-        };
-         await new Promise(resolve => setTimeout(resolve, 500)); // Simulate processing
+        paperDetails = { directQuestions: newExamDirectQuestions.trim(), fileName: "Directly Entered Questions" };
+        await new Promise(resolve => setTimeout(resolve, 500));
         toast({ title: "Questions Processed", description: "Directly entered questions have been saved." });
       } else if (newExamQuestionMode === 'upload' && !newExamPaperFile) {
-        // Optional paper upload, proceed without if no file
         paperDetails = { fileName: "No paper file attached" };
       }
 
@@ -236,26 +240,15 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
         classId: classContext?.classId,
       };
 
-      // Here you would typically save newExam to Firestore
-      // For now, we'll use the onExamCreated callback for parent components
       if (onExamCreated) {
         onExamCreated(newExam);
       } else {
-        // Fallback if no callback (e.g., if used in a context where direct state update is not feasible)
-        // This might involve router.push or other side effects if this dialog is standalone
         console.warn("CreateExamDialog: onExamCreated callback not provided. Exam object:", newExam);
       }
-
-      toast({
-        title: "Exam Created!",
-        description: `"${newExam.title}" has been scheduled.`,
-      });
-      
-      onOpenChange(false); // Close the dialog
-      // resetCreateExamDialog() is called by useEffect when isOpen changes to false
+      toast({ title: "Exam Created!", description: `"${newExam.title}" has been scheduled.` });
+      setIsOpen(false);
     } catch (error) {
       console.error("Error during exam creation:", error);
-      // Error is usually toasted by uploadQuestionPaperFile or initial checks
     } finally {
       setIsProcessing(false);
     }
@@ -271,32 +264,19 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
         const textarea = event.currentTarget;
         const currentText = textarea.value;
         const selectionStart = textarea.selectionStart;
-
         let lastQuestionNumber = 0;
         const questionPattern = /^Q(\d+)\.\s*/i;
-        
-        // Scan all lines before the cursor to find the highest question number
         currentText.substring(0, selectionStart).split('\n').forEach(line => {
             const match = line.match(questionPattern);
             if (match && match[1]) {
                 const num = parseInt(match[1], 10);
-                if (num > lastQuestionNumber) {
-                    lastQuestionNumber = num;
-                }
+                if (num > lastQuestionNumber) lastQuestionNumber = num;
             }
         });
-        
         const nextQuestionNumber = lastQuestionNumber + 1;
         const newQuestionText = `\nQ${nextQuestionNumber}. `;
-
-        const newText = 
-            currentText.substring(0, selectionStart) + 
-            newQuestionText + 
-            currentText.substring(textarea.selectionEnd);
-        
+        const newText = currentText.substring(0, selectionStart) + newQuestionText + currentText.substring(textarea.selectionEnd);
         setNewExamDirectQuestions(newText);
-
-        // Set cursor position after the inserted text
         setTimeout(() => {
             const newCursorPosition = selectionStart + newQuestionText.length;
             textarea.focus();
@@ -306,7 +286,7 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
     }
   };
 
-  return (
+  const dialogContent = (
     <>
       <DialogHeader>
         <DialogTitle className="text-xl">Create New Exam</DialogTitle>
@@ -375,45 +355,33 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
             <Label htmlFor="totalMarks">Total Marks</Label>
             <Input id="totalMarks" type="number" value={newExamTotalMarks} onChange={(e) => setNewExamTotalMarks(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g., 100" className="rounded-lg" disabled={isProcessing}/>
         </div>
-        
         <div className="grid gap-2">
             <Label>Question Paper Options</Label>
             <RadioGroup 
             value={newExamQuestionMode} 
             onValueChange={(value: 'upload' | 'link' | 'editor') => {
                 setNewExamQuestionMode(value);
-                if (value === 'upload') {
-                    setNewExamQuestionLink('');
-                    setNewExamDirectQuestions('');
-                } else if (value === 'link') {
-                    setNewExamPaperFile(null);
-                    setNewExamDirectQuestions('');
-                } else { // editor
-                    setNewExamPaperFile(null);
-                    setNewExamQuestionLink('');
-                }
+                if (value === 'upload') { setNewExamQuestionLink(''); setNewExamDirectQuestions(''); }
+                else if (value === 'link') { setNewExamPaperFile(null); setNewExamDirectQuestions(''); }
+                else { setNewExamPaperFile(null); setNewExamQuestionLink(''); }
             }} 
             className="grid grid-cols-1 sm:grid-cols-3 gap-x-3 gap-y-2"
             disabled={isProcessing}
             >
-            <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" 
-                    onClick={() => !isProcessing && setNewExamQuestionMode('upload')}>
+            <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" onClick={() => !isProcessing && setNewExamQuestionMode('upload')}>
                 <RadioGroupItem value="upload" id="q-upload" />
                 <Label htmlFor="q-upload" className="cursor-pointer text-sm font-normal flex items-center"><UploadCloud className="mr-2 h-4 w-4"/>Upload File</Label>
             </div>
-            <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" 
-                    onClick={() => !isProcessing && setNewExamQuestionMode('link')}>
+            <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" onClick={() => !isProcessing && setNewExamQuestionMode('link')}>
                 <RadioGroupItem value="link" id="q-link" />
                 <Label htmlFor="q-link" className="cursor-pointer text-sm font-normal flex items-center"><LinkIcon className="mr-2 h-4 w-4"/>Link Online</Label>
             </div>
-            <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" 
-                    onClick={() => !isProcessing && setNewExamQuestionMode('editor')}>
+            <div className="flex items-center space-x-2 p-3 border rounded-lg data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary cursor-pointer" onClick={() => !isProcessing && setNewExamQuestionMode('editor')}>
                 <RadioGroupItem value="editor" id="q-editor" />
                 <Label htmlFor="q-editor" className="cursor-pointer text-sm font-normal flex items-center"><Edit2Icon className="mr-2 h-4 w-4"/>Write Directly</Label>
             </div>
             </RadioGroup>
         </div>
-
         {newExamQuestionMode === 'upload' && (
             <div className="grid gap-2">
             <Label htmlFor="questionPaperFile">Upload File (Optional, Max {MAX_FILE_SIZE_MB}MB)</Label>
@@ -421,40 +389,21 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
             {newExamPaperFile && <p className="text-xs text-muted-foreground">Selected: {newExamPaperFile.name}</p>}
             </div>
         )}
-
         {newExamQuestionMode === 'link' && (
             <div className="grid gap-2">
             <Label htmlFor="questionPaperLink">Link to Online Questions (e.g., Google Doc, Quiz URL)</Label>
             <div className="relative">
                 <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input 
-                    id="questionPaperLink" 
-                    type="url" 
-                    value={newExamQuestionLink} 
-                    onChange={(e) => setNewExamQuestionLink(e.target.value)} 
-                    placeholder="https://docs.google.com/..." 
-                    className="rounded-lg pl-10" 
-                    disabled={isProcessing}
-                />
+                <Input id="questionPaperLink" type="url" value={newExamQuestionLink} onChange={(e) => setNewExamQuestionLink(e.target.value)} placeholder="https://docs.google.com/..." className="rounded-lg pl-10" disabled={isProcessing}/>
             </div>
             </div>
         )}
-
         {newExamQuestionMode === 'editor' && (
           <div className="grid gap-2">
             <Label htmlFor="directQuestions">Write or Paste Questions Here</Label>
-            <Textarea
-              id="directQuestions"
-              value={newExamDirectQuestions}
-              onChange={handleDirectQuestionsChange}
-              onKeyDown={handleDirectQuestionsKeyDown}
-              placeholder="E.g.:\nQ1. What is the capital of France?\nQ2. Explain..."
-              className="rounded-lg min-h-[150px] text-sm font-mono"
-              disabled={isProcessing}
-            />
+            <Textarea id="directQuestions" value={newExamDirectQuestions} onChange={handleDirectQuestionsChange} onKeyDown={handleDirectQuestionsKeyDown} placeholder="E.g.:\nQ1. What is the capital of France?\nQ2. Explain..." className="rounded-lg min-h-[150px] text-sm font-mono" disabled={isProcessing}/>
           </div>
         )}
-
       </div>
       <DialogFooter>
         <DialogClose asChild>
@@ -467,4 +416,28 @@ export function CreateExamDialog({ isOpen, onOpenChange, onExamCreated, classCon
       </DialogFooter>
     </>
   );
-}
+
+  if (!isControlled) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogTrigger asChild>
+          <Button variant="default" className="btn-gel rounded-lg">
+            <PlusCircle className="mr-2 h-5 w-5" /> Create New Exam
+          </Button>
+        </DialogTrigger>
+        {isOpen && (
+            <DialogContent className="sm:max-w-2xl rounded-xl">
+                {dialogContent}
+            </DialogContent>
+        )}
+      </Dialog>
+    );
+  }
+
+  // If controlled, Dialog and DialogTrigger are managed by parent.
+  // This component just provides the content.
+  return dialogContent;
+};
+
+CreateExamDialogComponent.displayName = 'CreateExamDialog';
+export default React.memo(CreateExamDialogComponent);
