@@ -105,7 +105,7 @@ const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: ex
     setNewExamDirectQuestions('');
     if (questionPaperInputRef.current) questionPaperInputRef.current.value = "";
     setIsProcessing(false);
-  }, []); // Add dependencies if any setters rely on external scope that changes
+  }, []);
   
   useEffect(() => {
     if (!isOpen) {
@@ -259,26 +259,68 @@ const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: ex
   };
 
   const handleDirectQuestionsKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         const textarea = event.currentTarget;
         const currentText = textarea.value;
         const selectionStart = textarea.selectionStart;
-        let lastQuestionNumber = 0;
+        
+        const lines = currentText.substring(0, selectionStart).split('\n');
+        const currentLineText = lines[lines.length - 1] || '';
+        
+        let newTextSuffix = '';
+
         const questionPattern = /^Q(\d+)\.\s*/i;
-        currentText.substring(0, selectionStart).split('\n').forEach(line => {
-            const match = line.match(questionPattern);
-            if (match && match[1]) {
-                const num = parseInt(match[1], 10);
-                if (num > lastQuestionNumber) lastQuestionNumber = num;
+        const optionPattern = /^([A-D])\.\s*/i;
+
+        const currentLineIsQuestion = questionPattern.test(currentLineText);
+        const currentLineIsOption = optionPattern.test(currentLineText);
+
+        if (currentLineIsOption) {
+            const optionMatch = currentLineText.match(optionPattern);
+            const currentOptionLetter = optionMatch ? optionMatch[1].toUpperCase() : '';
+            if (currentOptionLetter === 'A') newTextSuffix = '\nB. ';
+            else if (currentOptionLetter === 'B') newTextSuffix = '\nC. ';
+            else if (currentOptionLetter === 'C') newTextSuffix = '\nD. ';
+            else { // After D, or if it's not A, B, C (e.g. malformed) start new question
+                let lastQuestionNumber = 0;
+                currentText.split('\n').forEach(line => {
+                    const qMatch = line.match(questionPattern);
+                    if (qMatch && qMatch[1]) {
+                        lastQuestionNumber = Math.max(lastQuestionNumber, parseInt(qMatch[1], 10));
+                    }
+                });
+                newTextSuffix = `\nQ${lastQuestionNumber + 1}. `;
             }
-        });
-        const nextQuestionNumber = lastQuestionNumber + 1;
-        const newQuestionText = `\nQ${nextQuestionNumber}. `;
-        const newText = currentText.substring(0, selectionStart) + newQuestionText + currentText.substring(textarea.selectionEnd);
-        setNewExamDirectQuestions(newText);
+        } else if (currentLineIsQuestion || currentLineText.trim().endsWith('?')) { // If it looks like a question
+            newTextSuffix = '\nA. ';
+        } else { // Default: start a new question
+            let lastQuestionNumber = 0;
+            currentText.split('\n').forEach(line => {
+                const qMatch = line.match(questionPattern);
+                if (qMatch && qMatch[1]) {
+                    lastQuestionNumber = Math.max(lastQuestionNumber, parseInt(qMatch[1], 10));
+                }
+            });
+            newTextSuffix = `\nQ${lastQuestionNumber + 1}. `;
+            // If current line is completely empty, and previous line was Qx., still add A.
+            if (lines.length > 1 && questionPattern.test(lines[lines.length-2])) {
+                if (currentLineText.trim() === "") {
+                    newTextSuffix = '\nA. ';
+                }
+            }
+        }
+        // Ensure first line is Q1. if text is empty
+        if (currentText.trim() === "") {
+            newTextSuffix = "Q1. ";
+        }
+
+
+        const newFullText = currentText.substring(0, selectionStart) + newTextSuffix + currentText.substring(textarea.selectionEnd);
+        setNewExamDirectQuestions(newFullText);
+        
         setTimeout(() => {
-            const newCursorPosition = selectionStart + newQuestionText.length;
+            const newCursorPosition = selectionStart + newTextSuffix.length;
             textarea.focus();
             textarea.selectionStart = newCursorPosition;
             textarea.selectionEnd = newCursorPosition;
@@ -401,7 +443,15 @@ const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: ex
         {newExamQuestionMode === 'editor' && (
           <div className="grid gap-2">
             <Label htmlFor="directQuestions">Write or Paste Questions Here</Label>
-            <Textarea id="directQuestions" value={newExamDirectQuestions} onChange={handleDirectQuestionsChange} onKeyDown={handleDirectQuestionsKeyDown} placeholder="E.g.:\nQ1. What is the capital of France?\nQ2. Explain..." className="rounded-lg min-h-[150px] text-sm font-mono" disabled={isProcessing}/>
+            <Textarea 
+              id="directQuestions" 
+              value={newExamDirectQuestions} 
+              onChange={handleDirectQuestionsChange} 
+              onKeyDown={handleDirectQuestionsKeyDown} 
+              placeholder="E.g.:\nQ1. What is 2+2?\nA. 3\nB. 4\nC. 5\n\nQ2. Explain..." 
+              className="rounded-lg min-h-[150px] text-sm font-mono" 
+              disabled={isProcessing}
+            />
           </div>
         )}
       </div>
@@ -440,4 +490,5 @@ const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: ex
 };
 
 CreateExamDialogComponent.displayName = 'CreateExamDialog';
-export default React.memo(CreateExamDialogComponent);
+const MemoizedCreateExamDialog = React.memo(CreateExamDialogComponent);
+export default MemoizedCreateExamDialog;
