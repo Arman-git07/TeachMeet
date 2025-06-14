@@ -262,63 +262,76 @@ const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: ex
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         const textarea = event.currentTarget;
-        const currentText = textarea.value;
+        const currentFullText = textarea.value;
         const selectionStart = textarea.selectionStart;
         
-        const lines = currentText.substring(0, selectionStart).split('\n');
-        const currentLineText = lines[lines.length - 1] || '';
-        
-        let newTextSuffix = '';
+        const textBeforeCursor = currentFullText.substring(0, selectionStart);
+        const linesBeforeCursor = textBeforeCursor.split('\n');
+        const currentLineText = linesBeforeCursor[linesBeforeCursor.length - 1] || '';
+
+        let newTextSuffix = '\n'; // Default to a simple newline
 
         const questionPattern = /^Q(\d+)\.\s*/i;
-        const optionPattern = /^([A-D])\.\s*/i;
+        const optionPattern = /^([A-D])\.\s*/i; // Case-insensitive match for A-D
 
-        const currentLineIsQuestion = questionPattern.test(currentLineText);
-        const currentLineIsOption = optionPattern.test(currentLineText);
-
-        if (currentLineIsOption) {
-            const optionMatch = currentLineText.match(optionPattern);
-            const currentOptionLetter = optionMatch ? optionMatch[1].toUpperCase() : '';
-            if (currentOptionLetter === 'A') newTextSuffix = '\nB. ';
-            else if (currentOptionLetter === 'B') newTextSuffix = '\nC. ';
-            else if (currentOptionLetter === 'C') newTextSuffix = '\nD. ';
-            else { // After D, or if it's not A, B, C (e.g. malformed) start new question
-                let lastQuestionNumber = 0;
-                currentText.split('\n').forEach(line => {
-                    const qMatch = line.match(questionPattern);
-                    if (qMatch && qMatch[1]) {
-                        lastQuestionNumber = Math.max(lastQuestionNumber, parseInt(qMatch[1], 10));
-                    }
-                });
-                newTextSuffix = `\nQ${lastQuestionNumber + 1}. `;
-            }
-        } else if (currentLineIsQuestion || currentLineText.trim().endsWith('?')) { // If it looks like a question
-            newTextSuffix = '\nA. ';
-        } else { // Default: start a new question
-            let lastQuestionNumber = 0;
-            currentText.split('\n').forEach(line => {
-                const qMatch = line.match(questionPattern);
-                if (qMatch && qMatch[1]) {
-                    lastQuestionNumber = Math.max(lastQuestionNumber, parseInt(qMatch[1], 10));
-                }
-            });
-            newTextSuffix = `\nQ${lastQuestionNumber + 1}. `;
-            // If current line is completely empty, and previous line was Qx., still add A.
-            if (lines.length > 1 && questionPattern.test(lines[lines.length-2])) {
-                if (currentLineText.trim() === "") {
-                    newTextSuffix = '\nA. ';
-                }
-            }
-        }
-        // Ensure first line is Q1. if text is empty
-        if (currentText.trim() === "") {
+        if (currentFullText.trim() === "") {
             newTextSuffix = "Q1. ";
+        } else {
+            const currentLineIsOption = optionPattern.test(currentLineText);
+            const currentLineIsQuestion = questionPattern.test(currentLineText);
+            const currentLineEndsWithQuestionMark = currentLineText.trim().endsWith('?');
+
+            if (currentLineIsOption) {
+                const optionMatch = currentLineText.match(optionPattern);
+                const currentOptionLetter = optionMatch ? optionMatch[1].toUpperCase() : '';
+                if (currentOptionLetter === 'A') newTextSuffix = '\nB. ';
+                else if (currentOptionLetter === 'B') newTextSuffix = '\nC. ';
+                else if (currentOptionLetter === 'C') newTextSuffix = '\nD. ';
+                else if (currentOptionLetter === 'D') { // After D, start a new question
+                    let lastQuestionNumber = 0;
+                    currentFullText.split('\n').forEach(line => {
+                        const qMatch = line.match(questionPattern);
+                        if (qMatch && qMatch[1]) {
+                            lastQuestionNumber = Math.max(lastQuestionNumber, parseInt(qMatch[1], 10));
+                        }
+                    });
+                    newTextSuffix = `\n\nQ${lastQuestionNumber + 1}. `; // Extra newline for spacing
+                }
+            } else if (currentLineIsQuestion || currentLineEndsWithQuestionMark) {
+                // If the current line is a question or ends with '?', start options
+                newTextSuffix = '\nA. ';
+            } else if (currentLineText.trim() === "") {
+                // If current line is empty, check the previous non-empty line
+                let previousMeaningfulLine = "";
+                for (let i = linesBeforeCursor.length - 2; i >= 0; i--) {
+                    if (linesBeforeCursor[i].trim() !== "") {
+                        previousMeaningfulLine = linesBeforeCursor[i].trim();
+                        break;
+                    }
+                }
+                
+                const previousLineIsQuestion = questionPattern.test(previousMeaningfulLine);
+                const previousLineIsOptionD = optionPattern.test(previousMeaningfulLine) && previousMeaningfulLine.match(optionPattern)![1].toUpperCase() === 'D';
+
+                if (previousLineIsQuestion || previousLineIsOptionD) {
+                     let lastQuestionNumber = 0;
+                    currentFullText.split('\n').forEach(line => {
+                        const qMatch = line.match(questionPattern);
+                        if (qMatch && qMatch[1]) {
+                            lastQuestionNumber = Math.max(lastQuestionNumber, parseInt(qMatch[1], 10));
+                        }
+                    });
+                    newTextSuffix = `\nQ${lastQuestionNumber + 1}. `;
+                }
+                // else, it remains a simple '\n' for an empty line not following a Q or D.
+            }
+            // If none of the specific conditions are met, newTextSuffix remains '\n' (default)
         }
 
-
-        const newFullText = currentText.substring(0, selectionStart) + newTextSuffix + currentText.substring(textarea.selectionEnd);
-        setNewExamDirectQuestions(newFullText);
+        const newFullTextValue = currentFullText.substring(0, selectionStart) + newTextSuffix + currentFullText.substring(textarea.selectionEnd);
+        setNewExamDirectQuestions(newFullTextValue);
         
+        // Set cursor position after the suffix
         setTimeout(() => {
             const newCursorPosition = selectionStart + newTextSuffix.length;
             textarea.focus();
@@ -448,7 +461,7 @@ const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: ex
               value={newExamDirectQuestions} 
               onChange={handleDirectQuestionsChange} 
               onKeyDown={handleDirectQuestionsKeyDown} 
-              placeholder="E.g.:\nQ1. What is 2+2?\nA. 3\nB. 4\nC. 5\n\nQ2. Explain..." 
+              placeholder="Type your questions. For MCQs, start with Q1., then A., B., etc. Press Enter for new lines or auto-formatting."
               className="rounded-lg min-h-[150px] text-sm font-mono" 
               disabled={isProcessing}
             />
@@ -492,3 +505,4 @@ const CreateExamDialogComponent: React.FC<CreateExamDialogProps> = ({ isOpen: ex
 CreateExamDialogComponent.displayName = 'CreateExamDialog';
 const MemoizedCreateExamDialog = React.memo(CreateExamDialogComponent);
 export default MemoizedCreateExamDialog;
+
