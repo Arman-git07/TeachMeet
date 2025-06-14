@@ -7,9 +7,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"; // Added DialogTrigger
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Added these
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -22,8 +21,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebas
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent";
-
+// Removed import for StartMeetingDialogContent as it's not used here for creating classes.
 
 interface Classroom {
   id: string;
@@ -173,25 +171,35 @@ export default function ClassesPage() {
     let filteredByActiveRole: Classroom[] = [];
 
     if (activeFilter === 'teaching') {
-        // Only show if authenticated, filters by user.uid
         filteredByActiveRole = user ? classrooms.filter(cls => cls.teacherId === user.uid) : [];
     } else if (activeFilter === 'requested') {
-        // Show classes user has requested.
-        // If user is authenticated, also ensure they are not the teacher of these requested classes.
         filteredByActiveRole = classrooms.filter(cls =>
             requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid)
         );
     } else if (activeFilter === 'joined') {
-        // Show classes they requested AND are not teaching.
         filteredByActiveRole = user
             ? classrooms.filter(cls => requestedClassIds.includes(cls.id) && cls.teacherId !== user.uid)
-            : classrooms.filter(cls => requestedClassIds.includes(cls.id)); // if not authed, same as requested for demo
-    } else { // 'all' or any other unknown filter defaults to all
+            : classrooms.filter(cls => requestedClassIds.includes(cls.id));
+    } else { 
         filteredByActiveRole = classrooms.slice();
     }
     
-    // Default sort: by creation date (newest first)
     filteredByActiveRole.sort((a, b) => {
+        const aIsRequested = requestedClassIds.includes(a.id) && (!user || a.teacherId !== user.uid);
+        const bIsRequested = requestedClassIds.includes(b.id) && (!user || b.teacherId !== user.uid);
+        const aIsTeaching = user && a.teacherId === user.uid;
+        const bIsTeaching = user && b.teacherId === user.uid;
+
+        // Prioritize based on context, especially for "all" or general views
+        if (activeFilter === 'all' || activeFilter === 'joined' || activeFilter === 'requested') {
+            if (aIsRequested && !bIsRequested) return -1;
+            if (!aIsRequested && bIsRequested) return 1;
+        }
+        if (activeFilter === 'all' || activeFilter === 'teaching') {
+            if (aIsTeaching && !bIsTeaching) return -1;
+            if (!aIsTeaching && bIsTeaching) return 1;
+        }
+        
         return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
     });
     
@@ -212,7 +220,7 @@ export default function ClassesPage() {
           setEditClassImageFile(null);
           setEditClassImagePreview(editingClass?.thumbnailUrl || null);
         }
-        event.target.value = "";
+        if (event.target) event.target.value = "";
         return;
       }
       const reader = new FileReader();
@@ -498,7 +506,38 @@ export default function ClassesPage() {
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[520px] rounded-xl">
-                   <StartMeetingDialogContent />
+                   <DialogHeader>
+                      <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
+                      <DialogDescription>
+                        Fill in the details to set up your new class.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+                      <div className="grid gap-2">
+                        <Label htmlFor="newClassName">Class Name</Label>
+                        <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingClassImage}/>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="newClassDescription">Description</Label>
+                        <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingClassImage}/>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
+                        <Input id="newClassImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'create')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
+                        {newClassImagePreview && (
+                          <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
+                            <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingClassImage}>Cancel</Button>
+                      <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage || !newClassName.trim()}>
+                        {isUploadingClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {isUploadingClassImage ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
+                      </Button>
+                    </DialogFooter>
                 </DialogContent>
                 </Dialog>
             )}
@@ -515,6 +554,7 @@ export default function ClassesPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-60 rounded-xl">
             {currentFilterOptions.map(option => (
+                (option.value !== 'teaching' || isAuthenticated) && // Conditionally render "My Teaching"
                 <DropdownMenuItem
                     key={option.value}
                     onClick={() => {
@@ -560,7 +600,7 @@ export default function ClassesPage() {
               <Input id="editClassImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'edit')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingEditClassImage}/>
               {editClassImagePreview && (
                 <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
-                  <Image src={editClassImagePreview} alt="Class image preview" layout="fill" objectFit="cover" />
+                  <Image src={editClassImagePreview} alt="Class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom"/>
                 </div>
               )}
             </div>
@@ -632,7 +672,38 @@ export default function ClassesPage() {
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[520px] rounded-xl">
-                    <StartMeetingDialogContent />
+                     <DialogHeader>
+                        <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
+                        <DialogDescription>
+                          Fill in the details to set up your new class.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+                        <div className="grid gap-2">
+                          <Label htmlFor="newClassNameModal">Class Name</Label>
+                          <Input id="newClassNameModal" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingClassImage}/>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="newClassDescriptionModal">Description</Label>
+                          <Textarea id="newClassDescriptionModal" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingClassImage}/>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="newClassImageModal">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
+                          <Input id="newClassImageModal" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'create')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
+                          {newClassImagePreview && (
+                            <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
+                              <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom"/>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingClassImage}>Cancel</Button>
+                        <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage || !newClassName.trim()}>
+                          {isUploadingClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                          {isUploadingClassImage ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
+                        </Button>
+                      </DialogFooter>
                   </DialogContent>
                 </Dialog>
             )}
@@ -651,7 +722,6 @@ export default function ClassesPage() {
             let actionButton;
             const showPendingBadge = isRequested && !isTeacher && activeFilter !== 'joined';
 
-
             if (isTeacher) {
                 actionButton = (
                     <Button onClick={() => handleOpenEditDialog(classroom)} className="w-full btn-gel rounded-lg text-sm">
@@ -659,24 +729,24 @@ export default function ClassesPage() {
                     </Button>
                 );
             } else if (activeFilter === 'joined' && isRequested) {
-                actionButton = ( // User is in "My Joined Classes" view, and this class was requested
+                actionButton = (
                     <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> View Class
                     </Button>
                 );
             } else if (activeFilter === 'requested' && isRequested) {
-                actionButton = ( // User is in "My Requests" view, and this class was requested
+                actionButton = ( 
                     <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                         <ArrowRight className="mr-2 h-4 w-4" /> Resend Request
                     </Button>
                 );
-            } else if (isRequested) { // User is in "All Classes" view (or other), and this class was requested
+            } else if (isRequested) {
                 actionButton = (
                     <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
                         <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
                     </Button>
                 );
-            } else { // Not a teacher, not requested yet (in any view)
+            } else { 
                 actionButton = (
                     <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
