@@ -214,6 +214,13 @@ export default function ClassDetailsPage() {
   const materialFileRef = useRef<HTMLInputElement>(null);
   const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
 
+  // Card Payment Dialog State
+  const [isCardPaymentDialogOpen, setIsCardPaymentDialogOpen] = useState(false);
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+
 
   useEffect(() => {
     if (classId && !authLoading) {
@@ -441,7 +448,7 @@ export default function ClassDetailsPage() {
       toast({ title: "Link Material Added", description: `"${newMaterial.title}" has been added.` });
     } else {
       setIsUploadingMaterial(false);
-      return; 
+      return;
     }
 
     setClassroom(prev => prev ? { ...prev, materials: [...(prev.materials || []), newMaterial] } : null);
@@ -451,12 +458,12 @@ export default function ClassDetailsPage() {
 
 
   const handleTriggerAssignmentUploadDialog = () => {
-    setDialogAssignmentName(''); 
+    setDialogAssignmentName('');
     setIsAssignmentUploadDialogOpen(true);
   };
 
   const handleDialogSubmitAndChooseFile = () => {
-    if (!dialogAssignmentName.trim()) { 
+    if (!dialogAssignmentName.trim()) {
         toast({ variant: "destructive", title: "Assignment Title Required", description: "Please enter a title for the assignment materials you are uploading." });
         return;
     }
@@ -493,7 +500,7 @@ export default function ClassDetailsPage() {
     const newAssignmentEntry: Assignment = {
         id: `assign_teacher_${Date.now()}`,
         title: selectedAssignmentTitleForUpload,
-        dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), 
+        dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
         status: "Pending",
         description: `Materials uploaded by teacher for "${selectedAssignmentTitleForUpload}". File: ${file.name}`
     };
@@ -517,6 +524,46 @@ export default function ClassDetailsPage() {
     setDialogAssignmentName('');
   };
 
+  const handleCardPaymentSubmit = () => {
+    // Basic validation (can be expanded)
+    if (!cardNumber || !cardExpiry || !cardCvv || !cardName) {
+      toast({
+        variant: "destructive",
+        title: "Missing Card Information",
+        description: "Please fill in all card details.",
+      });
+      return;
+    }
+    // In a real app, send to payment processor
+    toast({
+      title: "Payment Submitted (Mock)",
+      description: "Your card payment is being processed.",
+    });
+    // Simulate success
+    setTimeout(() => {
+      toast({
+        title: "Payment Successful (Mock)",
+        description: `Successfully paid for ${classroom?.name}.`,
+      });
+      // Update fee details (mock)
+      if (classroom?.feeDetails && editableFeeDetails) {
+        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); // Assume full payment
+        const newFeeDetailsData: FeeDetails = {
+            ...classroom.feeDetails,
+            paidAmount: newPaidAmount,
+        };
+        setClassroom(prev => prev ? { ...prev, feeDetails: newFeeDetailsData } : null);
+        setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null);
+      }
+      setIsCardPaymentDialogOpen(false);
+      // Clear card details
+      setCardNumber('');
+      setCardExpiry('');
+      setCardCvv('');
+      setCardName('');
+    }, 1500);
+  };
+
   const handleMockPayment = (method: string) => {
     if (!classroom || !classroom.feeDetails) {
       toast({
@@ -531,7 +578,7 @@ export default function ClassDetailsPage() {
     const remainingFee = editableFeeDetails
       ? parseFloat(editableFeeDetails.totalFee || '0') - parseFloat(editableFeeDetails.paidAmount || '0')
       : classroom.feeDetails.totalFee - classroom.feeDetails.paidAmount;
-      
+
     if (remainingFee <= 0) {
       toast({
         title: "No Payment Due",
@@ -542,7 +589,7 @@ export default function ClassDetailsPage() {
     }
 
     if (method === "Google Pay / UPI") {
-      const mockVpa = "teachmeet-mock@exampleupi"; 
+      const mockVpa = "teachmeet-mock@exampleupi";
       const payeeName = "TeachMeet Platform";
       const transactionNote = `Class Fee for ${classroom.name}`;
       const upiUrl = `upi://pay?pa=${encodeURIComponent(mockVpa)}&pn=${encodeURIComponent(payeeName)}&am=${remainingFee.toFixed(2)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
@@ -552,10 +599,11 @@ export default function ClassDetailsPage() {
         description: `Attempting to open UPI app to pay ₹${remainingFee.toFixed(2)}. If nothing happens, the app might not be installed or supported.`,
         duration: 7000,
       });
-      
+
       window.location.href = upiUrl;
+      setIsPaymentDialogOpen(false);
     } else if (method === "PhonePe") {
-        const mockPhonePeVpa = "teachmeet-phonepe-mock@exampleybl"; 
+        const mockPhonePeVpa = "teachmeet-phonepe-mock@exampleybl";
         const payeeName = "TeachMeet Platform";
         const transactionNote = `Class Fee for ${classroom.name}`;
         const phonePeUpiUrl = `phonepe://pay?pa=${encodeURIComponent(mockPhonePeVpa)}&pn=${encodeURIComponent(payeeName)}&am=${remainingFee.toFixed(2)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
@@ -565,8 +613,9 @@ export default function ClassDetailsPage() {
             description: `Attempting to open PhonePe app to pay ₹${remainingFee.toFixed(2)}. If nothing happens, the app might not be installed or supported.`,
             duration: 7000,
         });
-        
+
         window.location.href = phonePeUpiUrl;
+        setIsPaymentDialogOpen(false);
     } else if (method === "Net Banking") {
         const htmlContent = `
           <!DOCTYPE html>
@@ -604,14 +653,18 @@ export default function ClassDetailsPage() {
             description: "A new tab should open with a mock bank selection page. No actual payment will be processed.",
             duration: 7000,
         });
-    } else { // For other methods like Card
+        setIsPaymentDialogOpen(false);
+    } else if (method === "Credit/Debit Card") {
+        setIsPaymentDialogOpen(false); // Close payment method selection dialog
+        setIsCardPaymentDialogOpen(true); // Open card details dialog
+    } else {
       toast({
         title: `Processing with ${method} (Mock)`,
         description: "Payment integration is a planned feature. No actual transaction will occur.",
         duration: 4000,
       });
+      setIsPaymentDialogOpen(false);
     }
-    setIsPaymentDialogOpen(false); // Close dialog after initiating
   };
 
 
@@ -1339,7 +1392,72 @@ export default function ClassDetailsPage() {
         </DialogContent>
         )}
       </Dialog>
+
+      {/* Card Payment Dialog */}
+      <Dialog open={isCardPaymentDialogOpen} onOpenChange={setIsCardPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <ShadDialogTitle>Enter Card Details</ShadDialogTitle>
+            <DialogDescription>
+              Enter your card information to complete the payment. (Mock Interface)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="cardNumber">Card Number</Label>
+              <Input
+                id="cardNumber"
+                value={cardNumber}
+                onChange={(e) => setCardNumber(e.target.value)}
+                placeholder="0000 0000 0000 0000"
+                className="rounded-lg"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="cardExpiry">Expiry Date (MM/YY)</Label>
+                <Input
+                  id="cardExpiry"
+                  value={cardExpiry}
+                  onChange={(e) => setCardExpiry(e.target.value)}
+                  placeholder="MM/YY"
+                  className="rounded-lg"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="cardCvv">CVV</Label>
+                <Input
+                  id="cardCvv"
+                  value={cardCvv}
+                  onChange={(e) => setCardCvv(e.target.value)}
+                  placeholder="123"
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="cardName">Cardholder Name</Label>
+              <Input
+                id="cardName"
+                value={cardName}
+                onChange={(e) => setCardName(e.target.value)}
+                placeholder="Full Name"
+                className="rounded-lg"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-lg" onClick={() => setIsCardPaymentDialogOpen(false)}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={handleCardPaymentSubmit} className="btn-gel rounded-lg">
+              Pay ${currentRemainingFee > 0 ? currentRemainingFee.toFixed(2) : "0.00"} (Mock)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
