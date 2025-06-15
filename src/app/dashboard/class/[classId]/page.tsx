@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import CreateExamDialog from '@/components/exam/CreateExamDialog'; // Changed to default import
+import CreateExamDialog from '@/components/exam/CreateExamDialog';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -709,6 +709,7 @@ export default function ClassDetailsPage() {
                         <PlusCircle className="mr-2 h-4 w-4" /> Post New Announcement
                       </Button>
                     </DialogTrigger>
+                    {isPostAnnouncementDialogOpen && (
                     <DialogContent className="sm:max-w-lg rounded-xl">
                       <DialogHeader>
                         <ShadDialogTitle>Create New Announcement</ShadDialogTitle>
@@ -749,6 +750,7 @@ export default function ClassDetailsPage() {
                         </Button>
                       </DialogFooter>
                     </DialogContent>
+                    )}
                   </Dialog>
                 </CardFooter>
               )}
