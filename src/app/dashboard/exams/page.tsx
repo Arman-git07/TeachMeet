@@ -2,7 +2,7 @@
 // src/app/dashboard/exams/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,17 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
 // Dynamically import CreateExamDialog to avoid hydration issues with the dialog state
-const CreateExamDialog = dynamic(() => import('@/components/exam/CreateExamDialog'), { ssr: false });
+const CreateExamDialog = dynamic(() =>
+  import('@/components/exam/CreateExamDialog').then(mod => mod.default),
+  {
+    ssr: false,
+    loading: () => (
+      <Button variant="default" className="btn-gel rounded-lg" disabled>
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Create Exam...
+      </Button>
+    )
+  }
+);
 
 // This interface should ideally be in a shared types file
 interface Exam {
@@ -43,9 +53,10 @@ const initialMockExams: Exam[] = [
 export default function ExamsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const router = useRouter(); 
+  const router = useRouter();
   const isTeacher = user?.role === 'teacher'; // Assuming user object has a 'role' property
-  const [exams, setExams] = useState<Exam[]>(initialMockExams);  const [isLoading, setIsLoading] = useState(true);
+  const [exams, setExams] = useState<Exam[]>(initialMockExams);
+  const [isLoading, setIsLoading] = useState(true);
 
 
   useEffect(() => {
@@ -79,10 +90,10 @@ export default function ExamsPage() {
   
   const getStatusVariant = (status: Exam['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch(status) {
-        case "Upcoming": return "default"; 
-        case "Active": return "secondary"; 
-        case "Ended": return "outline"; 
-        case "Graded": return "default"; 
+        case "Upcoming": return "default";
+        case "Active": return "secondary";
+        case "Ended": return "outline";
+        case "Graded": return "default";
         default: return "default";
     }
   };
@@ -153,10 +164,10 @@ export default function ExamsPage() {
             <CardDescription>There are no exams listed yet. {user ? "Create one to get started!" : "Check back later."}</CardDescription>
           </CardHeader>
           {user && (
-            <CardContent>                
+            <CardContent>
               {isTeacher && <CreateExamDialog onExamCreated={handleExamCreated} />}
             </CardContent>
-           
+
           )}
         </Card>
       ) : (
@@ -199,12 +210,12 @@ export default function ExamsPage() {
                     </Button>
                   </>
                 ) : (
-                  <Button 
-                    onClick={() => handleViewExam(exam)} 
+                  <Button
+                    onClick={() => handleViewExam(exam)}
                     className="w-full btn-gel rounded-lg text-sm"
                     disabled={exam.status === "Upcoming" && now < exam.scheduledDateTime}
                   >
-                    {exam.status === "Upcoming" && now < exam.scheduledDateTime 
+                    {exam.status === "Upcoming" && now < exam.scheduledDateTime
                         ? <><CalendarClock className="mr-2 h-4 w-4" /> Not Yet Active</>
                         : <><FileText className="mr-2 h-4 w-4" /> View Paper & Submit</>
                     }
@@ -215,8 +226,7 @@ export default function ExamsPage() {
           );
         })}
         </div>
-      />
+      )}
     </div>
   );
 }
-    

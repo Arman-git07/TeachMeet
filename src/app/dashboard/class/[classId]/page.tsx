@@ -814,6 +814,7 @@ export default function ClassDetailsPage() {
                           <UploadCloud className="mr-2 h-4 w-4" /> Upload Assignment
                       </Button>
                     </DialogTrigger>
+                    {isAssignmentUploadDialogOpen && (
                     <DialogContent className="sm:max-w-md rounded-xl">
                       <DialogHeader>
                         <ShadDialogTitle>Upload Assignment Materials</ShadDialogTitle>
@@ -844,6 +845,7 @@ export default function ClassDetailsPage() {
                         </Button>
                       </DialogFooter>
                     </DialogContent>
+                    )}
                   </Dialog>
                 )}
               </CardFooter>
@@ -884,6 +886,7 @@ export default function ClassDetailsPage() {
                         <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
                       </Button>
                     </DialogTrigger>
+                    {isUploadMaterialDialogOpen && (
                     <DialogContent className="sm:max-w-lg rounded-xl">
                       <DialogHeader>
                         <ShadDialogTitle>Upload New Class Material</ShadDialogTitle>
@@ -936,6 +939,7 @@ export default function ClassDetailsPage() {
                         </Button>
                       </DialogFooter>
                     </DialogContent>
+                    )}
                   </Dialog>
                 )}
                 <Button asChild variant="outline" className="w-full rounded-lg text-sm">
@@ -973,6 +977,7 @@ export default function ClassDetailsPage() {
                       <PlusCircle className="mr-2 h-4 w-4" /> Create New Exam for this Class
                     </Button>
                   </DialogTrigger>
+                  {isCreateExamDialogOpenForClass && (
                   <DialogContent className="sm:max-w-lg rounded-xl">
                     <CreateExamDialog
                       isOpen={isCreateExamDialogOpenForClass}
@@ -981,6 +986,7 @@ export default function ClassDetailsPage() {
                       classContext={classroom ? { classId: classroom.id, className: classroom.name } : undefined}
                     />
                   </DialogContent>
+                  )}
                 </Dialog>
               )}
               <Button asChild variant="outline" className="w-full rounded-lg text-sm">
@@ -1070,6 +1076,7 @@ export default function ClassDetailsPage() {
                       {classroom.feeDetails && currentRemainingFee <= 0 ? "Fully Paid" : "Make Payment"}
                     </Button>
                   </DialogTrigger>
+                  {isPaymentDialogOpen && (
                   <DialogContent className="sm:max-w-md rounded-xl">
                     <DialogHeader>
                       <ShadDialogTitle>Choose Payment Method</ShadDialogTitle>
@@ -1099,6 +1106,7 @@ export default function ClassDetailsPage() {
                       </DialogClose>
                     </DialogFooter>
                   </DialogContent>
+                  )}
                 </Dialog>
               )}
             </CardFooter>
@@ -1118,6 +1126,7 @@ export default function ClassDetailsPage() {
           if (!isOpen) setEditingAnnouncement(null);
           setIsEditAnnouncementDialogOpen(isOpen);
       }}>
+        {isEditAnnouncementDialogOpen && (
         <DialogContent className="sm:max-w-lg rounded-xl">
           <DialogHeader>
             <ShadDialogTitle>Edit Announcement</ShadDialogTitle>
@@ -1156,6 +1165,7 @@ export default function ClassDetailsPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
+        )}
       </Dialog>
 
       {/* Delete Announcement Confirmation Dialog */}
@@ -1176,6 +1186,7 @@ export default function ClassDetailsPage() {
 
       {/* Edit Schedule Dialog */}
       <Dialog open={isEditScheduleDialogOpen} onOpenChange={setIsEditScheduleDialogOpen}>
+        {isEditScheduleDialogOpen && (
         <DialogContent className="sm:max-w-lg rounded-xl">
           <DialogHeader>
             <ShadDialogTitle>Edit Class Schedule</ShadDialogTitle>
@@ -1237,6 +1248,7 @@ export default function ClassDetailsPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
+        )}
       </Dialog>
     </div>
   );
