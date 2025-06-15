@@ -74,8 +74,25 @@ export function SlideUpPanel() {
       <div className="container mx-auto max-w-3xl flex flex-col sm:flex-row items-center sm:items-start justify-center gap-x-6 gap-y-4">
         {/* Start New Meeting Button with Dialog */}
         <div className="w-full sm:flex-1 flex justify-center">
-          <Dialog>
-            <DialogTrigger asChild>
+          {isAuthenticated ? (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  size="lg"
+                  className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+                  aria-label="Start New Meeting"
+                  disabled={authLoading}
+                >
+                  <PlusCircle className="mr-2 h-6 w-6" />
+                  Start New Meeting
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg rounded-xl">
+                <StartMeetingDialogContent />
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <Link href={startMeetingHref} passHref legacyBehavior>
               <Button
                 size="lg"
                 className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
@@ -85,11 +102,8 @@ export function SlideUpPanel() {
                 <PlusCircle className="mr-2 h-6 w-6" />
                 Start New Meeting
               </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg rounded-xl"> {/* Changed to rounded-xl */}
-              <StartMeetingDialogContent />
-            </DialogContent>
-          </Dialog>
+            </Link>
+          )}
         </div>
 
         {/* Join Meeting Section */}
@@ -110,13 +124,13 @@ export function SlideUpPanel() {
             <Dialog>
               <DialogTrigger asChild>
                 <Button
-                  className="absolute top-0 right-0 h-full bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0 rounded-lg shadow-lg z-10 px-3 py-1.5 text-sm flex items-center" /* Changed to rounded-lg */
+                  className="absolute top-0 right-0 h-full bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shrink-0 rounded-lg shadow-lg z-10 px-3 py-1.5 text-sm flex items-center"
                   aria-label="Enter Meeting Code"
                 >
                   <Code className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px] rounded-xl"> {/* Changed to rounded-xl */}
+              <DialogContent className="sm:max-w-[425px] rounded-xl">
                 <DialogHeader>
                   <DialogTitle>Enter Meeting Code</DialogTitle>
                   <DialogDescription>
@@ -133,19 +147,19 @@ export function SlideUpPanel() {
                       value={meetingCodeDialogInput}
                       onChange={(e) => setMeetingCodeDialogInput(e.target.value)}
                       placeholder="e.g., abc-xyz-123"
-                      className="col-span-3 rounded-lg" /* Changed to rounded-lg */
+                      className="col-span-3 rounded-lg"
                     />
                   </div>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
-                    <Button type="button" variant="outline" className="rounded-lg"> {/* Changed to rounded-lg */}
+                    <Button type="button" variant="outline" className="rounded-lg">
                       Cancel
                     </Button>
                   </DialogClose>
                   {/* Ensure the link works correctly with DialogClose for navigation */}
                   <DialogClose asChild>
-                    <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-lg"> {/* Changed to rounded-lg */}
+                    <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-lg">
                       Join
                     </Button>
                   </DialogClose>
