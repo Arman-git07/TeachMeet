@@ -554,10 +554,21 @@ export default function ClassDetailsPage() {
         duration: 7000,
       });
       
-      // Attempt to open the UPI link
       window.location.href = upiUrl;
-      
-    } else { // For other methods like PhonePe, Net Banking, Card
+    } else if (method === "PhonePe") {
+        const mockPhonePeVpa = "teachmeet-phonepe-mock@exampleybl"; 
+        const payeeName = "TeachMeet Platform";
+        const transactionNote = `Class Fee for ${classroom.name}`;
+        const phonePeUpiUrl = `phonepe://pay?pa=${encodeURIComponent(mockPhonePeVpa)}&pn=${encodeURIComponent(payeeName)}&am=${remainingFee.toFixed(2)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+
+        toast({
+            title: "Redirecting for PhonePe Payment (Mock)",
+            description: `Attempting to open PhonePe app to pay ₹${remainingFee.toFixed(2)}. If nothing happens, the app might not be installed or supported.`,
+            duration: 7000,
+        });
+        
+        window.location.href = phonePeUpiUrl;
+    } else { // For other methods like Net Banking, Card
       toast({
         title: `Processing with ${method} (Mock)`,
         description: "Payment integration is a planned feature. No actual transaction will occur.",
