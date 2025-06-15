@@ -542,10 +542,9 @@ export default function ClassDetailsPage() {
     }
 
     if (method === "Google Pay / UPI") {
-      const mockVpa = "teachmeet-mock@exampleupi"; // Placeholder
+      const mockVpa = "teachmeet-mock@exampleupi"; 
       const payeeName = "TeachMeet Platform";
       const transactionNote = `Class Fee for ${classroom.name}`;
-      // Using upi:// scheme for broader compatibility. For specific GPay intent: tez://upi/pay?pa=...
       const upiUrl = `upi://pay?pa=${encodeURIComponent(mockVpa)}&pn=${encodeURIComponent(payeeName)}&am=${remainingFee.toFixed(2)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
 
       toast({
@@ -568,7 +567,44 @@ export default function ClassDetailsPage() {
         });
         
         window.location.href = phonePeUpiUrl;
-    } else { // For other methods like Net Banking, Card
+    } else if (method === "Net Banking") {
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Mock Net Banking</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f9; color: #333; text-align: center; padding: 20px; box-sizing: border-box; }
+                  .container { background-color: white; padding: 30px 40px; border-radius: 12px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); max-width: 600px; border: 1px solid #e0e0e0; }
+                  h1 { color: #223D4A; font-size: 1.8em; margin-bottom: 15px; }
+                  p { line-height: 1.6; margin-bottom: 12px; font-size: 0.95em; }
+                  strong { color: #32CD32; }
+                  .button-placeholder { margin-top: 25px; padding: 12px 25px; background-color: #007bff; color: white; border: none; border-radius: 8px; font-size: 1em; cursor: pointer; transition: background-color 0.2s; }
+                  .button-placeholder:hover { background-color: #0056b3; }
+                  .footer { margin-top: 30px; font-size: 0.85em; color: #777; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>TeachMeet - Mock Net Banking Portal</h1>
+                  <p>In a real application, this page would allow you to select your bank from a list and proceed with net banking authentication to complete your payment for <strong>${classroom.name}</strong> (Amount: ₹${remainingFee.toFixed(2)}).</p>
+                  <p>This is a simulated page for demonstration purposes only.</p>
+                  <button class="button-placeholder" onclick="window.close()">Close this Mock Page</button>
+              </div>
+              <div class="footer">This is a mock interface. No real payment will be processed.</div>
+          </body>
+          </html>
+        `;
+        const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`;
+        window.open(dataUri, '_blank');
+        toast({
+            title: "Redirecting to Mock Net Banking",
+            description: "A new tab should open with a mock bank selection page. No actual payment will be processed.",
+            duration: 7000,
+        });
+    } else { // For other methods like Card
       toast({
         title: `Processing with ${method} (Mock)`,
         description: "Payment integration is a planned feature. No actual transaction will occur.",
