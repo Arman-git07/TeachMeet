@@ -5,6 +5,7 @@ import { Video, PlusCircle, Code } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic'; // Added dynamic
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,16 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; 
+// import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Removed direct import
+
+// Dynamically import StartMeetingDialogContent
+const StartMeetingDialogContent = dynamic(() => 
+  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent), 
+  { 
+    ssr: false,
+    loading: () => <p className="p-4 text-center">Loading dialog...</p> // Optional loading state
+  }
+);
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);

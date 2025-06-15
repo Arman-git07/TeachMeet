@@ -1,6 +1,7 @@
 
 'use client';
 import Link from 'next/link';
+import dynamic from 'next/dynamic'; // Added dynamic
 import {
   LogIn,
   UserPlus,
@@ -36,8 +37,18 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent";
+// import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Removed direct import
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
+// Dynamically import StartMeetingDialogContent
+const StartMeetingDialogContent = dynamic(() => 
+  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent), 
+  { 
+    ssr: false,
+    loading: () => <p className="p-4 text-center">Loading dialog...</p> // Optional loading state
+  }
+);
+
 
 type NavItemProps = {
   href?: string,
