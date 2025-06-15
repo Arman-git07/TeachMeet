@@ -387,7 +387,6 @@ export default function ClassDetailsPage() {
   const handleMaterialFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Add size validation if needed
       setNewMaterialFile(file);
     } else {
       setNewMaterialFile(null);
@@ -422,7 +421,6 @@ export default function ClassDetailsPage() {
     let newMaterial: Material;
 
     if (newMaterialType === 'file' && newMaterialFile) {
-      // Simulate file upload
       await new Promise(resolve => setTimeout(resolve, 1500));
       newMaterial = {
         id: `mat_${Date.now()}`,
@@ -443,7 +441,7 @@ export default function ClassDetailsPage() {
       toast({ title: "Link Material Added", description: `"${newMaterial.title}" has been added.` });
     } else {
       setIsUploadingMaterial(false);
-      return; // Should not happen
+      return; 
     }
 
     setClassroom(prev => prev ? { ...prev, materials: [...(prev.materials || []), newMaterial] } : null);
@@ -520,13 +518,55 @@ export default function ClassDetailsPage() {
   };
 
   const handleMockPayment = (method: string) => {
-    toast({
-      title: `Processing with ${method} (Mock)`,
-      description: "Payment integration is a planned feature. No actual transaction will occur.",
-      duration: 4000,
-    });
-    setIsPaymentDialogOpen(false);
+    if (!classroom || !classroom.feeDetails) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Cannot initiate payment. Fee details are missing.",
+      });
+      setIsPaymentDialogOpen(false);
+      return;
+    }
+
+    const remainingFee = editableFeeDetails
+      ? parseFloat(editableFeeDetails.totalFee || '0') - parseFloat(editableFeeDetails.paidAmount || '0')
+      : classroom.feeDetails.totalFee - classroom.feeDetails.paidAmount;
+      
+    if (remainingFee <= 0) {
+      toast({
+        title: "No Payment Due",
+        description: "This class fee is already fully paid.",
+      });
+      setIsPaymentDialogOpen(false);
+      return;
+    }
+
+    if (method === "Google Pay / UPI") {
+      const mockVpa = "teachmeet-mock@exampleupi"; // Placeholder
+      const payeeName = "TeachMeet Platform";
+      const transactionNote = `Class Fee for ${classroom.name}`;
+      // Using upi:// scheme for broader compatibility. For specific GPay intent: tez://upi/pay?pa=...
+      const upiUrl = `upi://pay?pa=${encodeURIComponent(mockVpa)}&pn=${encodeURIComponent(payeeName)}&am=${remainingFee.toFixed(2)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+
+      toast({
+        title: "Redirecting for Payment (Mock)",
+        description: `Attempting to open UPI app to pay ₹${remainingFee.toFixed(2)}. If nothing happens, the app might not be installed or supported.`,
+        duration: 7000,
+      });
+      
+      // Attempt to open the UPI link
+      window.location.href = upiUrl;
+      
+    } else { // For other methods like PhonePe, Net Banking, Card
+      toast({
+        title: `Processing with ${method} (Mock)`,
+        description: "Payment integration is a planned feature. No actual transaction will occur.",
+        duration: 4000,
+      });
+    }
+    setIsPaymentDialogOpen(false); // Close dialog after initiating
   };
+
 
   const handleExamCreated = (newExam: any) => {
     console.log("New exam created via dialog on class page:", newExam);
@@ -980,7 +1020,7 @@ export default function ClassDetailsPage() {
                     </Button>
                   </DialogTrigger>
                   {isCreateExamDialogOpenForClass && (
-                  <DialogContent className="sm:max-w-lg rounded-xl">
+                  <DialogContent className="sm:max-w-2xl rounded-xl">
                     <CreateExamDialog
                       isOpen={isCreateExamDialogOpenForClass}
                       onOpenChange={setIsCreateExamDialogOpenForClass}
