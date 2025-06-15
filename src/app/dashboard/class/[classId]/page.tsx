@@ -647,16 +647,26 @@ export default function ClassDetailsPage() {
           </html>
         `;
         const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`;
-        window.open(dataUri, '_blank');
-        toast({
-            title: "Redirecting to Mock Net Banking",
-            description: "A new tab should open with a mock bank selection page. No actual payment will be processed.",
-            duration: 7000,
-        });
+        const newTab = window.open(dataUri, '_blank');
+        
+        if (newTab) {
+          toast({
+              title: "Redirecting to Mock Net Banking",
+              description: "A new tab should open with a mock bank selection page. No actual payment will be processed.",
+              duration: 7000,
+          });
+        } else {
+          toast({
+              variant: "destructive",
+              title: "Popup Possibly Blocked",
+              description: "Could not open the Net Banking page. Please check if your browser blocked a popup and allow popups for this site.",
+              duration: 10000,
+          });
+        }
         setIsPaymentDialogOpen(false);
     } else if (method === "Credit/Debit Card") {
-        setIsPaymentDialogOpen(false); // Close payment method selection dialog
-        setIsCardPaymentDialogOpen(true); // Open card details dialog
+        setIsPaymentDialogOpen(false); 
+        setIsCardPaymentDialogOpen(true); 
     } else {
       toast({
         title: `Processing with ${method} (Mock)`,
