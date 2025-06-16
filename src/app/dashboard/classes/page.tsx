@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Changed: Removed ShadDialogTitle alias
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -110,15 +110,6 @@ export default function ClassesPage() {
   const [newClassImagePreview, setNewClassImagePreview] = useState<string | null>(null);
   const [isUploadingClassImage, setIsUploadingClassImage] = useState(false);
 
-  // Edit Class Dialog State
-  const [isEditClassDialogOpen, setIsEditClassDialogOpen] = useState(false);
-  const [editingClass, setEditingClass] = useState<Classroom | null>(null);
-  const [editClassName, setEditClassName] = useState('');
-  const [editClassDescription, setEditClassDescription] = useState('');
-  const [editClassImageFile, setEditClassImageFile] = useState<File | null>(null);
-  const [editClassImagePreview, setEditClassImagePreview] = useState<string | null>(null);
-  const [isUploadingEditClassImage, setIsUploadingEditClassImage] = useState(false);
-
   const currentFilterOptions = filterOptionsConfig.filter(opt => !opt.requiresAuth || isAuthenticated);
 
 
@@ -216,40 +207,25 @@ export default function ClassesPage() {
   }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
 
 
-  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'create' | 'edit') => {
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
         toast({ variant: "destructive", title: "Image Too Large", description: `Please select an image smaller than ${MAX_IMAGE_SIZE_MB}MB.` });
-        if (type === 'create') {
-          setNewClassImageFile(null);
-          setNewClassImagePreview(null);
-        } else {
-          setEditClassImageFile(null);
-          setEditClassImagePreview(editingClass?.thumbnailUrl || null);
-        }
+        setNewClassImageFile(null);
+        setNewClassImagePreview(null);
         if (event.target) event.target.value = "";
         return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (type === 'create') {
-          setNewClassImageFile(file);
-          setNewClassImagePreview(reader.result as string);
-        } else {
-          setEditClassImageFile(file);
-          setEditClassImagePreview(reader.result as string);
-        }
+        setNewClassImageFile(file);
+        setNewClassImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     } else {
-      if (type === 'create') {
-        setNewClassImageFile(null);
-        setNewClassImagePreview(null);
-      } else {
-        setEditClassImageFile(null);
-        setEditClassImagePreview(editingClass?.thumbnailUrl || null);
-      }
+      setNewClassImageFile(null);
+      setNewClassImagePreview(null);
     }
   };
 
@@ -263,27 +239,15 @@ export default function ClassesPage() {
     setIsCreateClassDialogOpen(false);
   };
 
-  const resetEditClassDialog = () => {
-    setEditingClass(null);
-    setEditClassName('');
-    setEditClassDescription('');
-    setEditClassImageFile(null);
-    if (editClassImagePreview?.startsWith('blob:')) URL.revokeObjectURL(editClassImagePreview);
-    setEditClassImagePreview(null);
-    setIsUploadingEditClassImage(false);
-    setIsEditClassDialogOpen(false);
-  };
-
-  const uploadImage = async (imageFile: File, userId: string, type: 'create' | 'edit'): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
-    setIsUploadingClassImage(type === 'create');
-    setIsUploadingEditClassImage(type === 'edit');
+  const uploadImage = async (imageFile: File, userId: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
+    setIsUploadingClassImage(true);
 
     const imageFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
     const imagePath = `class_thumbnails/${userId}/${imageFileName}`;
     const imageFileRef = storageRef(storage, imagePath);
 
     const toastId = `upload-class-image-${Date.now()}`;
-    const toastTitle = type === 'create' ? "Uploading Class Image..." : "Uploading New Class Image...";
+    const toastTitle = "Uploading Class Image...";
 
     toast({
         id: toastId,
@@ -344,7 +308,7 @@ export default function ClassesPage() {
 
     if (newClassImageFile) {
       try {
-        imageDetails = await uploadImage(newClassImageFile, user.uid, 'create');
+        imageDetails = await uploadImage(newClassImageFile, user.uid);
       } catch (error) {
         setIsUploadingClassImage(false);
         return;
@@ -380,59 +344,6 @@ export default function ClassesPage() {
     resetCreateClassDialog();
   };
 
-  const handleUpdateClass = async () => {
-    if (!editingClass || !editClassName.trim() || !editClassDescription.trim()) {
-      toast({ variant: "destructive", title: "Missing Information", description: "Please provide a class name and description." });
-      return;
-    }
-    if (!user) {
-      toast({ variant: "destructive", title: "Authentication Error", description: "You must be logged in to update a class." });
-      return;
-    }
-
-    setIsUploadingEditClassImage(true);
-    let imageDetails = {
-      thumbnailUrl: editingClass.thumbnailUrl,
-      dataAiHint: editingClass.dataAiHint
-    };
-
-    if (editClassImageFile) {
-      try {
-        imageDetails = await uploadImage(editClassImageFile, user.uid, 'edit');
-      } catch (error) {
-        setIsUploadingEditClassImage(false);
-        return;
-      }
-    } else if (editingClass.name !== editClassName.trim() && editingClass.thumbnailUrl.includes('placehold.co') && editingClass.thumbnailUrl.includes('?text=')) {
-      const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
-      imageDetails = {
-        thumbnailUrl: `https://placehold.co/600x400.png?text=${newClassNameInitials}`,
-        dataAiHint: editingClass.dataAiHint
-      };
-    }
-
-
-    setClassrooms(prev => prev.map(cls =>
-      cls.id === editingClass.id
-        ? {
-            ...cls,
-            name: editClassName.trim(),
-            description: editClassDescription.trim(),
-            thumbnailUrl: imageDetails.thumbnailUrl,
-            dataAiHint: imageDetails.dataAiHint,
-          }
-        : cls
-    ));
-
-    toast({
-      title: "Class Updated!",
-      description: `"${editClassName.trim()}" has been successfully updated.`,
-    });
-
-    resetEditClassDialog();
-  };
-
-
   const handleRequestToJoin = (classId: string, className: string) => {
     const alreadyRequested = requestedClassIds.includes(classId);
 
@@ -461,25 +372,12 @@ export default function ClassesPage() {
     }
   };
 
-  const handleOpenEditDialog = (classToEdit: Classroom) => {
-    setEditingClass(classToEdit);
-    setEditClassName(classToEdit.name);
-    setEditClassDescription(classToEdit.description);
-    setEditClassImagePreview(classToEdit.thumbnailUrl);
-    setEditClassImageFile(null);
-    setIsEditClassDialogOpen(true);
+  const handleNavigateToEditClass = (classToEdit: Classroom) => {
+    router.push(`/dashboard/class/${classToEdit.id}/edit?name=${encodeURIComponent(classToEdit.name)}`);
   };
 
   const handleViewClass = (classId: string, className: string) => {
     router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
-  };
-
-  const handleManageMembers = (classId: string, className: string) => {
-    if (!classId) {
-      toast({ variant: "destructive", title: "Error", description: "Class ID is missing."});
-      return;
-    }
-    router.push(`/dashboard/class/${classId}/manage-members?name=${encodeURIComponent(className)}`);
   };
 
   useEffect(() => {
@@ -487,11 +385,8 @@ export default function ClassesPage() {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(newClassImagePreview);
       }
-      if (editClassImagePreview && editClassImagePreview.startsWith('blob:')) {
-        URL.revokeObjectURL(editClassImagePreview);
-      }
     };
-  }, [newClassImagePreview, editClassImagePreview]);
+  }, [newClassImagePreview]);
 
   const activeFilterLabel = currentFilterOptions.find(opt => opt.value === activeFilter)?.label || "Explore All Classes";
 
@@ -516,7 +411,7 @@ export default function ClassesPage() {
                 {isCreateClassDialogOpen && (
                   <DialogContent className="sm:max-w-[520px] rounded-xl">
                     <DialogHeader>
-                        <DialogTitle className="text-xl">Create New Classroom</DialogTitle> {/* Changed */}
+                        <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
                         <DialogDescription>
                           Fill in the details to set up your new class.
                         </DialogDescription>
@@ -532,7 +427,7 @@ export default function ClassesPage() {
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                          <Input id="newClassImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'create')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
+                          <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
                           {newClassImagePreview && (
                             <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
                               <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
@@ -583,54 +478,6 @@ export default function ClassesPage() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-
-      <Dialog open={isEditClassDialogOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) resetEditClassDialog();
-          setIsEditClassDialogOpen(isOpen);
-      }}>
-        {isEditClassDialogOpen && (
-          <DialogContent className="sm:max-w-[520px] rounded-xl">
-            <DialogHeader>
-              <DialogTitle className="text-xl">Edit Classroom</DialogTitle> {/* Changed */}
-              <DialogDescription>
-                Update the details for your class: {editingClass?.name}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-              <div className="grid gap-2">
-                <Label htmlFor="editClassName">Class Name</Label>
-                <Input id="editClassName" value={editClassName} onChange={(e) => setEditClassName(e.target.value)} placeholder="e.g., Math 101" className="rounded-lg" disabled={isUploadingEditClassImage}/>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="editClassDescription">Description</Label>
-                <Textarea id="editClassDescription" value={editClassDescription} onChange={(e) => setEditClassDescription(e.target.value)} placeholder="A brief overview of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingEditClassImage}/>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="editClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                <Input id="editClassImage" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'edit')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingEditClassImage}/>
-                {editClassImagePreview && (
-                  <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
-                    <Image src={editClassImagePreview} alt="Class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom"/>
-                  </div>
-                )}
-              </div>
-              <div className="grid gap-2 pt-2">
-                  <Button variant="outline" className="rounded-lg" onClick={() => editingClass && handleManageMembers(editingClass.id, editingClass.name)} disabled={isUploadingEditClassImage || !editingClass}>
-                      <UsersIcon className="mr-2 h-4 w-4" /> Manage Members
-                  </Button>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" className="rounded-lg" onClick={resetEditClassDialog} disabled={isUploadingEditClassImage}>Cancel</Button>
-              <Button type="button" onClick={handleUpdateClass} className="btn-gel rounded-lg" disabled={isUploadingEditClassImage || !editClassName.trim()}>
-                {isUploadingEditClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {isUploadingEditClassImage ? (editClassImageFile ? 'Uploading Image...' : 'Saving...') : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
 
       {(initialLoading || authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0)) ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
@@ -686,7 +533,7 @@ export default function ClassesPage() {
                   {isCreateClassDialogOpen && (
                     <DialogContent className="sm:max-w-[520px] rounded-xl">
                       <DialogHeader>
-                          <DialogTitle className="text-xl">Create New Classroom</DialogTitle> {/* Changed */}
+                          <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
                           <DialogDescription>
                             Fill in the details to set up your new class.
                           </DialogDescription>
@@ -702,7 +549,7 @@ export default function ClassesPage() {
                           </div>
                           <div className="grid gap-2">
                             <Label htmlFor="newClassImageModal">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                            <Input id="newClassImageModal" type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, 'create')} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
+                            <Input id="newClassImageModal" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
                             {newClassImagePreview && (
                               <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
                                 <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom"/>
@@ -739,7 +586,7 @@ export default function ClassesPage() {
 
             if (isTeacher) {
                 actionButton = (
-                    <Button onClick={() => handleOpenEditDialog(classroom)} className="w-full btn-gel rounded-lg text-sm">
+                    <Button onClick={() => handleNavigateToEditClass(classroom)} className="w-full btn-gel rounded-lg text-sm">
                         <Edit className="mr-2 h-4 w-4" /> Manage Class
                     </Button>
                 );
