@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Changed: Removed ShadDialogTitle alias
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +21,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebas
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import dynamic from 'next/dynamic';
 
 interface Classroom {
   id: string;
@@ -53,6 +54,14 @@ const defaultTeacherDetailsMap: Record<string, { name: string; initial: string; 
   cl6: { name: "Lena Petrova", initial: "LP", placeholderId: "teacher5_placeholder_uid" },
 };
 
+// Dynamically import StartMeetingDialogContent
+const StartMeetingDialogContent = dynamic(() =>
+  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
+  {
+    ssr: false,
+    loading: () => <p className="p-4 text-center">Loading dialog...</p> // Optional loading state
+  }
+);
 
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
@@ -507,7 +516,7 @@ export default function ClassesPage() {
                 {isCreateClassDialogOpen && (
                   <DialogContent className="sm:max-w-[520px] rounded-xl">
                     <DialogHeader>
-                        <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
+                        <DialogTitle className="text-xl">Create New Classroom</DialogTitle> {/* Changed */}
                         <DialogDescription>
                           Fill in the details to set up your new class.
                         </DialogDescription>
@@ -583,7 +592,7 @@ export default function ClassesPage() {
         {isEditClassDialogOpen && (
           <DialogContent className="sm:max-w-[520px] rounded-xl">
             <DialogHeader>
-              <DialogTitle className="text-xl">Edit Classroom</DialogTitle>
+              <DialogTitle className="text-xl">Edit Classroom</DialogTitle> {/* Changed */}
               <DialogDescription>
                 Update the details for your class: {editingClass?.name}.
               </DialogDescription>
@@ -677,7 +686,7 @@ export default function ClassesPage() {
                   {isCreateClassDialogOpen && (
                     <DialogContent className="sm:max-w-[520px] rounded-xl">
                       <DialogHeader>
-                          <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
+                          <DialogTitle className="text-xl">Create New Classroom</DialogTitle> {/* Changed */}
                           <DialogDescription>
                             Fill in the details to set up your new class.
                           </DialogDescription>
@@ -812,3 +821,4 @@ export default function ClassesPage() {
     </div>
   );
 }
+
