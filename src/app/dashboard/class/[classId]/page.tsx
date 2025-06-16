@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import {
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle,
     Megaphone, ClipboardList, Link as LinkIconLucide, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Bank as BankIcon, Hash
-} from 'lucide-react'; // Renamed LinkIcon to LinkIconLucide, Added Building, Bank as BankIcon, Hash
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Landmark, Hash
+} from 'lucide-react'; // Added Landmark, removed Bank as BankIcon
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,7 @@ import CreateExamDialog from '@/components/exam/CreateExamDialog';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Separator } from '@/components/ui/separator'; // Added Separator
+import { Separator } from '@/components/ui/separator';
 
 interface Announcement {
   id: string;
@@ -1261,7 +1261,7 @@ export default function ClassDetailsPage() {
                       <div>
                         <Label htmlFor="teacherBankAccount" className="text-xs">Bank Account Number</Label>
                          <div className="relative mt-1">
-                            <BankIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Landmark className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input id="teacherBankAccount" value={teacherBankAccountInput} onChange={(e) => setTeacherBankAccountInput(e.target.value)} placeholder="e.g., 123456789012" className="rounded-lg h-9 text-sm pl-10"/>
                         </div>
                       </div>
