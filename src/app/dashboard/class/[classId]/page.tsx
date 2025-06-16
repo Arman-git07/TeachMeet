@@ -63,7 +63,7 @@ interface FeeDetails {
   totalFee: number;
   paidAmount: number;
   nextDueDate?: string;
-  currency: string; // Added currency
+  currency: string; 
 }
 
 interface ScheduleItem {
@@ -102,7 +102,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
   let mockTeacherPaymentDetails: Partial<ClassroomDetails> = {};
 
   if (id === "cl1") {
-    baseTeacherId = "dr_ada_lovelace_uid";
+    baseTeacherId = "dr_ada_lovelace_uid"; // This will be overwritten if the current user is "cl1"
     mockTeacherPaymentDetails = {
       teacherUpiId: "teacher-cl1@exampleupi",
       teacherBankAccount: "123456789012",
@@ -154,7 +154,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       totalFee: 500,
       paidAmount: 250,
       nextDueDate: "2024-09-01",
-      currency: "USD", // Default currency
+      currency: "USD", 
     },
     ...mockTeacherPaymentDetails,
   };
@@ -204,7 +204,7 @@ export default function ClassDetailsPage() {
     totalFee: string;
     paidAmount: string;
     nextDueDate: string;
-    currency: string; // Added currency
+    currency: string; 
   } | null>(null);
 
   const [isPostAnnouncementDialogOpen, setIsPostAnnouncementDialogOpen] = useState(false);
@@ -247,13 +247,13 @@ export default function ClassDetailsPage() {
   const [teacherBankNameInput, setTeacherBankNameInput] = useState('');
   
   const getCurrencySymbol = (currencyCode?: string): string => {
-    if (!currencyCode) return '$'; // Default
+    if (!currencyCode) return '$'; 
     switch (currencyCode.toUpperCase()) {
       case 'USD': return '$';
       case 'EUR': return '€';
       case 'INR': return '₹';
       case 'GBP': return '£';
-      default: return currencyCode + ' '; // Fallback to code if symbol unknown
+      default: return currencyCode + ' '; 
     }
   };
 
@@ -264,11 +264,13 @@ export default function ClassDetailsPage() {
       setTimeout(() => {
         const details = getMockClassroomDetails(classId, classNameQuery);
         if (details && user) {
-          if (details.id === 'cl1') {
+          // If this class (cl1) is created by current user, update teacher details
+          if (details.id === 'cl1') { // Assuming 'cl1' is the special ID for current user's class
             details.teacherId = user.uid;
             details.teacherName = user.displayName || "Current User (Teacher)";
             const initials = (user.displayName || "CU").split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
             details.teacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${initials}`;
+            // Initialize teacher payment inputs if details exist for cl1
             if (details.teacherUpiId) setTeacherUpiIdInput(details.teacherUpiId);
             if (details.teacherBankAccount) setTeacherBankAccountInput(details.teacherBankAccount);
             if (details.teacherBankIfsc) setTeacherBankIfscInput(details.teacherBankIfsc);
@@ -281,16 +283,18 @@ export default function ClassDetailsPage() {
             totalFee: String(details.feeDetails.totalFee),
             paidAmount: String(details.feeDetails.paidAmount),
             nextDueDate: details.feeDetails.nextDueDate || '',
-            currency: details.feeDetails.currency || 'USD', // Initialize currency
+            currency: details.feeDetails.currency || 'USD', 
           });
         } else {
-          setEditableFeeDetails({ // Default if no feeDetails
-            totalFee: '0',
-            paidAmount: '0',
-            nextDueDate: '',
-            currency: 'USD',
+          // Default if no feeDetails for a class
+          setEditableFeeDetails({ 
+            totalFee: '0', 
+            paidAmount: '0', 
+            nextDueDate: '', 
+            currency: 'USD', 
           });
         }
+        // Initialize teacher payment inputs if details exist and not for cl1 (already handled above)
         if (!(details?.id === 'cl1' && user?.uid === details.teacherId)) {
             if (details?.teacherUpiId) setTeacherUpiIdInput(details.teacherUpiId);
             if (details?.teacherBankAccount) setTeacherBankAccountInput(details.teacherBankAccount);
@@ -300,7 +304,7 @@ export default function ClassDetailsPage() {
         setLoading(false);
       }, 500);
     } else if (!classId) {
-      setLoading(false);
+      setLoading(false); // No classId means nothing to load
     }
   }, [classId, classNameQuery, user, authLoading]);
 
@@ -321,13 +325,18 @@ export default function ClassDetailsPage() {
     }
     if (classroom) {
       if (user.uid === classroom.teacherId) {
+        // Teacher can always start
         router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
       } else {
+        // Student joining behavior - this might depend on if the meeting is 'live'
+        // For simplicity, this prototype allows students to go to waiting room for any class meeting
         toast({
           variant: "destructive",
           title: "Access Denied",
           description: "Only the class teacher or registered members can start/join this meeting directly. Please wait for the teacher to start the meeting or provide a join link.",
         });
+        // Consider: router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
+        // Or check meeting status from a backend before allowing join.
       }
     }
   };
@@ -442,17 +451,19 @@ export default function ClassDetailsPage() {
     setIsUploadingMaterial(true);
     let newMaterial: Material;
     if (newMaterialType === 'file' && newMaterialFile) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Simulate upload delay
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Mock upload
       newMaterial = { id: `mat_${Date.now()}`, title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'file', fileName: newMaterialFile.name };
       toast({ title: "File Material Added (Mock)", description: `"${newMaterial.title}" has been added.` });
     } else if (newMaterialType === 'link') {
       newMaterial = { id: `mat_${Date.now()}`, title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'link', url: newMaterialUrl.trim() };
       toast({ title: "Link Material Added", description: `"${newMaterial.title}" has been added.` });
-    } else { setIsUploadingMaterial(false); return; }
+    } else { setIsUploadingMaterial(false); return; } // Should not happen with current logic
     setClassroom(prev => prev ? { ...prev, materials: [...(prev.materials || []), newMaterial] } : null);
     setIsUploadMaterialDialogOpen(false); resetUploadMaterialDialog();
   };
 
+  // For Teacher: Uploading assignment-related materials (e.g., question paper, guidelines)
   const handleTriggerAssignmentUploadDialog = () => { setDialogAssignmentName(''); setIsAssignmentUploadDialogOpen(true); };
 
   const handleDialogSubmitAndChooseFile = () => {
@@ -461,17 +472,18 @@ export default function ClassDetailsPage() {
   };
 
   const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; if (event.target) event.target.value = "";
+    const file = event.target.files?.[0]; if (event.target) event.target.value = ""; // Reset file input
     if (!file) { toast({ variant: "info", title: "File Selection Cancelled", description: "No file was selected for upload." }); setSelectedAssignmentTitleForUpload(null); setIsAssignmentUploadDialogOpen(false); return; }
     if (!selectedAssignmentTitleForUpload) { console.error("No assignment title selected."); toast({ variant: "destructive", title: "Internal Error", description: "Assignment title missing." }); setIsAssignmentUploadDialogOpen(false); return; }
     toast({ title: "Uploading Assignment Materials...", description: `Simulating upload for "${selectedAssignmentTitleForUpload}".` }); setIsAssignmentUploadDialogOpen(false);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Mock upload delay
     const newAssignmentEntry: Assignment = { id: `assign_teacher_${Date.now()}`, title: selectedAssignmentTitleForUpload, dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), status: "Pending", description: `Materials for "${selectedAssignmentTitleForUpload}". File: ${file.name}` };
     setClassroom(prev => prev ? { ...prev, assignments: [newAssignmentEntry, ...(prev.assignments || [])] } : null);
     toast({ title: "Assignment Materials Uploaded (Mock)", description: `"${selectedAssignmentTitleForUpload}" (file: ${file.name}) added.`, duration: 5000 });
     setSelectedAssignmentTitleForUpload(null); setDialogAssignmentName('');
   };
   
+  // Function to generate a toast message with developer and teacher cut
   const makePaymentToast = (method: string, remainingFee: number, classroomName: string, currency: string) => {
     const developerCut = remainingFee * 0.02;
     const teacherReceives = remainingFee - developerCut;
@@ -496,10 +508,10 @@ export default function ClassDetailsPage() {
     const successToastMessage = `Mock card payment of ${currencySymbol}${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name || 'the class'} processed. The class fee is now considered fully paid. ${currencySymbol}${(amountForTheCurrentPayment * 0.98).toFixed(2)} (conceptual) to teacher, ${currencySymbol}${(amountForTheCurrentPayment * 0.02).toFixed(2)} to developer (UPI: 07arman2004-1@oksbi).`;
     setTimeout(() => {
       if (classroom?.feeDetails && editableFeeDetails) {
-        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); 
+        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); // Fully paid
         const newFeeDetailsData: FeeDetails = { ...classroom.feeDetails, paidAmount: newPaidAmount, currency: editableFeeDetails.currency };
         setClassroom(prev => prev ? { ...prev, feeDetails: newFeeDetailsData } : null);
-        setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null);
+        setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null); // Update editable state too
         toast({ title: "Card Payment Successful (Mock)", description: successToastMessage, duration: 10000 });
       } else { toast({ title: "Card Payment Processed (Mock)", description: `Mock card payment for ${classroom?.name} completed.` }); }
       setIsCardPaymentDialogOpen(false); setCardNumber(''); setCardExpiry(''); setCardCvv(''); setCardName('');
@@ -544,10 +556,12 @@ export default function ClassDetailsPage() {
   const handleExamCreated = (newExam: any) => {
     console.log("New exam created via dialog on class page:", newExam);
     toast({ title: "Exam Scheduled (Class Context)", description: `${newExam.title} has been scheduled for this class.` });
+    // Potentially update classroom.exams state here
   };
 
   const handleToggleEditFeeDetails = () => {
     if (isEditingFeeDetails && classroom?.feeDetails) {
+      // Reset editable details to current classroom details if cancelling edit
       setEditableFeeDetails({
         totalFee: String(classroom.feeDetails.totalFee),
         paidAmount: String(classroom.feeDetails.paidAmount),
@@ -711,10 +725,57 @@ export default function ClassDetailsPage() {
           <Card className="rounded-lg shadow-md border-border/30">
             <CardHeader><CardTitle className="flex items-center text-lg"><DollarSign className="mr-2 h-5 w-5 text-primary" />Fees &amp; Payment</CardTitle></CardHeader>
             <CardContent className="space-y-4 text-sm">
-             {isCurrentUserTeacher && (<div className="border-b border-border/30 pb-4 mb-4"><h3 className="text-md font-semibold text-foreground mb-2">Your Payment Receiving Details</h3>
-                  {isEditingTeacherPaymentDetails ? (<div className="space-y-3"><div><Label htmlFor="teacherUpiId" className="text-xs">UPI ID</Label><div className="relative mt-1"><Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="teacherUpiId" value={teacherUpiIdInput} onChange={(e) => setTeacherUpiIdInput(e.target.value)} placeholder="your@upi" className="rounded-lg h-9 text-sm pl-10"/></div></div><div><Label htmlFor="teacherBankName" className="text-xs">Bank Name</Label><div className="relative mt-1"><Building className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="teacherBankName" value={teacherBankNameInput} onChange={(e) => setTeacherBankNameInput(e.target.value)} placeholder="e.g., SBI" className="rounded-lg h-9 text-sm pl-10"/></div></div><div><Label htmlFor="teacherBankAccount" className="text-xs">Bank Account</Label><div className="relative mt-1"><Landmark className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="teacherBankAccount" value={teacherBankAccountInput} onChange={(e) => setTeacherBankAccountInput(e.target.value)} placeholder="e.g., 1234567890" className="rounded-lg h-9 text-sm pl-10"/></div></div><div><Label htmlFor="teacherBankIfsc" className="text-xs">IFSC</Label><div className="relative mt-1"><Input id="teacherBankIfsc" value={teacherBankIfscInput} onChange={(e) => setTeacherBankIfscInput(e.target.value)} placeholder="e.g., SBIN0001234" className="rounded-lg h-9 text-sm"/></div></div><div className="flex gap-2 mt-2"><Button onClick={handleSaveTeacherPaymentDetails} className="btn-gel rounded-lg text-xs flex-1">Save</Button><Button onClick={handleToggleEditTeacherPaymentDetails} variant="outline" className="rounded-lg text-xs flex-1">Cancel</Button></div></div>
-                  ) : (classroom.teacherUpiId || classroom.teacherBankAccount ? (<div className="space-y-1">{classroom.teacherUpiId && <p>UPI ID: <span className="font-medium text-foreground">{classroom.teacherUpiId}</span></p>}{classroom.teacherBankAccount && <p>Bank: <span className="font-medium text-foreground">{classroom.teacherBankName || 'N/A'} - Acct: ...{classroom.teacherBankAccount.slice(-4)} (IFSC: {classroom.teacherBankIfsc || 'N/A'})</span></p>}<Button onClick={handleToggleEditTeacherPaymentDetails} variant="link" size="sm" className="p-0 h-auto text-accent text-xs mt-1">Edit</Button></div>) : (<Button onClick={handleToggleEditTeacherPaymentDetails} variant="outline" className="w-full rounded-lg text-sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Details</Button>))}
-                  <Separator className="my-4" /></div>)}
+             {isCurrentUserTeacher && (
+                <div className="border-b border-border/30 pb-4 mb-4">
+                  <h3 className="text-md font-semibold text-foreground mb-2">Your Payment Receiving Details</h3>
+                  {isEditingTeacherPaymentDetails ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="teacherUpiId" className="text-xs">UPI ID</Label>
+                         <div className="relative mt-1">
+                            <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input id="teacherUpiId" value={teacherUpiIdInput} onChange={(e) => setTeacherUpiIdInput(e.target.value)} placeholder="your@upi" className="rounded-lg h-9 text-sm pl-10"/>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="teacherBankName" className="text-xs">Bank Name</Label>
+                         <div className="relative mt-1">
+                            <Building className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input id="teacherBankName" value={teacherBankNameInput} onChange={(e) => setTeacherBankNameInput(e.target.value)} placeholder="e.g., SBI" className="rounded-lg h-9 text-sm pl-10"/>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="teacherBankAccount" className="text-xs">Bank Account Number</Label>
+                         <div className="relative mt-1">
+                            <Landmark className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input id="teacherBankAccount" value={teacherBankAccountInput} onChange={(e) => setTeacherBankAccountInput(e.target.value)} placeholder="e.g., 123456789012" className="rounded-lg h-9 text-sm pl-10"/>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="teacherBankIfsc" className="text-xs">IFSC Code</Label>
+                        <div className="relative mt-1">
+                            <Input id="teacherBankIfsc" value={teacherBankIfscInput} onChange={(e) => setTeacherBankIfscInput(e.target.value)} placeholder="e.g., SBIN0001234" className="rounded-lg h-9 text-sm"/>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button onClick={handleSaveTeacherPaymentDetails} className="btn-gel rounded-lg text-xs flex-1">Save</Button>
+                        <Button onClick={handleToggleEditTeacherPaymentDetails} variant="outline" className="rounded-lg text-xs flex-1">Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    classroom.teacherUpiId || classroom.teacherBankAccount ? (
+                      <div className="space-y-1">
+                        {classroom.teacherUpiId && <p>UPI ID: <span className="font-medium text-foreground">{classroom.teacherUpiId}</span></p>}
+                        {classroom.teacherBankAccount && <p>Bank: <span className="font-medium text-foreground">{classroom.teacherBankName || 'N/A'} - Acct: ...{classroom.teacherBankAccount.slice(-4)} (IFSC: {classroom.teacherBankIfsc || 'N/A'})</span></p>}
+                        <Button onClick={handleToggleEditTeacherPaymentDetails} variant="link" size="sm" className="p-0 h-auto text-accent text-xs mt-1">Edit</Button>
+                      </div>
+                    ) : (
+                       <Button onClick={handleToggleEditTeacherPaymentDetails} variant="outline" className="w-full rounded-lg text-sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Details</Button>
+                    )
+                  )}
+                  <Separator className="my-4" />
+                </div>
+              )}
               {!classroom.feeDetails && !isEditingFeeDetails && !editableFeeDetails?.currency ? (
                 <p className="text-muted-foreground">Fee details not available.</p>
               ) : isCurrentUserTeacher && isEditingFeeDetails ? (
