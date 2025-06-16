@@ -544,13 +544,13 @@ export default function ClassDetailsPage() {
     
     toast({
       title: "Payment Submitted (Mock)",
-      description: "Your card payment is being processed.",
+      description: `Your card payment of $${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name} is being processed. In a real scenario, funds would be transferred to the appropriate bank account.`,
     });
     
     setTimeout(() => {
       toast({
         title: "Card Payment Successful (Mock)",
-        description: `Your mock payment of $${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name} has been processed. Funds will be (notionally) transferred.`,
+        description: `Your mock payment of $${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name} has been processed.`,
       });
       if (classroom?.feeDetails && editableFeeDetails) {
         const newPaidAmount = parseFloat(editableFeeDetails.totalFee); 
@@ -1238,7 +1238,7 @@ export default function ClassDetailsPage() {
                     <DialogHeader>
                       <ShadDialogTitle>Choose Payment Method</ShadDialogTitle>
                       <DialogDescription>
-                        Select your preferred payment option. (Mock Interface)
+                        Select your preferred payment option. (Mock Interface) Please note: A 2% platform fee will be applied to this payment, directed to the developer's account (UPI: 07arman2004-1@oksbi).
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-3 py-4">
@@ -1476,3 +1476,4 @@ export default function ClassDetailsPage() {
     </div>
   );
 }
+
