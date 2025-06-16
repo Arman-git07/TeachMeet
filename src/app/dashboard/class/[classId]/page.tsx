@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import {
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle,
     Megaphone, ClipboardList, Link as LinkIconLucide, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Bank, Hash
-} from 'lucide-react'; // Renamed LinkIcon to LinkIconLucide to avoid conflict with NextLink, Added Building, Bank, Hash
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Bank as BankIcon, Hash
+} from 'lucide-react'; // Renamed LinkIcon to LinkIconLucide, Added Building, Bank as BankIcon, Hash
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
@@ -591,11 +591,6 @@ export default function ClassDetailsPage() {
     toast(makePaymentToast("Credit/Debit Card", amountForTheCurrentPayment, classroom?.name || "the class"));
     
     setTimeout(() => {
-      // This second toast could be removed if the first one is sufficient
-      toast({
-        title: "Card Payment Successful (Mock)",
-        description: `Details for ${classroom?.name} processed.`,
-      });
       if (classroom?.feeDetails && editableFeeDetails) {
         const newPaidAmount = parseFloat(editableFeeDetails.totalFee); 
         const newFeeDetailsData: FeeDetails = {
@@ -604,6 +599,16 @@ export default function ClassDetailsPage() {
         };
         setClassroom(prev => prev ? { ...prev, feeDetails: newFeeDetailsData } : null);
         setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null);
+
+        toast({
+            title: "Card Payment Successful (Mock)",
+            description: `Payment of $${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name} processed. The class fee is now fully paid.`,
+        });
+      } else {
+         toast({
+            title: "Card Payment Processed (Mock)",
+            description: `Mock card payment for ${classroom?.name} completed.`,
+        });
       }
       setIsCardPaymentDialogOpen(false);
       setCardNumber('');
@@ -1202,7 +1207,7 @@ export default function ClassDetailsPage() {
               )) : <p className="text-muted-foreground">No exams scheduled for this class yet.</p>}
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-2">
-              {isCurrentUserTeacher && (
+            {isCurrentUserTeacher && (
                  <Dialog open={isCreateExamDialogOpenForClass} onOpenChange={setIsCreateExamDialogOpenForClass}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full rounded-lg text-sm">
@@ -1256,7 +1261,7 @@ export default function ClassDetailsPage() {
                       <div>
                         <Label htmlFor="teacherBankAccount" className="text-xs">Bank Account Number</Label>
                          <div className="relative mt-1">
-                            <Bank className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <BankIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input id="teacherBankAccount" value={teacherBankAccountInput} onChange={(e) => setTeacherBankAccountInput(e.target.value)} placeholder="e.g., 123456789012" className="rounded-lg h-9 text-sm pl-10"/>
                         </div>
                       </div>
