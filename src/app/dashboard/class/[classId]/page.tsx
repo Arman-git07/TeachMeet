@@ -588,6 +588,7 @@ export default function ClassDetailsPage() {
         if (amountForTheCurrentPayment < 0) amountForTheCurrentPayment = 0;
     }
     
+    const successToastMessage = `Mock card payment of $${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name || 'the class'} processed. The class fee is now considered fully paid.`;
     toast(makePaymentToast("Credit/Debit Card", amountForTheCurrentPayment, classroom?.name || "the class"));
     
     setTimeout(() => {
@@ -602,7 +603,7 @@ export default function ClassDetailsPage() {
 
         toast({
             title: "Card Payment Successful (Mock)",
-            description: `Payment of $${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name} processed. The class fee is now fully paid.`,
+            description: successToastMessage,
         });
       } else {
          toast({
