@@ -37,13 +37,13 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
 
   useEffect(() => {
     setMessages([
-      { 
-        id: 'sys_join', 
-        senderName: 'System', 
-        text: `Welcome to the chat for "${className}". This is a public discussion forum for all class members.`, 
-        timestamp: new Date(), 
+      {
+        id: 'sys_join',
+        senderName: 'System',
+        text: `All class members and teacher of this class can chat here.`,
+        timestamp: new Date(),
         isMe: false,
-        isSystem: true 
+        isSystem: true
       }
     ]);
   }, [className]);
@@ -66,7 +66,7 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
     if (!inputValue.trim()) return;
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
-      senderName: 'You', 
+      senderName: 'You',
       text: inputValue.trim(),
       timestamp: new Date(),
       isMe: true,
@@ -74,21 +74,8 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
     };
     setMessages(prev => [...prev, newMessage]);
     setInputValue("");
-
-    // Mock AI/other user response for demonstration - REMOVED
-    // setTimeout(() => {
-    //   const mockResponse: ChatMessage = {
-    //     id: (Date.now() + 1).toString(),
-    //     senderName: 'Classmate AI (Mock)',
-    //     text: `Acknowledged your message: "${newMessage.text.substring(0,25)}${newMessage.text.length > 25 ? '...' : ''}"`,
-    //     timestamp: new Date(),
-    //     isMe: false,
-    //     senderAvatar: `https://placehold.co/40x40/FFD700/000000.png?text=AI` // Example AI avatar
-    //   };
-    //   setMessages(prev => [...prev, mockResponse]);
-    // }, 1200 + Math.random() * 800);
   };
-  
+
   const backToClassDetailsLink = `/dashboard/class/${classId}?name=${encodeURIComponent(className)}`;
 
   return (
