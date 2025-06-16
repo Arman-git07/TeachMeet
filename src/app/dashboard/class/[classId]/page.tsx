@@ -63,7 +63,7 @@ interface FeeDetails {
   totalFee: number;
   paidAmount: number;
   nextDueDate?: string;
-  currency: string; 
+  currency: string;
 }
 
 interface ScheduleItem {
@@ -102,7 +102,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
   let mockTeacherPaymentDetails: Partial<ClassroomDetails> = {};
 
   if (id === "cl1") {
-    baseTeacherId = "dr_ada_lovelace_uid"; 
+    baseTeacherId = "dr_ada_lovelace_uid";
     mockTeacherPaymentDetails = {
       teacherUpiId: "teacher-cl1@exampleupi",
       teacherBankAccount: "123456789012",
@@ -154,7 +154,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
       totalFee: 500,
       paidAmount: 250,
       nextDueDate: "2024-09-01",
-      currency: "USD", 
+      currency: "USD",
     },
     ...mockTeacherPaymentDetails,
   };
@@ -204,7 +204,7 @@ export default function ClassDetailsPage() {
     totalFee: string;
     paidAmount: string;
     nextDueDate: string;
-    currency: string; 
+    currency: string;
   } | null>(null);
 
   const [isPostAnnouncementDialogOpen, setIsPostAnnouncementDialogOpen] = useState(false);
@@ -248,9 +248,9 @@ export default function ClassDetailsPage() {
 
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
   const [refundAmountInput, setRefundAmountInput] = useState('');
-  
+
   const getCurrencySymbol = (currencyCode?: string): string => {
-    if (!currencyCode) return '$'; 
+    if (!currencyCode) return '$';
     switch (currencyCode.toUpperCase()) {
       case 'USD': return '$';
       case 'EUR': return '€';
@@ -266,7 +266,7 @@ export default function ClassDetailsPage() {
       case 'ZAR': return 'R';
       case 'AED': return 'د.إ';
       case 'SGD': return 'S$';
-      default: return currencyCode + ' '; 
+      default: return currencyCode + ' ';
     }
   };
 
@@ -277,7 +277,7 @@ export default function ClassDetailsPage() {
       setTimeout(() => {
         const details = getMockClassroomDetails(classId, classNameQuery);
         if (details && user) {
-          if (details.id === 'cl1') { 
+          if (details.id === 'cl1') {
             details.teacherId = user.uid;
             details.teacherName = user.displayName || "Current User (Teacher)";
             const initials = (user.displayName || "CU").split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
@@ -294,14 +294,14 @@ export default function ClassDetailsPage() {
             totalFee: String(details.feeDetails.totalFee),
             paidAmount: String(details.feeDetails.paidAmount),
             nextDueDate: details.feeDetails.nextDueDate || '',
-            currency: details.feeDetails.currency || 'USD', 
+            currency: details.feeDetails.currency || 'USD',
           });
         } else {
-          setEditableFeeDetails({ 
-            totalFee: '0', 
-            paidAmount: '0', 
-            nextDueDate: '', 
-            currency: 'USD', 
+          setEditableFeeDetails({
+            totalFee: '0',
+            paidAmount: '0',
+            nextDueDate: '',
+            currency: 'USD',
           });
         }
         if (!(details?.id === 'cl1' && user?.uid === details.teacherId)) {
@@ -313,7 +313,7 @@ export default function ClassDetailsPage() {
         setLoading(false);
       }, 500);
     } else if (!classId) {
-      setLoading(false); 
+      setLoading(false);
     }
   }, [classId, classNameQuery, user, authLoading]);
 
@@ -455,13 +455,13 @@ export default function ClassDetailsPage() {
     setIsUploadingMaterial(true);
     let newMaterial: Material;
     if (newMaterialType === 'file' && newMaterialFile) {
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      await new Promise(resolve => setTimeout(resolve, 1500));
       newMaterial = { id: `mat_${Date.now()}`, title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'file', fileName: newMaterialFile.name };
       toast({ title: "File Material Added (Mock)", description: `"${newMaterial.title}" has been added.` });
     } else if (newMaterialType === 'link') {
       newMaterial = { id: `mat_${Date.now()}`, title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'link', url: newMaterialUrl.trim() };
       toast({ title: "Link Material Added", description: `"${newMaterial.title}" has been added.` });
-    } else { setIsUploadingMaterial(false); return; } 
+    } else { setIsUploadingMaterial(false); return; }
     setClassroom(prev => prev ? { ...prev, materials: [...(prev.materials || []), newMaterial] } : null);
     setIsUploadMaterialDialogOpen(false); resetUploadMaterialDialog();
   };
@@ -474,17 +474,17 @@ export default function ClassDetailsPage() {
   };
 
   const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; if (event.target) event.target.value = ""; 
+    const file = event.target.files?.[0]; if (event.target) event.target.value = "";
     if (!file) { toast({ variant: "info", title: "File Selection Cancelled", description: "No file was selected for upload." }); setSelectedAssignmentTitleForUpload(null); setIsAssignmentUploadDialogOpen(false); return; }
     if (!selectedAssignmentTitleForUpload) { console.error("No assignment title selected."); toast({ variant: "destructive", title: "Internal Error", description: "Assignment title missing." }); setIsAssignmentUploadDialogOpen(false); return; }
     toast({ title: "Uploading Assignment Materials...", description: `Simulating upload for "${selectedAssignmentTitleForUpload}".` }); setIsAssignmentUploadDialogOpen(false);
-    await new Promise(resolve => setTimeout(resolve, 1500)); 
+    await new Promise(resolve => setTimeout(resolve, 1500));
     const newAssignmentEntry: Assignment = { id: `assign_teacher_${Date.now()}`, title: selectedAssignmentTitleForUpload, dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), status: "Pending", description: `Materials for "${selectedAssignmentTitleForUpload}". File: ${file.name}` };
     setClassroom(prev => prev ? { ...prev, assignments: [newAssignmentEntry, ...(prev.assignments || [])] } : null);
     toast({ title: "Assignment Materials Uploaded (Mock)", description: `"${selectedAssignmentTitleForUpload}" (file: ${file.name}) added.`, duration: 5000 });
     setSelectedAssignmentTitleForUpload(null); setDialogAssignmentName('');
   };
-  
+
   const makePaymentToast = (method: string, remainingFee: number, classroomName: string, currency: string) => {
     const developerCut = remainingFee * 0.02;
     const teacherReceives = remainingFee - developerCut;
@@ -509,10 +509,10 @@ export default function ClassDetailsPage() {
     const successToastMessage = `Mock card payment of ${currencySymbol}${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name || 'the class'} processed. The class fee is now considered fully paid. ${currencySymbol}${(amountForTheCurrentPayment * 0.98).toFixed(2)} (conceptual) to teacher, ${currencySymbol}${(amountForTheCurrentPayment * 0.02).toFixed(2)} to developer (UPI: 07arman2004-1@oksbi).`;
     setTimeout(() => {
       if (classroom?.feeDetails && editableFeeDetails) {
-        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); 
+        const newPaidAmount = parseFloat(editableFeeDetails.totalFee);
         const newFeeDetailsData: FeeDetails = { ...classroom.feeDetails, paidAmount: newPaidAmount, currency: editableFeeDetails.currency };
         setClassroom(prev => prev ? { ...prev, feeDetails: newFeeDetailsData } : null);
-        setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null); 
+        setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null);
         toast({ title: "Card Payment Successful (Mock)", description: successToastMessage, duration: 10000 });
       } else { toast({ title: "Card Payment Processed (Mock)", description: `Mock card payment for ${classroom?.name} completed.` }); }
       setIsCardPaymentDialogOpen(false); setCardNumber(''); setCardExpiry(''); setCardCvv(''); setCardName('');
@@ -546,15 +546,15 @@ export default function ClassDetailsPage() {
           <p><strong>Amount to Transfer to Teacher:</strong> ${currentCurrencySymbol}${(remainingFee * 0.98).toFixed(2)}</p></div>
           <p>The remaining 2% (${currentCurrencySymbol}${(remainingFee * 0.02).toFixed(2)}) is for the developer (UPI: 07arman2004-1@oksbi).</p><p>This is a simulated page.</p><button class="button-placeholder" onclick="window.close()">Close</button></div>
           <div class="footer">Mock interface. No real payment.</div></body></html>`;
-        const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`; 
+        const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`;
         const newTab = window.open(dataUri, '_blank');
-        if (newTab) { 
-            toast(makePaymentToast(method, remainingFee, classroom.name, currentCurrency)); 
-        } else { 
-            toast({ variant: "destructive", title: "Popup Blocked", description: "Could not open Net Banking page. Please check your browser's popup blocker settings and try again.", duration: 10000 }); 
+        if (newTab) {
+            toast(makePaymentToast(method, remainingFee, classroom.name, currentCurrency));
+        } else {
+            toast({ variant: "destructive", title: "Popup Blocked", description: "Could not open Net Banking page. Please check your browser's popup blocker settings and try again.", duration: 10000 });
         }
         setIsPaymentDialogOpen(false);
-    } else if (method === "Credit/Debit Card") { setIsPaymentDialogOpen(false); setIsCardPaymentDialogOpen(true); 
+    } else if (method === "Credit/Debit Card") { setIsPaymentDialogOpen(false); setIsCardPaymentDialogOpen(true);
     } else { toast(makePaymentToast(method, remainingFee, classroom.name, currentCurrency)); setIsPaymentDialogOpen(false); }
   };
 
@@ -594,7 +594,7 @@ export default function ClassDetailsPage() {
     toast({ title: "Fee Details Updated (Mock)", description: "Class fee information has been saved locally." });
     setIsEditingFeeDetails(false);
   };
-  
+
   const handleToggleEditTeacherPaymentDetails = () => {
     if (!isEditingTeacherPaymentDetails && classroom) {
       setTeacherUpiIdInput(classroom.teacherUpiId || ''); setTeacherBankAccountInput(classroom.teacherBankAccount || '');
@@ -626,10 +626,10 @@ export default function ClassDetailsPage() {
 
     const newPaidAmount = classroom.feeDetails.paidAmount - amountToRefund;
     const updatedFeeDetails: FeeDetails = { ...classroom.feeDetails, paidAmount: newPaidAmount };
-    
+
     setClassroom(prev => prev ? { ...prev, feeDetails: updatedFeeDetails } : null);
     setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null);
-    
+
     toast({ title: "Refund Processed (Mock)", description: `${getCurrencySymbol(classroom.feeDetails.currency)}${amountToRefund.toFixed(2)} has been refunded to the student (conceptually).` });
     setIsRefundDialogOpen(false);
     setRefundAmountInput('');
@@ -798,6 +798,9 @@ export default function ClassDetailsPage() {
                        <Button onClick={handleToggleEditTeacherPaymentDetails} variant="outline" className="w-full rounded-lg text-sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Details</Button>
                     )
                   )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Note: Student payments made to these details will have a 2% platform fee deducted for the developer (UPI: 07arman2004-1@oksbi).
+                  </p>
                   <Separator className="my-4" />
                 </div>
               )}
@@ -857,7 +860,7 @@ export default function ClassDetailsPage() {
                           variant="outline"
                           className="flex-1 rounded-lg text-sm border-orange-500 text-orange-500 hover:bg-orange-500/10 hover:text-orange-600"
                           onClick={() => {
-                            setRefundAmountInput(''); 
+                            setRefundAmountInput('');
                             setIsRefundDialogOpen(true);
                           }}
                         >
@@ -881,7 +884,7 @@ export default function ClassDetailsPage() {
       <Dialog open={isEditScheduleDialogOpen} onOpenChange={setIsEditScheduleDialogOpen}>
         {isEditScheduleDialogOpen && (<DialogContent className="sm:max-w-lg rounded-xl"><DialogHeader><ShadDialogTitle>Edit Schedule</ShadDialogTitle><DialogDescription>Add, remove, or modify entries.</DialogDescription></DialogHeader><div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">{editingScheduleItems.length > 0 ? (editingScheduleItems.map((item, index) => (<div key={item.id || index} className="flex items-center justify-between gap-2 p-2 border rounded-lg"><div className="flex-grow"><p className="text-sm font-medium">{item.day} - {item.time}</p>{item.topic && <p className="text-xs text-muted-foreground">{item.topic}</p>}</div><Button variant="ghost" size="icon" onClick={() => handleRemoveScheduleItemInDialog(item.id)} className="text-destructive h-8 w-8 rounded-md"><Trash2 className="h-4 w-4" /></Button></div>))) : (<p className="text-sm text-muted-foreground text-center py-4">No entries.</p>)}<div className="pt-4 border-t"><Label className="text-sm font-medium block mb-2">Add New</Label><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Input value={newScheduleDayInput} onChange={(e) => setNewScheduleDayInput(e.target.value)} placeholder="Day" className="rounded-lg"/><Input value={newScheduleTimeInput} onChange={(e) => setNewScheduleTimeInput(e.target.value)} placeholder="Time" className="rounded-lg"/></div><Input value={newScheduleTopicInput} onChange={(e) => setNewScheduleTopicInput(e.target.value)} placeholder="Topic" className="rounded-lg mt-3"/><Button onClick={handleAddScheduleItemInDialog} className="w-full mt-3 btn-gel rounded-lg text-sm"><PlusCircle className="mr-2 h-4 w-4" /> Add</Button></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg">Cancel</Button></DialogClose><Button type="button" onClick={handleSaveChangesToSchedule} className="btn-gel rounded-lg">Save Schedule</Button></DialogFooter></DialogContent>)}</Dialog>
       <Dialog open={isCardPaymentDialogOpen} onOpenChange={setIsCardPaymentDialogOpen}><DialogContent className="sm:max-w-md rounded-xl"><DialogHeader><ShadDialogTitle>Enter Card Details</ShadDialogTitle><DialogDescription>Enter card info to complete payment. (Mock)</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="cardNumber">Card Number</Label><Input id="cardNumber" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="rounded-lg"/></div><div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="cardExpiry">Expiry (MM/YY)</Label><Input id="cardExpiry" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM/YY" className="rounded-lg"/></div><div className="grid gap-2"><Label htmlFor="cardCvv">CVV</Label><Input id="cardCvv" value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" className="rounded-lg"/></div></div><div className="grid gap-2"><Label htmlFor="cardName">Cardholder Name</Label><Input id="cardName" value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Full Name" className="rounded-lg"/></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={() => setIsCardPaymentDialogOpen(false)}>Cancel</Button></DialogClose><Button type="button" onClick={handleCardPaymentSubmit} className="btn-gel rounded-lg">Pay {getCurrencySymbol(classroom?.feeDetails?.currency || 'USD')}{currentRemainingFee > 0 ? currentRemainingFee.toFixed(2) : "0.00"} (Mock)</Button></DialogFooter></DialogContent></Dialog>
-    
+
       <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
         <DialogContent className="sm:max-w-md rounded-xl">
           <DialogHeader>
