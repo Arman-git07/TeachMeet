@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import {
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle,
     Megaphone, ClipboardList, Link as LinkIconLucide, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Landmark, Hash
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Hash, Landmark as LandmarkIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -253,6 +253,16 @@ export default function ClassDetailsPage() {
       case 'EUR': return '€';
       case 'INR': return '₹';
       case 'GBP': return '£';
+      case 'CAD': return 'CA$';
+      case 'AUD': return 'A$';
+      case 'JPY': return '¥';
+      case 'CNY': return 'CN¥';
+      case 'CHF': return 'CHF';
+      case 'RUB': return '₽';
+      case 'BRL': return 'R$';
+      case 'ZAR': return 'R';
+      case 'AED': return 'د.إ';
+      case 'SGD': return 'S$';
       default: return currencyCode + ' '; 
     }
   };
@@ -545,9 +555,13 @@ export default function ClassDetailsPage() {
           <p><strong>Amount to Transfer to Teacher:</strong> ${currentCurrencySymbol}${(remainingFee * 0.98).toFixed(2)}</p></div>
           <p>The remaining 2% (${currentCurrencySymbol}${(remainingFee * 0.02).toFixed(2)}) is for the developer (UPI: 07arman2004-1@oksbi).</p><p>This is a simulated page.</p><button class="button-placeholder" onclick="window.close()">Close</button></div>
           <div class="footer">Mock interface. No real payment.</div></body></html>`;
-        const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`; const newTab = window.open(dataUri, '_blank');
-        if (newTab) { toast(makePaymentToast(method, remainingFee, classroom.name, currentCurrency)); }
-        else { toast({ variant: "destructive", title: "Popup Blocked", description: "Could not open Net Banking page. Please check popup blocker.", duration: 10000 }); }
+        const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`; 
+        const newTab = window.open(dataUri, '_blank');
+        if (newTab) { 
+            toast(makePaymentToast(method, remainingFee, classroom.name, currentCurrency)); 
+        } else { 
+            toast({ variant: "destructive", title: "Popup Blocked", description: "Could not open Net Banking page. Please check your browser's popup blocker settings and try again.", duration: 10000 }); 
+        }
         setIsPaymentDialogOpen(false);
     } else if (method === "Credit/Debit Card") { setIsPaymentDialogOpen(false); setIsCardPaymentDialogOpen(true); 
     } else { toast(makePaymentToast(method, remainingFee, classroom.name, currentCurrency)); setIsPaymentDialogOpen(false); }
@@ -747,7 +761,7 @@ export default function ClassDetailsPage() {
                       <div>
                         <Label htmlFor="teacherBankAccount" className="text-xs">Bank Account Number</Label>
                          <div className="relative mt-1">
-                            <Landmark className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <LandmarkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input id="teacherBankAccount" value={teacherBankAccountInput} onChange={(e) => setTeacherBankAccountInput(e.target.value)} placeholder="e.g., 123456789012" className="rounded-lg h-9 text-sm pl-10"/>
                         </div>
                       </div>
@@ -784,7 +798,22 @@ export default function ClassDetailsPage() {
                     <Label htmlFor="feeCurrency" className="text-xs">Currency</Label>
                     <Select value={editableFeeDetails?.currency} onValueChange={(value) => setEditableFeeDetails(prev => prev ? { ...prev, currency: value } : null)} disabled={!isEditingFeeDetails}>
                         <SelectTrigger id="feeCurrency" className="rounded-lg h-9 text-sm"><SelectValue placeholder="Select currency" /></SelectTrigger>
-                        <SelectContent><SelectItem value="USD">USD ($)</SelectItem><SelectItem value="EUR">EUR (€)</SelectItem><SelectItem value="INR">INR (₹)</SelectItem><SelectItem value="GBP">GBP (£)</SelectItem></SelectContent>
+                        <SelectContent>
+                            <SelectItem value="USD">USD ($) - US Dollar</SelectItem>
+                            <SelectItem value="EUR">EUR (€) - Euro</SelectItem>
+                            <SelectItem value="INR">INR (₹) - Indian Rupee</SelectItem>
+                            <SelectItem value="GBP">GBP (£) - British Pound</SelectItem>
+                            <SelectItem value="CAD">CAD (CA$) - Canadian Dollar</SelectItem>
+                            <SelectItem value="AUD">AUD (A$) - Australian Dollar</SelectItem>
+                            <SelectItem value="JPY">JPY (¥) - Japanese Yen</SelectItem>
+                            <SelectItem value="CNY">CNY (CN¥) - Chinese Yuan</SelectItem>
+                            <SelectItem value="CHF">CHF (CHF) - Swiss Franc</SelectItem>
+                            <SelectItem value="RUB">RUB (₽) - Russian Ruble</SelectItem>
+                            <SelectItem value="BRL">BRL (R$) - Brazilian Real</SelectItem>
+                            <SelectItem value="ZAR">ZAR (R) - South African Rand</SelectItem>
+                            <SelectItem value="AED">AED (د.إ) - UAE Dirham</SelectItem>
+                            <SelectItem value="SGD">SGD (S$) - Singapore Dollar</SelectItem>
+                        </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1"><Label htmlFor="totalFee" className="text-xs">Class Total Fee ({getCurrencySymbol(editableFeeDetails?.currency)})</Label><Input id="totalFee" type="number" value={editableFeeDetails?.totalFee} onChange={(e) => setEditableFeeDetails(prev => prev ? { ...prev, totalFee: e.target.value } : null)} className="rounded-lg h-9 text-sm" placeholder="e.g., 500"/></div>
