@@ -75,18 +75,18 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
     setMessages(prev => [...prev, newMessage]);
     setInputValue("");
 
-    // Mock AI/other user response for demonstration
-    setTimeout(() => {
-      const mockResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        senderName: 'Classmate AI (Mock)',
-        text: `Acknowledged your message: "${newMessage.text.substring(0,25)}${newMessage.text.length > 25 ? '...' : ''}"`,
-        timestamp: new Date(),
-        isMe: false,
-        senderAvatar: `https://placehold.co/40x40/FFD700/000000.png?text=AI` // Example AI avatar
-      };
-      setMessages(prev => [...prev, mockResponse]);
-    }, 1200 + Math.random() * 800);
+    // Mock AI/other user response for demonstration - REMOVED
+    // setTimeout(() => {
+    //   const mockResponse: ChatMessage = {
+    //     id: (Date.now() + 1).toString(),
+    //     senderName: 'Classmate AI (Mock)',
+    //     text: `Acknowledged your message: "${newMessage.text.substring(0,25)}${newMessage.text.length > 25 ? '...' : ''}"`,
+    //     timestamp: new Date(),
+    //     isMe: false,
+    //     senderAvatar: `https://placehold.co/40x40/FFD700/000000.png?text=AI` // Example AI avatar
+    //   };
+    //   setMessages(prev => [...prev, mockResponse]);
+    // }, 1200 + Math.random() * 800);
   };
   
   const backToClassDetailsLink = `/dashboard/class/${classId}?name=${encodeURIComponent(className)}`;
