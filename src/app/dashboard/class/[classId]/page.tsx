@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import {
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle,
     Megaphone, ClipboardList, Link as LinkIconLucide, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Hash, Landmark as LandmarkIcon
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Hash, Landmark as LandmarkIcon, Undo2
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -102,7 +102,7 @@ const getMockClassroomDetails = (id: string, nameQueryParam?: string | null): Cl
   let mockTeacherPaymentDetails: Partial<ClassroomDetails> = {};
 
   if (id === "cl1") {
-    baseTeacherId = "dr_ada_lovelace_uid"; // This will be overwritten if the current user is "cl1"
+    baseTeacherId = "dr_ada_lovelace_uid"; 
     mockTeacherPaymentDetails = {
       teacherUpiId: "teacher-cl1@exampleupi",
       teacherBankAccount: "123456789012",
@@ -245,6 +245,9 @@ export default function ClassDetailsPage() {
   const [teacherBankAccountInput, setTeacherBankAccountInput] = useState('');
   const [teacherBankIfscInput, setTeacherBankIfscInput] = useState('');
   const [teacherBankNameInput, setTeacherBankNameInput] = useState('');
+
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+  const [refundAmountInput, setRefundAmountInput] = useState('');
   
   const getCurrencySymbol = (currencyCode?: string): string => {
     if (!currencyCode) return '$'; 
@@ -274,13 +277,11 @@ export default function ClassDetailsPage() {
       setTimeout(() => {
         const details = getMockClassroomDetails(classId, classNameQuery);
         if (details && user) {
-          // If this class (cl1) is created by current user, update teacher details
-          if (details.id === 'cl1') { // Assuming 'cl1' is the special ID for current user's class
+          if (details.id === 'cl1') { 
             details.teacherId = user.uid;
             details.teacherName = user.displayName || "Current User (Teacher)";
             const initials = (user.displayName || "CU").split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
             details.teacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${initials}`;
-            // Initialize teacher payment inputs if details exist for cl1
             if (details.teacherUpiId) setTeacherUpiIdInput(details.teacherUpiId);
             if (details.teacherBankAccount) setTeacherBankAccountInput(details.teacherBankAccount);
             if (details.teacherBankIfsc) setTeacherBankIfscInput(details.teacherBankIfsc);
@@ -296,7 +297,6 @@ export default function ClassDetailsPage() {
             currency: details.feeDetails.currency || 'USD', 
           });
         } else {
-          // Default if no feeDetails for a class
           setEditableFeeDetails({ 
             totalFee: '0', 
             paidAmount: '0', 
@@ -304,7 +304,6 @@ export default function ClassDetailsPage() {
             currency: 'USD', 
           });
         }
-        // Initialize teacher payment inputs if details exist and not for cl1 (already handled above)
         if (!(details?.id === 'cl1' && user?.uid === details.teacherId)) {
             if (details?.teacherUpiId) setTeacherUpiIdInput(details.teacherUpiId);
             if (details?.teacherBankAccount) setTeacherBankAccountInput(details.teacherBankAccount);
@@ -314,7 +313,7 @@ export default function ClassDetailsPage() {
         setLoading(false);
       }, 500);
     } else if (!classId) {
-      setLoading(false); // No classId means nothing to load
+      setLoading(false); 
     }
   }, [classId, classNameQuery, user, authLoading]);
 
@@ -335,18 +334,13 @@ export default function ClassDetailsPage() {
     }
     if (classroom) {
       if (user.uid === classroom.teacherId) {
-        // Teacher can always start
         router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
       } else {
-        // Student joining behavior - this might depend on if the meeting is 'live'
-        // For simplicity, this prototype allows students to go to waiting room for any class meeting
         toast({
           variant: "destructive",
           title: "Access Denied",
           description: "Only the class teacher or registered members can start/join this meeting directly. Please wait for the teacher to start the meeting or provide a join link.",
         });
-        // Consider: router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
-        // Or check meeting status from a backend before allowing join.
       }
     }
   };
@@ -461,19 +455,17 @@ export default function ClassDetailsPage() {
     setIsUploadingMaterial(true);
     let newMaterial: Material;
     if (newMaterialType === 'file' && newMaterialFile) {
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Mock upload
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
       newMaterial = { id: `mat_${Date.now()}`, title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'file', fileName: newMaterialFile.name };
       toast({ title: "File Material Added (Mock)", description: `"${newMaterial.title}" has been added.` });
     } else if (newMaterialType === 'link') {
       newMaterial = { id: `mat_${Date.now()}`, title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'link', url: newMaterialUrl.trim() };
       toast({ title: "Link Material Added", description: `"${newMaterial.title}" has been added.` });
-    } else { setIsUploadingMaterial(false); return; } // Should not happen with current logic
+    } else { setIsUploadingMaterial(false); return; } 
     setClassroom(prev => prev ? { ...prev, materials: [...(prev.materials || []), newMaterial] } : null);
     setIsUploadMaterialDialogOpen(false); resetUploadMaterialDialog();
   };
 
-  // For Teacher: Uploading assignment-related materials (e.g., question paper, guidelines)
   const handleTriggerAssignmentUploadDialog = () => { setDialogAssignmentName(''); setIsAssignmentUploadDialogOpen(true); };
 
   const handleDialogSubmitAndChooseFile = () => {
@@ -482,18 +474,17 @@ export default function ClassDetailsPage() {
   };
 
   const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; if (event.target) event.target.value = ""; // Reset file input
+    const file = event.target.files?.[0]; if (event.target) event.target.value = ""; 
     if (!file) { toast({ variant: "info", title: "File Selection Cancelled", description: "No file was selected for upload." }); setSelectedAssignmentTitleForUpload(null); setIsAssignmentUploadDialogOpen(false); return; }
     if (!selectedAssignmentTitleForUpload) { console.error("No assignment title selected."); toast({ variant: "destructive", title: "Internal Error", description: "Assignment title missing." }); setIsAssignmentUploadDialogOpen(false); return; }
     toast({ title: "Uploading Assignment Materials...", description: `Simulating upload for "${selectedAssignmentTitleForUpload}".` }); setIsAssignmentUploadDialogOpen(false);
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Mock upload delay
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
     const newAssignmentEntry: Assignment = { id: `assign_teacher_${Date.now()}`, title: selectedAssignmentTitleForUpload, dueDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), status: "Pending", description: `Materials for "${selectedAssignmentTitleForUpload}". File: ${file.name}` };
     setClassroom(prev => prev ? { ...prev, assignments: [newAssignmentEntry, ...(prev.assignments || [])] } : null);
     toast({ title: "Assignment Materials Uploaded (Mock)", description: `"${selectedAssignmentTitleForUpload}" (file: ${file.name}) added.`, duration: 5000 });
     setSelectedAssignmentTitleForUpload(null); setDialogAssignmentName('');
   };
   
-  // Function to generate a toast message with developer and teacher cut
   const makePaymentToast = (method: string, remainingFee: number, classroomName: string, currency: string) => {
     const developerCut = remainingFee * 0.02;
     const teacherReceives = remainingFee - developerCut;
@@ -518,10 +509,10 @@ export default function ClassDetailsPage() {
     const successToastMessage = `Mock card payment of ${currencySymbol}${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name || 'the class'} processed. The class fee is now considered fully paid. ${currencySymbol}${(amountForTheCurrentPayment * 0.98).toFixed(2)} (conceptual) to teacher, ${currencySymbol}${(amountForTheCurrentPayment * 0.02).toFixed(2)} to developer (UPI: 07arman2004-1@oksbi).`;
     setTimeout(() => {
       if (classroom?.feeDetails && editableFeeDetails) {
-        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); // Fully paid
+        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); 
         const newFeeDetailsData: FeeDetails = { ...classroom.feeDetails, paidAmount: newPaidAmount, currency: editableFeeDetails.currency };
         setClassroom(prev => prev ? { ...prev, feeDetails: newFeeDetailsData } : null);
-        setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null); // Update editable state too
+        setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null); 
         toast({ title: "Card Payment Successful (Mock)", description: successToastMessage, duration: 10000 });
       } else { toast({ title: "Card Payment Processed (Mock)", description: `Mock card payment for ${classroom?.name} completed.` }); }
       setIsCardPaymentDialogOpen(false); setCardNumber(''); setCardExpiry(''); setCardCvv(''); setCardName('');
@@ -570,12 +561,10 @@ export default function ClassDetailsPage() {
   const handleExamCreated = (newExam: any) => {
     console.log("New exam created via dialog on class page:", newExam);
     toast({ title: "Exam Scheduled (Class Context)", description: `${newExam.title} has been scheduled for this class.` });
-    // Potentially update classroom.exams state here
   };
 
   const handleToggleEditFeeDetails = () => {
     if (isEditingFeeDetails && classroom?.feeDetails) {
-      // Reset editable details to current classroom details if cancelling edit
       setEditableFeeDetails({
         totalFee: String(classroom.feeDetails.totalFee),
         paidAmount: String(classroom.feeDetails.paidAmount),
@@ -583,7 +572,6 @@ export default function ClassDetailsPage() {
         currency: classroom.feeDetails.currency || 'USD',
       });
     } else if (!isEditingFeeDetails && !editableFeeDetails && classroom?.feeDetails) {
-      // If not editing and editableFeeDetails is null, initialize from classroom
        setEditableFeeDetails({
         totalFee: String(classroom.feeDetails.totalFee),
         paidAmount: String(classroom.feeDetails.paidAmount),
@@ -591,7 +579,6 @@ export default function ClassDetailsPage() {
         currency: classroom.feeDetails.currency || 'USD',
       });
     } else if (!isEditingFeeDetails && !editableFeeDetails && !classroom?.feeDetails) {
-      // If no details exist at all, initialize with defaults for editing
       setEditableFeeDetails({ totalFee: '0', paidAmount: '0', nextDueDate: '', currency: 'USD' });
     }
     setIsEditingFeeDetails(!isEditingFeeDetails);
@@ -622,6 +609,30 @@ export default function ClassDetailsPage() {
     if (teacherBankIfscInput && !/^[A-Za-z]{4}0[A-Z0-9]{6}$/.test(teacherBankIfscInput)) { toast({ variant: "destructive", title: "Invalid IFSC Code" }); return; }
     const updatedClassroom = { ...classroom, teacherUpiId: teacherUpiIdInput.trim() || undefined, teacherBankAccount: teacherBankAccountInput.trim() || undefined, teacherBankIfsc: teacherBankIfscInput.trim().toUpperCase() || undefined, teacherBankName: teacherBankNameInput.trim() || undefined };
     setClassroom(updatedClassroom); toast({ title: "Payment Details Updated" }); setIsEditingTeacherPaymentDetails(false);
+  };
+
+  const handleConfirmRefund = () => {
+    if (!classroom || !classroom.feeDetails || !editableFeeDetails) return;
+    const amountToRefund = parseFloat(refundAmountInput);
+
+    if (isNaN(amountToRefund) || amountToRefund <= 0) {
+      toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid positive amount to refund." });
+      return;
+    }
+    if (amountToRefund > classroom.feeDetails.paidAmount) {
+      toast({ variant: "destructive", title: "Refund Exceeds Paid", description: `Cannot refund more than the paid amount of ${getCurrencySymbol(classroom.feeDetails.currency)}${classroom.feeDetails.paidAmount.toFixed(2)}.` });
+      return;
+    }
+
+    const newPaidAmount = classroom.feeDetails.paidAmount - amountToRefund;
+    const updatedFeeDetails: FeeDetails = { ...classroom.feeDetails, paidAmount: newPaidAmount };
+    
+    setClassroom(prev => prev ? { ...prev, feeDetails: updatedFeeDetails } : null);
+    setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null);
+    
+    toast({ title: "Refund Processed (Mock)", description: `${getCurrencySymbol(classroom.feeDetails.currency)}${amountToRefund.toFixed(2)} has been refunded to the student (conceptually).` });
+    setIsRefundDialogOpen(false);
+    setRefundAmountInput('');
   };
 
   const isCurrentUserTeacher = user?.uid === classroom?.teacherId;
@@ -829,7 +840,34 @@ export default function ClassDetailsPage() {
               ) : ( <p className="text-muted-foreground">Class fee details not set up yet.</p> )}
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-2">
-              {isCurrentUserTeacher && !isEditingTeacherPaymentDetails && (isEditingFeeDetails ? (<><Button onClick={handleSaveFeeDetails} className="w-full btn-gel rounded-lg text-sm">Save Fee Details</Button><Button onClick={handleToggleEditFeeDetails} variant="outline" className="w-full rounded-lg text-sm">Cancel</Button></>) : (<Button onClick={handleToggleEditFeeDetails} variant="outline" className="w-full rounded-lg text-sm"><Edit2 className="mr-2 h-4 w-4" /> Edit Fee Structure</Button>))}
+              {isCurrentUserTeacher && !isEditingTeacherPaymentDetails && (
+                <div className="w-full flex flex-col sm:flex-row gap-2">
+                  {isEditingFeeDetails ? (
+                    <>
+                      <Button onClick={handleSaveFeeDetails} className="flex-1 btn-gel rounded-lg text-sm">Save Fee Details</Button>
+                      <Button onClick={handleToggleEditFeeDetails} variant="outline" className="flex-1 rounded-lg text-sm">Cancel</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button onClick={handleToggleEditFeeDetails} variant="outline" className="flex-1 rounded-lg text-sm">
+                        <Edit2 className="mr-2 h-4 w-4" /> Edit Fee Structure
+                      </Button>
+                      {classroom?.feeDetails && classroom.feeDetails.paidAmount > 0 && (
+                        <Button
+                          variant="outline"
+                          className="flex-1 rounded-lg text-sm border-orange-500 text-orange-500 hover:bg-orange-500/10 hover:text-orange-600"
+                          onClick={() => {
+                            setRefundAmountInput(''); 
+                            setIsRefundDialogOpen(true);
+                          }}
+                        >
+                          <Undo2 className="mr-2 h-4 w-4" /> Issue Refund
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
               {!isEditingFeeDetails && !isCurrentUserTeacher && (<Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}><DialogTrigger asChild><Button className="w-full btn-gel rounded-lg text-sm" disabled={!classroom.feeDetails || currentRemainingFee <= 0}>{classroom.feeDetails && currentRemainingFee <= 0 ? "Fully Paid" : "Make Payment"}</Button></DialogTrigger>
                   {isPaymentDialogOpen && (<DialogContent className="sm:max-w-md rounded-xl"><DialogHeader><ShadDialogTitle>Choose Payment Method</ShadDialogTitle><DialogDescription>Select preferred option. (Mock Interface) Note: A 2% platform fee will be applied, directed to developer (UPI: 07arman2004-1@oksbi). Remainder to teacher.</DialogDescription></DialogHeader><div className="grid gap-3 py-4"><Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("Google Pay / UPI")}><Smartphone className="mr-3 h-5 w-5 text-blue-500" /> Google Pay / UPI</Button><Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("PhonePe")}><Smartphone className="mr-3 h-5 w-5 text-purple-600" /> PhonePe</Button><Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("Net Banking")}><Banknote className="mr-3 h-5 w-5 text-green-600" /> Net Banking</Button><Button variant="outline" className="rounded-lg justify-start py-3 text-base" onClick={() => handleMockPayment("Credit/Debit Card")}><CreditCard className="mr-3 h-5 w-5 text-orange-500" /> Credit/Debit Card</Button></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg">Cancel</Button></DialogClose></DialogFooter></DialogContent>)}</Dialog>)}
             </CardFooter>
@@ -843,6 +881,44 @@ export default function ClassDetailsPage() {
       <Dialog open={isEditScheduleDialogOpen} onOpenChange={setIsEditScheduleDialogOpen}>
         {isEditScheduleDialogOpen && (<DialogContent className="sm:max-w-lg rounded-xl"><DialogHeader><ShadDialogTitle>Edit Schedule</ShadDialogTitle><DialogDescription>Add, remove, or modify entries.</DialogDescription></DialogHeader><div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">{editingScheduleItems.length > 0 ? (editingScheduleItems.map((item, index) => (<div key={item.id || index} className="flex items-center justify-between gap-2 p-2 border rounded-lg"><div className="flex-grow"><p className="text-sm font-medium">{item.day} - {item.time}</p>{item.topic && <p className="text-xs text-muted-foreground">{item.topic}</p>}</div><Button variant="ghost" size="icon" onClick={() => handleRemoveScheduleItemInDialog(item.id)} className="text-destructive h-8 w-8 rounded-md"><Trash2 className="h-4 w-4" /></Button></div>))) : (<p className="text-sm text-muted-foreground text-center py-4">No entries.</p>)}<div className="pt-4 border-t"><Label className="text-sm font-medium block mb-2">Add New</Label><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Input value={newScheduleDayInput} onChange={(e) => setNewScheduleDayInput(e.target.value)} placeholder="Day" className="rounded-lg"/><Input value={newScheduleTimeInput} onChange={(e) => setNewScheduleTimeInput(e.target.value)} placeholder="Time" className="rounded-lg"/></div><Input value={newScheduleTopicInput} onChange={(e) => setNewScheduleTopicInput(e.target.value)} placeholder="Topic" className="rounded-lg mt-3"/><Button onClick={handleAddScheduleItemInDialog} className="w-full mt-3 btn-gel rounded-lg text-sm"><PlusCircle className="mr-2 h-4 w-4" /> Add</Button></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg">Cancel</Button></DialogClose><Button type="button" onClick={handleSaveChangesToSchedule} className="btn-gel rounded-lg">Save Schedule</Button></DialogFooter></DialogContent>)}</Dialog>
       <Dialog open={isCardPaymentDialogOpen} onOpenChange={setIsCardPaymentDialogOpen}><DialogContent className="sm:max-w-md rounded-xl"><DialogHeader><ShadDialogTitle>Enter Card Details</ShadDialogTitle><DialogDescription>Enter card info to complete payment. (Mock)</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="cardNumber">Card Number</Label><Input id="cardNumber" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="rounded-lg"/></div><div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="cardExpiry">Expiry (MM/YY)</Label><Input id="cardExpiry" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM/YY" className="rounded-lg"/></div><div className="grid gap-2"><Label htmlFor="cardCvv">CVV</Label><Input id="cardCvv" value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" className="rounded-lg"/></div></div><div className="grid gap-2"><Label htmlFor="cardName">Cardholder Name</Label><Input id="cardName" value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Full Name" className="rounded-lg"/></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={() => setIsCardPaymentDialogOpen(false)}>Cancel</Button></DialogClose><Button type="button" onClick={handleCardPaymentSubmit} className="btn-gel rounded-lg">Pay {getCurrencySymbol(classroom?.feeDetails?.currency || 'USD')}{currentRemainingFee > 0 ? currentRemainingFee.toFixed(2) : "0.00"} (Mock)</Button></DialogFooter></DialogContent></Dialog>
+    
+      <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <ShadDialogTitle>Issue Refund</ShadDialogTitle>
+            <DialogDescription>
+              Enter the amount to refund to the student. This is a mock operation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {classroom?.feeDetails && (
+              <div className="text-sm space-y-1">
+                <p>Total Paid: <span className="font-medium">{getCurrencySymbol(classroom.feeDetails.currency)}{classroom.feeDetails.paidAmount.toFixed(2)}</span></p>
+                <p>Total Fee: <span className="font-medium">{getCurrencySymbol(classroom.feeDetails.currency)}{classroom.feeDetails.totalFee.toFixed(2)}</span></p>
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label htmlFor="refundAmountInput">Refund Amount ({getCurrencySymbol(classroom?.feeDetails?.currency)})</Label>
+              <Input
+                id="refundAmountInput"
+                type="number"
+                value={refundAmountInput}
+                onChange={(e) => setRefundAmountInput(e.target.value)}
+                placeholder="e.g., 50.00"
+                className="rounded-lg"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="rounded-lg">Cancel</Button>
+            </DialogClose>
+            <Button type="button" onClick={handleConfirmRefund} className="btn-gel rounded-lg bg-orange-500 hover:bg-orange-600 text-white">
+              Confirm Refund
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
