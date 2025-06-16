@@ -525,7 +525,6 @@ export default function ClassDetailsPage() {
   };
 
   const handleCardPaymentSubmit = () => {
-    // Basic validation (can be expanded)
     if (!cardNumber || !cardExpiry || !cardCvv || !cardName) {
       toast({
         variant: "destructive",
@@ -534,20 +533,27 @@ export default function ClassDetailsPage() {
       });
       return;
     }
-    // In a real app, send to payment processor
+
+    let amountForTheCurrentPayment = 0;
+    if (classroom?.feeDetails) {
+        const total = editableFeeDetails ? parseFloat(editableFeeDetails.totalFee || '0') : classroom.feeDetails.totalFee;
+        const paid = editableFeeDetails ? parseFloat(editableFeeDetails.paidAmount || '0') : classroom.feeDetails.paidAmount;
+        amountForTheCurrentPayment = total - paid;
+        if (amountForTheCurrentPayment < 0) amountForTheCurrentPayment = 0;
+    }
+    
     toast({
       title: "Payment Submitted (Mock)",
       description: "Your card payment is being processed.",
     });
-    // Simulate success
+    
     setTimeout(() => {
       toast({
-        title: "Payment Successful (Mock)",
-        description: `Successfully paid for ${classroom?.name}.`,
+        title: "Card Payment Successful (Mock)",
+        description: `Your mock payment of $${amountForTheCurrentPayment.toFixed(2)} for ${classroom?.name} has been processed. Funds will be (notionally) transferred.`,
       });
-      // Update fee details (mock)
       if (classroom?.feeDetails && editableFeeDetails) {
-        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); // Assume full payment
+        const newPaidAmount = parseFloat(editableFeeDetails.totalFee); 
         const newFeeDetailsData: FeeDetails = {
             ...classroom.feeDetails,
             paidAmount: newPaidAmount,
@@ -556,7 +562,6 @@ export default function ClassDetailsPage() {
         setEditableFeeDetails(prev => prev ? { ...prev, paidAmount: String(newPaidAmount) } : null);
       }
       setIsCardPaymentDialogOpen(false);
-      // Clear card details
       setCardNumber('');
       setCardExpiry('');
       setCardCvv('');
