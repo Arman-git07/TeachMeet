@@ -1,7 +1,8 @@
 
 'use client';
 import Link from 'next/link';
-import dynamic from 'next/dynamic'; // Added dynamic
+import dynamic from 'next/dynamic';
+import React, { useState } from 'react'; // Added useState
 import {
   LogIn,
   UserPlus,
@@ -37,15 +38,26 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-// import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Removed direct import
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger as SignOutAlertDialogTrigger, // Keep this specific alias if used elsewhere, or remove if only general trigger needed
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from '@/components/ui/button';
 
-// Dynamically import StartMeetingDialogContent
+
 const StartMeetingDialogContent = dynamic(() => 
   import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent), 
   { 
     ssr: false,
-    loading: () => <p className="p-4 text-center">Loading dialog...</p> // Optional loading state
+    loading: () => <p className="p-4 text-center">Loading dialog...</p>
   }
 );
 
@@ -101,12 +113,12 @@ const NavItem = ({
   const buttonClassName = cn(
     commonClasses,
     isStrictlyHomeActive
-      ? "bg-secondary text-secondary-foreground" // Blue active state for Home
-      : isActive // For other active items
-      ? "bg-primary text-primary-foreground" // Green active state for others
-      : isGreenTheme // Special green theme for some inactive items
+      ? "bg-secondary text-secondary-foreground" 
+      : isActive 
+      ? "bg-primary text-primary-foreground" 
+      : isGreenTheme 
       ? "text-primary hover:bg-primary hover:text-primary-foreground"
-      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" // Default hover
+      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" 
   );
 
 
@@ -138,7 +150,7 @@ const NavItem = ({
             <SidebarMenuButton
               onClick={handleClick}
               className={buttonClassName}
-              isActive={isActive} // isActive here might determine trigger's appearance if it's also a link
+              isActive={isActive}
             >
               {buttonContent}
             </SidebarMenuButton>
@@ -177,7 +189,7 @@ const NavItem = ({
           <SidebarMenuButton
             as="a"
             onClick={handleClick}
-            isActive={isActive} // This isActive is for the generic active state handling
+            isActive={isActive}
             className={buttonClassName}
             target={target}
           >
@@ -188,14 +200,13 @@ const NavItem = ({
     );
   }
 
-  // Fallback for items without href (like Sign Out)
   return (
      <SidebarMenuItem>
          <SidebarMenuButton
          onClick={handleClick}
          className={cn(
              commonClasses,
-             "hover:bg-destructive hover:text-destructive-foreground" // Example style for non-nav, action button
+             "hover:bg-destructive hover:text-destructive-foreground" 
          )}
          >
          {buttonContent}
@@ -210,6 +221,7 @@ export function AppSidebar() {
   const { isAuthenticated, signOut, loading } = useAuth();
   const router = useRouter(); 
   const { isMobile, setOpenMobile } = useSidebar();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const legalAndInfoItems = [
     { href: "/terms-of-service", label: "Terms of Service", icon: BookOpen, target: "_blank" },
@@ -218,6 +230,7 @@ export function AppSidebar() {
   ];
 
   return (
+    <>
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
         <Link href="/" legacyBehavior>
@@ -249,7 +262,6 @@ export function AppSidebar() {
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
               <NavItem href="/dashboard/classes" icon={Users} currentPath={pathname}>Classes</NavItem>
-              {/* <NavItem href="/dashboard/exams" icon={ClipboardCheck} currentPath={pathname}>Exams</NavItem> Removed */}
             </>
           ) : (
             <>
@@ -272,11 +284,46 @@ export function AppSidebar() {
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
           <NavItem icon={ShieldAlert} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal &amp; Info</NavItem>
           {isAuthenticated && (
-            <NavItem icon={LogOut} currentPath={pathname} onClick={signOut}>Sign Out</NavItem>
+            <NavItem 
+              icon={LogOut} 
+              currentPath={pathname} 
+              onClick={() => setShowSignOutConfirm(true)}
+            >
+              Sign Out
+            </NavItem>
           )}
         </SidebarMenu>
         )}
       </SidebarFooter>
     </Sidebar>
+
+    <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+      <AlertDialogContent className="rounded-xl shadow-xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm Sign Out</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to sign out of TeachMeet?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel 
+            onClick={() => setShowSignOutConfirm(false)} 
+            className="rounded-lg"
+          >
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={() => {
+              signOut();
+              setShowSignOutConfirm(false);
+            }} 
+            className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))}
+          >
+            Sign Out
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
