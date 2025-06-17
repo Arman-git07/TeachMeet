@@ -5,13 +5,13 @@ import { Video, PlusCircle, Code } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic'; // Added dynamic
+import dynamic from 'next/dynamic';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
-  DialogHeader,
+  // DialogHeader, // Removed DialogHeader import
   DialogTitle,
   DialogClose,
   DialogTrigger,
@@ -84,19 +84,17 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent
                 className="sm:max-w-lg rounded-xl"
-                aria-labelledby="start-meeting-dialog-title"
-                aria-describedby="start-meeting-dialog-description"
+                // Removed aria-labelledby and aria-describedby
               >
-                <DialogHeader>
-                  <DialogTitle id="start-meeting-dialog-title" className="flex items-center">
-                     <Video className="mr-2 h-6 w-6 text-primary" />
-                    Start a New Meeting
-                  </DialogTitle>
-                  <DialogDescription id="start-meeting-dialog-description">
-                    Set a topic and share the invite to begin.
-                  </DialogDescription>
-                </DialogHeader>
-                <StartMeetingDialogContent />
+                {/* DialogHeader removed, DialogTitle and DialogDescription are direct children */}
+                <DialogTitle id="start-meeting-dialog-title" className="flex items-center text-xl">
+                  <Video className="mr-2 h-6 w-6 text-primary" />
+                  Start a New Meeting
+                </DialogTitle>
+                <DialogDescription id="start-meeting-dialog-description" className="text-sm text-muted-foreground">
+                  Set a topic and share the invite to begin.
+                </DialogDescription>
+                <StartMeetingDialogContent /> {/* This renders only the form body and footer */}
               </DialogContent>
             </Dialog>
           ) : (
@@ -140,15 +138,13 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent
                 className="sm:max-w-[425px] rounded-xl"
-                aria-labelledby="enter-code-dialog-title"
-                aria-describedby="enter-code-dialog-description"
+                // Removed aria-labelledby and aria-describedby
               >
-                <DialogHeader>
-                  <DialogTitle id="enter-code-dialog-title">Enter Meeting Code</DialogTitle>
-                  <DialogDescription id="enter-code-dialog-description">
-                    Type in the meeting code provided by the host to join the session.
-                  </DialogDescription>
-                </DialogHeader>
+                {/* DialogHeader removed, DialogTitle and DialogDescription are direct children */}
+                <DialogTitle id="enter-code-dialog-title" className="text-xl">Enter Meeting Code</DialogTitle>
+                <DialogDescription id="enter-code-dialog-description" className="text-sm text-muted-foreground">
+                  Type in the meeting code provided by the host to join the session.
+                </DialogDescription>
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="dialogMeetingCodeInput" className="text-right">
