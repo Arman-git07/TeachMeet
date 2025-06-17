@@ -151,7 +151,7 @@ export function StartMeetingDialogContent() {
   return (
     <>
       <DialogHeader>
-        <DialogTitle id="startNewMeetingDialogTitle" className="flex items-center">
+        <DialogTitle className="flex items-center">
           <Video className="mr-2 h-6 w-6 text-primary" />
           Start a New Meeting
         </DialogTitle>
