@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogTrigger, // Ensured DialogTrigger is imported
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
@@ -88,7 +89,7 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent 
                 className="sm:max-w-lg rounded-xl"
-                aria-label="Start a New Meeting" // Added aria-label
+                aria-label="Start a New Meeting" 
               >
                 <StartMeetingDialogContent />
               </DialogContent>
@@ -134,7 +135,7 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent 
                 className="sm:max-w-[425px] rounded-xl"
-                aria-label="Enter Meeting Code" // Added aria-label
+                aria-label="Enter Meeting Code" 
               >
                 <DialogHeader>
                   <DialogTitle>Enter Meeting Code</DialogTitle>
@@ -177,3 +178,4 @@ export function SlideUpPanel() {
     </div>
   );
 }
+
