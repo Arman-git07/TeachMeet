@@ -101,7 +101,6 @@ export function StartMeetingDialogContent() {
       await setDoc(meetingDocRef, meetingData);
       console.log("[StartMeetingDialog] Successfully created main meeting document in Firestore.");
 
-      // toast({ title: "Meeting Room Created", description: "Successfully registered the meeting room."});
 
       const newMeetingEntry: OngoingMeeting = { 
         id: meetingId, 
@@ -128,17 +127,20 @@ export function StartMeetingDialogContent() {
 
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       
-      // Note: DialogClose will handle closing the dialog if this button is its child.
-      // If navigation happens before DialogClose fully unmounts, there might be React warnings.
-      // For simplicity, we rely on DialogClose wrapping a button that calls this.
       router.push(joinNowLinkPath);
 
     } catch (error: any) {
       console.error("[StartMeetingDialog] CRITICAL: Error creating meeting document in Firestore:", error);
+      let description = `Could not create the meeting in the database: ${error.message}.`;
+      if (error.message && error.message.toLowerCase().includes('permission')) {
+        description = `Permission Denied: ${error.message}. Please check your Firebase Firestore security rules to allow writes to the 'meetings' collection for authenticated users. For development, you might need a rule like 'allow write: if request.auth != null;'.`;
+      } else {
+        description += " Check console & Firestore rules.";
+      }
       toast({
         variant: "destructive",
         title: "Failed to Start Meeting",
-        description: `Could not create the meeting in the database: ${error.message}. Check console & Firestore rules.`,
+        description: description,
         duration: 10000,
       });
     } finally {
@@ -225,7 +227,6 @@ export function StartMeetingDialogContent() {
             Cancel
           </Button>
         </DialogClose>
-        {/* This button is wrapped by DialogClose in the parent if needed */}
         <Button 
           type="button" 
           onClick={handleStartAndJoinMeeting} 
