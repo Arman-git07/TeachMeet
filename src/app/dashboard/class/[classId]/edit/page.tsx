@@ -243,14 +243,14 @@ export default function EditClassPage() {
   const canEdit = true; // For demo, assume current user can edit
 
   return (
-    <div className="space-y-6 p-4 md:p-8 max-w-2xl mx-auto">
+    <div className="space-y-6 p-4 md:p-8 w-full">
        <div className="flex items-center justify-between">
         <Button onClick={() => router.back()} variant="outline" className="rounded-lg">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
       </div>
 
-      <Card className="rounded-xl shadow-xl border-border/50">
+      <Card className="rounded-xl shadow-xl border-border/50 max-w-2xl mx-auto">
         <CardHeader>
           <div className="flex items-center gap-3">
             <EditIcon className="h-7 w-7 text-primary" />
