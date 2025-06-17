@@ -9,10 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Mic } from "lucide-react"; // Removed Languages icon
+import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Mic, Save, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import { updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -35,29 +38,29 @@ const SettingsSection = React.forwardRef<
 ));
 SettingsSection.displayName = "SettingsSection";
 
-// Removed languageOptions and ttsVoiceOptions
-
 export default function SettingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
 
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
   const recordingSettingsRef = useRef<HTMLDivElement>(null); 
-  // const languageSettingsRef = useRef<HTMLDivElement>(null); // Removed
 
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
   const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#000000");
   const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
   const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
   
-  // Removed language and TTS states
-  // const [defaultSpokenLanguage, setDefaultSpokenLanguage] = useState<string>("en-US");
-  // const [preferredTranslationLanguage, setPreferredTranslationLanguage] = useState<string>("en-US");
-  // const [preferredTTSVoice, setPreferredTTSVoice] = useState<string>("neutral");
+  const [displayNameInput, setDisplayNameInput] = useState<string>('');
+  const [isSavingGeneralSettings, setIsSavingGeneralSettings] = useState<boolean>(false);
+
 
   useEffect(() => {
+    if (user && !authLoading) {
+      setDisplayNameInput(user.displayName || '');
+    }
     // Camera filter
     const storedFilter = localStorage.getItem("teachmeet-camera-filter");
     if (storedFilter) setSelectedFilter(storedFilter);
@@ -75,9 +78,29 @@ export default function SettingsPage() {
     if (storedShapeRecognition) setEnableShapeRecognition(storedShapeRecognition === 'true');
     else localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(true));
 
-    // Removed loading of language and TTS settings from localStorage
+  }, [user, authLoading]);
 
-  }, []);
+  const handleSaveGeneralSettings = async () => {
+    if (!auth.currentUser) {
+      toast({ variant: "destructive", title: "Error", description: "You are not signed in." });
+      return;
+    }
+    if (!displayNameInput.trim()) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Display name cannot be empty." });
+      return;
+    }
+    setIsSavingGeneralSettings(true);
+    try {
+      await updateProfile(auth.currentUser, { displayName: displayNameInput.trim() });
+      toast({ title: "Success", description: "Display name updated successfully." });
+      // The useAuth hook's onAuthStateChanged should pick up the change and update context
+    } catch (error: any) {
+      console.error("Error updating display name:", error);
+      toast({ variant: "destructive", title: "Update Failed", description: error.message || "Could not update display name." });
+    } finally {
+      setIsSavingGeneralSettings(false);
+    }
+  };
 
   const handleFilterChange = (value: string) => {
     setSelectedFilter(value);
@@ -120,8 +143,6 @@ export default function SettingsPage() {
       description: "Your whiteboard preferences are up-to-date and saved in your browser's local storage.",
     });
   };
-
-  // Removed handleLanguageSettingChange function
   
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
@@ -131,7 +152,6 @@ export default function SettingsPage() {
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
         recordingSettings: recordingSettingsRef,
-        // languageSettings: languageSettingsRef, // Removed
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -178,18 +198,31 @@ export default function SettingsPage() {
             <Clapperboard className="mr-2 h-5 w-5" />
             Recording Settings
           </Button>
-           {/* Removed Language & Translation quick nav button */}
         </div>
       </SettingsSection>
 
       <SettingsSection title="General Settings" description="Manage your profile and basic preferences." icon={UserCircle}>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="displayName">Display Name</Label>
-            <Input id="displayName" defaultValue="Current User Name" className="mt-1 rounded-lg" />
+            <Label htmlFor="displayNameInput">Display Name</Label>
+            <Input 
+              id="displayNameInput" 
+              value={displayNameInput} 
+              onChange={(e) => setDisplayNameInput(e.target.value)} 
+              className="mt-1 rounded-lg" 
+              disabled={isSavingGeneralSettings || authLoading}
+              placeholder={authLoading ? "Loading name..." : "Enter your display name"}
+            />
           </div>
         </div>
-        <Button className="mt-6 btn-gel rounded-lg">Save General Settings</Button>
+        <Button 
+          className="mt-6 btn-gel rounded-lg" 
+          onClick={handleSaveGeneralSettings}
+          disabled={isSavingGeneralSettings || authLoading || (user?.displayName === displayNameInput.trim() && displayNameInput.trim() !== '')}
+        >
+          {isSavingGeneralSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          {isSavingGeneralSettings ? 'Saving...' : 'Save General Settings'}
+        </Button>
       </SettingsSection>
 
       <SettingsSection 
@@ -248,7 +281,6 @@ export default function SettingsPage() {
         <Button className="mt-6 btn-gel rounded-lg">Save Recording Settings</Button>
       </SettingsSection>
       
-      {/* Removed Language & Translation Settings Section */}
 
       <SettingsSection title="Notifications" description="Control how you receive notifications." icon={Bell} id="notifications">
         <div className="space-y-4">
