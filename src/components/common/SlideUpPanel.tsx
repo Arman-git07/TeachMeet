@@ -89,9 +89,9 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent
                 className="sm:max-w-lg rounded-xl"
-                aria-label="Start New Meeting Dialog"
+                aria-labelledby="start-meeting-dialog-title"
               >
-                <StartMeetingDialogContent /> {/* This component provides its own DialogHeader and DialogTitle */}
+                <StartMeetingDialogContent />
               </DialogContent>
             </Dialog>
           ) : (
@@ -135,10 +135,10 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent
                 className="sm:max-w-[425px] rounded-xl"
-                aria-label="Enter Meeting Code Dialog"
+                aria-labelledby="enter-code-dialog-title"
               >
                 <DialogHeader>
-                  <DialogTitle>Enter Meeting Code</DialogTitle>
+                  <DialogTitle id="enter-code-dialog-title">Enter Meeting Code</DialogTitle>
                   <DialogDescription>
                     Type in the meeting code provided by the host to join the session.
                   </DialogDescription>
