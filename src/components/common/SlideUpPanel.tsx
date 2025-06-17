@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -87,7 +86,10 @@ export function SlideUpPanel() {
                   Start New Meeting
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-lg rounded-xl">
+              <DialogContent 
+                className="sm:max-w-lg rounded-xl"
+                aria-label="Start a New Meeting" // Added aria-label
+              >
                 <StartMeetingDialogContent />
               </DialogContent>
             </Dialog>
@@ -130,7 +132,10 @@ export function SlideUpPanel() {
                   <Code className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px] rounded-xl">
+              <DialogContent 
+                className="sm:max-w-[425px] rounded-xl"
+                aria-label="Enter Meeting Code" // Added aria-label
+              >
                 <DialogHeader>
                   <DialogTitle>Enter Meeting Code</DialogTitle>
                   <DialogDescription>
