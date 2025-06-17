@@ -26,54 +26,54 @@ import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { db, storage } from '@/lib/firebase'; // Import db and storage
-import { doc, getDoc, updateDoc, addDoc, collection, query, orderBy, onSnapshot, deleteDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore'; // Firestore imports
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from 'firebase/storage'; // Storage imports
+import { db, storage } from '@/lib/firebase'; 
+import { doc, getDoc, updateDoc, addDoc, collection, query, orderBy, onSnapshot, deleteDoc, serverTimestamp, Timestamp, writeBatch, where } from 'firebase/firestore'; 
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from 'firebase/storage'; 
 
 
 interface Announcement {
   id: string;
   title: string;
   content: string;
-  date: any; // Firestore Timestamp or Date
+  date: any; 
 }
 
 interface Assignment {
   id: string;
   title: string;
-  dueDate: any; // Firestore Timestamp or Date
-  status: 'Pending' | 'Submitted' | 'Graded' | 'Overdue'; // Status might be client-calculated or stored
+  dueDate: any; 
+  status: 'Pending' | 'Submitted' | 'Graded' | 'Overdue'; 
   description?: string;
-  filePath?: string; // Path in Firebase Storage for teacher-uploaded assignment file
-  fileName?: string; // Original name of teacher-uploaded file
+  filePath?: string; 
+  fileName?: string; 
 }
 
 interface Material {
   id: string;
   title: string;
-  type: 'link' | 'file' | 'video'; // Video type will be treated like a link
-  url?: string; // For links or video URLs
-  filePath?: string; // Path in Firebase Storage for file type
-  fileName?: string; // Original name for file type
+  type: 'link' | 'file' | 'video'; 
+  url?: string; 
+  filePath?: string; 
+  fileName?: string; 
   description?: string;
 }
 
 interface ClassExam {
   id: string;
   title: string;
-  dueDateTime: any; // Firestore Timestamp or Date
+  dueDateTime: any; 
   status: 'Upcoming' | 'Active' | 'Ended' | 'Graded';
 }
 
 interface FeeDetails {
   totalFee: number;
   paidAmount: number;
-  nextDueDate?: string; // ISO string date
+  nextDueDate?: string; 
   currency: string;
 }
 
 interface ScheduleItem {
-  id: string; // Can be auto-generated or based on day
+  id: string; 
   day: string;
   time: string;
   topic?: string;
@@ -90,14 +90,13 @@ interface ClassroomDetails {
   thumbnailUrl: string;
   announcements?: Announcement[];
   schedule?: ScheduleItem[];
-  scheduleLastUpdated?: any; // Firestore Timestamp or Date
-  // Assignments, Materials, Exams will be fetched from subcollections
+  scheduleLastUpdated?: any; 
   feeDetails?: FeeDetails;
   teacherUpiId?: string;
   teacherBankAccount?: string;
   teacherBankIfsc?: string;
   teacherBankName?: string;
-  createdAt?: any; // Firestore Timestamp or Date
+  createdAt?: any; 
 }
 
 const getStatusColor = (status: Assignment['status'] | ClassExam['status']) => {
@@ -116,7 +115,7 @@ const getStatusColor = (status: Assignment['status'] | ClassExam['status']) => {
 const MaterialIcon = ({ type }: { type: Material['type'] }) => {
   if (type === 'link') return <LinkIconLucide className="mr-2 h-5 w-5 text-primary" />;
   if (type === 'file') return <FileIcon className="mr-2 h-5 w-5 text-primary" />;
-  if (type === 'video') return <VideoIconLucide className="mr-2 h-5 w-5 text-primary" />; // Video uses Video icon
+  if (type === 'video') return <VideoIconLucide className="mr-2 h-5 w-5 text-primary" />; 
   return <Info className="mr-2 h-5 w-5 text-primary" />;
 };
 
@@ -132,7 +131,7 @@ export default function ClassDetailsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [exams, setExams] = useState<ClassExam[]>([]); // For exams linked to this class
+  const [exams, setExams] = useState<ClassExam[]>([]); 
 
   const [loading, setLoading] = useState(true);
   const [isCreateExamDialogOpenForClass, setIsCreateExamDialogOpenForClass] = useState(false);
@@ -182,6 +181,8 @@ export default function ClassDetailsPage() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [cardName, setCardName] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
 
   const [isEditingTeacherPaymentDetails, setIsEditingTeacherPaymentDetails] = useState(false);
   const [teacherUpiIdInput, setTeacherUpiIdInput] = useState('');
@@ -194,7 +195,6 @@ export default function ClassDetailsPage() {
 
   const getCurrencySymbol = (currencyCode?: string): string => {
     if (!currencyCode) return '$';
-    // Simplified, add more as needed
     const symbols: { [key: string]: string } = { USD: '$', EUR: '€', INR: '₹', GBP: '£' };
     return symbols[currencyCode.toUpperCase()] || currencyCode + ' ';
   };
@@ -236,36 +236,35 @@ export default function ClassDetailsPage() {
         router.push('/dashboard/classes');
       }
       setLoading(false);
-    }, (error) => {
+    }, (error: any) => {
       console.error("Error fetching classroom details:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not load class details." });
+      let desc = "Could not load class details.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied fetching class details. Please check Firestore security rules.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
       setLoading(false);
     });
 
     const unsubFunctions: (() => void)[] = [unsubClassroom];
 
-    // Fetch Announcements
     const announcementsColRef = collection(db, "classrooms", classId, "announcements");
     const announcementsQuery = query(announcementsColRef, orderBy("date", "desc"));
     unsubFunctions.push(onSnapshot(announcementsQuery, (snapshot) => {
         setAnnouncements(snapshot.docs.map(d => ({ id: d.id, ...d.data(), date: d.data().date?.toDate() } as Announcement)));
     }));
 
-    // Fetch Assignments
     const assignmentsColRef = collection(db, "classrooms", classId, "assignments");
     const assignmentsQuery = query(assignmentsColRef, orderBy("dueDate", "desc"));
     unsubFunctions.push(onSnapshot(assignmentsQuery, (snapshot) => {
         setAssignments(snapshot.docs.map(d => ({ id: d.id, ...d.data(), dueDate: d.data().dueDate?.toDate() } as Assignment)));
     }));
     
-    // Fetch Materials
     const materialsColRef = collection(db, "classrooms", classId, "materials");
-    // Consider adding an 'uploadedAt' field for ordering if needed
     unsubFunctions.push(onSnapshot(materialsColRef, (snapshot) => {
         setMaterials(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Material)));
     }));
 
-    // Fetch Exams relevant to this class
     const examsColRef = collection(db, "exams");
     const examsQuery = query(examsColRef, where("classId", "==", classId), orderBy("dueDateTime", "desc"));
      unsubFunctions.push(onSnapshot(examsQuery, (snapshot) => {
@@ -284,8 +283,6 @@ export default function ClassDetailsPage() {
 
   const handleStartClassMeeting = () => {
     if (!user || !classroom) return;
-    // For simplicity, allow any authenticated user to try joining the waiting room for a class.
-    // The meeting page itself should handle actual join permissions.
     router.push(`/dashboard/meeting/${classroom.id}/wait?topic=${encodeURIComponent(classroom.name)}`);
   };
   
@@ -304,8 +301,12 @@ export default function ClassDetailsPage() {
       toast({ title: "Announcement Posted" });
       setIsPostAnnouncementDialogOpen(false);
       setPostAnnouncementTitleInput(''); setPostAnnouncementContentInput('');
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not post announcement." });
+    } catch (error: any) {
+      let desc = "Could not post announcement.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to post announcement. Check Firestore rules for 'classrooms/{classId}/announcements'.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     }
   };
 
@@ -323,12 +324,16 @@ export default function ClassDetailsPage() {
       await updateDoc(announcementRef, {
         title: editAnnouncementTitleInput.trim(),
         content: editAnnouncementContentInput.trim(),
-        date: serverTimestamp(), // Update timestamp on edit
+        date: serverTimestamp(), 
       });
       toast({ title: "Announcement Updated" });
       setIsEditAnnouncementDialogOpen(false); setEditingAnnouncement(null);
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not update announcement." });
+    } catch (error: any) {
+      let desc = "Could not update announcement.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to update announcement. Check Firestore rules.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     }
   };
 
@@ -342,31 +347,33 @@ export default function ClassDetailsPage() {
     let itemRef;
     let itemTypeDisplay = itemToDelete.type.charAt(0).toUpperCase() + itemToDelete.type.slice(1);
     
-    if (itemToDelete.type === 'announcement') {
-      itemRef = doc(db, "classrooms", classId, "announcements", itemToDelete.id);
-    } else if (itemToDelete.type === 'material') {
-      itemRef = doc(db, "classrooms", classId, "materials", itemToDelete.id);
-      // If material was a file, delete from storage too
-      const materialDoc = materials.find(m => m.id === itemToDelete.id);
-      if (materialDoc?.filePath) {
-        try { await deleteObject(storageRef(storage, materialDoc.filePath)); } 
-        catch (e) { console.warn("Error deleting material file from storage:", e); }
-      }
-    } else if (itemToDelete.type === 'assignment') {
-      itemRef = doc(db, "classrooms", classId, "assignments", itemToDelete.id);
-      // If assignment had an uploaded file, delete from storage
-      const assignmentDoc = assignments.find(a => a.id === itemToDelete.id);
-       if (assignmentDoc?.filePath) {
-        try { await deleteObject(storageRef(storage, assignmentDoc.filePath)); }
-        catch (e) { console.warn("Error deleting assignment file from storage:", e); }
-      }
-    } else { return; }
-
     try {
+      if (itemToDelete.type === 'announcement') {
+        itemRef = doc(db, "classrooms", classId, "announcements", itemToDelete.id);
+      } else if (itemToDelete.type === 'material') {
+        itemRef = doc(db, "classrooms", classId, "materials", itemToDelete.id);
+        const materialDoc = materials.find(m => m.id === itemToDelete.id);
+        if (materialDoc?.filePath) {
+          try { await deleteStorageObject(storageRef(storage, materialDoc.filePath)); } 
+          catch (e) { console.warn("Error deleting material file from storage:", e); }
+        }
+      } else if (itemToDelete.type === 'assignment') {
+        itemRef = doc(db, "classrooms", classId, "assignments", itemToDelete.id);
+        const assignmentDoc = assignments.find(a => a.id === itemToDelete.id);
+         if (assignmentDoc?.filePath) {
+          try { await deleteStorageObject(storageRef(storage, assignmentDoc.filePath)); }
+          catch (e) { console.warn("Error deleting assignment file from storage:", e); }
+        }
+      } else { return; }
+
       await deleteDoc(itemRef);
       toast({ title: `${itemTypeDisplay} Deleted` });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: `Could not delete ${itemToDelete.type}.` });
+    } catch (error: any) {
+      let desc = `Could not delete ${itemToDelete.type}.`;
+      if (error.code === 'permission-denied') {
+        desc = `Permission denied to delete ${itemToDelete.type}. Check Firestore/Storage rules.`;
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     }
     setIsDeleteConfirmDialogOpen(false); setItemToDelete(null);
   };
@@ -399,8 +406,12 @@ export default function ClassDetailsPage() {
       });
       toast({ title: "Schedule Updated" });
       setIsEditScheduleDialogOpen(false);
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not update schedule." });
+    } catch (error: any) {
+      let desc = "Could not update schedule.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to update schedule. Check Firestore rules.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     }
   };
 
@@ -431,15 +442,21 @@ export default function ClassDetailsPage() {
         materialData = { title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'file', fileName: newMaterialFile.name, filePath: filePath, url: downloadURL };
       } else if (newMaterialType === 'link') {
         materialData = { title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'link', url: newMaterialUrl.trim() };
-      } else if (newMaterialType === 'video') { // Assuming 'video' is similar to 'link' for URL
+      } else if (newMaterialType === 'video') { 
          materialData = { title: newMaterialTitle.trim(), description: newMaterialDescription.trim() || undefined, type: 'video', url: newMaterialUrl.trim() };
       } else { setIsUploadingMaterial(false); return; }
       
       await addDoc(collection(db, "classrooms", classId, "materials"), materialData);
       toast({ title: "Material Added" });
       setIsUploadMaterialDialogOpen(false); resetUploadMaterialDialog();
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not add material." });
+    } catch (error: any) {
+      let desc = "Could not add material.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to add material. Check Firestore/Storage rules for 'classrooms/{classId}/materials'.";
+      } else if (error.code && error.code.includes('storage/unauthorized')) {
+        desc = "Permission denied for material file upload. Check Firebase Storage rules for 'class_materials'.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
       setIsUploadingMaterial(false);
     }
   };
@@ -447,19 +464,13 @@ export default function ClassDetailsPage() {
   const handleTriggerAssignmentUploadDialog = () => { 
     setSelectedAssignmentTitleForUpload(''); 
     setSelectedAssignmentDescriptionForUpload('');
-    setSelectedAssignmentDueDateForUpload(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // Default to 1 week from now
+    setSelectedAssignmentDueDateForUpload(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); 
     setIsAssignmentUploadDialogOpen(true); 
-  };
-
-  const handleDialogSubmitAndChooseFile = () => { // Renamed for clarity if file is primary
-    if (!selectedAssignmentTitleForUpload.trim()) { toast({ variant: "destructive", title: "Assignment Title Required" }); return; }
-    assignmentFileRef.current?.click(); // Open file picker
-    // If file not mandatory, can proceed to save directly if no file picked later
   };
 
   const handleFileSelectedForAssignment = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; 
-    if (event.target) event.target.value = ""; // Reset file input
+    if (event.target) event.target.value = ""; 
 
     if (!selectedAssignmentTitleForUpload || !selectedAssignmentDueDateForUpload || !classId || !isCurrentUserTeacher || !user) {
         toast({ variant: "destructive", title: "Internal Error", description: "Assignment context missing." });
@@ -467,7 +478,7 @@ export default function ClassDetailsPage() {
         return;
     }
 
-    setIsUploadingMaterial(true); // Re-use uploading state for processing
+    setIsUploadingMaterial(true); 
     
     let assignmentData: Omit<Assignment, 'id' | 'status'> = {
         title: selectedAssignmentTitleForUpload.trim(),
@@ -482,24 +493,28 @@ export default function ClassDetailsPage() {
             const filePath = `class_assignments/${classId}/${user.uid}/${fileName}`;
             const fileUploadRef = storageRef(storage, filePath);
             await uploadBytesResumable(fileUploadRef, file);
-            const downloadURL = await getDownloadURL(fileUploadRef);
+            // const downloadURL = await getDownloadURL(fileUploadRef); // Not always needed by student.
             assignmentData.filePath = filePath;
             assignmentData.fileName = file.name;
-            // assignmentData.url = downloadURL; // Maybe not needed if filePath is enough
         }
         
         await addDoc(collection(db, "classrooms", classId, "assignments"), assignmentData);
         toast({ title: "Assignment Added", description: `"${assignmentData.title}" with${file ? ` file ${file.name}` : ' no file'} added.` });
         setIsAssignmentUploadDialogOpen(false); 
-        setSelectedAssignmentTitleForUpload(null); setSelectedAssignmentDescriptionForUpload(''); // Reset
-    } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "Could not add assignment." });
+        setSelectedAssignmentTitleForUpload(null); setSelectedAssignmentDescriptionForUpload(''); 
+    } catch (error: any) {
+      let desc = "Could not add assignment.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to add assignment. Check Firestore rules for 'classrooms/{classId}/assignments'.";
+      } else if (error.code && error.code.includes('storage/unauthorized')) {
+         desc = "Permission denied for assignment file upload. Check Firebase Storage rules for 'class_assignments'.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     } finally {
         setIsUploadingMaterial(false);
     }
   };
   
-  // Payment related handlers (simplified mocks for now)
   const makePaymentToast = (method: string, remainingFee: number, classroomName: string, currency: string) => {
     const developerCut = remainingFee * 0.02;
     const teacherReceives = remainingFee - developerCut;
@@ -519,7 +534,6 @@ export default function ClassDetailsPage() {
 
     setIsProcessing(true);
     try {
-      // Mock payment processing
       await new Promise(resolve => setTimeout(resolve, 1500));
       const newPaidAmount = classroom.feeDetails.totalFee;
       const updatedFeeDetails: FeeDetails = { ...classroom.feeDetails, paidAmount: newPaidAmount };
@@ -529,8 +543,12 @@ export default function ClassDetailsPage() {
 
       toast({ title: "Card Payment Successful (Mock)", description: `Payment for ${classroom?.name} processed. Fee is now fully paid.`, duration: 10000 });
       setIsCardPaymentDialogOpen(false); setCardNumber(''); setCardExpiry(''); setCardCvv(''); setCardName('');
-    } catch (error) {
-        toast({ variant: "destructive", title: "Payment Error", description: "Could not process card payment." });
+    } catch (error: any) {
+      let desc = "Could not process card payment.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to update fee details after payment. Check Firestore rules.";
+      }
+      toast({ variant: "destructive", title: "Payment Error", description: desc });
     } finally {
         setIsProcessing(false);
     }
@@ -547,16 +565,15 @@ export default function ClassDetailsPage() {
     if (method === "Google Pay / UPI" && classroom.teacherUpiId) { window.open(`upi://pay?pa=${encodeURIComponent(classroom.teacherUpiId)}&pn=${encodeURIComponent(classroom.teacherName)}&am=${(remainingFee * 0.98).toFixed(2)}&cu=${currentCurrency}&tn=ClassFee`, '_blank'); }
     else if (method === "PhonePe" && classroom.teacherUpiId) { window.open(`phonepe://pay?pa=${encodeURIComponent(classroom.teacherUpiId)}&pn=${encodeURIComponent(classroom.teacherName)}&am=${(remainingFee * 0.98).toFixed(2)}&cu=${currentCurrency}&tn=ClassFee`, '_blank'); }
     else if (method === "Net Banking") { 
-        const htmlContent = `<!DOCTYPE html><body><h1>Mock Net Banking for ${classroom.name}</h1><p>Amount: ${currentCurrencySymbol}${remainingFee.toFixed(2)}</p><p>Pay to: ${classroom.teacherBankName || 'N/A'} - Acc: ${classroom.teacherBankAccount || 'N/A'} (IFSC: ${classroom.teacherBankIfsc || 'N/A'})</p><p>2% to developer.</p><button onclick="window.close()">Close</button></body></html>`;
+        const htmlContent = `<!DOCTYPE html><body><h1>Mock Net Banking for ${classroom.name}</h1><p>Amount: ${getCurrencySymbol(currentCurrency)}${remainingFee.toFixed(2)}</p><p>Pay to: ${classroom.teacherBankName || 'N/A'} - Acc: ${classroom.teacherBankAccount || 'N/A'} (IFSC: ${classroom.teacherBankIfsc || 'N/A'})</p><p>2% to developer.</p><button onclick="window.close()">Close</button></body></html>`;
         const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`;
         window.open(dataUri, '_blank');
     }
     setIsPaymentDialogOpen(false);
   };
 
-  const handleExamCreated = (newExam: any) => { // Type any for simplicity, should be Exam interface
+  const handleExamCreated = (newExam: any) => { 
     toast({ title: "Exam Scheduled (From Class)", description: `${newExam.title} has been scheduled for this class.` });
-    // Exams are global but linked by classId, UI will update via exams state listener
   };
   
   const handleToggleEditFeeDetails = () => setIsEditingFeeDetails(!isEditingFeeDetails);
@@ -576,8 +593,12 @@ export default function ClassDetailsPage() {
       await updateDoc(classroomRef, { feeDetails: newFeeDetails });
       toast({ title: "Fee Details Updated" });
       setIsEditingFeeDetails(false);
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not update fee details." });
+    } catch (error: any) {
+      let desc = "Could not update fee details.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to update fee details. Check Firestore rules.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     }
   };
 
@@ -598,8 +619,12 @@ export default function ClassDetailsPage() {
       });
       toast({ title: "Payment Details Updated" });
       setIsEditingTeacherPaymentDetails(false);
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not update payment details." });
+    } catch (error: any) {
+      let desc = "Could not update payment details.";
+       if (error.code === 'permission-denied') {
+        desc = "Permission denied to update payment details. Check Firestore rules.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     }
   };
   
@@ -616,17 +641,21 @@ export default function ClassDetailsPage() {
       await updateDoc(classroomRef, { feeDetails: updatedFeeDetails });
       toast({ title: "Refund Processed (Mock)", description: `${getCurrencySymbol(classroom.feeDetails.currency)}${amountToRefund.toFixed(2)} conceptually refunded.` });
       setIsRefundDialogOpen(false); setRefundAmountInput('');
-    } catch (error) {
-        toast({ variant: "destructive", title: "Refund Error", description: "Could not process refund." });
+    } catch (error: any) {
+      let desc = "Could not process refund.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied to update fee details for refund. Check Firestore rules.";
+      }
+      toast({ variant: "destructive", title: "Refund Error", description: desc });
     }
   };
 
 
   if (loading || authLoading) {
-    return ( /* Skeleton Loader from original */ <div className="flex flex-col items-center justify-center h-full p-8"><Card className="w-full max-w-4xl p-8 rounded-xl shadow-xl border-border/50"><CardHeader><div className="h-8 bg-muted rounded w-3/4 mx-auto mb-2"></div><div className="h-4 bg-muted rounded w-1/2 mx-auto"></div></CardHeader><CardContent className="space-y-6 mt-6"><div className="h-40 bg-muted rounded-lg w-full"></div><div className="space-y-2"><div className="h-4 bg-muted rounded w-full"></div><div className="h-4 bg-muted rounded w-5/6"></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">{[...Array(6)].map((_, i) => (<div key={i} className="h-24 bg-muted rounded-lg"></div>))}</div></CardContent></Card></div>);
+    return ( <div className="flex flex-col items-center justify-center h-full p-8"><Card className="w-full max-w-4xl p-8 rounded-xl shadow-xl border-border/50"><CardHeader><div className="h-8 bg-muted rounded w-3/4 mx-auto mb-2"></div><div className="h-4 bg-muted rounded w-1/2 mx-auto"></div></CardHeader><CardContent className="space-y-6 mt-6"><div className="h-40 bg-muted rounded-lg w-full"></div><div className="space-y-2"><div className="h-4 bg-muted rounded w-full"></div><div className="h-4 bg-muted rounded w-5/6"></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">{[...Array(6)].map((_, i) => (<div key={i} className="h-24 bg-muted rounded-lg"></div>))}</div></CardContent></Card></div>);
   }
   if (!classroom) {
-    return ( /* Not Found from original */ <div className="flex flex-col items-center justify-center h-full p-8 text-center"><AlertTriangle className="h-16 w-16 text-destructive mb-4" /><h1 className="text-2xl font-bold text-destructive mb-2">Class Not Found</h1><p className="text-muted-foreground mb-6">Details for ID &quot;{classId}&quot; could not be loaded.</p><Button onClick={() => router.push('/dashboard/classes')} variant="outline" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Classes</Button></div>);
+    return ( <div className="flex flex-col items-center justify-center h-full p-8 text-center"><AlertTriangle className="h-16 w-16 text-destructive mb-4" /><h1 className="text-2xl font-bold text-destructive mb-2">Class Not Found</h1><p className="text-muted-foreground mb-6">Details for ID &quot;{classId}&quot; could not be loaded.</p><Button onClick={() => router.push('/dashboard/classes')} variant="outline" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Classes</Button></div>);
   }
   
   const currentRemainingFee = editableFeeDetails && classroom?.feeDetails
@@ -762,7 +791,7 @@ export default function ClassDetailsPage() {
       <Dialog open={isEditAnnouncementDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingAnnouncement(null); setIsEditAnnouncementDialogOpen(isOpen); }}>{isEditAnnouncementDialogOpen && (<DialogContent className="sm:max-w-lg rounded-xl"><DialogHeader><ShadDialogTitle>Edit Announcement</ShadDialogTitle><DialogDescription>Modify the title and content of the announcement.</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="editAnnouncementTitle">Title</Label><Input id="editAnnouncementTitle" value={editAnnouncementTitleInput} onChange={(e) => setEditAnnouncementTitleInput(e.target.value)} className="rounded-lg"/></div><div className="grid gap-2"><Label htmlFor="editAnnouncementContent">Content</Label><Textarea id="editAnnouncementContent" value={editAnnouncementContentInput} onChange={(e) => setEditAnnouncementContentInput(e.target.value)} className="rounded-lg min-h-[100px]"/></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg">Cancel</Button></DialogClose><Button type="button" onClick={handleDialogUpdateAnnouncement} className="btn-gel rounded-lg">Save Changes</Button></DialogFooter></DialogContent>)}</Dialog>
       <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={setIsDeleteConfirmDialogOpen}><AlertDialogContent className="rounded-xl"><AlertDialogHeader><ShadAlertDialogTitle>Confirm Deletion</ShadAlertDialogTitle><AlertDialogDescription>Are you sure you want to delete this {itemToDelete?.type}? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg" onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDeleteItem} className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <Dialog open={isEditScheduleDialogOpen} onOpenChange={setIsEditScheduleDialogOpen}>{isEditScheduleDialogOpen && (<DialogContent className="sm:max-w-lg rounded-xl"><DialogHeader><ShadDialogTitle>Edit Class Schedule</ShadDialogTitle><DialogDescription>Add, remove, or modify class schedule entries.</DialogDescription></DialogHeader><div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">{editingScheduleItems.length > 0 ? (editingScheduleItems.map((item, index) => (<div key={item.id || index} className="flex items-center justify-between gap-2 p-2 border rounded-lg"><div className="flex-grow"><p className="text-sm font-medium">{item.day} - {item.time}</p>{item.topic && <p className="text-xs text-muted-foreground">{item.topic}</p>}</div><Button variant="ghost" size="icon" onClick={() => handleRemoveScheduleItemInDialog(item.id)} className="text-destructive h-8 w-8 rounded-md"><Trash2 className="h-4 w-4" /></Button></div>))) : (<p className="text-sm text-muted-foreground text-center py-4">No schedule entries yet.</p>)}<div className="pt-4 border-t"><Label className="text-sm font-medium block mb-2">Add New Entry</Label><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Input value={newScheduleDayInput} onChange={(e) => setNewScheduleDayInput(e.target.value)} placeholder="Day (e.g., Monday)" className="rounded-lg"/><Input value={newScheduleTimeInput} onChange={(e) => setNewScheduleTimeInput(e.target.value)} placeholder="Time (e.g., 10:00 AM)" className="rounded-lg"/></div><Input value={newScheduleTopicInput} onChange={(e) => setNewScheduleTopicInput(e.target.value)} placeholder="Topic (Optional)" className="rounded-lg mt-3"/><Button onClick={handleAddScheduleItemInDialog} className="w-full mt-3 btn-gel rounded-lg text-sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg">Cancel</Button></DialogClose><Button type="button" onClick={handleSaveChangesToSchedule} className="btn-gel rounded-lg">Save Schedule</Button></DialogFooter></DialogContent>)}</Dialog>
-      <Dialog open={isCardPaymentDialogOpen} onOpenChange={setIsCardPaymentDialogOpen}><DialogContent className="sm:max-w-md rounded-xl"><DialogHeader><ShadDialogTitle>Enter Card Details</ShadDialogTitle><DialogDescription>Enter your card information to complete the payment. (This is a mock interface).</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="cardNumber">Card Number</Label><Input id="cardNumber" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="rounded-lg"/></div><div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="cardExpiry">Expiry (MM/YY)</Label><Input id="cardExpiry" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM/YY" className="rounded-lg"/></div><div className="grid gap-2"><Label htmlFor="cardCvv">CVV</Label><Input id="cardCvv" value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" className="rounded-lg"/></div></div><div className="grid gap-2"><Label htmlFor="cardName">Cardholder Name</Label><Input id="cardName" value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Full Name as on Card" className="rounded-lg"/></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={() => setIsCardPaymentDialogOpen(false)}>Cancel</Button></DialogClose><Button type="button" onClick={handleCardPaymentSubmit} className="btn-gel rounded-lg" disabled={isProcessing}>Pay {currentCurrencySymbol}{currentRemainingFee > 0 ? currentRemainingFee.toFixed(2) : "0.00"} (Mock)</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isCardPaymentDialogOpen} onOpenChange={setIsCardPaymentDialogOpen}><DialogContent className="sm:max-w-md rounded-xl"><DialogHeader><ShadDialogTitle>Enter Card Details</ShadDialogTitle><DialogDescription>Enter your card information to complete the payment. (This is a mock interface).</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="cardNumber">Card Number</Label><Input id="cardNumber" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="rounded-lg"/></div><div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="cardExpiry">Expiry (MM/YY)</Label><Input id="cardExpiry" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM/YY" className="rounded-lg"/></div><div className="grid gap-2"><Label htmlFor="cardCvv">CVV</Label><Input id="cardCvv" value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" className="rounded-lg"/></div></div><div className="grid gap-2"><Label htmlFor="cardName">Cardholder Name</Label><Input id="cardName" value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Full Name as on Card" className="rounded-lg"/></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={() => setIsCardPaymentDialogOpen(false)}>Cancel</Button></DialogClose><Button type="button" onClick={handleCardPaymentSubmit} className="btn-gel rounded-lg" disabled={isProcessing || !cardNumber || !cardExpiry || !cardCvv || !cardName}>{isProcessing ? "Processing..." : `Pay ${currentCurrencySymbol}${currentRemainingFee > 0 ? currentRemainingFee.toFixed(2) : "0.00"} (Mock)`}</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}><DialogContent className="sm:max-w-md rounded-xl"><DialogHeader><ShadDialogTitle>Issue Refund</ShadDialogTitle><DialogDescription>Enter the amount to refund to the student. This is a mock operation.</DialogDescription></DialogHeader><div className="grid gap-4 py-4">{classroom?.feeDetails && (<div className="text-sm space-y-1"><p>Total Paid: <span className="font-medium">{currentCurrencySymbol}{classroom.feeDetails.paidAmount.toFixed(2)}</span></p><p>Total Fee: <span className="font-medium">{currentCurrencySymbol}{classroom.feeDetails.totalFee.toFixed(2)}</span></p></div>)}<div className="grid gap-2"><Label htmlFor="refundAmountInput">Refund Amount ({currentCurrencySymbol})</Label><Input id="refundAmountInput" type="number" value={refundAmountInput} onChange={(e) => setRefundAmountInput(e.target.value)} placeholder="e.g., 50.00" className="rounded-lg"/></div></div><DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg">Cancel</Button></DialogClose><Button type="button" onClick={handleConfirmRefund} className="btn-gel rounded-lg bg-orange-500 hover:bg-orange-600 text-white">Confirm Refund</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );

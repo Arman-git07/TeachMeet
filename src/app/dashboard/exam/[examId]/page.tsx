@@ -14,9 +14,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { db, storage } from '@/lib/firebase'; // Import db and storage
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Firestore imports
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Storage imports
+import { db, storage } from '@/lib/firebase'; 
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; 
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; 
 
 interface ExamDetails {
   id: string;
@@ -24,8 +24,8 @@ interface ExamDetails {
   description: string; 
   teacherName: string;
   teacherId: string;
-  scheduledDateTime: any; // Firestore Timestamp or Date
-  dueDateTime: any; // Firestore Timestamp or Date
+  scheduledDateTime: any; 
+  dueDateTime: any; 
   totalMarks: number;
   questionPaperUrl?: string; 
   questionPaperFileName?: string; 
@@ -37,10 +37,9 @@ interface ExamDetails {
 interface ExamSubmission {
     userId: string;
     examId: string;
-    answerSheetUrl?: string; // URL to the uploaded answer sheet in Storage
+    answerSheetUrl?: string; 
     answerSheetFileName?: string;
-    submittedAt: any; // Firestore Timestamp
-    // Could add grade, feedback later
+    submittedAt: any; 
 }
 
 const MAX_ANSWER_FILE_SIZE_MB = 20;
@@ -78,22 +77,24 @@ export default function ExamTakingPage() {
         toast({ variant: "destructive", title: "Error", description: "Exam not found." });
         router.push('/dashboard/exams');
       }
-    }).catch(error => {
+    }).catch((error: any) => {
       console.error("Error fetching exam details:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not load exam details." });
+      let desc = "Could not load exam details.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied fetching exam details. Please check Firestore security rules.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
     }).finally(() => {
       setLoading(false);
     });
   }, [examId, router, toast]);
 
-  // Check for existing submission
   useEffect(() => {
     if (!examId || !user || !db) return;
     const submissionDocRef = doc(db, "exams", examId, "submissions", user.uid);
     getDoc(submissionDocRef).then(docSnap => {
       if (docSnap.exists()) {
         setSubmissionStatus('submitted');
-        // Optionally, load submitted file details if needed for display
       }
     }).catch(error => console.error("Error checking existing submission:", error));
   }, [examId, user]);
@@ -167,10 +168,16 @@ export default function ExamTakingPage() {
       toast.dismiss(toastId);
       toast({ title: "Submission Successful!", description: `${answerFile.name} submitted for "${examDetails.title}".` });
       setSubmissionStatus('submitted');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting answer:", error);
       toast.dismiss(toastId);
-      toast({ variant: "destructive", title: "Submission Failed", description: (error as Error).message || "Could not submit answer." });
+      let desc = (error as Error).message || "Could not submit answer.";
+      if (error.code === 'permission-denied') {
+          desc = "Permission denied to submit answer. Check Firestore rules for 'exams/{examId}/submissions'.";
+      } else if (error.code && error.code.includes('storage/unauthorized')) {
+          desc = "Permission denied for answer file upload. Check Firebase Storage rules for 'exam_submissions'.";
+      }
+      toast({ variant: "destructive", title: "Submission Failed", description: desc });
       setSubmissionStatus('error');
     } finally {
       setIsSubmitting(false);
@@ -179,10 +186,10 @@ export default function ExamTakingPage() {
 
 
   if (loading || authLoading) {
-    return ( /* Skeleton Loader from original */ <div className="flex flex-col items-center justify-center h-full p-8"><Card className="w-full max-w-3xl p-8 rounded-xl shadow-xl border-border/50"><CardHeader><div className="h-8 bg-muted rounded w-3/4 mx-auto mb-2"></div><div className="h-4 bg-muted rounded w-1/2 mx-auto"></div></CardHeader><CardContent className="space-y-6 mt-6"><div className="h-40 bg-muted rounded-lg w-full"></div><div className="space-y-2"><div className="h-4 bg-muted rounded w-full"></div><div className="h-4 bg-muted rounded w-5/6"></div></div></CardContent></Card></div>);
+    return ( <div className="flex flex-col items-center justify-center h-full p-8"><Card className="w-full max-w-3xl p-8 rounded-xl shadow-xl border-border/50"><CardHeader><div className="h-8 bg-muted rounded w-3/4 mx-auto mb-2"></div><div className="h-4 bg-muted rounded w-1/2 mx-auto"></div></CardHeader><CardContent className="space-y-6 mt-6"><div className="h-40 bg-muted rounded-lg w-full"></div><div className="space-y-2"><div className="h-4 bg-muted rounded w-full"></div><div className="h-4 bg-muted rounded w-5/6"></div></div></CardContent></Card></div>);
   }
   if (!examDetails) {
-    return ( /* Not Found message from original */ <div className="flex flex-col items-center justify-center h-full p-8 text-center"><AlertTriangle className="h-16 w-16 text-destructive mb-4" /><h1 className="text-2xl font-bold text-destructive mb-2">Exam Not Found</h1><p className="text-muted-foreground mb-6">The exam details for ID &quot;{examId}&quot; could not be loaded.</p><Button onClick={() => router.push('/dashboard/exams')} variant="outline" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Exams</Button></div>);
+    return ( <div className="flex flex-col items-center justify-center h-full p-8 text-center"><AlertTriangle className="h-16 w-16 text-destructive mb-4" /><h1 className="text-2xl font-bold text-destructive mb-2">Exam Not Found</h1><p className="text-muted-foreground mb-6">The exam details for ID &quot;{examId}&quot; could not be loaded.</p><Button onClick={() => router.push('/dashboard/exams')} variant="outline" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Exams</Button></div>);
   }
   
   const isExamActive = new Date() >= new Date(examDetails.scheduledDateTime) && new Date() < new Date(examDetails.dueDateTime);

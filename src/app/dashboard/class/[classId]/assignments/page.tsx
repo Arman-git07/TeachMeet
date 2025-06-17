@@ -19,28 +19,27 @@ import { useToast } from '@/hooks/use-toast';
 import { autoCheckAssignment, type AutoCheckAssignmentInput, type AutoCheckAssignmentOutput } from '@/ai/flows/auto-check-assignment-flow';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { db, storage } from '@/lib/firebase'; // Import db and storage
-import { collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, getDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Firestore imports
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from 'firebase/storage'; // Storage imports
+import { db, storage } from '@/lib/firebase'; 
+import { collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, getDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; 
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from 'firebase/storage'; 
 
-interface AssignmentDefinition { // Teacher-defined assignment
+interface AssignmentDefinition { 
   id: string;
   title: string;
-  dueDate: any; // Firestore Timestamp or Date
+  dueDate: any; 
   description?: string;
-  teacherRubricText?: string; // Optional: Teacher can upload rubric text here
-  // filePath?: string; // For question paper file if any, handled in class/[classId] page
+  teacherRubricText?: string; 
 }
 
-interface StudentSubmission { // Student's submission for an assignment
-  id: string; // assignmentId
-  title: string; // assignment title (denormalized)
+interface StudentSubmission { 
+  id: string; 
+  title: string; 
   status: 'Pending' | 'Submitted' | 'Graded' | 'Overdue' | 'Awaiting Feedback';
   submittedFileName?: string;
-  submittedFileContent?: string; // Actual submission text
-  submittedFileStoragePath?: string; // Path in Firebase Storage for student's submission
+  submittedFileContent?: string; 
+  submittedFileStoragePath?: string; 
   feedback?: AutoCheckAssignmentOutput | null;
-  lastSubmittedAt?: any; // Firestore Timestamp or Date
+  lastSubmittedAt?: any; 
 }
 
 const getStatusColor = (status: StudentSubmission['status']) => {
@@ -54,7 +53,7 @@ const getStatusColor = (status: StudentSubmission['status']) => {
   }
 };
 
-const FeedbackDialogContent = ({ assignment }: { assignment: StudentSubmission }) => { // Changed to StudentSubmission
+const FeedbackDialogContent = ({ assignment }: { assignment: StudentSubmission }) => { 
   if (!assignment.feedback && !assignment.submittedFileContent) {
     return ( <div className="flex flex-col items-center justify-center text-center p-6 space-y-3"><Info className="w-12 h-12 text-muted-foreground" /><p className="text-lg font-medium">No Feedback or Submission Details</p><p className="text-sm text-muted-foreground">It seems feedback hasn't been generated yet, or no submission details are available for this assignment.</p></div>);
   }
@@ -76,7 +75,7 @@ export default function ClassAssignmentsPage() {
 
   const [assignmentDefinitions, setAssignmentDefinitions] = useState<AssignmentDefinition[]>([]);
   const [studentSubmissions, setStudentSubmissions] = useState<StudentSubmission[]>([]);
-  const [combinedAssignments, setCombinedAssignments] = useState<StudentSubmission[]>([]); // Merged view
+  const [combinedAssignments, setCombinedAssignments] = useState<StudentSubmission[]>([]); 
   const [loading, setLoading] = useState(true);
 
   const rubricFileRef = useRef<HTMLInputElement>(null);
@@ -91,7 +90,6 @@ export default function ClassAssignmentsPage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<StudentSubmission | null>(null);
 
-  // Fetch assignment definitions
   useEffect(() => {
     if (!classId || !db) return;
     setLoading(true);
@@ -106,23 +104,26 @@ export default function ClassAssignmentsPage() {
           title: data.title,
           dueDate: data.dueDate?.toDate ? data.dueDate.toDate() : new Date(data.dueDate),
           description: data.description,
-          teacherRubricText: data.teacherRubricText, // Teacher might have set this
+          teacherRubricText: data.teacherRubricText, 
         });
       });
       setAssignmentDefinitions(fetchedDefinitions);
-      if (!user) setLoading(false); // If no user, we are done loading after definitions
-    }, (error) => {
+      if (!user) setLoading(false); 
+    }, (error: any) => {
       console.error("Error fetching assignment definitions:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not load assignment definitions." });
+      let desc = "Could not load assignment definitions.";
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied fetching assignment definitions. Please check Firestore security rules.";
+      }
+      toast({ variant: "destructive", title: "Error", description: desc });
       setLoading(false);
     });
     return () => unsubscribe();
   }, [classId, toast, user]);
 
-  // Fetch student's submissions for these assignments
   useEffect(() => {
     if (!classId || !user || !db || assignmentDefinitions.length === 0) {
-        if (assignmentDefinitions.length > 0 && !user) setLoading(false); // definitions loaded, but no user
+        if (assignmentDefinitions.length > 0 && !user) setLoading(false); 
         return;
     }
     
@@ -133,7 +134,7 @@ export default function ClassAssignmentsPage() {
             if (subDocSnap.exists()) {
                 const data = subDocSnap.data();
                 return {
-                    ...def, // copy definition details
+                    ...def, 
                     status: data.status || 'Submitted',
                     submittedFileName: data.submittedFileName,
                     submittedFileContent: data.submittedFileContent,
@@ -142,7 +143,6 @@ export default function ClassAssignmentsPage() {
                     lastSubmittedAt: data.lastSubmittedAt?.toDate ? data.lastSubmittedAt.toDate() : new Date(data.lastSubmittedAt),
                 } as StudentSubmission;
             }
-            // If no submission exists, create a pending entry from definition
             return {
                 ...def,
                 status: 'Pending',
@@ -152,9 +152,13 @@ export default function ClassAssignmentsPage() {
         try {
             const fetchedSubmissions = await Promise.all(submissionsPromises);
             setStudentSubmissions(fetchedSubmissions);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error fetching student submissions:", error);
-            toast({ variant: "destructive", title: "Error", description: "Could not load your submissions." });
+            let desc = "Could not load your submissions.";
+            if (error.code === 'permission-denied') {
+                desc = "Permission denied fetching your submissions. Please check Firestore security rules.";
+            }
+            toast({ variant: "destructive", title: "Error", description: desc });
         } finally {
              setLoading(false);
         }
@@ -164,13 +168,12 @@ export default function ClassAssignmentsPage() {
 
   }, [classId, user, assignmentDefinitions, toast]);
 
-  // Combine definitions and submissions for UI
   useEffect(() => {
     if (assignmentDefinitions.length === 0) {
         setCombinedAssignments([]);
         return;
     }
-    if (!user) { // If user not logged in, show definitions as pending
+    if (!user) { 
         setCombinedAssignments(assignmentDefinitions.map(def => ({
             ...def,
             status: 'Pending', 
@@ -181,11 +184,11 @@ export default function ClassAssignmentsPage() {
     const merged = assignmentDefinitions.map(def => {
       const submission = studentSubmissions.find(sub => sub.id === def.id);
       if (submission) {
-        return { // Merge, submission takes precedence for status-like fields
+        return { 
           id: def.id,
           title: def.title,
-          dueDate: def.dueDate, // From definition
-          description: def.description, // From definition
+          dueDate: def.dueDate, 
+          description: def.description, 
           status: submission.status,
           submittedFileName: submission.submittedFileName,
           submittedFileContent: submission.submittedFileContent,
@@ -193,11 +196,9 @@ export default function ClassAssignmentsPage() {
           lastSubmittedAt: submission.lastSubmittedAt
         };
       }
-      // No submission yet, treat as pending based on definition
       return { ...def, status: 'Pending' as StudentSubmission['status'] };
     });
 
-    // Calculate Overdue status
     const now = new Date();
     const finalAssignments = merged.map(a => {
         if (a.status === 'Pending' && a.dueDate && new Date(a.dueDate) < now) {
@@ -210,7 +211,7 @@ export default function ClassAssignmentsPage() {
   }, [assignmentDefinitions, studentSubmissions, user]);
 
 
-  const handleInitiateSubmission = (assignmentDef: AssignmentDefinition) => { // Takes AssignmentDefinition
+  const handleInitiateSubmission = (assignmentDef: AssignmentDefinition) => { 
     const submission = combinedAssignments.find(ca => ca.id === assignmentDef.id);
     if (submission?.status === 'Graded' || submission?.status === 'Awaiting Feedback') {
       toast({title: "Already Processed", description: `This assignment (${assignmentDef.title}) is already ${submission.status.toLowerCase()}. You can view feedback or resubmit if allowed.`});
@@ -221,15 +222,15 @@ export default function ClassAssignmentsPage() {
          router.push('/auth/signin');
          return;
     }
-    setCurrentAssignmentForRubricUpload(assignmentDef); // Store the definition
+    setCurrentAssignmentForRubricUpload(assignmentDef); 
     
-    if (assignmentDef.teacherRubricText) { // If teacher provided rubric
+    if (assignmentDef.teacherRubricText) { 
         setUploadedRubricText(assignmentDef.teacherRubricText);
         setCurrentAssignmentForSubmission(assignmentDef); 
         setCurrentAssignmentForRubricUpload(null);
         toast({title: "Step: Select Your Submission", description: `Rubric provided by teacher for "${assignmentDef.title}". Now, please select your assignment file (.txt).`, duration: 7000 });
         studentSubmissionFileRef.current?.click();
-    } else { // Student needs to upload rubric
+    } else { 
         toast({ title: "Step 1: Select Rubric", description: `Please select the teacher's rubric/model answer file (.txt) for "${assignmentDef.title}".`, duration: 7000 });
         rubricFileRef.current?.click();
     }
@@ -283,25 +284,21 @@ export default function ClassAssignmentsPage() {
       } catch (aiError) {
         console.error("Error during AI check:", aiError);
         toast({ variant: "destructive", title: "AI Check Error", description: "Could not get AI feedback. " + (aiError instanceof Error ? aiError.message : "Please try again.") });
-        // Proceed to save submission without AI feedback
       }
       
-      // Upload student's file to storage
       const submissionFilePath = `class_submissions/${classId}/${assignmentId}/${user.uid}/${file.name}`;
       const submissionFileRef = storageRef(storage, submissionFilePath);
       try {
         await uploadBytesResumable(submissionFileRef, file);
-        // const downloadURL = await getDownloadURL(submissionFileRef); // Not strictly needed if path is stored
-
-        // Save submission to Firestore
+        
         const submissionDocRef = doc(db, "classrooms", classId, "assignments", assignmentId, "submissions", user.uid);
         await setDoc(submissionDocRef, {
             userId: user.uid,
             assignmentId: assignmentId,
             title: currentAssignmentForSubmission.title,
-            status: feedbackResult ? 'Submitted' : 'Awaiting Feedback', // Or 'Submitted' if AI failed but file saved
+            status: feedbackResult ? 'Submitted' : 'Awaiting Feedback', 
             submittedFileName: file.name,
-            submittedFileContent: studentAssignmentText, // For AI check and display
+            submittedFileContent: studentAssignmentText, 
             submittedFileStoragePath: submissionFilePath,
             feedback: feedbackResult || null,
             lastSubmittedAt: serverTimestamp(),
@@ -312,9 +309,15 @@ export default function ClassAssignmentsPage() {
         ));
         toast({ title: feedbackResult ? "AI Feedback Received" : "Submission Saved (AI Skipped)", description: `Your work for "${currentAssignmentForSubmission.title}" is saved. ${feedbackResult ? 'Click "View Feedback".' : ''}`, duration: 7000 });
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error saving submission or uploading file:", error);
-        toast({ variant: "destructive", title: "Submission Save Error", description: "Could not save your submission. " + (error instanceof Error ? error.message : "Please try again.") });
+        let desc = "Could not save your submission. " + (error instanceof Error ? error.message : "Please try again.");
+        if (error.code === 'permission-denied') {
+            desc = "Permission denied to save submission. Check Firestore rules for 'classrooms/{classId}/assignments/{assignmentId}/submissions'.";
+        } else if (error.code && error.code.includes('storage/unauthorized')) {
+            desc = "Permission denied for submission file upload. Check Firebase Storage rules for 'class_submissions'.";
+        }
+        toast({ variant: "destructive", title: "Submission Save Error", description: desc });
         setCombinedAssignments(prev => prev.map(a => a.id === assignmentId ? {...a, status: 'Pending', feedback: null, submittedFileName: undefined, submittedFileContent: undefined } : a));
       } finally {
         setCurrentAssignmentForSubmission(null);
@@ -341,11 +344,9 @@ export default function ClassAssignmentsPage() {
     const assignmentId = assignmentToDelete.id;
     
     try {
-      // Delete Firestore document
       const submissionDocRef = doc(db, "classrooms", classId, "assignments", assignmentId, "submissions", user.uid);
       await deleteDoc(submissionDocRef);
 
-      // Delete file from Storage if path exists
       if (assignmentToDelete.submittedFileStoragePath) {
         const fileToDeleteRef = storageRef(storage, assignmentToDelete.submittedFileStoragePath);
         await deleteStorageObject(fileToDeleteRef).catch(e => console.warn("Error deleting file from storage:", e));
@@ -355,9 +356,15 @@ export default function ClassAssignmentsPage() {
         a.id === assignmentId ? { ...a, status: 'Pending', feedback: null, submittedFileName: undefined, submittedFileContent: undefined, submittedFileStoragePath: undefined } : a
       ));
       toast({ title: "Submission Deleted", description: `Your submission for "${assignmentToDelete.title}" has been removed.` });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting submission:", error);
-      toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete submission." });
+      let desc = "Could not delete submission.";
+      if (error.code === 'permission-denied') {
+          desc = "Permission denied to delete submission. Check Firestore rules.";
+      } else if (error.code && error.code.includes('storage/unauthorized')) {
+          desc = "Permission denied deleting submission file from storage. Check Storage rules.";
+      }
+      toast({ variant: "destructive", title: "Deletion Failed", description: desc });
     }
     setIsDeleteConfirmOpen(false);
     setAssignmentToDelete(null);
@@ -406,7 +413,7 @@ export default function ClassAssignmentsPage() {
         </ScrollArea>
       )}
       <footer className="flex-none py-2 text-center text-xs text-muted-foreground border-t bg-background">Submit assignments by providing a teacher rubric (if not provided) and your work. Get AI-powered feedback.</footer>
-      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}><DialogContent className="sm:max-w-lg rounded-xl"><DialogHeader><ShadDialogTitle>Feedback for: {selectedAssignmentForFeedback?.title}</ShadDialogTitle><DialogDescription>Review your submission and the AI-generated feedback.</DialogDescription></DialogHeader>{selectedAssignmentForFeedback && <FeedbackDialogContent assignment={selectedAssignmentForFeedback} />  /* Ensure this is StudentSubmission compatible */ }<DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg">Close</Button></DialogClose></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}><DialogContent className="sm:max-w-lg rounded-xl"><DialogHeader><ShadDialogTitle>Feedback for: {selectedAssignmentForFeedback?.title}</ShadDialogTitle><DialogDescription>Review your submission and the AI-generated feedback.</DialogDescription></DialogHeader>{selectedAssignmentForFeedback && <FeedbackDialogContent assignment={selectedAssignmentForFeedback} />  }</DialogContent></Dialog>
       <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}><AlertDialogContent className="rounded-xl"><AlertDialogHeader><ShadAlertDialogTitle>Confirm Delete Submission</ShadAlertDialogTitle><AlertDialogDescription>Are you sure you want to delete your submission for "{assignmentToDelete?.title}"? This action cannot be undone, but you can submit again if the due date has not passed.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => {setIsDeleteConfirmOpen(false); setAssignmentToDelete(null);}} className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteSubmission} className={cn(buttonVariants({ variant: "destructive", className:"rounded-lg"}))}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );

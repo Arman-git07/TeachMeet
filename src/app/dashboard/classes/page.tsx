@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase'; // Import db
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc } from 'firebase/firestore'; // Firestore imports
+import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc, updateDoc } from 'firebase/firestore'; // Firestore imports
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,7 +48,7 @@ interface Classroom {
   dataAiHint?: string;
   createdAt: any; // Firestore Timestamp or Date
   joinRequests?: { [userId: string]: boolean }; // For client-side checking after fetch
-  members?: { [userId: string]: boolean }; // For client-side checking after fetch
+  members?: { [userId: string]: { role: 'student' | 'teacher' } }; 
 }
 
 
@@ -98,7 +98,7 @@ export default function ClassesPage() {
 
   useEffect(() => {
     const fetchClassrooms = async () => {
-      if (authLoading) return; // Wait for auth state to be resolved
+      if (authLoading) return; 
       setInitialLoading(true);
       try {
         let q;
@@ -109,8 +109,7 @@ export default function ClassesPage() {
         }
         
         const querySnapshot = await getDocs(q);
-        const fetchedClassrooms: Classroom[] = [];
-        for (const docSnap of querySnapshot.docs) {
+        const fetchedClassroomsPromises = querySnapshot.docs.map(async (docSnap) => {
           const data = docSnap.data();
           const classroomData: Classroom = {
             id: docSnap.id,
@@ -123,11 +122,10 @@ export default function ClassesPage() {
             thumbnailUrl: data.thumbnailUrl,
             dataAiHint: data.dataAiHint,
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-            joinRequests: {}, // Will be populated below
-            members: {}, // Will be populated below
+            joinRequests: {},
+            members: {}, 
           };
 
-          // Populate joinRequests and members for client-side status checks
           if (user) {
             const joinRequestRef = doc(db, "classrooms", docSnap.id, "joinRequests", user.uid);
             const joinRequestSnap = await getDoc(joinRequestRef);
@@ -138,15 +136,20 @@ export default function ClassesPage() {
             const memberRef = doc(db, "classrooms", docSnap.id, "members", user.uid);
             const memberSnap = await getDoc(memberRef);
             if (memberSnap.exists()) {
-              classroomData.members![user.uid] = true;
+              classroomData.members![user.uid] = { role: memberSnap.data()?.role || 'student' };
             }
           }
-          fetchedClassrooms.push(classroomData);
-        }
+          return classroomData;
+        });
+        const fetchedClassrooms = await Promise.all(fetchedClassroomsPromises);
         setClassrooms(fetchedClassrooms);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching classrooms: ", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not fetch classrooms." });
+        let desc = "Could not fetch classrooms.";
+        if (error.code === 'permission-denied') {
+          desc = "Permission denied fetching classrooms. Please check Firestore security rules.";
+        }
+        toast({ variant: "destructive", title: "Error", description: desc });
       } finally {
         setInitialLoading(false);
       }
@@ -168,8 +171,7 @@ export default function ClassesPage() {
     } else if (activeFilter === 'joined' && user) {
       filteredClassrooms = classrooms.filter(cls => cls.members && cls.members![user.uid] && cls.teacherId !== user.uid);
     }
-    // 'teaching' and 'all' are handled by the Firestore query mostly, 'all' uses all fetched.
-
+    
     setDisplayClassrooms(filteredClassrooms);
 
   }, [classrooms, user, activeFilter, initialLoading, authLoading]);
@@ -223,7 +225,11 @@ export default function ClassesPage() {
         (snapshot) => { /* Progress handling if needed */ },
         (error) => {
           toast.dismiss(toastId);
-          toast({ variant: "destructive", title: "Image Upload Failed", description: `Could not upload. Error: ${error.message}` });
+          let desc = `Could not upload. Error: ${error.message}`;
+          if (error.code && error.code.includes('storage/unauthorized')) {
+            desc = "Permission denied for image upload. Please check Firebase Storage security rules for 'class_thumbnails'.";
+          }
+          toast({ variant: "destructive", title: "Image Upload Failed", description: desc });
           reject(error);
         },
         async () => {
@@ -231,7 +237,7 @@ export default function ClassesPage() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast.dismiss(toastId);
             toast({ title: "Image Uploaded!", description: `New image successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); // No AI hint for uploaded images
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); 
           } catch (getUrlError) {
              toast.dismiss(toastId);
              toast({ variant: "destructive", title: "Image URL Error", description: (getUrlError as Error).message });
@@ -276,7 +282,7 @@ export default function ClassesPage() {
         teacherName: user.displayName || "Teacher",
         teacherId: user.uid,
         teacherAvatar: teacherAvatarUrl,
-        memberCount: 1, // Teacher is the first member
+        memberCount: 1, 
         createdAt: serverTimestamp(),
         thumbnailUrl: imageDetails.thumbnailUrl,
         dataAiHint: imageDetails.dataAiHint,
@@ -284,7 +290,6 @@ export default function ClassesPage() {
 
       const docRef = await addDoc(collection(db, "classrooms"), newClassData);
       
-      // Add teacher as a member
       const memberRef = doc(db, "classrooms", docRef.id, "members", user.uid);
       await setDoc(memberRef, {
         userId: user.uid,
@@ -294,24 +299,26 @@ export default function ClassesPage() {
         joinedAt: serverTimestamp(),
       });
       
-      // Optimistically update UI or refetch
       const createdClass: Classroom = {
           ...newClassData,
           id: docRef.id,
-          createdAt: new Date(), // For immediate display
-          members: { [user.uid]: true }, // Teacher is a member
+          createdAt: new Date(), 
+          members: { [user.uid]: { role: 'teacher'} }, 
       };
       setClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
       if (activeFilter === 'all' || activeFilter === 'teaching') {
         setDisplayClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
       }
 
-
       toast({ title: "Class Created!", description: `"${newClassName.trim()}" has been successfully created.` });
       resetCreateClassDialog();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating class:", error);
-      toast({ variant: "destructive", title: "Creation Failed", description: (error as Error).message });
+      let desc = (error as Error).message;
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied creating class or adding member. Check Firestore security rules for 'classrooms' and 'classrooms/{classId}/members'.";
+      }
+      toast({ variant: "destructive", title: "Creation Failed", description: desc });
       setIsUploadingOrCreating(false);
     }
   };
@@ -341,15 +348,18 @@ export default function ClassesPage() {
         requestedAt: serverTimestamp(),
       });
 
-      // Optimistically update client-side state
       setClassrooms(prev => prev.map(cls => 
         cls.id === classId ? { ...cls, joinRequests: { ...cls.joinRequests, [user.uid]: true } } : cls
       ));
       
       toast({ title: "Request Sent!", description: `Your request to join "${className}" has been sent.` });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending join request:", error);
-      toast({ variant: "destructive", title: "Request Failed", description: (error as Error).message });
+      let desc = (error as Error).message;
+      if (error.code === 'permission-denied') {
+        desc = "Permission denied sending join request. Check Firestore security rules for 'classrooms/{classId}/joinRequests'.";
+      }
+      toast({ variant: "destructive", title: "Request Failed", description: desc });
     }
   };
 
@@ -552,19 +562,19 @@ export default function ClassesPage() {
                         <Edit className="mr-2 h-4 w-4" /> Manage Class
                     </Button>
                 );
-            } else if (isMember) { // User is a member but not the teacher
+            } else if (isMember) { 
                 actionButton = (
                     <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> View Class
                     </Button>
                 );
-            } else if (isRequested) { // User has requested but is not yet a member
+            } else if (isRequested) { 
                 actionButton = (
                     <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
                         <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
                     </Button>
                 );
-            } else { // User is not teacher, not member, and has not requested
+            } else { 
                 actionButton = (
                     <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
