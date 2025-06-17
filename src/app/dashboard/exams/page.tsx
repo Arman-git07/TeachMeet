@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlusCircle, Edit, Eye, FileText, CalendarClock, ClipboardCheck, Loader2 } from "lucide-react";
@@ -12,88 +12,104 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { db } from '@/lib/firebase'; // Import db
+import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore'; // Firestore imports
 
-// Dynamically import CreateExamDialog to avoid hydration issues with the dialog state
 const CreateExamDialog = dynamic(() =>
   import('@/components/exam/CreateExamDialog').then(mod => mod.default),
   {
     ssr: false,
-    loading: () => (
-      <Button variant="default" className="btn-gel rounded-lg" disabled>
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Create Exam...
-      </Button>
-    )
+    loading: () => ( <Button variant="default" className="btn-gel rounded-lg" disabled><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Create Exam...</Button> )
   }
 );
 
-// This interface should ideally be in a shared types file
 interface Exam {
   id: string;
   title: string;
   description: string;
   teacherId: string;
   teacherName: string;
-  scheduledDateTime: Date;
-  dueDateTime: Date;
+  scheduledDateTime: any; // Firestore Timestamp or Date
+  dueDateTime: any; // Firestore Timestamp or Date
   totalMarks: number;
   questionPaperUrl?: string;
   questionPaperFileName?: string;
-  directQuestions?: string; // Added for directly written questions
+  directQuestions?: string;
   status: 'Upcoming' | 'Active' | 'Ended' | 'Graded';
-  classId?: string; // Optional: to associate exam with a class
+  classId?: string;
+  className?: string; // Denormalized for display
 }
-
-const initialMockExams: Exam[] = [
-  { id: "exam1", title: "Midterm Mathematics Test", description: "Covering chapters 1-5. Ensure you show all your work.", teacherId: "teacher1_mock_uid", teacherName: "Dr. Elara Vance", scheduledDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), dueDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), totalMarks: 100, status: "Upcoming", questionPaperFileName: "math_midterm.pdf" },
-  { id: "exam2", title: "History Essay Submission", description: "A 1500-word essay on the impact of the Silk Road.", teacherId: "teacher2_mock_uid", teacherName: "Prof. Kenji Ito", scheduledDateTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), dueDateTime: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), totalMarks: 50, status: "Graded", questionPaperFileName: "history_essay_prompt.pdf" },
-  { id: "exam3", title: "Physics Practical Exam", description: "Online practical simulation. Ensure your software is up to date.", teacherId: "teacher1_mock_uid", teacherName: "Dr. Elara Vance", scheduledDateTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), dueDateTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000), totalMarks: 75, status: "Ended", questionPaperFileName: "physics_practical_guide.pdf" },
-];
-
 
 export default function ExamsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const router = useRouter();
-  const isTeacher = user?.role === 'teacher'; // Assuming user object has a 'role' property
-  const [exams, setExams] = useState<Exam[]>(initialMockExams);
+  const searchParams = useSearchParams(); // For potential classId filter from URL
+  const filterClassId = searchParams.get('classId');
+  const filterClassName = searchParams.get('className');
+
+  const [exams, setExams] = useState<Exam[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-
   useEffect(() => {
-    // Simulate fetching exams
-    setTimeout(() => {
-      // In a real app, fetch exams from Firestore here
-      // For now, we use initialMockExams and update their status dynamically
-      const updatedExams = exams.map(exam => {
-        const now = new Date();
-        let currentStatus = exam.status;
-        if (exam.status !== "Graded") { // Don't change status if already graded
-            if (now >= exam.dueDateTime) {
-                currentStatus = "Ended";
-            } else if (now >= exam.scheduledDateTime && now < exam.dueDateTime) {
-                currentStatus = "Active";
-            } else {
-                currentStatus = "Upcoming";
-            }
+    if (!db) return;
+    setIsLoading(true);
+    
+    let examsQuery;
+    if (filterClassId) {
+      examsQuery = query(collection(db, "exams"), where("classId", "==", filterClassId), orderBy("scheduledDateTime", "desc"));
+    } else if (user) { // Show exams created by user or where user might be a participant (more complex, for now just created by)
+      examsQuery = query(collection(db, "exams"), where("teacherId", "==", user.uid), orderBy("scheduledDateTime", "desc"));
+    } else { // No user, no filter - maybe show public exams if that's a feature, or empty for now
+      examsQuery = query(collection(db, "exams"), orderBy("scheduledDateTime", "desc")); // Example: Fetch all
+    }
+
+    const unsubscribe = onSnapshot(examsQuery, (snapshot) => {
+      const fetchedExams: Exam[] = [];
+      const now = new Date();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        let status = data.status as Exam['status'];
+        const scheduled = data.scheduledDateTime?.toDate ? data.scheduledDateTime.toDate() : new Date(data.scheduledDateTime);
+        const due = data.dueDateTime?.toDate ? data.dueDateTime.toDate() : new Date(data.dueDateTime);
+
+        if (status !== "Graded") {
+          if (now >= due) status = "Ended";
+          else if (now >= scheduled && now < due) status = "Active";
+          else status = "Upcoming";
         }
-        return { ...exam, status: currentStatus };
+        
+        fetchedExams.push({ 
+            id: doc.id, ...data, 
+            scheduledDateTime: scheduled, 
+            dueDateTime: due,
+            status: status 
+        } as Exam);
       });
-      setExams(updatedExams);
+      setExams(fetchedExams);
       setIsLoading(false);
-    }, 750); // Simulate network delay
-  }, []); // Empty dependency array to run once on mount
+    }, (error) => {
+      console.error("Error fetching exams:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not load exams." });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, filterClassId, toast]);
 
   const handleExamCreated = (newExam: Exam) => {
-    setExams(prevExams => [newExam, ...prevExams]);
-    // Optionally: Save to Firestore here if CreateExamDialog doesn't do it.
+    // If CreateExamDialog saves to Firestore, this might just be a toast or UI refresh trigger
+    // For now, let's assume it adds to local state optimistically or relies on onSnapshot
+    toast({ title: "Exam Scheduled", description: `${newExam.title} has been scheduled.` });
+    // No local state update needed if onSnapshot is working correctly and new exam matches query
   };
   
   const getStatusVariant = (status: Exam['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch(status) {
         case "Upcoming": return "default";
-        case "Active": return "secondary";
+        case "Active": return "secondary"; // Greenish/active color
         case "Ended": return "outline";
-        case "Graded": return "default";
+        case "Graded": return "default"; // Could be a success color too
         default: return "default";
     }
   };
@@ -103,128 +119,75 @@ export default function ExamsPage() {
   };
 
   const handleViewSubmissions = (exam: Exam) => {
-    toast({ title: "View Submissions (Mock)", description: `Navigating to submissions for "${exam.title}".`});
+    toast({ title: "View Submissions (Not Implemented)", description: `Functionality to view submissions for "${exam.title}" is planned.`});
     // router.push(`/dashboard/exam/${exam.id}/submissions`);
   };
 
   const handleEditExam = (exam: Exam) => {
-    toast({ title: "Edit Exam (Mock)", description: `Editing functionality for "${exam.title}" is not yet implemented.`});
+    toast({ title: "Edit Exam (Not Implemented)", description: `Editing functionality for "${exam.title}" is planned.`});
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-8 p-4 md:p-8 h-full flex flex-col">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <div className="h-9 w-64 bg-muted rounded-md mb-1"></div>
-            <div className="h-5 w-80 bg-muted rounded-md"></div>
-          </div>
-          <div className="h-11 w-48 bg-muted rounded-lg"></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
-              <CardHeader className="pb-3">
-                <div className="h-6 w-3/4 bg-muted rounded-md mb-1"></div>
-                <div className="h-4 w-1/2 bg-muted rounded-md"></div>
-              </CardHeader>
-              <CardContent className="flex-grow space-y-1.5">
-                <div className="h-4 w-full bg-muted rounded-md"></div>
-                <div className="h-4 w-5/6 bg-muted rounded-md"></div>
-                <div className="h-4 w-4/6 bg-muted rounded-md"></div>
-              </CardContent>
-              <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
-                 <div className="h-9 w-full bg-muted rounded-lg"></div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
+    return ( /* Skeleton loader from original */ <div className="space-y-8 p-4 md:p-8 h-full flex flex-col"><div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"><div><div className="h-9 w-64 bg-muted rounded-md mb-1"></div><div className="h-5 w-80 bg-muted rounded-md"></div></div><div className="h-11 w-48 bg-muted rounded-lg"></div></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">{[...Array(3)].map((_, i) => (<Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50"><CardHeader className="pb-3"><div className="h-6 w-3/4 bg-muted rounded-md mb-1"></div><div className="h-4 w-1/2 bg-muted rounded-md"></div></CardHeader><CardContent className="flex-grow space-y-1.5"><div className="h-4 w-full bg-muted rounded-md"></div><div className="h-4 w-5/6 bg-muted rounded-md"></div><div className="h-4 w-4/6 bg-muted rounded-md"></div></CardContent><CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2"><div className="h-9 w-full bg-muted rounded-lg"></div></CardFooter></Card>))}</div></div>);
   }
 
+  const pageTitle = filterClassId && filterClassName 
+    ? `Exams for ${filterClassName}` 
+    : "Exams & Tests";
+  const pageDescription = filterClassId 
+    ? `Manage assessments for this specific class.`
+    : `Manage all upcoming and past assessments.`;
 
   return (
     <div className="space-y-8 p-4 md:p-8 h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Exams & Tests</h1>
-          <p className="text-muted-foreground">Manage upcoming and past assessments.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
+          <p className="text-muted-foreground">{pageDescription}</p>
         </div>
-        {isTeacher && (
-          <CreateExamDialog onExamCreated={handleExamCreated} />
+        {user && ( // Only show create button if user is logged in (teacher role check can be inside dialog or backend)
+          <CreateExamDialog onExamCreated={handleExamCreated} classContext={filterClassId && filterClassName ? { classId: filterClassId, className: filterClassName} : undefined} />
         )}
       </div>
 
       {exams.length === 0 ? (
         <Card className="text-center py-12 rounded-xl shadow-lg border-border/50 flex-grow flex flex-col justify-center items-center">
-          <CardHeader>
-            <ClipboardCheck className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <CardTitle className="text-2xl">No Exams Scheduled</CardTitle>
-            <CardDescription>There are no exams listed yet. {user ? "Create one to get started!" : "Check back later."}</CardDescription>
-          </CardHeader>
-          {user && (
-            <CardContent>
-              {isTeacher && <CreateExamDialog onExamCreated={handleExamCreated} />}
-            </CardContent>
-
-          )}
+          <CardHeader><ClipboardCheck className="mx-auto h-16 w-16 text-muted-foreground mb-4" /><CardTitle className="text-2xl">No Exams Found</CardTitle><CardDescription>{filterClassId ? "No exams scheduled for this class yet." : "There are no exams listed. Create one to get started!"}</CardDescription></CardHeader>
+          {user && !filterClassId && (<CardContent><CreateExamDialog onExamCreated={handleExamCreated} /></CardContent>)}
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {exams.map(exam => {
-            const isTeacher = user?.uid === exam.teacherId;
-            // Status should now be correctly set from useEffect or initial data
-            const now = new Date(); // For enabling/disabling the "View Paper" button
+            const isTeacherForThisExam = user?.uid === exam.teacherId;
+            const now = new Date();
 
             return (
             <Card key={exam.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50">
               <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg truncate flex-grow mr-2" title={exam.title}>{exam.title}</CardTitle>
-                    <Badge variant={getStatusVariant(exam.status)} className="text-xs rounded-md flex-shrink-0">{exam.status}</Badge>
-                </div>
-                <CardDescription className="text-xs text-muted-foreground">By {exam.teacherName}</CardDescription>
+                <div className="flex justify-between items-start"><CardTitle className="text-lg truncate flex-grow mr-2" title={exam.title}>{exam.title}</CardTitle><Badge variant={getStatusVariant(exam.status)} className="text-xs rounded-md flex-shrink-0">{exam.status}</Badge></div>
+                <CardDescription className="text-xs text-muted-foreground">By {exam.teacherName} {exam.className && `(Class: ${exam.className})`}</CardDescription>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground flex-grow space-y-1.5">
                 <p className="line-clamp-2 text-xs">{exam.description}</p>
-                <div className="text-xs">
-                    <span className="font-medium">Scheduled:</span> {format(exam.scheduledDateTime, "PPp")}
-                </div>
-                <div className="text-xs">
-                    <span className="font-medium">Due:</span> {format(exam.dueDateTime, "PPp")}
-                </div>
-                <div className="text-xs">
-                    <span className="font-medium">Marks:</span> {exam.totalMarks}
-                </div>
+                <div className="text-xs"><span className="font-medium">Scheduled:</span> {format(new Date(exam.scheduledDateTime), "PPp")}</div>
+                <div className="text-xs"><span className="font-medium">Due:</span> {format(new Date(exam.dueDateTime), "PPp")}</div>
+                <div className="text-xs"><span className="font-medium">Marks:</span> {exam.totalMarks}</div>
                 {exam.questionPaperFileName && <p className="text-xs truncate"><span className="font-medium">Paper:</span> {exam.questionPaperFileName}</p>}
               </CardContent>
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
-                {isTeacher ? (
+                {isTeacherForThisExam ? (
                   <>
-                    <Button onClick={() => handleViewSubmissions(exam)} variant="outline" className="w-full rounded-lg text-sm">
-                        <Eye className="mr-2 h-4 w-4" /> View Submissions (Mock)
-                    </Button>
-                    <Button onClick={() => handleEditExam(exam)} className="w-full btn-gel rounded-lg text-sm">
-                        <Edit className="mr-2 h-4 w-4" /> Edit Exam (Mock)
-                    </Button>
+                    <Button onClick={() => handleViewSubmissions(exam)} variant="outline" className="w-full rounded-lg text-sm"><Eye className="mr-2 h-4 w-4" /> View Submissions</Button>
+                    <Button onClick={() => handleEditExam(exam)} className="w-full btn-gel rounded-lg text-sm"><Edit className="mr-2 h-4 w-4" /> Edit Exam</Button>
                   </>
                 ) : (
-                  <Button
-                    onClick={() => handleViewExam(exam)}
-                    className="w-full btn-gel rounded-lg text-sm"
-                    disabled={exam.status === "Upcoming" && now < exam.scheduledDateTime}
-                  >
-                    {exam.status === "Upcoming" && now < exam.scheduledDateTime
-                        ? <><CalendarClock className="mr-2 h-4 w-4" /> Not Yet Active</>
-                        : <><FileText className="mr-2 h-4 w-4" /> View Paper & Submit</>
-                    }
+                  <Button onClick={() => handleViewExam(exam)} className="w-full btn-gel rounded-lg text-sm" disabled={exam.status === "Upcoming" && now < new Date(exam.scheduledDateTime)}>
+                    {exam.status === "Upcoming" && now < new Date(exam.scheduledDateTime) ? <><CalendarClock className="mr-2 h-4 w-4" /> Not Yet Active</> : <><FileText className="mr-2 h-4 w-4" /> View Paper & Submit</>}
                   </Button>
                 )}
               </CardFooter>
             </Card>
-          );
-        })}
+          );})}
         </div>
       )}
     </div>

@@ -7,9 +7,11 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { ArrowLeft, FileText as FileTextIcon, Link as LinkIcon, Video, Info, FolderOpen } from 'lucide-react';
+import { ArrowLeft, FileText as FileTextIcon, Link as LinkIcon, Video, Info, FolderOpen, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase'; // Import db
+import { collection, query, onSnapshot } from 'firebase/firestore'; // Firestore imports
 
 interface Material {
   id: string;
@@ -18,24 +20,8 @@ interface Material {
   url?: string;
   fileName?: string;
   description?: string;
+  filePath?: string; // Path in Firebase Storage
 }
-
-// Mock function to get materials for a class
-// In a real app, this would fetch from a database (e.g., Firestore)
-const getMockMaterialsForClass = (classId: string, className?: string | null): Material[] => {
-  const defaultClassName = className || `Class ${classId}`;
-  return [
-    { id: `mat_live_${classId}`, title: "Join Live Class Session!", type: "link", url: `/dashboard/meeting/${classId}/wait?topic=${encodeURIComponent(defaultClassName)}`, description: "Click here to join the ongoing or upcoming class meeting for this class." },
-    { id: `mat1_${classId}`, title: "Course Syllabus", type: "file", fileName: `syllabus_${classId}.pdf`, description: "Detailed course outline, grading policy, and schedule for the entire semester." },
-    { id: `mat2_${classId}`, title: "Recommended Reading List", type: "link", url: "#", description: "A curated list of external articles, books, and resources to supplement your learning." },
-    { id: `mat3_${classId}`, title: "Introductory Video Lecture Series", type: "video", url: "#", description: "A collection of pre-recorded lectures covering the fundamental concepts of this course." },
-    { id: `mat4_${classId}`, title: "Python Setup Guide (for labs)", type: "file", fileName: `python_setup_guide_${classId}.md`, description: "Step-by-step instructions for setting up your Python development environment for lab exercises." },
-    { id: `mat5_${classId}`, title: "Week 1 Lecture Slides", type: "file", fileName: `week1_slides_${classId}.pptx`, description: "Presentation slides for the first week's topics." },
-    { id: `mat6_${classId}`, title: "External Resource: Khan Academy Math", type: "link", url: "https://www.khanacademy.org/math", description: "Helpful math resources for foundational concepts." },
-    { id: `mat7_${classId}`, title: "Project Guidelines Document", type: "file", fileName: `project_guidelines_${classId}.pdf`, description: "Comprehensive guidelines for the final project, including rubric and submission details." },
-    { id: `mat8_${classId}`, title: "Supplementary Video: The Double Slit Experiment", type: "video", url: "#", description: "An engaging video explaining the double-slit experiment in quantum physics." },
-  ];
-};
 
 const MaterialTypeIcon = ({ type }: { type: Material['type'] }) => {
   if (type === 'link') return <LinkIcon className="mr-3 h-6 w-6 text-primary flex-shrink-0" />;
@@ -57,43 +43,59 @@ export default function ClassMaterialsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (classId) {
-      setLoading(true);
-      // Simulate fetching materials
-      setTimeout(() => {
-        const fetchedMaterials = getMockMaterialsForClass(classId, className);
-        setMaterials(fetchedMaterials);
-        setLoading(false);
-      }, 500);
-    }
-  }, [classId, className]);
+    if (!classId || !db) return;
+    setLoading(true);
+    const materialsColRef = collection(db, "classrooms", classId, "materials");
+    // Add orderBy if you have a timestamp field for materials
+    const q = query(materialsColRef);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedMaterials: Material[] = [];
+      snapshot.forEach(doc => {
+        fetchedMaterials.push({ id: doc.id, ...doc.data() } as Material);
+      });
+      
+      // Prepend the dynamic "Join Live Class" link
+      const liveClassMaterial: Material = {
+        id: `mat_live_${classId}`, 
+        title: "Join Live Class Session!", 
+        type: "link", 
+        url: `/dashboard/meeting/${classId}/wait?topic=${encodeURIComponent(className)}`, 
+        description: "Click here to join the ongoing or upcoming class meeting for this class."
+      };
+      setMaterials([liveClassMaterial, ...fetchedMaterials]);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching materials:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not load materials." });
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [classId, className, toast]);
 
   const handleMaterialAction = (material: Material) => {
     if (material.url) {
-      if (material.url.startsWith('/')) { // Internal link
+      if (material.url.startsWith('/')) { 
         router.push(material.url);
-      } else { // External link
+      } else { 
         window.open(material.url, '_blank', 'noopener,noreferrer');
       }
-    } else if (material.fileName) {
-      toast({
-        title: "Download (Mock)",
-        description: `Simulating download for: ${material.fileName}`,
-      });
-      // In a real app: window.location.href = actualDownloadLink;
+    } else if (material.type === 'file' && material.fileName) { // For locally uploaded files, url might be the downloadURL from storage
+        toast({
+            title: "File Access",
+            description: `File: ${material.fileName}. In a real app, this would trigger a download or open in a new tab if a direct URL exists.`,
+        });
+        // If material.filePath exists and you want to construct a download:
+        // const storageFileRef = storageRef(storage, material.filePath);
+        // getDownloadURL(storageFileRef).then(url => window.open(url, '_blank')).catch(...);
     } else {
-      toast({
-        variant: "destructive",
-        title: "Action Not Available",
-        description: "No URL or file associated with this material.",
-      });
+      toast({ variant: "destructive", title: "Action Not Available", description: "No URL or file associated." });
     }
   };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4"></div>
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Loading materials for {className}...</p>
       </div>
     );
@@ -134,22 +136,16 @@ export default function ClassMaterialsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground pb-4 pt-0">
-                  {material.description ? (
-                     <p className="line-clamp-2">{material.description}</p>
-                  ) : (
-                    <p className="italic">No description provided.</p>
-                  )}
-                  {material.fileName && material.type === 'file' && (
-                    <p className="text-xs mt-1">File: <span className="font-medium text-accent">{material.fileName}</span></p>
-                  )}
+                  {material.description ? ( <p className="line-clamp-2">{material.description}</p> ) : ( <p className="italic">No description provided.</p> )}
+                  {material.fileName && material.type === 'file' && ( <p className="text-xs mt-1">File: <span className="font-medium text-accent">{material.fileName}</span></p> )}
                 </CardContent>
                 <CardFooter className="border-t pt-3">
                    <Button 
                     onClick={() => handleMaterialAction(material)} 
                     className="w-full rounded-lg text-sm btn-gel"
-                    disabled={!material.url && !material.fileName}
+                    disabled={!material.url && !(material.type === 'file' && material.fileName)}
                     >
-                    {material.type === 'link' || material.type === 'video' ? 'Open Link' : 'Download File'}
+                    {material.type === 'link' || material.type === 'video' ? 'Open Link' : (material.type === 'file' ? 'View/Download File' : 'Access Material')}
                   </Button>
                 </CardFooter>
               </Card>

@@ -13,8 +13,9 @@ import { ArrowLeft, Save, Loader2, UploadCloud, Users as UsersIcon, Edit as Edit
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
-import { storage } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase'; // Import db
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { doc, getDoc, updateDoc } from 'firebase/firestore'; // Firestore imports
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -24,7 +25,7 @@ interface ClassroomEditableDetails {
   description: string;
   thumbnailUrl: string;
   dataAiHint?: string;
-  teacherId?: string; // For permission checks
+  teacherId: string; 
 }
 
 const MAX_IMAGE_SIZE_MB = 5;
@@ -40,30 +41,13 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
   return (firstInitial + lastInitial).toUpperCase();
 };
 
-// Mock function to fetch class details - replace with actual API call
-const getMockClassroomForEdit = (id: string, nameQueryParam?: string | null): ClassroomEditableDetails | null => {
-  if (!id) return null;
-  // In a real app, you'd fetch this from your backend.
-  // For now, let's assume some base data or use query params.
-  return {
-    id: id,
-    name: nameQueryParam || `Class ${id}`,
-    description: `This is a sample description for ${nameQueryParam || `Class ${id}`}. You can edit it here.`,
-    thumbnailUrl: `https://placehold.co/600x400.png?text=${getInitialsFromName(nameQueryParam || `Class ${id}`, "C")}`,
-    dataAiHint: "education general",
-    teacherId: "teacher1_placeholder_uid" // Assume a teacher ID for permission checks
-  };
-};
-
 export default function EditClassPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
 
   const classId = params.classId as string;
-  const classNameQuery = searchParams.get('name');
 
   const [classroom, setClassroom] = useState<ClassroomEditableDetails | null>(null);
   const [editClassName, setEditClassName] = useState('');
@@ -74,12 +58,20 @@ export default function EditClassPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (classId) {
+    if (classId && !authLoading) {
       setIsLoading(true);
-      // Simulate fetching data
-      setTimeout(() => {
-        const fetchedClass = getMockClassroomForEdit(classId, classNameQuery);
-        if (fetchedClass) {
+      const classroomDocRef = doc(db, "classrooms", classId);
+      getDoc(classroomDocRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data() as Omit<ClassroomEditableDetails, 'id'>;
+          const fetchedClass: ClassroomEditableDetails = { id: docSnap.id, ...data };
+          
+          if (user && fetchedClass.teacherId !== user.uid) {
+            toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to edit this class." });
+            router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(fetchedClass.name)}`);
+            return;
+          }
+
           setClassroom(fetchedClass);
           setEditClassName(fetchedClass.name);
           setEditClassDescription(fetchedClass.description);
@@ -88,10 +80,15 @@ export default function EditClassPage() {
           toast({ variant: "destructive", title: "Error", description: "Could not load class details." });
           router.push('/dashboard/classes');
         }
+      }).catch(error => {
+        console.error("Error fetching class for edit:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to fetch class details." });
+        router.push('/dashboard/classes');
+      }).finally(() => {
         setIsLoading(false);
-      }, 500);
+      });
     }
-  }, [classId, classNameQuery, router, toast]);
+  }, [classId, user, authLoading, router, toast]);
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -115,10 +112,9 @@ export default function EditClassPage() {
     }
   };
 
-  const uploadImage = async (imageFile: File, userId: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
-    // This is a duplicated function. Ideally, refactor into a shared utility.
+  const uploadImageToStorage = async (imageFile: File, userId: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
     const imageFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
-    const imagePath = `class_thumbnails/${userId}/${imageFileName}`;
+    const imagePath = `class_thumbnails/${userId}/${imageFileName}`; // Same path as create
     const imageFileRef = storageRef(storage, imagePath);
     const toastId = `upload-edit-class-image-${Date.now()}`;
     toast({
@@ -129,9 +125,9 @@ export default function EditClassPage() {
     return new Promise((resolve, reject) => {
       const uploadTask = uploadBytesResumable(imageFileRef, imageFile);
       uploadTask.on('state_changed',
-        (snapshot) => { /* Progress handling */ }, (error) => {
+        (snapshot) => { /* Progress */ }, (error) => {
           toast.dismiss(toastId);
-          toast({ variant: "destructive", title: "Image Upload Failed", description: `Could not upload. Please try again.` });
+          toast({ variant: "destructive", title: "Image Upload Failed", description: `Could not upload. Error: ${error.message}` });
           reject(error);
         },
         async () => {
@@ -139,10 +135,10 @@ export default function EditClassPage() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast.dismiss(toastId);
             toast({ title: "Image Uploaded!", description: `New image successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined });
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); // No AI hint for uploaded images
           } catch (getUrlError) {
              toast.dismiss(toastId);
-             toast({ variant: "destructive", title: "Image URL Error" });
+             toast({ variant: "destructive", title: "Image URL Error", description: (getUrlError as Error).message });
              reject(getUrlError);
           }
         }
@@ -155,60 +151,43 @@ export default function EditClassPage() {
       toast({ variant: "destructive", title: "Missing Information", description: "Please provide a class name and description." });
       return;
     }
-    if (!user) {
-      toast({ variant: "destructive", title: "Authentication Error", description: "You must be logged in to update a class." });
+    if (!user || user.uid !== classroom.teacherId) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to update this class." });
       return;
     }
-    // Basic permission check (in a real app, this might be more robust)
-    // if (user.uid !== classroom.teacherId) {
-    //   toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to edit this class." });
-    //   return;
-    // }
 
     setIsSaving(true);
-    let imageDetails = {
-      thumbnailUrl: classroom.thumbnailUrl,
-      dataAiHint: classroom.dataAiHint
-    };
+    let updatedThumbnailUrl = classroom.thumbnailUrl;
+    let updatedDataAiHint = classroom.dataAiHint;
 
-    if (editClassImageFile) {
-      try {
-        imageDetails = await uploadImage(editClassImageFile, user.uid);
-      } catch (error) {
-        setIsSaving(false);
-        return;
+    try {
+      if (editClassImageFile) {
+        const imageUploadResult = await uploadImageToStorage(editClassImageFile, user.uid);
+        updatedThumbnailUrl = imageUploadResult.thumbnailUrl;
+        updatedDataAiHint = imageUploadResult.dataAiHint;
+      } else if (classroom.name !== editClassName.trim() && classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=')) {
+        // If name changed and placeholder was based on old name, update placeholder
+        const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
+        updatedThumbnailUrl = `https://placehold.co/600x400.png?text=${newClassNameInitials}`;
+        // Keep existing dataAiHint if it was a placeholder
       }
-    } else if (classroom.name !== editClassName.trim() && classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=')) {
-      const newClassNameInitials = getInitialsFromName(editClassName.trim(), "C");
-      imageDetails = {
-        thumbnailUrl: `https://placehold.co/600x400.png?text=${newClassNameInitials}`,
-        dataAiHint: classroom.dataAiHint
-      };
-    }
 
-    // Mock update: In a real app, you'd send this to your backend/Firebase
-    console.log("Updating class (mock):", {
-      ...classroom,
-      name: editClassName.trim(),
-      description: editClassDescription.trim(),
-      thumbnailUrl: imageDetails.thumbnailUrl,
-      dataAiHint: imageDetails.dataAiHint,
-    });
-    // Update local state to reflect changes immediately for demo
-    setClassroom(prev => prev ? ({
-        ...prev,
+      const classroomDocRef = doc(db, "classrooms", classId);
+      await updateDoc(classroomDocRef, {
         name: editClassName.trim(),
         description: editClassDescription.trim(),
-        thumbnailUrl: imageDetails.thumbnailUrl,
-        dataAiHint: imageDetails.dataAiHint,
-    }) : null);
+        thumbnailUrl: updatedThumbnailUrl,
+        dataAiHint: updatedDataAiHint, // Will be undefined if new image uploaded, or same if placeholder updated
+      });
 
-    toast({
-      title: "Class Updated!",
-      description: `"${editClassName.trim()}" has been successfully updated.`,
-    });
-    setIsSaving(false);
-    router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(editClassName.trim())}`);
+      toast({ title: "Class Updated!", description: `"${editClassName.trim()}" has been successfully updated.` });
+      router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(editClassName.trim())}`);
+    } catch (error) {
+      console.error("Error updating class:", error);
+      toast({ variant: "destructive", title: "Update Failed", description: (error as Error).message });
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   const handleManageMembers = () => {
@@ -238,9 +217,7 @@ export default function EditClassPage() {
     );
   }
   
-  // Basic permission check (simplified for mock)
-  // const canEdit = user?.uid === classroom.teacherId;
-  const canEdit = true; // For demo, assume current user can edit
+  const canEdit = user?.uid === classroom.teacherId;
 
   return (
     <div className="space-y-6 p-4 md:p-8 w-full">
@@ -259,7 +236,7 @@ export default function EditClassPage() {
           <CardDescription>Update the details for your class.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-            { !canEdit && (
+            { !canEdit && user && ( // Only show if logged in but not authorized
                  <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Permission Denied</AlertTitle>
@@ -279,7 +256,7 @@ export default function EditClassPage() {
             <Input id="editClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isSaving || !canEdit}/>
             {editClassImagePreview && (
               <div className="mt-2 relative w-full h-48 rounded-lg overflow-hidden border shadow-inner">
-                <Image src={editClassImagePreview} alt="Class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom"/>
+                <Image src={editClassImagePreview} alt="Class image preview" layout="fill" objectFit="cover" data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? classroom.dataAiHint : "education classroom"} />
               </div>
             )}
           </div>
@@ -299,4 +276,3 @@ export default function EditClassPage() {
     </div>
   );
 }
-

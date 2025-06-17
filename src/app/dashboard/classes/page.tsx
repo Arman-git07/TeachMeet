@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,12 +16,25 @@ import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2,
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
-import { storage } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase'; // Import db
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc } from 'firebase/firestore'; // Firestore imports
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
+
+// Dynamically import StartMeetingDialogContent
+const StartMeetingDialogContent = dynamic(() =>
+  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
+  {
+    ssr: false,
+    loading: () => <p className="p-4 text-center">Loading dialog...</p>
+  }
+);
+
+const MAX_IMAGE_SIZE_MB = 5;
+const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 
 interface Classroom {
   id: string;
@@ -33,39 +46,11 @@ interface Classroom {
   memberCount: number;
   thumbnailUrl: string;
   dataAiHint?: string;
-  createdAt: Date;
+  createdAt: any; // Firestore Timestamp or Date
+  joinRequests?: { [userId: string]: boolean }; // For client-side checking after fetch
+  members?: { [userId: string]: boolean }; // For client-side checking after fetch
 }
 
-const baseMockClassroomsData: Omit<Classroom, 'teacherName' | 'teacherId' | 'teacherAvatar' | 'createdAt' | 'memberCount'>[] = [
-  { id: "cl1", name: "Introduction to Quantum Physics", description: "Explore the fascinating world of quantum mechanics, from wave-particle duality to quantum entanglement. Suitable for beginners with a curious mind.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "science education" },
-  { id: "cl2", name: "Advanced JavaScript Techniques", description: "Deep dive into modern JavaScript patterns, performance optimization, and functional programming concepts. Prior JS knowledge recommended.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "programming code" },
-  { id: "cl3", name: "Creative Writing Workshop", description: "Unleash your inner storyteller. This workshop focuses on weekly prompts, constructive peer reviews, and in-depth discussions on narrative craft.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "writing books" },
-  { id: "cl4", name: "Beginner's Yoga & Mindfulness", description: "Learn foundational yoga poses and mindfulness techniques designed to reduce stress and improve overall well-being. No prior experience needed.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "yoga meditation" },
-  { id: "cl5", name: "Data Science Bootcamp Prep", description: "A foundational course covering basic statistics, Python programming, and data visualization to prepare for a data science bootcamp.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "data science" },
-  { id: "cl6", name: "The Art of Digital Painting", description: "From basic sketching to advanced rendering techniques, learn to create stunning digital artwork using popular software.", thumbnailUrl: `https://placehold.co/600x400.png`, dataAiHint: "digital art" },
-];
-
-const defaultTeacherDetailsMap: Record<string, { name: string; initial: string; placeholderId: string }> = {
-  cl1: { name: "Dr. Evelyn Reed", initial: "ER", placeholderId: "teacher1_placeholder_uid" },
-  cl2: { name: "Mr. Kenji Tanaka", initial: "KT", placeholderId: "teacher2_placeholder_uid" },
-  cl3: { name: "Ms. Aisha Khan", initial: "AK", placeholderId: "teacher3_placeholder_uid" },
-  cl4: { name: "Sara Chen", initial: "SC", placeholderId: "user1_placeholder_uid" },
-  cl5: { name: "Dr. Ben Carter", initial: "BC", placeholderId: "teacher4_placeholder_uid" },
-  cl6: { name: "Lena Petrova", initial: "LP", placeholderId: "teacher5_placeholder_uid" },
-};
-
-// Dynamically import StartMeetingDialogContent
-const StartMeetingDialogContent = dynamic(() =>
-  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
-  {
-    ssr: false,
-    loading: () => <p className="p-4 text-center">Loading dialog...</p> // Optional loading state
-  }
-);
-
-const MAX_IMAGE_SIZE_MB = 5;
-const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
-const REQUESTED_CLASSES_KEY = 'teachmeet-requested-classes';
 
 const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string => {
   if (!name || typeof name !== 'string') return defaultInitial;
@@ -94,7 +79,7 @@ export default function ClassesPage() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  const [requestedClassIds, setRequestedClassIds] = useState<string[]>([]);
+  
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
 
   const [activeFilter, setActiveFilter] = useState<string>("all");
@@ -102,109 +87,92 @@ export default function ClassesPage() {
 
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Create Class Dialog State
   const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [newClassDescription, setNewClassDescription] = useState('');
   const [newClassImageFile, setNewClassImageFile] = useState<File | null>(null);
   const [newClassImagePreview, setNewClassImagePreview] = useState<string | null>(null);
-  const [isUploadingClassImage, setIsUploadingClassImage] = useState(false);
+  const [isUploadingOrCreating, setIsUploadingOrCreating] = useState(false);
 
   const currentFilterOptions = filterOptionsConfig.filter(opt => !opt.requiresAuth || isAuthenticated);
 
-
   useEffect(() => {
-    const storedRequests = localStorage.getItem(REQUESTED_CLASSES_KEY);
-    if (storedRequests) {
+    const fetchClassrooms = async () => {
+      if (authLoading) return; // Wait for auth state to be resolved
+      setInitialLoading(true);
       try {
-        const parsedRequests = JSON.parse(storedRequests);
-        if (Array.isArray(parsedRequests)) {
-          setRequestedClassIds(parsedRequests);
+        let q;
+        if (activeFilter === 'teaching' && user) {
+          q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"));
+        } else {
+          q = query(collection(db, "classrooms"), orderBy("createdAt", "desc"));
         }
+        
+        const querySnapshot = await getDocs(q);
+        const fetchedClassrooms: Classroom[] = [];
+        for (const docSnap of querySnapshot.docs) {
+          const data = docSnap.data();
+          const classroomData: Classroom = {
+            id: docSnap.id,
+            name: data.name,
+            teacherName: data.teacherName,
+            teacherId: data.teacherId,
+            teacherAvatar: data.teacherAvatar,
+            description: data.description,
+            memberCount: data.memberCount || 0,
+            thumbnailUrl: data.thumbnailUrl,
+            dataAiHint: data.dataAiHint,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+            joinRequests: {}, // Will be populated below
+            members: {}, // Will be populated below
+          };
+
+          // Populate joinRequests and members for client-side status checks
+          if (user) {
+            const joinRequestRef = doc(db, "classrooms", docSnap.id, "joinRequests", user.uid);
+            const joinRequestSnap = await getDoc(joinRequestRef);
+            if (joinRequestSnap.exists()) {
+              classroomData.joinRequests![user.uid] = true;
+            }
+
+            const memberRef = doc(db, "classrooms", docSnap.id, "members", user.uid);
+            const memberSnap = await getDoc(memberRef);
+            if (memberSnap.exists()) {
+              classroomData.members![user.uid] = true;
+            }
+          }
+          fetchedClassrooms.push(classroomData);
+        }
+        setClassrooms(fetchedClassrooms);
       } catch (error) {
-        console.error("Error parsing requested classes from localStorage:", error);
-        localStorage.removeItem(REQUESTED_CLASSES_KEY);
+        console.error("Error fetching classrooms: ", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch classrooms." });
+      } finally {
+        setInitialLoading(false);
       }
-    }
-  }, []);
+    };
+    fetchClassrooms();
+  }, [user, authLoading, activeFilter, toast]);
+
 
   useEffect(() => {
-    setInitialLoading(true);
-    const processedMocks = baseMockClassroomsData.map((baseCls, index) => {
-      let finalTeacherId: string;
-      let finalTeacherName: string;
-      let finalTeacherAvatar: string;
-
-      const defaultDetails = defaultTeacherDetailsMap[baseCls.id as keyof typeof defaultTeacherDetailsMap] || { name: "Mock Teacher", initial: "M", placeholderId: `teacher_mock_${baseCls.id}`};
-
-      if (baseCls.id === "cl1" && user && !authLoading) {
-        finalTeacherId = user.uid;
-        finalTeacherName = user.displayName || "My Class Teacher";
-        finalTeacherAvatar = user.photoURL || `https://placehold.co/40x40.png?text=${getInitialsFromName(finalTeacherName, "M")}`;
-      } else {
-        finalTeacherId = defaultDetails.placeholderId;
-        finalTeacherName = defaultDetails.name;
-        finalTeacherAvatar = `https://placehold.co/40x40.png?text=${defaultDetails.initial}`;
-      }
-
-      return {
-        ...baseCls,
-        teacherId: finalTeacherId,
-        teacherName: finalTeacherName,
-        teacherAvatar: finalTeacherAvatar,
-        memberCount: Math.floor(Math.random() * 25) + 10,
-        createdAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 180) + 1)),
-      };
-    });
-    setClassrooms(processedMocks);
-    setInitialLoading(false);
-  }, [user, authLoading]);
-
-
- useEffect(() => {
     if (initialLoading || authLoading) {
       setDisplayClassrooms([]);
       return;
     }
 
-    let filteredByActiveRole: Classroom[] = [];
+    let filteredClassrooms = classrooms;
 
-    if (activeFilter === 'teaching') {
-        filteredByActiveRole = user ? classrooms.filter(cls => cls.teacherId === user.uid) : [];
-    } else if (activeFilter === 'requested') {
-        filteredByActiveRole = classrooms.filter(cls =>
-            requestedClassIds.includes(cls.id) && (!user || cls.teacherId !== user.uid)
-        );
-    } else if (activeFilter === 'joined') {
-        filteredByActiveRole = user
-            ? classrooms.filter(cls => requestedClassIds.includes(cls.id) && cls.teacherId !== user.uid)
-            : classrooms.filter(cls => requestedClassIds.includes(cls.id));
-    } else { 
-        filteredByActiveRole = classrooms.slice();
+    if (activeFilter === 'requested' && user) {
+      filteredClassrooms = classrooms.filter(cls => cls.joinRequests && cls.joinRequests![user.uid] && cls.teacherId !== user.uid);
+    } else if (activeFilter === 'joined' && user) {
+      filteredClassrooms = classrooms.filter(cls => cls.members && cls.members![user.uid] && cls.teacherId !== user.uid);
     }
-    
-    filteredByActiveRole.sort((a, b) => {
-        const aIsRequested = requestedClassIds.includes(a.id) && (!user || a.teacherId !== user.uid);
-        const bIsRequested = requestedClassIds.includes(b.id) && (!user || b.teacherId !== user.uid);
-        const aIsTeaching = user && a.teacherId === user.uid;
-        const bIsTeaching = user && b.teacherId === user.uid;
+    // 'teaching' and 'all' are handled by the Firestore query mostly, 'all' uses all fetched.
 
-        // Prioritize based on context, especially for "all" or general views
-        if (activeFilter === 'all' || activeFilter === 'joined' || activeFilter === 'requested') {
-            if (aIsRequested && !bIsRequested) return -1;
-            if (!aIsRequested && bIsRequested) return 1;
-        }
-        if (activeFilter === 'all' || activeFilter === 'teaching') {
-            if (aIsTeaching && !bIsTeaching) return -1;
-            if (!aIsTeaching && bIsTeaching) return 1;
-        }
-        
-        return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
-    });
-    
-    setDisplayClassrooms(filteredByActiveRole);
+    setDisplayClassrooms(filteredClassrooms);
 
-  }, [classrooms, user, requestedClassIds, authLoading, activeFilter, initialLoading]);
+  }, [classrooms, user, activeFilter, initialLoading, authLoading]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,55 +203,38 @@ export default function ClassesPage() {
     setNewClassImageFile(null);
     if (newClassImagePreview?.startsWith('blob:')) URL.revokeObjectURL(newClassImagePreview);
     setNewClassImagePreview(null);
-    setIsUploadingClassImage(false);
+    setIsUploadingOrCreating(false);
     setIsCreateClassDialogOpen(false);
   };
 
-  const uploadImage = async (imageFile: File, userId: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
-    setIsUploadingClassImage(true);
-
+  const uploadImageToStorage = async (imageFile: File, userId: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
     const imageFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
     const imagePath = `class_thumbnails/${userId}/${imageFileName}`;
     const imageFileRef = storageRef(storage, imagePath);
-
     const toastId = `upload-class-image-${Date.now()}`;
-    const toastTitle = "Uploading Class Image...";
-
     toast({
-        id: toastId,
-        title: toastTitle,
-        description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Starting upload of {imageFile.name}. (0%)</span></div>,
+        id: toastId, title: "Uploading Class Image...",
+        description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Starting upload...</span></div>,
         duration: Infinity,
     });
-
     return new Promise((resolve, reject) => {
       const uploadTask = uploadBytesResumable(imageFileRef, imageFile);
       uploadTask.on('state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          toast({
-            id: toastId,
-            title: toastTitle,
-            description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Uploading {imageFile.name}. Please wait. ({Math.round(progress)}%)</span></div>,
-            duration: Infinity,
-          });
-        },
+        (snapshot) => { /* Progress handling if needed */ },
         (error) => {
-          console.error("Class Image Upload Error:", error);
           toast.dismiss(toastId);
-          toast({ variant: "destructive", title: "Image Upload Failed", description: `Could not upload ${imageFile.name}. Please try again.` });
+          toast({ variant: "destructive", title: "Image Upload Failed", description: `Could not upload. Error: ${error.message}` });
           reject(error);
         },
         async () => {
           try {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast.dismiss(toastId);
-            toast({ title: "Image Uploaded!", description: `${imageFile.name} successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined });
+            toast({ title: "Image Uploaded!", description: `New image successfully uploaded.` });
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); // No AI hint for uploaded images
           } catch (getUrlError) {
-             console.error("Error getting download URL for class image:", getUrlError);
              toast.dismiss(toastId);
-             toast({ variant: "destructive", title: "Image URL Error", description: "Image uploaded, but could not get URL." });
+             toast({ variant: "destructive", title: "Image URL Error", description: (getUrlError as Error).message });
              reject(getUrlError);
           }
         }
@@ -302,75 +253,106 @@ export default function ClassesPage() {
       return;
     }
 
-    setIsUploadingClassImage(true);
-
+    setIsUploadingOrCreating(true);
     let imageDetails: { thumbnailUrl: string; dataAiHint?: string };
 
-    if (newClassImageFile) {
-      try {
-        imageDetails = await uploadImage(newClassImageFile, user.uid);
-      } catch (error) {
-        setIsUploadingClassImage(false);
-        return;
+    try {
+      if (newClassImageFile) {
+        imageDetails = await uploadImageToStorage(newClassImageFile, user.uid);
+      } else {
+        const classNameInitials = getInitialsFromName(newClassName.trim(), "C");
+        imageDetails = {
+          thumbnailUrl: `https://placehold.co/600x400.png?text=${classNameInitials}`,
+          dataAiHint: "education general"
+        };
       }
-    } else {
-      const classNameInitials = getInitialsFromName(newClassName.trim(), "C");
-      imageDetails = {
-        thumbnailUrl: `https://placehold.co/600x400.png?text=${classNameInitials}`,
-        dataAiHint: "education general"
+
+      const teacherInitials = getInitialsFromName(user.displayName || "User", "U");
+      const teacherAvatarUrl = user.photoURL || `https://placehold.co/40x40.png?text=${teacherInitials}`;
+
+      const newClassData = {
+        name: newClassName.trim(),
+        description: newClassDescription.trim(),
+        teacherName: user.displayName || "Teacher",
+        teacherId: user.uid,
+        teacherAvatar: teacherAvatarUrl,
+        memberCount: 1, // Teacher is the first member
+        createdAt: serverTimestamp(),
+        thumbnailUrl: imageDetails.thumbnailUrl,
+        dataAiHint: imageDetails.dataAiHint,
       };
+
+      const docRef = await addDoc(collection(db, "classrooms"), newClassData);
+      
+      // Add teacher as a member
+      const memberRef = doc(db, "classrooms", docRef.id, "members", user.uid);
+      await setDoc(memberRef, {
+        userId: user.uid,
+        name: user.displayName || "Teacher",
+        avatarUrl: teacherAvatarUrl,
+        role: "teacher",
+        joinedAt: serverTimestamp(),
+      });
+      
+      // Optimistically update UI or refetch
+      const createdClass: Classroom = {
+          ...newClassData,
+          id: docRef.id,
+          createdAt: new Date(), // For immediate display
+          members: { [user.uid]: true }, // Teacher is a member
+      };
+      setClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
+      if (activeFilter === 'all' || activeFilter === 'teaching') {
+        setDisplayClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
+      }
+
+
+      toast({ title: "Class Created!", description: `"${newClassName.trim()}" has been successfully created.` });
+      resetCreateClassDialog();
+    } catch (error) {
+      console.error("Error creating class:", error);
+      toast({ variant: "destructive", title: "Creation Failed", description: (error as Error).message });
+      setIsUploadingOrCreating(false);
     }
-
-    const teacherInitials = getInitialsFromName(user.displayName || "User", "U");
-    const teacherAvatarUrl = user.photoURL || `https://placehold.co/40x40.png?text=${teacherInitials}`;
-
-    const newClass: Classroom = {
-      id: `cl${Date.now()}`,
-      name: newClassName.trim(),
-      description: newClassDescription.trim(),
-      teacherName: user.displayName || "Teacher",
-      teacherId: user.uid,
-      teacherAvatar: teacherAvatarUrl,
-      memberCount: 1,
-      createdAt: new Date(),
-      ...imageDetails,
-    };
-    setClassrooms(prev => [newClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
-    toast({
-      title: "Class Created!",
-      description: `"${newClassName.trim()}" has been successfully created.`,
-    });
-
-    resetCreateClassDialog();
   };
 
-  const handleRequestToJoin = (classId: string, className: string) => {
-    const alreadyRequested = requestedClassIds.includes(classId);
-
-    if (alreadyRequested && activeFilter !== 'requested') {
-      toast({
-        title: "Request Already Sent",
-        description: `You have already requested to join "${className}".`,
-      });
+  const handleRequestToJoin = async (classId: string, className: string) => {
+    if (!user) {
+      toast({ variant: "destructive", title: "Authentication Required", description: "Please sign in to request to join a class." });
       return;
     }
+    
+    const classToUpdate = classrooms.find(c => c.id === classId);
+    if (classToUpdate?.members && classToUpdate.members[user.uid]) {
+        toast({ title: "Already a Member", description: `You are already a member of "${className}".`});
+        return;
+    }
+    if (classToUpdate?.joinRequests && classToUpdate.joinRequests[user.uid]) {
+        toast({ title: "Request Already Sent", description: `You have already requested to join "${className}".` });
+        return;
+    }
 
-    const newRequestedIds = [...new Set([...requestedClassIds, classId])];
-    setRequestedClassIds(newRequestedIds);
-    localStorage.setItem(REQUESTED_CLASSES_KEY, JSON.stringify(newRequestedIds));
+    try {
+      const requestRef = doc(db, "classrooms", classId, "joinRequests", user.uid);
+      await setDoc(requestRef, {
+        userId: user.uid,
+        userName: user.displayName || user.email,
+        userAvatar: user.photoURL,
+        requestedAt: serverTimestamp(),
+      });
 
-    if (alreadyRequested && activeFilter === 'requested') {
-        toast({
-            title: "Request Resent",
-            description: `Your request to join "${className}" has been (notionally) resent.`,
-        });
-    } else {
-        toast({
-            title: "Request Sent!",
-            description: `Your request to join "${className}" has been sent to the teacher.`,
-        });
+      // Optimistically update client-side state
+      setClassrooms(prev => prev.map(cls => 
+        cls.id === classId ? { ...cls, joinRequests: { ...cls.joinRequests, [user.uid]: true } } : cls
+      ));
+      
+      toast({ title: "Request Sent!", description: `Your request to join "${className}" has been sent.` });
+    } catch (error) {
+      console.error("Error sending join request:", error);
+      toast({ variant: "destructive", title: "Request Failed", description: (error as Error).message });
     }
   };
+
 
   const handleNavigateToEditClass = (classToEdit: Classroom) => {
     router.push(`/dashboard/class/${classToEdit.id}/edit?name=${encodeURIComponent(classToEdit.name)}`);
@@ -419,15 +401,15 @@ export default function ClassesPage() {
                       <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
                         <div className="grid gap-2">
                           <Label htmlFor="newClassName">Class Name</Label>
-                          <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingClassImage}/>
+                          <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/>
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="newClassDescription">Description</Label>
-                          <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingClassImage}/>
+                          <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/>
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                          <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
+                          <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingOrCreating}/>
                           {newClassImagePreview && (
                             <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
                               <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
@@ -436,10 +418,10 @@ export default function ClassesPage() {
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingClassImage}>Cancel</Button>
-                        <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage || !newClassName.trim()}>
-                          {isUploadingClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                          {isUploadingClassImage ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
+                        <DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button></DialogClose>
+                        <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>
+                          {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                          {isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
                         </Button>
                       </DialogFooter>
                   </DialogContent>
@@ -479,7 +461,7 @@ export default function ClassesPage() {
         </DropdownMenu>
       </div>
 
-      {(initialLoading || authLoading || (classrooms.length === 0 && baseMockClassroomsData.length > 0)) ? (
+      {(initialLoading || authLoading ) ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50">
@@ -521,7 +503,7 @@ export default function ClassesPage() {
           </CardHeader>
           <CardContent>
             {(activeFilter === 'all' || activeFilter === 'teaching') && classrooms.length === 0 && isAuthenticated && (
-                <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
+                 <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
                   if (!isOpen) resetCreateClassDialog();
                   setIsCreateClassDialogOpen(isOpen);
                 }}>
@@ -530,40 +512,17 @@ export default function ClassesPage() {
                       Create a Class
                     </Button>
                   </DialogTrigger>
-                  {isCreateClassDialogOpen && (
+                   {isCreateClassDialogOpen && (
                     <DialogContent className="sm:max-w-[520px] rounded-xl">
-                      <DialogHeader>
-                          <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
-                          <DialogDescription>
-                            Fill in the details to set up your new class.
-                          </DialogDescription>
-                        </DialogHeader>
+                        <DialogHeader><DialogTitle className="text-xl">Create New Classroom</DialogTitle><DialogDescription>Fill in the details to set up your new class.</DialogDescription></DialogHeader>
                         <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-                          <div className="grid gap-2">
-                            <Label htmlFor="newClassNameModal">Class Name</Label>
-                            <Input id="newClassNameModal" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingClassImage}/>
-                          </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="newClassDescriptionModal">Description</Label>
-                            <Textarea id="newClassDescriptionModal" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingClassImage}/>
-                          </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="newClassImageModal">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                            <Input id="newClassImageModal" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingClassImage}/>
-                            {newClassImagePreview && (
-                              <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
-                                <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom"/>
-                              </div>
-                            )}
+                          <div className="grid gap-2"><Label htmlFor="newClassNameModal">Class Name</Label><Input id="newClassNameModal" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/></div>
+                          <div className="grid gap-2"><Label htmlFor="newClassDescriptionModal">Description</Label><Textarea id="newClassDescriptionModal" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/></div>
+                          <div className="grid gap-2"><Label htmlFor="newClassImageModal">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label><Input id="newClassImageModal" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingOrCreating}/>
+                            {newClassImagePreview && (<div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner"><Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom"/></div>)}
                           </div>
                         </div>
-                        <DialogFooter>
-                          <Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingClassImage}>Cancel</Button>
-                          <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingClassImage || !newClassName.trim()}>
-                            {isUploadingClassImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            {isUploadingClassImage ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
-                          </Button>
-                        </DialogFooter>
+                        <DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button></DialogClose><Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>{isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}{isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}</Button></DialogFooter>
                     </DialogContent>
                   )}
                 </Dialog>
@@ -579,8 +538,11 @@ export default function ClassesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {displayClassrooms.map(classroom => {
             const isTeacher = user && user.uid === classroom.teacherId;
-            const isRequested = requestedClassIds.includes(classroom.id);
-            const showPendingBadge = isRequested && !isTeacher && activeFilter !== 'joined';
+            const isRequested = user && classroom.joinRequests && classroom.joinRequests[user.uid];
+            const isMember = user && classroom.members && classroom.members[user.uid];
+            
+            const showPendingBadge = isRequested && !isMember && !isTeacher;
+            const showJoinedBadge = isMember && !isTeacher;
             
             let actionButton;
 
@@ -590,25 +552,19 @@ export default function ClassesPage() {
                         <Edit className="mr-2 h-4 w-4" /> Manage Class
                     </Button>
                 );
-            } else if (activeFilter === 'joined' && isRequested) {
+            } else if (isMember) { // User is a member but not the teacher
                 actionButton = (
                     <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> View Class
                     </Button>
                 );
-            } else if (activeFilter === 'requested' && isRequested) {
-                actionButton = ( 
-                    <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
-                        <ArrowRight className="mr-2 h-4 w-4" /> Resend Request
-                    </Button>
-                );
-            } else if (isRequested) {
+            } else if (isRequested) { // User has requested but is not yet a member
                 actionButton = (
                     <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
                         <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
                     </Button>
                 );
-            } else { 
+            } else { // User is not teacher, not member, and has not requested
                 actionButton = (
                     <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
@@ -635,6 +591,10 @@ export default function ClassesPage() {
                     <Badge variant="secondary" className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     My Class
                     </Badge>
+                ) : showJoinedBadge ? (
+                     <Badge variant="default" className="bg-green-500/80 text-white absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
+                       Joined
+                    </Badge>
                 ) : null}
               </div>
               <CardHeader className="pb-2 pt-4">
@@ -653,7 +613,7 @@ export default function ClassesPage() {
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span className="flex items-center"><UsersIcon className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
-                    {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{classroom.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
+                    {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{new Date(classroom.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </div>
                 {actionButton}
                  <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
@@ -668,4 +628,3 @@ export default function ClassesPage() {
     </div>
   );
 }
-
