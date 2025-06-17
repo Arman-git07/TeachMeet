@@ -22,9 +22,9 @@ import { useAuth } from '@/hooks/useAuth';
 // import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Removed direct import
 
 // Dynamically import StartMeetingDialogContent
-const StartMeetingDialogContent = dynamic(() => 
-  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent), 
-  { 
+const StartMeetingDialogContent = dynamic(() =>
+  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
+  {
     ssr: false,
     loading: () => <p className="p-4 text-center">Loading dialog...</p> // Optional loading state
   }
@@ -32,9 +32,9 @@ const StartMeetingDialogContent = dynamic(() =>
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
-  const [meetingCodeDialogInput, setMeetingCodeDialogInput] = useState(''); 
+  const [meetingCodeDialogInput, setMeetingCodeDialogInput] = useState('');
   const { toast } = useToast();
-  const { isAuthenticated, loading: authLoading } = useAuth(); 
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
   useEffect(() => {
     const timer = setTimeout(() => setShowPanel(true), 300);
@@ -87,11 +87,11 @@ export function SlideUpPanel() {
                   Start New Meeting
                 </Button>
               </DialogTrigger>
-              <DialogContent 
+              <DialogContent
                 className="sm:max-w-lg rounded-xl"
-                aria-label="Start a New Meeting" 
+                // Removed aria-label="Start a New Meeting"
               >
-                <StartMeetingDialogContent />
+                <StartMeetingDialogContent /> {/* This component provides its own DialogHeader and DialogTitle */}
               </DialogContent>
             </Dialog>
           ) : (
@@ -133,9 +133,9 @@ export function SlideUpPanel() {
                   <Code className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent 
+              <DialogContent
                 className="sm:max-w-[425px] rounded-xl"
-                aria-label="Enter Meeting Code" 
+                // Removed aria-label="Enter Meeting Code"
               >
                 <DialogHeader>
                   <DialogTitle>Enter Meeting Code</DialogTitle>
@@ -178,4 +178,3 @@ export function SlideUpPanel() {
     </div>
   );
 }
-
