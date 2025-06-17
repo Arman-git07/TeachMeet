@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { DialogFooter, DialogClose } from "@/components/ui/dialog"; // Removed DialogHeader, DialogTitle, DialogDescription
 import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -150,15 +150,7 @@ export function StartMeetingDialogContent() {
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle id="start-meeting-dialog-title" className="flex items-center">
-          <Video className="mr-2 h-6 w-6 text-primary" />
-          Start a New Meeting
-        </DialogTitle>
-        <DialogDescription>
-          Set a topic and share the invite to begin.
-        </DialogDescription>
-      </DialogHeader>
+      {/* DialogHeader, DialogTitle, DialogDescription are now rendered by the parent (SlideUpPanel) */}
       <div className="space-y-5 py-4">
         <div>
           <Label htmlFor="meetingTopicDialog" className="block text-sm font-medium text-muted-foreground mb-1">

@@ -14,19 +14,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
-  DialogTrigger, // Ensured DialogTrigger is imported
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-// import { StartMeetingDialogContent } from "@/components/meeting/StartMeetingDialogContent"; // Removed direct import
 
-// Dynamically import StartMeetingDialogContent
 const StartMeetingDialogContent = dynamic(() =>
   import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
   {
     ssr: false,
-    loading: () => <p className="p-4 text-center">Loading dialog...</p> // Optional loading state
+    loading: () => <p className="p-4 text-center">Loading dialog...</p>
   }
 );
 
@@ -58,12 +56,9 @@ export function SlideUpPanel() {
     }
   };
 
-  const startMeetingHref = isAuthenticated ? "#" : "/auth/signin?action=start"; // Dialog trigger, so href can be # if auth
+  const startMeetingHref = isAuthenticated ? "#" : "/auth/signin?action=start";
   const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
 
-  if (authLoading) {
-    // Optional loading state
-  }
 
   return (
     <div
@@ -90,7 +85,17 @@ export function SlideUpPanel() {
               <DialogContent
                 className="sm:max-w-lg rounded-xl"
                 aria-labelledby="start-meeting-dialog-title"
+                aria-describedby="start-meeting-dialog-description"
               >
+                <DialogHeader>
+                  <DialogTitle id="start-meeting-dialog-title" className="flex items-center">
+                     <Video className="mr-2 h-6 w-6 text-primary" />
+                    Start a New Meeting
+                  </DialogTitle>
+                  <DialogDescription id="start-meeting-dialog-description">
+                    Set a topic and share the invite to begin.
+                  </DialogDescription>
+                </DialogHeader>
                 <StartMeetingDialogContent />
               </DialogContent>
             </Dialog>
@@ -136,10 +141,11 @@ export function SlideUpPanel() {
               <DialogContent
                 className="sm:max-w-[425px] rounded-xl"
                 aria-labelledby="enter-code-dialog-title"
+                aria-describedby="enter-code-dialog-description"
               >
                 <DialogHeader>
                   <DialogTitle id="enter-code-dialog-title">Enter Meeting Code</DialogTitle>
-                  <DialogDescription>
+                  <DialogDescription id="enter-code-dialog-description">
                     Type in the meeting code provided by the host to join the session.
                   </DialogDescription>
                 </DialogHeader>
@@ -163,7 +169,6 @@ export function SlideUpPanel() {
                       Cancel
                     </Button>
                   </DialogClose>
-                  {/* Ensure the link works correctly with DialogClose for navigation */}
                   <DialogClose asChild>
                     <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-lg">
                       Join
