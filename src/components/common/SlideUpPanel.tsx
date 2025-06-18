@@ -81,12 +81,16 @@ export function SlideUpPanel() {
                   Start New Meeting
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-lg rounded-xl">
-                <DialogTitle id="start-meeting-dialog-title-jsx" className="flex items-center text-xl">
-                  <Video className="mr-2 h-6 w-6 text-primary" />
+              <DialogContent
+                className="sm:max-w-lg rounded-xl"
+                aria-labelledby="start-meeting-dialog-title-jsx"
+                aria-describedby="start-meeting-dialog-description-jsx"
+              >
+                <DialogTitle id="start-meeting-dialog-title-jsx">
+                  <Video className="mr-2 h-6 w-6 text-primary inline-block" />
                   Start a New Meeting
                 </DialogTitle>
-                <DialogDescription id="start-meeting-dialog-description-jsx" className="text-sm text-muted-foreground">
+                <DialogDescription id="start-meeting-dialog-description-jsx">
                   Set a topic and share the invite to begin.
                 </DialogDescription>
                 <StartMeetingDialogContent />
@@ -131,9 +135,13 @@ export function SlideUpPanel() {
                   <Code className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px] rounded-xl">
-                <DialogTitle id="enter-code-dialog-title-jsx" className="text-xl">Enter Meeting Code</DialogTitle>
-                <DialogDescription id="enter-code-dialog-description-jsx" className="text-sm text-muted-foreground">
+              <DialogContent
+                className="sm:max-w-[425px] rounded-xl"
+                aria-labelledby="enter-code-dialog-title-jsx"
+                aria-describedby="enter-code-dialog-description-jsx"
+              >
+                <DialogTitle id="enter-code-dialog-title-jsx">Enter Meeting Code</DialogTitle>
+                <DialogDescription id="enter-code-dialog-description-jsx">
                   Type in the meeting code provided by the host to join the session.
                 </DialogDescription>
                 <div className="grid gap-4 py-4">
@@ -156,6 +164,11 @@ export function SlideUpPanel() {
                       Cancel
                     </Button>
                   </DialogClose>
+                  {/*
+                  This DialogClose around the Join button might be problematic if handleJoinFromDialog
+                  needs to prevent closing based on some condition. For now, assuming it always closes.
+                  If conditional closing is needed, the DialogClose should be removed from this button.
+                  */}
                   <DialogClose asChild>
                     <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-lg">
                       Join
@@ -170,3 +183,4 @@ export function SlideUpPanel() {
     </div>
   );
 }
+    
