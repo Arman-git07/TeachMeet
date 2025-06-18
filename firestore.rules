@@ -1,0 +1,136 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user is the teacher of a class
+    function isClassTeacher(classId, userId) {
+      return get(/databases/$(database)/documents/classrooms/$(classId)).data.teacherId == userId;
+    }
+
+    // Helper function to check if a user is a member of a class
+    function isClassMember(classId, userId) {
+      return exists(/databases/$(database)/documents/classrooms/$(classId)/members/$(userId));
+    }
+
+    // Helper function to check if a user is the creator of a meeting
+    function isMeetingCreator(meetingId, userId) {
+      return get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == userId;
+    }
+
+    // Helper function to check if a user is a participant in a meeting
+    function isMeetingParticipant(meetingId, userId) {
+      return exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(userId));
+    }
+
+    // Optional: Users collection for extended user profiles
+    // match /users/{userId} {
+    //   allow read: if request.auth != null;
+    //   allow write: if request.auth != null && request.auth.uid == userId;
+    // }
+
+    // Classrooms Collection
+    match /classrooms/{classId} {
+      allow read: if request.auth != null; // Any authenticated user can list/read basic class info
+      allow create: if request.auth != null && request.resource.data.teacherId == request.auth.uid; // User creating class must be its teacher
+      allow update: if request.auth != null && isClassTeacher(classId, request.auth.uid); // Only teacher can update class details
+      // allow delete: if request.auth != null && isClassTeacher(classId, request.auth.uid); // If you implement class deletion
+
+      // Members subcollection (stores who is part of the class)
+      match /members/{userId} {
+        allow read: if request.auth != null; // Any authenticated user can see member list
+        allow create: if request.auth != null && (isClassTeacher(classId, request.auth.uid) || request.auth.uid == userId); // Teacher can add members, or user adds self (e.g. after join request approval)
+        allow delete: if request.auth != null && (isClassTeacher(classId, request.auth.uid) || request.auth.uid == userId); // Teacher can remove, or user can leave
+        // Update might be restricted to teacher if roles are managed
+        allow update: if request.auth != null && isClassTeacher(classId, request.auth.uid);
+      }
+
+      // Join Requests subcollection
+      match /joinRequests/{userId} {
+        allow read: if request.auth != null && isClassTeacher(classId, request.auth.uid); // Only teacher views requests
+        allow create: if request.auth != null && request.auth.uid == userId && !isClassMember(classId, request.auth.uid); // User can request if not already a member
+        allow delete: if request.auth != null && (isClassTeacher(classId, request.auth.uid) || request.auth.uid == userId); // Teacher processes, or user cancels
+      }
+
+      // Announcements subcollection
+      match /announcements/{announcementId} {
+        allow read: if request.auth != null && isClassMember(classId, request.auth.uid);
+        allow create, update, delete: if request.auth != null && isClassTeacher(classId, request.auth.uid);
+      }
+
+      // Materials subcollection
+      match /materials/{materialId} {
+        allow read: if request.auth != null && isClassMember(classId, request.auth.uid);
+        allow create, update, delete: if request.auth != null && isClassTeacher(classId, request.auth.uid);
+      }
+
+      // Assignments subcollection
+      match /assignments/{assignmentId} {
+        allow read: if request.auth != null && isClassMember(classId, request.auth.uid);
+        allow create, update, delete: if request.auth != null && isClassTeacher(classId, request.auth.uid);
+
+        // Submissions for each assignment
+        match /submissions/{submissionUserId} {
+          allow read: if request.auth != null && (request.auth.uid == submissionUserId || isClassTeacher(classId, request.auth.uid));
+          allow create, update, delete: if request.auth != null && request.auth.uid == submissionUserId; // Students manage their own submissions
+        }
+      }
+    }
+
+    // Exams Collection
+    match /exams/{examId} {
+      allow read: if request.auth != null; // All authenticated users can see exam listings
+      allow create: if request.auth != null && request.resource.data.teacherId == request.auth.uid; // Exam creator must be teacher
+      allow update, delete: if request.auth != null && isClassTeacher(get(/databases/$(database)/documents/exams/$(examId)).data.classId, request.auth.uid); // Teacher of the class can manage the exam
+
+      // Submissions for each exam
+      match /submissions/{submissionUserId} {
+        allow read: if request.auth != null && (request.auth.uid == submissionUserId || isClassTeacher(get(/databases/$(database)/documents/exams/$(examId)).data.classId, request.auth.uid));
+        allow create, update, delete: if request.auth != null && request.auth.uid == submissionUserId; // Students manage their own submissions
+      }
+    }
+
+    // Meetings collection
+    match /meetings/{meetingId} {
+      allow create: if request.auth != null &&
+                       request.resource.data.creatorId == request.auth.uid &&
+                       request.resource.data.topic is string && request.resource.data.topic.size() > 0;
+
+      allow update, delete: if request.auth != null && isMeetingCreator(meetingId, request.auth.uid);
+      allow read: if request.auth != null && isMeetingParticipant(meetingId, request.auth.uid);
+
+      // Participants subcollection
+      match /participants/{participantId} {
+        allow read: if request.auth != null && isMeetingParticipant(meetingId, request.auth.uid);
+        allow write: if request.auth != null &&
+                       (
+                         ( // Case 1: User managing their own entry
+                           request.auth.uid == participantId &&
+                           request.resource.data.userId == request.auth.uid &&
+                           // Allow creating own entry, or updating only specific fields
+                           (request.method == 'create' || (request.method == 'update' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isMicMuted', 'isCameraOff', 'isHandRaised', 'isScreenSharing', 'photoURL', 'name'])))
+                         ) ||
+                         ( // Case 2: Meeting creator managing an entry (e.g. for moderation)
+                           isMeetingCreator(meetingId, request.auth.uid)
+                         )
+                       );
+        allow delete: if request.auth != null &&
+                        (
+                          request.auth.uid == participantId || // User deleting their own entry
+                          isMeetingCreator(meetingId, request.auth.uid) // Creator removing a participant
+                        );
+      }
+
+      // Future: Chat Messages subcollection (example)
+      // match /chatMessages/{messageId} {
+      //   allow read: if request.auth != null && isMeetingParticipant(meetingId, request.auth.uid);
+      //   allow create: if request.auth != null &&
+      //                   request.resource.data.senderId == request.auth.uid &&
+      //                   isMeetingParticipant(meetingId, request.auth.uid);
+      // }
+    }
+  }
+}
+
+    
