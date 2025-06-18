@@ -302,7 +302,7 @@ export default function ClassesPage() {
       const createdClass: Classroom = {
           ...newClassData,
           id: docRef.id,
-          createdAt: new Date(),
+          createdAt: new Date(), // Approximate, Firestore timestamp will be more accurate
           members: { [user.uid]: { role: 'teacher'} },
       };
       setClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
@@ -348,9 +348,11 @@ export default function ClassesPage() {
         requestedAt: serverTimestamp(),
       });
 
+      // Update local state to reflect the request
       setClassrooms(prev => prev.map(cls =>
         cls.id === classId ? { ...cls, joinRequests: { ...cls.joinRequests, [user.uid]: true } } : cls
       ));
+      // displayClassrooms will update via its useEffect dependency
 
       toast({ title: "Request Sent!", description: `Your request to join "${className}" has been sent.` });
     } catch (error: any) {
@@ -430,6 +432,7 @@ export default function ClassesPage() {
   };
 
 
+  // Cleanup for image preview URL
   useEffect(() => {
     return () => {
       if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
@@ -450,7 +453,7 @@ export default function ClassesPage() {
         <div className="flex items-center gap-2">
             {isAuthenticated && (
                 <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
-                    if (!isOpen) resetCreateClassDialog();
+                    if (!isOpen) resetCreateClassDialog(); // Reset when dialog is closed by any means
                     setIsCreateClassDialogOpen(isOpen);
                 }}>
                 <DialogTrigger asChild>
@@ -458,7 +461,7 @@ export default function ClassesPage() {
                     <PlusCircle className="mr-2 h-5 w-5" /> Create New Class
                     </Button>
                 </DialogTrigger>
-                {isCreateClassDialogOpen && (
+                {isCreateClassDialogOpen && ( // Conditionally render content to ensure state reset
                   <DialogContent className="sm:max-w-[520px] rounded-xl">
                     <DialogHeader>
                         <DialogTitle id="create-class-dialog-title" className="text-xl">Create New Classroom</DialogTitle>
@@ -499,6 +502,7 @@ export default function ClassesPage() {
         </div>
       </div>
 
+      {/* Filters */}
       <div className="my-4 flex items-center gap-2">
         <DropdownMenu open={isFilterDropdownOpen} onOpenChange={setIsFilterDropdownOpen}>
           <DropdownMenuTrigger asChild>
@@ -509,6 +513,7 @@ export default function ClassesPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-60 rounded-xl">
             {currentFilterOptions.map(option => (
+                // Conditionally render "My Teaching" based on authentication
                 (option.value !== 'teaching' || isAuthenticated) &&
                 <DropdownMenuItem
                     key={option.value}
@@ -529,6 +534,7 @@ export default function ClassesPage() {
         </DropdownMenu>
       </div>
 
+      {/* Classrooms Grid / Loading / Empty State */}
       {(initialLoading || authLoading ) ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
@@ -570,6 +576,7 @@ export default function ClassesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Show Create Class button in empty state only if user is authenticated and filter allows creation */}
             {(activeFilter === 'all' || activeFilter === 'teaching') && classrooms.length === 0 && isAuthenticated && (
                  <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
                   if (!isOpen) resetCreateClassDialog();
@@ -580,8 +587,9 @@ export default function ClassesPage() {
                       Create a Class
                     </Button>
                   </DialogTrigger>
-                   {isCreateClassDialogOpen && (
+                   {isCreateClassDialogOpen && ( // Conditionally render for state reset
                     <DialogContent className="sm:max-w-[520px] rounded-xl" aria-labelledby="create-class-dialog-title-modal" aria-describedby="create-class-dialog-description-modal">
+                        {/* Content from above, re-rendered if dialog is open */}
                         <DialogHeader>
                             <DialogTitle id="create-class-dialog-title-modal" className="text-xl">Create New Classroom</DialogTitle>
                             <DialogDescription id="create-class-dialog-description-modal">Fill in the details to set up your new class.</DialogDescription>
@@ -598,6 +606,7 @@ export default function ClassesPage() {
                   )}
                 </Dialog>
             )}
+            {/* Button to explore all classes if current filter shows none */}
             {(activeFilter === 'requested' || activeFilter === 'joined') && (
                  <Button onClick={() => { setActiveFilter('all'); setIsFilterDropdownOpen(false); }} size="lg" variant="outline" className="rounded-lg">
                     Explore All Classes
@@ -618,9 +627,9 @@ export default function ClassesPage() {
             let actionButton;
 
             if (isTeacher) {
-                actionButton = (
-                    <Button onClick={() => handleNavigateToEditClass(classroom)} className="w-full btn-gel rounded-lg text-sm">
-                        <Edit className="mr-2 h-4 w-4" /> Manage Class
+                actionButton = ( // This button does not navigate to edit, it's for viewing details. Edit is in dropdown.
+                    <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
+                         <ArrowRight className="mr-2 h-4 w-4" /> View Details
                     </Button>
                 );
             } else if (isMember) {
@@ -645,6 +654,7 @@ export default function ClassesPage() {
 
             return (
             <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50 relative">
+              {/* Dropdown Menu for Actions */}
               <div className="absolute top-2 right-2 z-10">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -670,6 +680,7 @@ export default function ClassesPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+              {/* Image and Badges */}
               <div className="relative h-40 w-full">
                  <Image
                     src={classroom.thumbnailUrl}
@@ -679,6 +690,7 @@ export default function ClassesPage() {
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
                     data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"}
                  />
+                {/* Badges for status */}
                 {showPendingBadge ? (
                     <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 left-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     Pending Request
@@ -693,6 +705,7 @@ export default function ClassesPage() {
                     </Badge>
                 ) : null}
               </div>
+              {/* Card Header with Title and Teacher Info */}
               <CardHeader className="pb-2 pt-4">
                 <CardTitle className="text-lg truncate leading-tight" title={classroom.name}>{classroom.name}</CardTitle>
                 <div className="flex items-center pt-1">
@@ -703,18 +716,23 @@ export default function ClassesPage() {
                     <CardDescription className="text-xs text-muted-foreground truncate">Taught by {classroom.teacherName}</CardDescription>
                 </div>
               </CardHeader>
+              {/* Card Content with Description */}
               <CardContent className="text-sm text-muted-foreground flex-grow min-h-[60px]">
                 <p className="line-clamp-3">{classroom.description}</p>
               </CardContent>
+              {/* Card Footer with Meta Info and Action Button */}
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span className="flex items-center"><UsersIcon className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
+                    {/* Display formatted date if createdAt exists */}
                     {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{new Date(classroom.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </div>
                 {actionButton}
-                 {/* <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
+                 {/* Alternative/Additional "View Details" button, if primary action is something else.
+                <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
                     View Details
-                </Button> */}
+                </Button>
+                */}
               </CardFooter>
             </Card>
           );
@@ -722,6 +740,7 @@ export default function ClassesPage() {
         </div>
       )}
 
+      {/* Delete Class Confirmation Dialog */}
       <AlertDialog open={isDeleteClassConfirmOpen} onOpenChange={setIsDeleteClassConfirmOpen}>
         <AlertDialogContent className="rounded-xl">
           <AlertDialogHeader>
