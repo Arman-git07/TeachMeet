@@ -9,9 +9,9 @@ import dynamic from 'next/dynamic';
 import {
   Dialog,
   DialogContent,
-  DialogDescription, // Ensured import
+  DialogDescription,
   DialogFooter,
-  DialogTitle,     // Ensured import
+  DialogTitle,
   DialogClose,
   DialogTrigger,
 } from "@/components/ui/dialog";
@@ -81,10 +81,7 @@ export function SlideUpPanel() {
                   Start New Meeting
                 </Button>
               </DialogTrigger>
-              <DialogContent
-                className="sm:max-w-lg rounded-xl"
-                aria-label="Start a New Meeting" // Added aria-label
-              >
+              <DialogContent className="sm:max-w-lg rounded-xl">
                 <DialogTitle id="start-meeting-dialog-title-jsx" className="flex items-center text-xl">
                   <Video className="mr-2 h-6 w-6 text-primary" />
                   Start a New Meeting
@@ -92,7 +89,7 @@ export function SlideUpPanel() {
                 <DialogDescription id="start-meeting-dialog-description-jsx" className="text-sm text-muted-foreground">
                   Set a topic and share the invite to begin.
                 </DialogDescription>
-                <StartMeetingDialogContent /> {/* This renders form body and footer */}
+                <StartMeetingDialogContent />
               </DialogContent>
             </Dialog>
           ) : (
@@ -134,10 +131,7 @@ export function SlideUpPanel() {
                   <Code className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent
-                className="sm:max-w-[425px] rounded-xl"
-                aria-label="Enter Meeting Code" // Added aria-label
-              >
+              <DialogContent className="sm:max-w-[425px] rounded-xl">
                 <DialogTitle id="enter-code-dialog-title-jsx" className="text-xl">Enter Meeting Code</DialogTitle>
                 <DialogDescription id="enter-code-dialog-description-jsx" className="text-sm text-muted-foreground">
                   Type in the meeting code provided by the host to join the session.
@@ -162,11 +156,6 @@ export function SlideUpPanel() {
                       Cancel
                     </Button>
                   </DialogClose>
-                  {/* The DialogClose around the Join button will close the dialog.
-                      If handleJoinFromDialog also navigates, this is fine.
-                      If it doesn't always navigate and might show an error toast,
-                      you might want to conditionally close the dialog.
-                      For now, this behavior is standard. */}
                   <DialogClose asChild>
                     <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-lg">
                       Join

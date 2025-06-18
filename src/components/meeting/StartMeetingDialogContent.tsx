@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { DialogFooter, DialogClose } from "@/components/ui/dialog"; // Removed DialogHeader, DialogTitle, DialogDescription
+import { DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -150,7 +150,7 @@ export function StartMeetingDialogContent() {
 
   return (
     <>
-      {/* DialogHeader, DialogTitle, DialogDescription are now rendered by the parent (SlideUpPanel) */}
+      {/* DialogTitle and DialogDescription are now rendered by SlideUpPanel.tsx */}
       <div className="space-y-5 py-4">
         <div>
           <Label htmlFor="meetingTopicDialog" className="block text-sm font-medium text-muted-foreground mb-1">
