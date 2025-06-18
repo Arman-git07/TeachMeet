@@ -4,27 +4,27 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck } from "lucide-react";
+import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
-import { db, storage } from '@/lib/firebase'; // Import db
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc, updateDoc } from 'firebase/firestore'; // Firestore imports
+import { db, storage } from '@/lib/firebase';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from "firebase/storage";
+import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
 
-// Dynamically import StartMeetingDialogContent
 const StartMeetingDialogContent = dynamic(() =>
   import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
   {
@@ -46,9 +46,9 @@ interface Classroom {
   memberCount: number;
   thumbnailUrl: string;
   dataAiHint?: string;
-  createdAt: any; // Firestore Timestamp or Date
-  joinRequests?: { [userId: string]: boolean }; // For client-side checking after fetch
-  members?: { [userId: string]: { role: 'student' | 'teacher' } }; 
+  createdAt: any;
+  joinRequests?: { [userId: string]: boolean };
+  members?: { [userId: string]: { role: 'student' | 'teacher' } };
 }
 
 
@@ -79,12 +79,9 @@ export default function ClassesPage() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  
   const [displayClassrooms, setDisplayClassrooms] = useState<Classroom[]>([]);
-
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-
   const [initialLoading, setInitialLoading] = useState(true);
 
   const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
@@ -94,11 +91,14 @@ export default function ClassesPage() {
   const [newClassImagePreview, setNewClassImagePreview] = useState<string | null>(null);
   const [isUploadingOrCreating, setIsUploadingOrCreating] = useState(false);
 
+  const [isDeleteClassConfirmOpen, setIsDeleteClassConfirmOpen] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<Classroom | null>(null);
+
   const currentFilterOptions = filterOptionsConfig.filter(opt => !opt.requiresAuth || isAuthenticated);
 
   useEffect(() => {
     const fetchClassrooms = async () => {
-      if (authLoading) return; 
+      if (authLoading) return;
       setInitialLoading(true);
       try {
         let q;
@@ -107,7 +107,7 @@ export default function ClassesPage() {
         } else {
           q = query(collection(db, "classrooms"), orderBy("createdAt", "desc"));
         }
-        
+
         const querySnapshot = await getDocs(q);
         const fetchedClassroomsPromises = querySnapshot.docs.map(async (docSnap) => {
           const data = docSnap.data();
@@ -123,7 +123,7 @@ export default function ClassesPage() {
             dataAiHint: data.dataAiHint,
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
             joinRequests: {},
-            members: {}, 
+            members: {},
           };
 
           if (user) {
@@ -171,7 +171,7 @@ export default function ClassesPage() {
     } else if (activeFilter === 'joined' && user) {
       filteredClassrooms = classrooms.filter(cls => cls.members && cls.members![user.uid] && cls.teacherId !== user.uid);
     }
-    
+
     setDisplayClassrooms(filteredClassrooms);
 
   }, [classrooms, user, activeFilter, initialLoading, authLoading]);
@@ -237,7 +237,7 @@ export default function ClassesPage() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             toast.dismiss(toastId);
             toast({ title: "Image Uploaded!", description: `New image successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined }); 
+            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined });
           } catch (getUrlError) {
              toast.dismiss(toastId);
              toast({ variant: "destructive", title: "Image URL Error", description: (getUrlError as Error).message });
@@ -282,14 +282,14 @@ export default function ClassesPage() {
         teacherName: user.displayName || "Teacher",
         teacherId: user.uid,
         teacherAvatar: teacherAvatarUrl,
-        memberCount: 1, 
+        memberCount: 1,
         createdAt: serverTimestamp(),
         thumbnailUrl: imageDetails.thumbnailUrl,
         dataAiHint: imageDetails.dataAiHint,
       };
 
       const docRef = await addDoc(collection(db, "classrooms"), newClassData);
-      
+
       const memberRef = doc(db, "classrooms", docRef.id, "members", user.uid);
       await setDoc(memberRef, {
         userId: user.uid,
@@ -298,12 +298,12 @@ export default function ClassesPage() {
         role: "teacher",
         joinedAt: serverTimestamp(),
       });
-      
+
       const createdClass: Classroom = {
           ...newClassData,
           id: docRef.id,
-          createdAt: new Date(), 
-          members: { [user.uid]: { role: 'teacher'} }, 
+          createdAt: new Date(),
+          members: { [user.uid]: { role: 'teacher'} },
       };
       setClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
       if (activeFilter === 'all' || activeFilter === 'teaching') {
@@ -328,7 +328,7 @@ export default function ClassesPage() {
       toast({ variant: "destructive", title: "Authentication Required", description: "Please sign in to request to join a class." });
       return;
     }
-    
+
     const classToUpdate = classrooms.find(c => c.id === classId);
     if (classToUpdate?.members && classToUpdate.members[user.uid]) {
         toast({ title: "Already a Member", description: `You are already a member of "${className}".`});
@@ -348,10 +348,10 @@ export default function ClassesPage() {
         requestedAt: serverTimestamp(),
       });
 
-      setClassrooms(prev => prev.map(cls => 
+      setClassrooms(prev => prev.map(cls =>
         cls.id === classId ? { ...cls, joinRequests: { ...cls.joinRequests, [user.uid]: true } } : cls
       ));
-      
+
       toast({ title: "Request Sent!", description: `Your request to join "${className}" has been sent.` });
     } catch (error: any) {
       console.error("Error sending join request:", error);
@@ -371,6 +371,64 @@ export default function ClassesPage() {
   const handleViewClass = (classId: string, className: string) => {
     router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
   };
+
+  const openDeleteClassDialog = (classroom: Classroom) => {
+    setClassToDelete(classroom);
+    setIsDeleteClassConfirmOpen(true);
+  };
+
+  const confirmDeleteClass = async () => {
+    if (!classToDelete || !user || classToDelete.teacherId !== user.uid) {
+      toast({ variant: "destructive", title: "Error", description: "Cannot delete class." });
+      return;
+    }
+    setIsUploadingOrCreating(true); // Reuse state for loading indicator
+    try {
+      // 1. Delete class thumbnail from Storage if it's not a placeholder
+      if (classToDelete.thumbnailUrl && !classToDelete.thumbnailUrl.includes('placehold.co')) {
+        try {
+          const thumbnailStorageRef = storageRef(storage, classToDelete.thumbnailUrl);
+          await deleteStorageObject(thumbnailStorageRef);
+          console.log(`[ClassesPage] Deleted thumbnail for class ${classToDelete.id}: ${classToDelete.thumbnailUrl}`);
+        } catch (storageError: any) {
+          if (storageError.code === 'storage/object-not-found') {
+            console.warn(`[ClassesPage] Thumbnail not found in storage for class ${classToDelete.id}, skipping deletion: ${classToDelete.thumbnailUrl}`);
+          } else {
+            console.error(`[ClassesPage] Error deleting thumbnail for class ${classToDelete.id}:`, storageError);
+            // Non-fatal, proceed with Firestore delete
+            toast({ variant: "warning", title: "Thumbnail Deletion Issue", description: "Could not delete class image, but will proceed with class deletion." });
+          }
+        }
+      }
+
+      // 2. Delete the classroom document from Firestore
+      await deleteDoc(doc(db, "classrooms", classToDelete.id));
+      toast({ title: "Class Deleted", description: `"${classToDelete.name}" has been deleted.` });
+      toast({
+        variant: "info",
+        title: "Subcollections & Files",
+        description: "Note: Class members, announcements, materials, assignments, and their files are not automatically deleted. Please clean them up manually or set up a Cloud Function for cascading deletes.",
+        duration: 10000,
+      });
+
+
+      // 3. Update local state
+      setClassrooms(prev => prev.filter(c => c.id !== classToDelete!.id));
+      // displayClassrooms will update automatically via its useEffect dependency on classrooms
+    } catch (error: any) {
+      console.error("Error deleting class:", error);
+      let desc = "Could not delete class.";
+      if (error.code === 'permission-denied') {
+          desc = "Permission denied deleting class. Check Firestore/Storage rules.";
+      }
+      toast({ variant: "destructive", title: "Deletion Failed", description: desc });
+    } finally {
+      setIsDeleteClassConfirmOpen(false);
+      setClassToDelete(null);
+      setIsUploadingOrCreating(false);
+    }
+  };
+
 
   useEffect(() => {
     return () => {
@@ -403,8 +461,8 @@ export default function ClassesPage() {
                 {isCreateClassDialogOpen && (
                   <DialogContent className="sm:max-w-[520px] rounded-xl">
                     <DialogHeader>
-                        <DialogTitle className="text-xl">Create New Classroom</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle id="create-class-dialog-title" className="text-xl">Create New Classroom</DialogTitle>
+                        <DialogDescription id="create-class-dialog-description">
                           Fill in the details to set up your new class.
                         </DialogDescription>
                       </DialogHeader>
@@ -451,7 +509,7 @@ export default function ClassesPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-60 rounded-xl">
             {currentFilterOptions.map(option => (
-                (option.value !== 'teaching' || isAuthenticated) && 
+                (option.value !== 'teaching' || isAuthenticated) &&
                 <DropdownMenuItem
                     key={option.value}
                     onClick={() => {
@@ -523,8 +581,11 @@ export default function ClassesPage() {
                     </Button>
                   </DialogTrigger>
                    {isCreateClassDialogOpen && (
-                    <DialogContent className="sm:max-w-[520px] rounded-xl">
-                        <DialogHeader><DialogTitle className="text-xl">Create New Classroom</DialogTitle><DialogDescription>Fill in the details to set up your new class.</DialogDescription></DialogHeader>
+                    <DialogContent className="sm:max-w-[520px] rounded-xl" aria-labelledby="create-class-dialog-title-modal" aria-describedby="create-class-dialog-description-modal">
+                        <DialogHeader>
+                            <DialogTitle id="create-class-dialog-title-modal" className="text-xl">Create New Classroom</DialogTitle>
+                            <DialogDescription id="create-class-dialog-description-modal">Fill in the details to set up your new class.</DialogDescription>
+                        </DialogHeader>
                         <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
                           <div className="grid gap-2"><Label htmlFor="newClassNameModal">Class Name</Label><Input id="newClassNameModal" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/></div>
                           <div className="grid gap-2"><Label htmlFor="newClassDescriptionModal">Description</Label><Textarea id="newClassDescriptionModal" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/></div>
@@ -550,10 +611,10 @@ export default function ClassesPage() {
             const isTeacher = user && user.uid === classroom.teacherId;
             const isRequested = user && classroom.joinRequests && classroom.joinRequests[user.uid];
             const isMember = user && classroom.members && classroom.members[user.uid];
-            
+
             const showPendingBadge = isRequested && !isMember && !isTeacher;
             const showJoinedBadge = isMember && !isTeacher;
-            
+
             let actionButton;
 
             if (isTeacher) {
@@ -562,19 +623,19 @@ export default function ClassesPage() {
                         <Edit className="mr-2 h-4 w-4" /> Manage Class
                     </Button>
                 );
-            } else if (isMember) { 
+            } else if (isMember) {
                 actionButton = (
                     <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> View Class
                     </Button>
                 );
-            } else if (isRequested) { 
+            } else if (isRequested) {
                 actionButton = (
                     <Button disabled className="w-full rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white">
                         <CheckCircle className="mr-2 h-4 w-4" /> Request Sent
                     </Button>
                 );
-            } else { 
+            } else {
                 actionButton = (
                     <Button onClick={() => handleRequestToJoin(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> Request to Join
@@ -584,6 +645,31 @@ export default function ClassesPage() {
 
             return (
             <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50 relative">
+              <div className="absolute top-2 right-2 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-card/70 hover:bg-muted text-muted-foreground hover:text-foreground">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="rounded-lg">
+                      <DropdownMenuItem onClick={() => handleViewClass(classroom.id, classroom.name)} className="rounded-md">
+                        <ArrowRight className="mr-2 h-4 w-4" /> View Details
+                      </DropdownMenuItem>
+                      {isTeacher && (
+                        <>
+                          <DropdownMenuItem onClick={() => handleNavigateToEditClass(classroom)} className="rounded-md">
+                            <Edit className="mr-2 h-4 w-4" /> Edit Class
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => openDeleteClassDialog(classroom)} className="text-destructive focus:text-destructive rounded-md">
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Class
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               <div className="relative h-40 w-full">
                  <Image
                     src={classroom.thumbnailUrl}
@@ -594,15 +680,15 @@ export default function ClassesPage() {
                     data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"}
                  />
                 {showPendingBadge ? (
-                    <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
+                    <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 left-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     Pending Request
                     </Badge>
-                ) : isTeacher ? (
-                    <Badge variant="secondary" className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
+                ) : isTeacher && !showJoinedBadge ? ( // Show "My Class" only if not also joined (which shouldn't happen for teacher)
+                    <Badge variant="secondary" className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     My Class
                     </Badge>
                 ) : showJoinedBadge ? (
-                     <Badge variant="default" className="bg-green-500/80 text-white absolute top-2 right-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
+                     <Badge variant="default" className="bg-green-500/80 text-white absolute top-2 left-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                        Joined
                     </Badge>
                 ) : null}
@@ -626,15 +712,37 @@ export default function ClassesPage() {
                     {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{new Date(classroom.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </div>
                 {actionButton}
-                 <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
+                 {/* <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
                     View Details
-                </Button>
+                </Button> */}
               </CardFooter>
             </Card>
           );
         })}
         </div>
       )}
+
+      <AlertDialog open={isDeleteClassConfirmOpen} onOpenChange={setIsDeleteClassConfirmOpen}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <ShadAlertDialogTitle>Confirm Delete Class</ShadAlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the class "{classToDelete?.name}"? This action cannot be undone and will remove the class details and main thumbnail.
+              <br/><br/>
+              <strong className="text-destructive-foreground bg-destructive p-1 rounded-md">Important:</strong> Associated class members, announcements, materials, assignments, and their uploaded files will <strong className="underline">not</strong> be automatically deleted from the database or storage. You may need to set up a Firebase Cloud Function for complete cleanup or manually remove them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteClassConfirmOpen(false)} className="rounded-lg">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteClass} className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))} disabled={isUploadingOrCreating}>
+              {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Class
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
+
+    
