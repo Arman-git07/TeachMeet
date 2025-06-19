@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Video, PlusCircle, Code } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react'; // Added Suspense
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -93,7 +93,9 @@ export function SlideUpPanel() {
                 <DialogDescription id="start-meeting-dialog-description-jsx">
                   Set a topic and share the invite to begin.
                 </DialogDescription>
-                <StartMeetingDialogContent />
+                <Suspense fallback={<p className="p-4 text-center">Loading meeting setup...</p>}>
+                  <StartMeetingDialogContent />
+                </Suspense>
               </DialogContent>
             </Dialog>
           ) : (
@@ -164,11 +166,6 @@ export function SlideUpPanel() {
                       Cancel
                     </Button>
                   </DialogClose>
-                  {/*
-                  This DialogClose around the Join button might be problematic if handleJoinFromDialog
-                  needs to prevent closing based on some condition. For now, assuming it always closes.
-                  If conditional closing is needed, the DialogClose should be removed from this button.
-                  */}
                   <DialogClose asChild>
                     <Button type="button" onClick={handleJoinFromDialog} className="btn-gel rounded-lg">
                       Join
@@ -183,4 +180,3 @@ export function SlideUpPanel() {
     </div>
   );
 }
-    

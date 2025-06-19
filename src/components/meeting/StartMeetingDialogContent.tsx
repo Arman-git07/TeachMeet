@@ -24,6 +24,7 @@ interface OngoingMeeting {
 
 
 export function StartMeetingDialogContent() {
+  console.log('[StartMeetingDialogContent] Component rendering/mounting.'); // Diagnostic log
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
   const [meetingId, setMeetingId] = useState("");
