@@ -203,7 +203,9 @@ export default function WhiteboardPage() {
       if (selectedTextObjectIds.includes(textObj.id)) {
         context.strokeStyle = "rgba(0, 123, 255, 0.7)";
         context.lineWidth = 1;
+        context.setLineDash([4, 2]);
         context.strokeRect(textObj.x - 2, textObj.y - 2, textObj.width + 4, textObj.height + 4);
+        context.setLineDash([]);
       }
     });
     
@@ -842,13 +844,13 @@ export default function WhiteboardPage() {
       finalizeLiveText();
     }
     
-    const isToolWithToggleableOptions = drawingTools.includes(toolId) || toolId === 'erase' || toolId === 'text';
+    const isToolWithToggleableOptions = drawingTools.includes(toolId) || toolId === 'erase' || toolId === 'text' || toolId === 'select';
 
-    if (activeTool === toolId && (isToolWithToggleableOptions || toolId === 'select')) { // Select tool can also toggle options if needed
+    if (activeTool === toolId && isToolWithToggleableOptions) {
       setShowDrawingToolOptions(prev => !prev);
     } else {
       setActiveTool(toolId);
-      if (isToolWithToggleableOptions || toolId === 'select') {
+      if (isToolWithToggleableOptions) {
         setShowDrawingToolOptions(true); 
       } else {
         setShowDrawingToolOptions(false); 
@@ -1183,4 +1185,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
