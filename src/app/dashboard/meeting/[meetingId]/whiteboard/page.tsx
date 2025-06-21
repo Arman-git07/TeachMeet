@@ -12,9 +12,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Minus, Type, Eraser, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, MousePointer2 } from "lucide-react";
+import { ArrowLeft, Brush, Minus, Type, Eraser, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, Lasso } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -72,8 +71,8 @@ interface TextElement {
   font: string;
   fontSize: number;
   lineHeight: number;
-  width: number; // Calculated width
-  height: number; // Calculated height
+  width: number;
+  height: number;
 }
 
 const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
@@ -111,7 +110,6 @@ export default function WhiteboardPage() {
   const [historyStep, setHistoryStep] = useState<number>(-1);
   const [isInitialStateSaved, setIsInitialStateSaved] = useState(false);
   
-
   const [isTypingText, setIsTypingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number, y: number } | null>(null);
@@ -121,18 +119,17 @@ export default function WhiteboardPage() {
   const [drawnTextObjects, setDrawnTextObjects] = useState<TextElement[]>([]);
 
   // State for select tool
-  const [selectionRect, setSelectionRect] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
+  const [isDrawingLasso, setIsDrawingLasso] = useState(false);
+  const [lassoPath, setLassoPath] = useState<{x: number, y: number}[]>([]);
   const [selectedTextObjectIds, setSelectedTextObjectIds] = useState<string[]>([]);
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
   const dragStartOffsetRef = useRef<{ x: number, y: number, objOffsets: Map<string, {x: number, y: number}> } | null>(null);
-
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const drawingOptionsToolbarRef = useRef<HTMLDivElement>(null);
 
-  const isDrawingRef = useRef(false); // For freehand/shape drawing
-  const isSelectingRef = useRef(false); // For selection rectangle
+  const isDrawingRef = useRef(false);
   const lastPositionRef = useRef<{ x: number, y: number } | null>(null);
   const shapeStartPointRef = useRef<{ x: number, y: number } | null>(null);
 
@@ -159,11 +156,11 @@ export default function WhiteboardPage() {
 
   const getLineWidth = useCallback(() => {
     return brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6;
-  }, [selectedBrushSize, brushSizes]);
+  }, [selectedBrushSize]);
   
   const getFontSize = useCallback(() => {
     return textSizes.find(s => s.name === selectedTextSize)?.fontSize || 16;
-  }, [selectedTextSize, textSizes]);
+  }, [selectedTextSize]);
 
 
   const redrawCanvasContent = useCallback(() => {
@@ -235,22 +232,26 @@ export default function WhiteboardPage() {
       }
     }
 
-    if (selectionRect) {
-        context.strokeStyle = "rgba(0, 123, 255, 0.5)";
+    if (isDrawingLasso && lassoPath.length > 1) {
+        context.beginPath();
+        context.moveTo(lassoPath[0].x, lassoPath[0].y);
+        for (let i = 1; i < lassoPath.length; i++) {
+            context.lineTo(lassoPath[i].x, lassoPath[i].y);
+        }
+        context.strokeStyle = "rgba(0, 123, 255, 0.7)";
         context.lineWidth = 1;
         context.setLineDash([4, 2]);
-        context.strokeRect(selectionRect.x, selectionRect.y, selectionRect.width, selectionRect.height);
+        context.stroke();
         context.setLineDash([]);
     }
 
-  }, [history, historyStep, canvasBackgroundColor, isInitialStateSaved, setIsInitialStateSaved, drawnTextObjects, isTypingText, currentText, textInputPosition, selectedColor, getFontSize, cursorBlinkVisible, selectionRect, selectedTextObjectIds]);
+  }, [history, historyStep, canvasBackgroundColor, isInitialStateSaved, setIsInitialStateSaved, drawnTextObjects, isTypingText, currentText, textInputPosition, selectedColor, getFontSize, cursorBlinkVisible, selectedTextObjectIds, isDrawingLasso, lassoPath]);
 
   const saveCurrentCanvasState = useCallback(() => {
     if (!canvasRef.current || !contextRef.current || canvasRef.current.width === 0 || canvasRef.current.height === 0) return;
     const canvas = canvasRef.current;
     const context = contextRef.current;
     try {
-        // Create a temporary canvas to draw only the non-text elements from history
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width;
         tempCanvas.height = canvas.height;
@@ -260,7 +261,6 @@ export default function WhiteboardPage() {
         tempCtx.fillStyle = canvasBackgroundColor;
         tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
         
-        // Draw current pixel-based drawings
         if (history.length > 0 && historyStep >= 0 && history[historyStep]) {
             tempCtx.putImageData(history[historyStep], 0, 0);
         }
@@ -314,7 +314,6 @@ export default function WhiteboardPage() {
       }
     };
   }, [isTypingText]);
-
 
   useEffect(() => {
     const WhiteboardPageHeader = () => (
@@ -387,7 +386,7 @@ export default function WhiteboardPage() {
 
 
   useEffect(() => {
-    if (contextRef.current && activeTool !== 'select') { // Don't change for select tool
+    if (contextRef.current && activeTool !== 'select') {
       if (activeTool === 'erase') {
         contextRef.current.strokeStyle = canvasBackgroundColor; 
         contextRef.current.globalCompositeOperation = 'source-over';
@@ -401,7 +400,7 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawCanvasContent();
-  }, [historyStep, drawnTextObjects, canvasBackgroundColor, redrawCanvasContent, isTypingText, cursorBlinkVisible, currentText, selectionRect, selectedTextObjectIds]); 
+  }, [historyStep, drawnTextObjects, canvasBackgroundColor, redrawCanvasContent, isTypingText, cursorBlinkVisible, currentText, selectedTextObjectIds, isDrawingLasso, lassoPath]); 
 
   const finalizeLiveText = useCallback(() => {
     if (!isTypingText || !contextRef.current || !liveTextInputRef.current) return; 
@@ -455,7 +454,7 @@ export default function WhiteboardPage() {
       
       if (isTypingText) {
          if (canvasRef.current && canvasRef.current.contains(target)) {
-           return; // Allow typing on canvas if that logic exists elsewhere
+           return;
          }
          if (isClickOnOptionsToggler && activeTool === 'text') {
            return;
@@ -538,7 +537,6 @@ export default function WhiteboardPage() {
       contextRef.current.fillStyle = canvasBackgroundColor;
       contextRef.current.fillRect(0,0,canvasRef.current.width, canvasRef.current.height);
     }
-
 
     contextRef.current.beginPath();
     contextRef.current.moveTo(pos.x, pos.y);
@@ -675,26 +673,21 @@ export default function WhiteboardPage() {
     redrawCanvasContent(); 
   }, [activeTool, selectedColor, getLineWidth, saveCurrentCanvasState, history, historyStep, canvasBackgroundColor, redrawCanvasContent]);
 
-
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
     if (!pos || !canvasRef.current) return;
 
     let currentCursor: string = 'default';
 
-    if (isDrawingRef.current) { // For drawing tools
+    if (isDrawingRef.current) {
       if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
       drawInternal(pos);
       currentCursor = (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'crosshair' : 'default';
-    } else if (isSelectingRef.current && activeTool === 'select' && shapeStartPointRef.current) { // For drawing selection rectangle
-      if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
-        const x = Math.min(pos.x, shapeStartPointRef.current.x);
-        const y = Math.min(pos.y, shapeStartPointRef.current.y);
-        const width = Math.abs(pos.x - shapeStartPointRef.current.x);
-        const height = Math.abs(pos.y - shapeStartPointRef.current.y);
-        setSelectionRect({ x, y, width, height });
+    } else if (isDrawingLasso) {
+        if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
+        setLassoPath(prev => [...prev, pos]);
         currentCursor = 'crosshair';
-    } else if (isDraggingSelection && activeTool === 'select' && dragStartOffsetRef.current) { // For dragging selected text
+    } else if (isDraggingSelection && activeTool === 'select' && dragStartOffsetRef.current) {
       if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
         const deltaX = pos.x - dragStartOffsetRef.current.x;
         const deltaY = pos.y - dragStartOffsetRef.current.y;
@@ -723,34 +716,46 @@ export default function WhiteboardPage() {
         }
     }
     canvasRef.current.style.cursor = currentCursor; 
-  }, [getPointerPosition, drawInternal, activeTool, isTypingText, isSelectingRef, isDraggingSelection, selectedTextObjectIds, drawnTextObjects]);
+  }, [getPointerPosition, drawInternal, activeTool, isTypingText, isDrawingLasso, isDraggingSelection, selectedTextObjectIds, drawnTextObjects]);
 
+  const isPointInPolygon = (point: {x: number, y: number}, polygon: {x: number, y: number}[]) => {
+      let isInside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+          const xi = polygon[i].x, yi = polygon[i].y;
+          const xj = polygon[j].x, yj = polygon[j].y;
+
+          const intersect = ((yi > point.y) !== (yj > point.y))
+              && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+          if (intersect) isInside = !isInside;
+      }
+      return isInside;
+  };
 
   const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
 
     if (isDrawingRef.current) {
       stopDrawingInternal(pos || undefined);
-    } else if (isSelectingRef.current && activeTool === 'select' && selectionRect) {
+    } else if (isDrawingLasso) {
+        const finalLassoPath = [...lassoPath, lassoPath[0]]; // Close the path for accurate detection
         const newSelectedIds = drawnTextObjects.filter(obj => {
-            const objRect = { x: obj.x, y: obj.y, width: obj.width, height: obj.height };
-            const selRect = selectionRect;
-            return (
-                objRect.x < selRect.x + selRect.width &&
-                objRect.x + objRect.width > selRect.x &&
-                objRect.y < selRect.y + selRect.height &&
-                objRect.y + objRect.height > selRect.y
-            );
+            const corners = [
+                { x: obj.x, y: obj.y },
+                { x: obj.x + obj.width, y: obj.y },
+                { x: obj.x, y: obj.y + obj.height },
+                { x: obj.x + obj.width, y: obj.y + obj.height },
+            ];
+            // Select if any corner is inside the lasso
+            return corners.some(corner => isPointInPolygon(corner, finalLassoPath));
         }).map(obj => obj.id);
+        
         setSelectedTextObjectIds(newSelectedIds);
-        isSelectingRef.current = false;
-        setSelectionRect(null); // Clear visual selection rect
+        setIsDrawingLasso(false);
+        setLassoPath([]);
         redrawCanvasContent();
     } else if (isDraggingSelection) {
         setIsDraggingSelection(false);
         dragStartOffsetRef.current = null;
-        // Text positions are already updated in drawnTextObjects state
-        // TODO: Potentially save state for undo for text moves here if that feature is added
         redrawCanvasContent();
     }
 
@@ -759,7 +764,7 @@ export default function WhiteboardPage() {
     window.removeEventListener('touchcancel', handlePointerUp);
     window.removeEventListener('mousemove', handlePointerMove);
     window.removeEventListener('mouseup', handlePointerUp);
-  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, activeTool, selectionRect, drawnTextObjects, isDraggingSelection, redrawCanvasContent]);
+  }, [getPointerPosition, stopDrawingInternal, handlePointerMove, lassoPath, drawnTextObjects, isDraggingSelection, redrawCanvasContent]);
 
   const handleCanvasPointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return; 
@@ -792,10 +797,9 @@ export default function WhiteboardPage() {
             });
             dragStartOffsetRef.current = { x: pos.x, y: pos.y, objOffsets };
         } else {
-            isSelectingRef.current = true;
-            shapeStartPointRef.current = pos;
-            setSelectionRect({ x: pos.x, y: pos.y, width: 0, height: 0 }); // Start drawing selection rect
-            setSelectedTextObjectIds([]); // Clear previous selection
+            setIsDrawingLasso(true);
+            setLassoPath([pos]);
+            setSelectedTextObjectIds([]);
         }
     } else if (activeTool === 'text') {
         setTextInputPosition(pos);
@@ -857,8 +861,8 @@ export default function WhiteboardPage() {
       }
     }
     if (toolId !== 'select') {
-        setSelectedTextObjectIds([]); // Clear selection when switching to other tools
-        setSelectionRect(null);
+        setSelectedTextObjectIds([]);
+        setLassoPath([]);
     }
   };
 
@@ -891,7 +895,7 @@ export default function WhiteboardPage() {
       setHistoryStep(0);
       setIsInitialStateSaved(true); 
       setSelectedTextObjectIds([]);
-      setSelectionRect(null);
+      setLassoPath([]);
       redrawCanvasContent(); 
     }
     setShowClearConfirmDialog(false);
@@ -929,13 +933,12 @@ export default function WhiteboardPage() {
     setCurrentText(event.target.value);
   };
 
-  const handleLiveTextInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleLiveTextInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => { 
     if (event.key === 'Enter' && !event.shiftKey) { 
       event.preventDefault(); 
       setCurrentText(prev => prev + '\n'); 
     }
   };
-
 
   return (
     <>
@@ -969,9 +972,9 @@ export default function WhiteboardPage() {
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
              <ToolButton
-              icon={MousePointer2}
-              label="Select"
-              onClick={() => handleToolClick("Select")}
+              icon={Lasso}
+              label="Lasso Select"
+              onClick={() => handleToolClick("select")}
               isActive={activeTool === "select"}
               data-options-toggler={true}
             />
@@ -1035,7 +1038,7 @@ export default function WhiteboardPage() {
             <div className="container mx-auto">
               {activeTool === 'select' ? (
                 <div className="flex flex-col items-center gap-2">
-                    <p className="text-sm text-muted-foreground">Select tool active. Click and drag to select text objects.</p>
+                    <p className="text-sm text-muted-foreground">Lasso Select tool active. Click and drag to select text objects.</p>
                     {selectedTextObjectIds.length > 0 && (
                         <p className="text-xs text-primary">{selectedTextObjectIds.length} text object(s) selected. Drag to move.</p>
                     )}
@@ -1179,9 +1182,10 @@ export default function WhiteboardPage() {
           </Card>
         </main>
         <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-          TeachMeet Whiteboard - Select & Move Text, Draw, Text Input, Erase. Undo/Redo for drawings.
+          TeachMeet Whiteboard - Lasso Select for Text, Draw, Text Input, Erase. Undo/Redo for drawings.
         </footer>
       </div>
     </>
   );
-}
+
+    
