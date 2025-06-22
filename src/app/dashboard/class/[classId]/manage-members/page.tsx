@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Users, UserCheck, UserX, ShieldCheck, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Users, UserCheck, UserX, ShieldCheck, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -51,7 +51,13 @@ export default function ManageMembersPage() {
       const classroomDocRef = doc(db, "classrooms", classId);
       const classroomSnap = await getDoc(classroomDocRef);
       if (classroomSnap.exists()) {
-        setClassroomTeacherId(classroomSnap.data().teacherId);
+        const teacherId = classroomSnap.data().teacherId;
+        setClassroomTeacherId(teacherId);
+        // Security check: if user is loaded and is not the teacher, redirect them.
+        if (user && user.uid !== teacherId) {
+            toast({ variant: "destructive", title: "Access Denied", description: "You are not authorized to manage members for this class." });
+            router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
+        }
       } else {
         toast({ variant: "destructive", title: "Error", description: "Class not found."});
         router.push("/dashboard/classes");
@@ -60,7 +66,7 @@ export default function ManageMembersPage() {
       console.error("Error fetching classroom teacherId:", error);
       toast({ variant: "destructive", title: "Error", description: "Could not verify class ownership."});
     }
-  }, [classId, router, toast]);
+  }, [classId, router, toast, user, className]);
 
 
   useEffect(() => {
@@ -70,13 +76,15 @@ export default function ManageMembersPage() {
   }, [classId, user, authLoading, fetchClassroomTeacher]);
 
   useEffect(() => {
-    if (!classId || !classroomTeacherId || (user && user.uid !== classroomTeacherId)) {
-        if (classroomTeacherId && user && user.uid !== classroomTeacherId) {
-            toast({ variant: "destructive", title: "Access Denied", description: "You are not authorized to manage members for this class." });
-            router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
-        }
-        return; // Don't fetch if not authorized or IDs not ready
+    if (!classId || !user || !classroomTeacherId) {
+      setLoading(false);
+      return; 
     }
+
+    if (user.uid !== classroomTeacherId) {
+        return; // Non-teachers should not set up listeners
+    }
+    
     setLoading(true);
 
     const membersUnsub = onSnapshot(
@@ -91,7 +99,7 @@ export default function ManageMembersPage() {
             avatarUrl: data.avatarUrl, 
             role: data.role,
             joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt),
-            email: data.email, // Assuming email is stored
+            email: data.email,
           });
         });
         setMembers(fetchedMembers.sort((a, b) => (a.role === 'teacher' ? -1 : b.role === 'teacher' ? 1 : 0) || a.name.localeCompare(b.name)));
@@ -103,6 +111,7 @@ export default function ManageMembersPage() {
       }
     );
     
+    // FIX: This listener will now only be set up if the current user is the teacher.
     const requestsUnsub = onSnapshot(
       query(collection(db, "classrooms", classId, "joinRequests")),
       (snapshot) => {
@@ -111,16 +120,14 @@ export default function ManageMembersPage() {
           const data = docSnap.data();
           fetchedRequests.push({ 
             id: docSnap.id, 
-            name: data.userName, // From join request structure
+            name: data.userName,
             avatarUrl: data.userAvatar, 
-            role: 'student', // Assume requests are for student role
+            role: 'student',
             requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date(data.requestedAt),
             status: 'requested',
-            // email: data.userEmail, // if stored
           });
         });
         setPendingRequests(fetchedRequests.sort((a,b) => (b.requestedAt?.getTime() || 0) - (a.requestedAt?.getTime() || 0) ));
-        // setLoading managed by members fetch
       }, (error) => {
         console.error("Error fetching join requests:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not load join requests." });
@@ -128,7 +135,7 @@ export default function ManageMembersPage() {
     );
 
     return () => { membersUnsub(); requestsUnsub(); };
-  }, [classId, className, classroomTeacherId, user, router, toast]);
+  }, [classId, classroomTeacherId, user, toast]);
 
 
   const openConfirmationDialog = (type: 'remove' | 'accept' | 'reject', member: Member) => {
@@ -160,9 +167,8 @@ export default function ManageMembersPage() {
           userId: member.id,
           name: member.name,
           avatarUrl: member.avatarUrl,
-          role: 'student', // Default role on acceptance
+          role: 'student',
           joinedAt: serverTimestamp(),
-          // email: member.email, // if available from request
         });
         await batch.commit();
         toast({ title: "Request Accepted", description: `${member.name}'s request to join has been accepted.` });
@@ -243,7 +249,7 @@ export default function ManageMembersPage() {
                     {member.email && <p className="text-xs text-muted-foreground">{member.email}</p>}
                   </div>
                 </div>
-                {member.role === 'student' && user?.uid === classroomTeacherId && ( // Only teacher can remove students
+                {member.role === 'student' && user?.uid === classroomTeacherId && (
                   <Button variant="ghost" size="sm" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmationDialog('remove', member)}>
                     <UserX className="mr-1.5 h-4 w-4" /> Remove
                   </Button>
@@ -254,7 +260,7 @@ export default function ManageMembersPage() {
         </CardContent>
       </Card>
 
-      {user?.uid === classroomTeacherId && ( // Only teacher sees pending requests
+      {user?.uid === classroomTeacherId && (
         <Card className="rounded-xl shadow-lg border-border/50 mt-6 flex-grow flex flex-col">
             <CardHeader>
             <CardTitle className="flex items-center text-lg"><UserCheck className="mr-2 h-5 w-5 text-accent" />Pending Requests ({pendingRequests.length})</CardTitle>
