@@ -39,103 +39,106 @@ export default function ManageMembersPage() {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingRequests, setPendingRequests] = useState<Member[]>([]);
-  const [classroomTeacherId, setClassroomTeacherId] = useState<string | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null: checking, false: denied, true: allowed
   const [loading, setLoading] = useState(true);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<{ type: 'remove' | 'accept' | 'reject'; member: Member } | null>(null);
 
+  useEffect(() => {
+    if (authLoading || !user || !classId) {
+      if (!authLoading) setLoading(false);
+      return;
+    }
 
-  const fetchClassroomTeacher = useCallback(async () => {
-    if (!classId) return;
-    try {
-      const classroomDocRef = doc(db, "classrooms", classId);
-      const classroomSnap = await getDoc(classroomDocRef);
-      if (classroomSnap.exists()) {
-        const teacherId = classroomSnap.data().teacherId;
-        setClassroomTeacherId(teacherId);
-        // Security check: if user is loaded and is not the teacher, redirect them.
-        if (user && user.uid !== teacherId) {
-            toast({ variant: "destructive", title: "Access Denied", description: "You are not authorized to manage members for this class." });
-            router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
+    let membersUnsub = () => {};
+    let requestsUnsub = () => {};
+
+    const checkAuthAndFetchData = async () => {
+      setLoading(true);
+      try {
+        const classroomDocRef = doc(db, "classrooms", classId);
+        const classroomSnap = await getDoc(classroomDocRef);
+
+        if (!classroomSnap.exists()) {
+          toast({ variant: "destructive", title: "Error", description: "Class not found." });
+          router.push("/dashboard/classes");
+          return;
         }
-      } else {
-        toast({ variant: "destructive", title: "Error", description: "Class not found."});
-        router.push("/dashboard/classes");
-      }
-    } catch (error) {
-      console.error("Error fetching classroom teacherId:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not verify class ownership."});
-    }
-  }, [classId, router, toast, user, className]);
+        
+        const teacherId = classroomSnap.data().teacherId;
+        const isTeacher = user.uid === teacherId;
+        
+        if (!isTeacher) {
+          setIsAuthorized(false);
+          setLoading(false);
+          toast({ variant: "destructive", title: "Access Denied", description: "You are not authorized to manage members for this class." });
+          router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
+          return;
+        }
 
+        setIsAuthorized(true);
 
-  useEffect(() => {
-    if (classId && user && !authLoading) {
-        fetchClassroomTeacher();
-    }
-  }, [classId, user, authLoading, fetchClassroomTeacher]);
+        // --- Set up listeners ONLY after authorization is confirmed ---
+        membersUnsub = onSnapshot(
+          query(collection(db, "classrooms", classId, "members")),
+          (snapshot) => {
+            const fetchedMembers: Member[] = [];
+            snapshot.forEach(docSnap => {
+              const data = docSnap.data();
+              fetchedMembers.push({ 
+                id: docSnap.id, 
+                name: data.name, 
+                avatarUrl: data.avatarUrl, 
+                role: data.role,
+                joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt),
+                email: data.email,
+              });
+            });
+            setMembers(fetchedMembers.sort((a, b) => (a.role === 'teacher' ? -1 : b.role === 'teacher' ? 1 : 0) || a.name.localeCompare(b.name)));
+          }, (error) => {
+            console.error("Error fetching members:", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not load members." });
+          }
+        );
+        
+        requestsUnsub = onSnapshot(
+          query(collection(db, "classrooms", classId, "joinRequests")),
+          (snapshot) => {
+            const fetchedRequests: Member[] = [];
+            snapshot.forEach(docSnap => {
+              const data = docSnap.data();
+              fetchedRequests.push({ 
+                id: docSnap.id, 
+                name: data.userName,
+                avatarUrl: data.userAvatar, 
+                role: 'student',
+                requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date(data.requestedAt),
+                status: 'requested',
+              });
+            });
+            setPendingRequests(fetchedRequests.sort((a,b) => (b.requestedAt?.getTime() || 0) - (a.requestedAt?.getTime() || 0) ));
+          }, (error) => {
+            console.error("Error fetching join requests:", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not load join requests." });
+          }
+        );
 
-  useEffect(() => {
-    if (!classId || !user || !classroomTeacherId) {
-      setLoading(false);
-      return; 
-    }
-
-    if (user.uid !== classroomTeacherId) {
-        return; // Non-teachers should not set up listeners
-    }
-    
-    setLoading(true);
-
-    const membersUnsub = onSnapshot(
-      query(collection(db, "classrooms", classId, "members")),
-      (snapshot) => {
-        const fetchedMembers: Member[] = [];
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          fetchedMembers.push({ 
-            id: docSnap.id, 
-            name: data.name, 
-            avatarUrl: data.avatarUrl, 
-            role: data.role,
-            joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt),
-            email: data.email,
-          });
-        });
-        setMembers(fetchedMembers.sort((a, b) => (a.role === 'teacher' ? -1 : b.role === 'teacher' ? 1 : 0) || a.name.localeCompare(b.name)));
+      } catch (error) {
+        console.error("Error checking authorization or fetching data:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load page data." });
+        setIsAuthorized(false);
+      } finally {
         setLoading(false);
-      }, (error) => {
-        console.error("Error fetching members:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load members." });
-        setLoading(false);
       }
-    );
+    };
     
-    // FIX: This listener will now only be set up if the current user is the teacher.
-    const requestsUnsub = onSnapshot(
-      query(collection(db, "classrooms", classId, "joinRequests")),
-      (snapshot) => {
-        const fetchedRequests: Member[] = [];
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          fetchedRequests.push({ 
-            id: docSnap.id, 
-            name: data.userName,
-            avatarUrl: data.userAvatar, 
-            role: 'student',
-            requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date(data.requestedAt),
-            status: 'requested',
-          });
-        });
-        setPendingRequests(fetchedRequests.sort((a,b) => (b.requestedAt?.getTime() || 0) - (a.requestedAt?.getTime() || 0) ));
-      }, (error) => {
-        console.error("Error fetching join requests:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load join requests." });
-      }
-    );
+    checkAuthAndFetchData();
 
-    return () => { membersUnsub(); requestsUnsub(); };
-  }, [classId, classroomTeacherId, user, toast]);
+    return () => {
+      membersUnsub();
+      requestsUnsub();
+    };
+  }, [classId, user, authLoading, router, toast, className]);
 
 
   const openConfirmationDialog = (type: 'remove' | 'accept' | 'reject', member: Member) => {
@@ -144,7 +147,7 @@ export default function ManageMembersPage() {
   };
 
   const handleConfirmAction = async () => {
-    if (!actionToConfirm || !classId || !user || user.uid !== classroomTeacherId) return;
+    if (!actionToConfirm || !classId || !isAuthorized) return;
     const { type, member } = actionToConfirm;
     
     const batch = writeBatch(db);
@@ -188,16 +191,16 @@ export default function ManageMembersPage() {
   };
 
 
-  if (loading || authLoading) {
+  if (loading || authLoading || isAuthorized === null) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading members for {className}...</p>
+        <p className="text-muted-foreground">Verifying access and loading members for {className}...</p>
       </div>
     );
   }
   
-  if (user && classroomTeacherId && user.uid !== classroomTeacherId) {
+  if (isAuthorized === false) {
      return (
         <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -249,7 +252,7 @@ export default function ManageMembersPage() {
                     {member.email && <p className="text-xs text-muted-foreground">{member.email}</p>}
                   </div>
                 </div>
-                {member.role === 'student' && user?.uid === classroomTeacherId && (
+                {member.role === 'student' && user?.uid === members.find(m => m.role === 'teacher')?.id && (
                   <Button variant="ghost" size="sm" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmationDialog('remove', member)}>
                     <UserX className="mr-1.5 h-4 w-4" /> Remove
                   </Button>
@@ -260,43 +263,41 @@ export default function ManageMembersPage() {
         </CardContent>
       </Card>
 
-      {user?.uid === classroomTeacherId && (
-        <Card className="rounded-xl shadow-lg border-border/50 mt-6 flex-grow flex flex-col">
-            <CardHeader>
-            <CardTitle className="flex items-center text-lg"><UserCheck className="mr-2 h-5 w-5 text-accent" />Pending Requests ({pendingRequests.length})</CardTitle>
-            <CardDescription>Students waiting for approval to join this class.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-2 overflow-y-auto p-3">
-            {pendingRequests.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No pending join requests.</p>
-            ) : (
-                pendingRequests.map(request => (
-                <div key={request.id} className="flex items-center justify-between p-2.5 hover:bg-muted/50 rounded-lg transition-colors">
-                    <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                        <AvatarImage src={request.avatarUrl} alt={request.name} data-ai-hint="user avatar"/>
-                        <AvatarFallback>{request.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className="text-sm font-medium text-foreground">{request.name}</p>
-                        {request.email && <p className="text-xs text-muted-foreground">{request.email}</p>}
-                    </div>
-                    </div>
-                    <div className="flex gap-2">
-                    <Button variant="default" size="sm" className="rounded-lg btn-gel text-xs" onClick={() => openConfirmationDialog('accept', request)}>
-                        Accept
-                    </Button>
-                    <Button variant="destructive" size="sm" className="rounded-lg text-xs" onClick={() => openConfirmationDialog('reject', request)}>
-                        Reject
-                    </Button>
-                    </div>
-                </div>
-                ))
-            )}
-            </CardContent>
-        </Card>
-      )}
-
+      <Card className="rounded-xl shadow-lg border-border/50 mt-6 flex-grow flex flex-col">
+          <CardHeader>
+          <CardTitle className="flex items-center text-lg"><UserCheck className="mr-2 h-5 w-5 text-accent" />Pending Requests ({pendingRequests.length})</CardTitle>
+          <CardDescription>Students waiting for approval to join this class.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-grow space-y-2 overflow-y-auto p-3">
+          {pendingRequests.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No pending join requests.</p>
+          ) : (
+              pendingRequests.map(request => (
+              <div key={request.id} className="flex items-center justify-between p-2.5 hover:bg-muted/50 rounded-lg transition-colors">
+                  <div className="flex items-center gap-3">
+                  <Avatar className="h-9 w-9">
+                      <AvatarImage src={request.avatarUrl} alt={request.name} data-ai-hint="user avatar"/>
+                      <AvatarFallback>{request.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                      <p className="text-sm font-medium text-foreground">{request.name}</p>
+                      {request.email && <p className="text-xs text-muted-foreground">{request.email}</p>}
+                  </div>
+                  </div>
+                  <div className="flex gap-2">
+                  <Button variant="default" size="sm" className="rounded-lg btn-gel text-xs" onClick={() => openConfirmationDialog('accept', request)}>
+                      Accept
+                  </Button>
+                  <Button variant="destructive" size="sm" className="rounded-lg text-xs" onClick={() => openConfirmationDialog('reject', request)}>
+                      Reject
+                  </Button>
+                  </div>
+              </div>
+              ))
+          )}
+          </CardContent>
+      </Card>
+      
       <footer className="flex-none py-2 text-center text-xs text-muted-foreground border-t bg-background mt-auto">
         Manage class participants and their access.
       </footer>
@@ -328,3 +329,5 @@ export default function ManageMembersPage() {
     </div>
   );
 }
+
+    
