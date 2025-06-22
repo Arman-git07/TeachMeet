@@ -98,7 +98,15 @@ export default function ClassesPage() {
 
   useEffect(() => {
     const fetchClassrooms = async () => {
-      if (authLoading) return;
+      // Add guard to ensure this doesn't run while auth is loading or if trying a user-specific filter without being authenticated
+      if (authLoading || (activeFilter !== 'all' && !isAuthenticated)) {
+        // If not authenticated and trying to view a protected filter, clear list and stop loading.
+        if (!isAuthenticated) {
+            setClassrooms([]);
+            setInitialLoading(false);
+        }
+        return;
+      }
       setInitialLoading(true);
       try {
         let q;
@@ -155,7 +163,7 @@ export default function ClassesPage() {
       }
     };
     fetchClassrooms();
-  }, [user, authLoading, activeFilter, toast]);
+  }, [user, authLoading, activeFilter, toast, isAuthenticated]);
 
 
   useEffect(() => {
@@ -763,5 +771,3 @@ export default function ClassesPage() {
     </div>
   );
 }
-
-    

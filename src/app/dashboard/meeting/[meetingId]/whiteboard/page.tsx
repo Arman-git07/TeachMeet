@@ -1187,5 +1187,4 @@ export default function WhiteboardPage() {
       </div>
     </>
   );
-
-    
+}
