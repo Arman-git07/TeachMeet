@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
   DialogTitle,
   DialogClose,
   DialogTrigger,
@@ -83,16 +84,16 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent
                 className="sm:max-w-lg rounded-xl"
-                aria-labelledby="start-meeting-dialog-title-jsx"
-                aria-describedby="start-meeting-dialog-description-jsx"
               >
-                <DialogTitle id="start-meeting-dialog-title-jsx">
-                  <Video className="mr-2 h-6 w-6 text-primary inline-block" />
-                  Start a New Meeting
-                </DialogTitle>
-                <DialogDescription id="start-meeting-dialog-description-jsx">
-                  Set a topic and share the invite to begin.
-                </DialogDescription>
+                <DialogHeader>
+                  <DialogTitle>
+                    <Video className="mr-2 h-6 w-6 text-primary inline-block" />
+                    Start a New Meeting
+                  </DialogTitle>
+                  <DialogDescription>
+                    Set a topic and share the invite to begin.
+                  </DialogDescription>
+                </DialogHeader>
                 <Suspense fallback={<p className="p-4 text-center">Loading meeting setup...</p>}>
                   <StartMeetingDialogContent />
                 </Suspense>
@@ -139,13 +140,13 @@ export function SlideUpPanel() {
               </DialogTrigger>
               <DialogContent
                 className="sm:max-w-[425px] rounded-xl"
-                aria-labelledby="enter-code-dialog-title-jsx"
-                aria-describedby="enter-code-dialog-description-jsx"
               >
-                <DialogTitle id="enter-code-dialog-title-jsx">Enter Meeting Code</DialogTitle>
-                <DialogDescription id="enter-code-dialog-description-jsx">
-                  Type in the meeting code provided by the host to join the session.
-                </DialogDescription>
+                <DialogHeader>
+                  <DialogTitle>Enter Meeting Code</DialogTitle>
+                  <DialogDescription>
+                    Type in the meeting code provided by the host to join the session.
+                  </DialogDescription>
+                </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="dialogMeetingCodeInput" className="text-right">
