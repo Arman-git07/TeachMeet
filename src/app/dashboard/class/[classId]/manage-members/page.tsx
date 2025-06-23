@@ -40,21 +40,19 @@ export default function ManageMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingRequests, setPendingRequests] = useState<Member[]>([]);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null: checking, false: denied, true: allowed
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<{ type: 'remove' | 'accept' | 'reject'; member: Member } | null>(null);
 
+  // Effect 1: Check authorization as soon as user and classId are available.
   useEffect(() => {
     if (authLoading || !user || !classId) {
-      if (!authLoading) setLoading(false);
+      if (!authLoading) setLoadingData(false);
       return;
     }
 
-    let membersUnsub = () => {};
-    let requestsUnsub = () => {};
-
-    const checkAuthAndFetchData = async () => {
-      setLoading(true);
+    const checkAuthorization = async () => {
+      setLoadingData(true);
       try {
         const classroomDocRef = doc(db, "classrooms", classId);
         const classroomSnap = await getDoc(classroomDocRef);
@@ -68,77 +66,77 @@ export default function ManageMembersPage() {
         const teacherId = classroomSnap.data().teacherId;
         const isTeacher = user.uid === teacherId;
         
+        setIsAuthorized(isTeacher);
+        
         if (!isTeacher) {
-          setIsAuthorized(false);
-          setLoading(false);
           toast({ variant: "destructive", title: "Access Denied", description: "You are not authorized to manage members for this class." });
           router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
-          return;
         }
-
-        setIsAuthorized(true);
-
-        // --- Set up listeners ONLY after authorization is confirmed ---
-        membersUnsub = onSnapshot(
-          query(collection(db, "classrooms", classId, "members")),
-          (snapshot) => {
-            const fetchedMembers: Member[] = [];
-            snapshot.forEach(docSnap => {
-              const data = docSnap.data();
-              fetchedMembers.push({ 
-                id: docSnap.id, 
-                name: data.name, 
-                avatarUrl: data.avatarUrl, 
-                role: data.role,
-                joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt),
-                email: data.email,
-              });
-            });
-            setMembers(fetchedMembers.sort((a, b) => (a.role === 'teacher' ? -1 : b.role === 'teacher' ? 1 : 0) || a.name.localeCompare(b.name)));
-          }, (error) => {
-            console.error("Error fetching members:", error);
-            toast({ variant: "destructive", title: "Error", description: "Could not load members." });
-          }
-        );
-        
-        requestsUnsub = onSnapshot(
-          query(collection(db, "classrooms", classId, "joinRequests")),
-          (snapshot) => {
-            const fetchedRequests: Member[] = [];
-            snapshot.forEach(docSnap => {
-              const data = docSnap.data();
-              fetchedRequests.push({ 
-                id: docSnap.id, 
-                name: data.userName,
-                avatarUrl: data.userAvatar, 
-                role: 'student',
-                requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date(data.requestedAt),
-                status: 'requested',
-              });
-            });
-            setPendingRequests(fetchedRequests.sort((a,b) => (b.requestedAt?.getTime() || 0) - (a.requestedAt?.getTime() || 0) ));
-          }, (error) => {
-            console.error("Error fetching join requests:", error);
-            toast({ variant: "destructive", title: "Error", description: "Could not load join requests." });
-          }
-        );
-
       } catch (error) {
-        console.error("Error checking authorization or fetching data:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load page data." });
+        console.error("Error during authorization check:", error);
+        toast({ variant: "destructive", title: "Authorization Error", description: "Could not verify your permissions." });
         setIsAuthorized(false);
-      } finally {
-        setLoading(false);
       }
     };
     
-    checkAuthAndFetchData();
+    checkAuthorization();
+  }, [classId, user, authLoading, router, toast, className]);
+
+
+  // Effect 2: Fetch data ONLY if authorization has been confirmed.
+  useEffect(() => {
+    // Do not proceed until authorization status is explicitly true.
+    if (isAuthorized !== true || !classId) {
+      // If authorization is null (checking) or false (denied), don't fetch data.
+      if(isAuthorized === false) setLoadingData(false);
+      return;
+    }
+
+    setLoadingData(true);
+
+    const membersUnsub = onSnapshot(
+      query(collection(db, "classrooms", classId, "members")),
+      (snapshot) => {
+        const fetchedMembers: Member[] = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          fetchedMembers.push({ 
+            id: docSnap.id, name: data.name, avatarUrl: data.avatarUrl, role: data.role,
+            joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt), email: data.email,
+          });
+        });
+        setMembers(fetchedMembers.sort((a, b) => (a.role === 'teacher' ? -1 : b.role === 'teacher' ? 1 : 0) || a.name.localeCompare(b.name)));
+      }, (error) => {
+        console.error("Error fetching members:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load members." });
+      }
+    );
+    
+    const requestsUnsub = onSnapshot(
+      query(collection(db, "classrooms", classId, "joinRequests")),
+      (snapshot) => {
+        const fetchedRequests: Member[] = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          fetchedRequests.push({ 
+            id: docSnap.id, name: data.userName, avatarUrl: data.userAvatar, role: 'student',
+            requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date(data.requestedAt), status: 'requested',
+          });
+        });
+        setPendingRequests(fetchedRequests.sort((a,b) => (b.requestedAt?.getTime() || 0) - (a.requestedAt?.getTime() || 0) ));
+      }, (error) => {
+        console.error("Error fetching join requests:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load join requests." });
+      }
+    );
+    
+    setLoadingData(false);
 
     return () => {
       membersUnsub();
       requestsUnsub();
     };
-  }, [classId, user, authLoading, router, toast, className]);
+  }, [isAuthorized, classId, toast]);
 
 
   const openConfirmationDialog = (type: 'remove' | 'accept' | 'reject', member: Member) => {
@@ -191,7 +189,7 @@ export default function ManageMembersPage() {
   };
 
 
-  if (loading || authLoading || isAuthorized === null) {
+  if (authLoading || loadingData || isAuthorized === null) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -329,5 +327,3 @@ export default function ManageMembersPage() {
     </div>
   );
 }
-
-    
