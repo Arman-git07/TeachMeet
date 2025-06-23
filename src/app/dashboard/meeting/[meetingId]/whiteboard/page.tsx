@@ -98,55 +98,49 @@ export default function WhiteboardPage() {
   const router = useRouter();
   const { setHeaderContent } = useDynamicHeader();
 
-  const [activeTool, setActiveTool] = useState<string | null>("draw");
+  // --- Refs for Performance-Critical Operations ---
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Refs to track current operation state without causing re-renders
+  const operationStateRef = useRef<'idle' | 'drawing' | 'lassoing' | 'dragging'>('idle');
+  const shapeStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  const currentDrawingPathRef = useRef<DrawnPath | null>(null);
+  const lassoPathRef = useRef<{x: number, y: number}[]>([]);
+  const canvasSnapshotRef = useRef<ImageData | null>(null);
+  const dragStartOffsetRef = useRef<{ x: number, y: number, pathOffsets: Map<string, {x: number, y: number}[]>, textOffsets: Map<string, {x: number, y: number}> } | null>(null);
 
-  const [selectedColor, setSelectedColor] = useState<string>("#000000");
+  // --- React State for UI and Committed Data ---
+  const [activeTool, setActiveTool] = useState<string | null>("draw");
+  const [selectedColor, setSelectedColorsetSelectedColor] = useState<string>("#000000");
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [selectedTextSize, setSelectedTextSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
-  const [showClearConfirmDialog, setShowClearConfirmDialog] = useState<boolean>(false);
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState<string>("#FFFFFF");
-
-  const [history, setHistory] = useState<HistoryState[]>([{ paths: [], texts: [] }]);
-  const [historyStep, setHistoryStep] = useState<number>(0);
   
+  // State for committed drawings and text, and selection state
   const [drawnPaths, setDrawnPaths] = useState<DrawnPath[]>([]);
   const [drawnTextObjects, setDrawnTextObjects] = useState<TextElement[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
   const [selectedTextObjectIds, setSelectedTextObjectIds] = useState<string[]>([]);
   
-  const [currentDrawingPath, setCurrentDrawingPath] = useState<DrawnPath | null>(null);
+  // State for live text input
   const [isTypingText, setIsTypingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number, y: number } | null>(null);
-  const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
   const [cursorBlinkVisible, setCursorBlinkVisible] = useState(true);
-  const cursorIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [isDrawingLasso, setIsDrawingLasso] = useState(false);
-  const [lassoPath, setLassoPath] = useState<{x: number, y: number}[]>([]);
-  const [isDraggingSelection, setIsDraggingSelection] = useState(false);
-  const dragStartOffsetRef = useRef<{ x: number, y: number, pathOffsets: Map<string, {x: number, y: number}[]>, textOffsets: Map<string, {x: number, y: number}> } | null>(null);
-
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
-  const drawingOptionsToolbarRef = useRef<HTMLDivElement>(null);
-  const isDrawingRef = useRef(false);
-  const shapeStartPointRef = useRef<{ x: number, y: number } | null>(null);
+  // State for Undo/Redo
+  const [history, setHistory] = useState<HistoryState[]>([{ paths: [], texts: [] }]);
+  const [historyStep, setHistoryStep] = useState<number>(0);
 
   const availableColors = [ "#000000", "#EF4444", "#F97316", "#EAB308", "#22C55E", "#0EA5E9", "#6366F1", "#EC4899", "#A855F7", "#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#D946EF", "#78716C", "#FFFFFF" ];
-  const brushSizes = [ { name: 'tiny', icon: CircleIconShape, label: 'Tiny Brush', lineWidth: 1 }, { name: 'small', icon: CircleIconShape, label: 'Small Brush', lineWidth: 3 }, { name: 'medium', icon: CircleIconShape, label: 'Medium Brush', lineWidth: 6 }, { name: 'large', icon: CircleIconShape, label: 'Large Brush', lineWidth: 10 }, { name: 'xlarge', icon: CircleIconShape, label: 'X-Large Brush', lineWidth: 15 } ];
-  const textSizes = [ { name: 'small', label: 'Small Text', fontSize: 12 }, { name: 'medium', label: 'Medium Text', fontSize: 16 }, { name: 'large', label: 'Large Text', fontSize: 24 }, { name: 'xlarge', label: 'X-Large Text', fontSize: 32 } ];
+  const brushSizes = [ { name: 'tiny', lineWidth: 1 }, { name: 'small', lineWidth: 3 }, { name: 'medium', lineWidth: 6 }, { name: 'large', lineWidth: 10 }, { name: 'xlarge', lineWidth: 15 } ];
+  const textSizes = [ { name: 'small', fontSize: 12 }, { name: 'medium', fontSize: 16 }, { name: 'large', fontSize: 24 }, { name: 'xlarge', fontSize: 32 } ];
 
   const getLineWidth = useCallback(() => brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6, [selectedBrushSize]);
   const getFontSize = useCallback(() => textSizes.find(s => s.name === selectedTextSize)?.fontSize || 16, [selectedTextSize]);
-
-  useEffect(() => {
-    if (history[historyStep]) {
-        setDrawnPaths(history[historyStep].paths);
-        setDrawnTextObjects(history[historyStep].texts);
-    }
-  }, [history, historyStep]);
 
   const saveStateToHistory = useCallback((newPaths: DrawnPath[], newTexts: TextElement[]) => {
       setHistory(prevHistory => {
@@ -161,6 +155,45 @@ export default function WhiteboardPage() {
       });
   }, [historyStep]);
 
+  const drawPath = useCallback((ctx: CanvasRenderingContext2D, path: DrawnPath) => {
+      if (path.points.length < 2) return;
+      ctx.beginPath();
+      ctx.strokeStyle = path.color;
+      ctx.lineWidth = path.lineWidth;
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
+      ctx.stroke();
+  }, []);
+
+  const drawText = useCallback((ctx: CanvasRenderingContext2D, textObj: TextElement) => {
+      ctx.fillStyle = textObj.color;
+      ctx.font = textObj.font;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      textObj.textLines.forEach((line, index) => ctx.fillText(line, textObj.x, textObj.y + (index * textObj.lineHeight)));
+  }, []);
+
+  const drawSelectionBox = useCallback((ctx: CanvasRenderingContext2D, items: (DrawnPath | TextElement)[]) => {
+      if (items.length === 0) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      items.forEach(item => {
+          if ('points' in item) { // It's a path
+              item.points.forEach(p => {
+                  minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                  maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+              });
+          } else { // It's text
+              minX = Math.min(minX, item.x); minY = Math.min(minY, item.y);
+              maxX = Math.max(maxX, item.x + item.width); maxY = Math.max(maxY, item.y + item.height);
+          }
+      });
+      ctx.strokeStyle = "rgba(0, 123, 255, 0.7)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 2]);
+      ctx.strokeRect(minX - 5, minY - 5, (maxX - minX) + 10, (maxY - minY) + 10);
+      ctx.setLineDash([]);
+  }, []);
+
   const redrawCanvasContent = useCallback(() => {
     if (!contextRef.current || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -169,127 +202,20 @@ export default function WhiteboardPage() {
     context.fillStyle = canvasBackgroundColor;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    const drawPath = (path: DrawnPath) => {
-        context.beginPath();
-        context.strokeStyle = path.color;
-        context.lineWidth = path.lineWidth;
-        context.moveTo(path.points[0].x, path.points[0].y);
-        for (let i = 1; i < path.points.length; i++) context.lineTo(path.points[i].x, path.points[i].y);
-        context.stroke();
-    };
-
-    drawnPaths.forEach(path => {
-        drawPath(path);
-        if (selectedPathIds.includes(path.id)) {
-            const minX = Math.min(...path.points.map(p => p.x));
-            const minY = Math.min(...path.points.map(p => p.y));
-            const maxX = Math.max(...path.points.map(p => p.x));
-            const maxY = Math.max(...path.points.map(p => p.y));
-            context.strokeStyle = "rgba(0, 123, 255, 0.7)";
-            context.lineWidth = 1;
-            context.setLineDash([4, 2]);
-            context.strokeRect(minX - 5, minY - 5, (maxX - minX) + 10, (maxY - minY) + 10);
-            context.setLineDash([]);
-        }
-    });
-
-    if (currentDrawingPath) drawPath(currentDrawingPath);
-
-    drawnTextObjects.forEach(textObj => {
-        context.fillStyle = textObj.color;
-        context.font = textObj.font;
-        context.textAlign = "left";
-        context.textBaseline = "top";
-        textObj.textLines.forEach((line, index) => context.fillText(line, textObj.x, textObj.y + (index * textObj.lineHeight)));
-        if (selectedTextObjectIds.includes(textObj.id)) {
-            context.strokeStyle = "rgba(0, 123, 255, 0.7)";
-            context.lineWidth = 1;
-            context.setLineDash([4, 2]);
-            context.strokeRect(textObj.x - 2, textObj.y - 2, textObj.width + 4, textObj.height + 4);
-            context.setLineDash([]);
-        }
-    });
-
-    if (isTypingText && textInputPosition) {
-        const liveFontSize = getFontSize();
-        const liveLineHeight = liveFontSize * 1.2;
-        context.fillStyle = selectedColor;
-        context.font = `${liveFontSize}px sans-serif`;
-        context.textAlign = "left";
-        context.textBaseline = "top";
-        const lines = currentText.split('\n');
-        lines.forEach((line, index) => context.fillText(line, textInputPosition.x, textInputPosition.y + (index * liveLineHeight)));
-        if (cursorBlinkVisible) {
-            const lastLine = lines[lines.length - 1];
-            const cursorX = textInputPosition.x + context.measureText(lastLine).width;
-            const cursorY = textInputPosition.y + (lines.length - 1) * liveLineHeight;
-            context.beginPath();
-            context.moveTo(cursorX, cursorY);
-            context.lineTo(cursorX, cursorY + liveFontSize);
-            context.strokeStyle = selectedColor;
-            context.lineWidth = 1;
-            context.stroke();
-        }
+    drawnPaths.forEach(path => drawPath(context, path));
+    drawnTextObjects.forEach(textObj => drawText(context, textObj));
+    
+    const selectedItems = [
+      ...drawnPaths.filter(p => selectedPathIds.includes(p.id)),
+      ...drawnTextObjects.filter(t => selectedTextObjectIds.includes(t.id))
+    ];
+    if (selectedItems.length > 0) {
+      drawSelectionBox(context, selectedItems);
     }
-
-    if (isDrawingLasso && lassoPath.length > 1) {
-        context.beginPath();
-        context.moveTo(lassoPath[0].x, lassoPath[0].y);
-        for (let i = 1; i < lassoPath.length; i++) context.lineTo(lassoPath[i].x, lassoPath[i].y);
-        context.strokeStyle = "rgba(0, 123, 255, 0.7)";
-        context.lineWidth = 1;
-        context.setLineDash([4, 2]);
-        context.stroke();
-        context.setLineDash([]);
-    }
-  }, [canvasBackgroundColor, drawnPaths, drawnTextObjects, selectedPathIds, selectedTextObjectIds, currentDrawingPath, isTypingText, textInputPosition, currentText, cursorBlinkVisible, getFontSize, selectedColor, isDrawingLasso, lassoPath]);
+  }, [canvasBackgroundColor, drawnPaths, drawnTextObjects, selectedPathIds, selectedTextObjectIds, drawPath, drawText, drawSelectionBox]);
 
   useEffect(() => {
-    const storedBg = localStorage.getItem("teachmeet-whiteboard-bg-color");
-    if (storedBg) setCanvasBackgroundColor(storedBg);
-    const storedPen = localStorage.getItem("teachmeet-whiteboard-pen-color");
-    if (storedPen) setSelectedColor(storedPen);
-  }, []);
-
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    if (isTypingText) {
-      intervalId = setInterval(() => setCursorBlinkVisible(prev => !prev), 500);
-    } else {
-      setCursorBlinkVisible(true);
-    }
-    return () => clearInterval(intervalId);
-  }, [isTypingText]);
-
-  useEffect(() => {
-    setHeaderContent(<div className="flex items-center justify-between w-full"><div className="flex items-center gap-3"><Edit3 className="h-7 w-7 text-primary" /><h1 className="text-xl font-semibold truncate">TeachMeet Whiteboard</h1></div>{meetingId && <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior><Button variant="outline" size="sm" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" />Back</Button></Link>}</div>);
-    return () => setHeaderContent(null);
-  }, [setHeaderContent, meetingId]);
-
-  const resizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (canvas && canvas.parentElement) {
-        const context = contextRef.current;
-        const newWidth = canvas.parentElement.clientWidth;
-        const newHeight = canvas.parentElement.clientHeight;
-        if (canvas.width !== newWidth || canvas.height !== newHeight) {
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            if (tempCtx) {
-                tempCanvas.width = canvas.width;
-                tempCanvas.height = canvas.height;
-                tempCtx.drawImage(canvas, 0, 0);
-                canvas.width = newWidth;
-                canvas.height = newHeight;
-                if (context) {
-                    context.lineCap = "round";
-                    context.lineJoin = "round";
-                    context.drawImage(tempCanvas, 0, 0);
-                    redrawCanvasContent();
-                }
-            }
-        }
-    }
+    redrawCanvasContent();
   }, [redrawCanvasContent]);
 
   useEffect(() => {
@@ -300,13 +226,8 @@ export default function WhiteboardPage() {
             contextRef.current.lineCap = "round";
             contextRef.current.lineJoin = "round";
         }
-        resizeCanvas();
     }
-    window.addEventListener("resize", resizeCanvas);
-    return () => window.removeEventListener("resize", resizeCanvas);
-  }, [resizeCanvas]);
-
-  useEffect(() => { redrawCanvasContent(); }, [drawnPaths, drawnTextObjects, currentDrawingPath, redrawCanvasContent]);
+  }, []);
 
   const finalizeLiveText = useCallback(() => {
     if (!isTypingText || !contextRef.current) return;
@@ -317,228 +238,226 @@ export default function WhiteboardPage() {
         const lineHeight = fontSize * 1.2;
         const lines = textToDraw.split('\n');
         let maxWidth = 0;
-        lines.forEach(line => {
-            contextRef.current!.font = font;
-            const metrics = contextRef.current!.measureText(line);
-            if (metrics.width > maxWidth) maxWidth = metrics.width;
-        });
+        contextRef.current.font = font;
+        lines.forEach(line => maxWidth = Math.max(maxWidth, contextRef.current!.measureText(line).width));
         const textHeight = lines.length * lineHeight;
         const newTextElement: TextElement = { id: Date.now().toString(), textLines: lines, x: textInputPosition.x, y: textInputPosition.y, color: selectedColor, fontSize, font, lineHeight, width: maxWidth, height: textHeight };
-        const newTexts = [...drawnTextObjects, newTextElement];
+        
+        const newPaths = history[historyStep].paths;
+        const newTexts = [...history[historyStep].texts, newTextElement];
         setDrawnTextObjects(newTexts);
-        saveStateToHistory(drawnPaths, newTexts);
+        saveStateToHistory(newPaths, newTexts);
     }
     setIsTypingText(false);
     setCurrentText('');
     setTextInputPosition(null);
-  }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, drawnTextObjects, drawnPaths, saveStateToHistory]);
+  }, [isTypingText, currentText, textInputPosition, selectedColor, getFontSize, saveStateToHistory, history, historyStep]);
 
-  const getPointerPosition = useCallback((event: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent): { x: number, y: number } | null => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const nativeEvent = 'nativeEvent' in event ? event.nativeEvent : event;
-    const clientX = nativeEvent instanceof TouchEvent ? (nativeEvent.touches[0] || nativeEvent.changedTouches[0]).clientX : (nativeEvent as MouseEvent).clientX;
-    const clientY = nativeEvent instanceof TouchEvent ? (nativeEvent.touches[0] || nativeEvent.changedTouches[0]).clientY : (nativeEvent as MouseEvent).clientY;
-    if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
-    return { x: clientX - rect.left, y: clientY - rect.top };
+  const getPointerPosition = useCallback((event: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent): { x: number, y: number } | null => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const nativeEvent = 'nativeEvent' in event ? event.nativeEvent : event;
+      const clientX = 'touches' in nativeEvent ? (nativeEvent.touches[0] || nativeEvent.changedTouches[0]).clientX : (nativeEvent as MouseEvent).clientX;
+      const clientY = 'touches' in nativeEvent ? (nativeEvent.touches[0] || nativeEvent.changedTouches[0]).clientY : (nativeEvent as MouseEvent).clientY;
+      if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
+      return { x: clientX - rect.left, y: clientY - rect.top };
   }, []);
 
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if ((event as React.MouseEvent).nativeEvent instanceof MouseEvent && (event as React.MouseEvent).nativeEvent.button !== 0) return;
-    const pos = getPointerPosition(event);
-    if (!pos) return;
-    if (isTypingText) finalizeLiveText();
+      if ((event as React.MouseEvent).button !== 0) return;
+      const pos = getPointerPosition(event);
+      if (!pos || !canvasRef.current || !contextRef.current) return;
 
-    if (activeTool === 'select') {
-        const onSelectedPath = selectedPathIds.some(id => {
-            const path = drawnPaths.find(p => p.id === id);
-            return path && path.points.some(point => Math.hypot(point.x - pos.x, point.y - pos.y) < path.lineWidth / 2 + 5);
-        });
-        const onSelectedText = selectedTextObjectIds.some(id => {
-            const obj = drawnTextObjects.find(t => t.id === id);
-            return obj && pos.x >= obj.x && pos.x <= obj.x + obj.width && pos.y >= obj.y && pos.y <= obj.y + obj.height;
-        });
+      if (isTypingText) finalizeLiveText();
+      
+      canvasSnapshotRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+      shapeStartPointRef.current = pos;
 
-        if (onSelectedPath || onSelectedText) {
-            setIsDraggingSelection(true);
-            const pathOffsets = new Map<string, {x: number, y: number}[]>();
-            selectedPathIds.forEach(id => { const path = drawnPaths.find(p => p.id === id); if (path) pathOffsets.set(id, path.points.map(p => ({...p}))); });
-            const textOffsets = new Map<string, {x: number, y: number}>();
-            selectedTextObjectIds.forEach(id => { const obj = drawnTextObjects.find(t => t.id === id); if (obj) textOffsets.set(id, {x: obj.x, y: obj.y}); });
-            dragStartOffsetRef.current = { x: pos.x, y: pos.y, pathOffsets, textOffsets };
-        } else {
-            setIsDrawingLasso(true);
-            setLassoPath([pos]);
-            setSelectedPathIds([]);
-            setSelectedTextObjectIds([]);
-        }
-    } else if (activeTool === 'text') {
-        setTextInputPosition(pos);
-        setCurrentText('');
-        setIsTypingText(true);
-        setTimeout(() => liveTextInputRef.current?.focus(), 0);
-    } else if (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) {
-        if (event.type === 'touchstart') event.preventDefault();
-        isDrawingRef.current = true;
-        shapeStartPointRef.current = pos;
-        setCurrentDrawingPath({ id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor, lineWidth: getLineWidth() });
-    }
-  }, [activeTool, getPointerPosition, isTypingText, finalizeLiveText, selectedPathIds, selectedTextObjectIds, drawnPaths, drawnTextObjects, getLineWidth, selectedColor, canvasBackgroundColor]);
+      if (activeTool === 'select') {
+          const clickedOnSelection = [
+            ...drawnPaths.filter(p => selectedPathIds.includes(p.id)),
+            ...drawnTextObjects.filter(t => selectedTextObjectIds.includes(t.id))
+          ].some(item => {
+              if('points' in item) return item.points.some(p => Math.hypot(p.x - pos.x, p.y - pos.y) < item.lineWidth / 2 + 5);
+              return pos.x >= item.x && pos.x <= item.x + item.width && pos.y >= item.y && pos.y <= item.y + item.height;
+          });
+
+          if (clickedOnSelection) {
+              operationStateRef.current = 'dragging';
+              const pathOffsets = new Map(selectedPathIds.map(id => [id, drawnPaths.find(p => p.id === id)!.points]));
+              const textOffsets = new Map(selectedTextObjectIds.map(id => [id, {x: drawnTextObjects.find(t=>t.id===id)!.x, y: drawnTextObjects.find(t=>t.id===id)!.y}]));
+              dragStartOffsetRef.current = { x: pos.x, y: pos.y, pathOffsets, textOffsets };
+          } else {
+              operationStateRef.current = 'lassoing';
+              lassoPathRef.current = [pos];
+              setSelectedPathIds([]);
+              setSelectedTextObjectIds([]);
+          }
+      } else if (activeTool === 'text') {
+          setTextInputPosition(pos);
+          setCurrentText('');
+          setIsTypingText(true);
+          setTimeout(() => liveTextInputRef.current?.focus(), 0);
+      } else if (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) {
+          operationStateRef.current = 'drawing';
+          currentDrawingPathRef.current = { id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor, lineWidth: getLineWidth() };
+      }
+  }, [getPointerPosition, isTypingText, finalizeLiveText, activeTool, selectedPathIds, selectedTextObjectIds, drawnPaths, drawnTextObjects, canvasBackgroundColor, selectedColor, getLineWidth]);
 
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
+    if (operationStateRef.current === 'idle') return;
     const pos = getPointerPosition(event);
-    if (!pos || !canvasRef.current) return;
-    const canvas = canvasRef.current;
+    if (!pos || !canvasSnapshotRef.current || !contextRef.current) return;
     
-    if (isDrawingRef.current && currentDrawingPath) {
-        if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
+    contextRef.current.putImageData(canvasSnapshotRef.current, 0, 0);
+
+    if (operationStateRef.current === 'drawing' && currentDrawingPathRef.current) {
         const start = shapeStartPointRef.current!;
         let newPoints: {x: number, y: number}[];
         if (activeTool === 'draw' || activeTool === 'erase') {
-            newPoints = [...currentDrawingPath.points, pos];
+            newPoints = [...currentDrawingPathRef.current.points, pos];
         } else {
             newPoints = [];
-            if (activeTool === 'line') { newPoints.push(start, pos); }
-            else if (activeTool === 'square') { newPoints.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start); }
+            if (activeTool === 'line') newPoints.push(start, pos);
+            else if (activeTool === 'square') newPoints.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
             else if (activeTool === 'circle') {
-                const dx = pos.x - start.x, dy = pos.y - start.y;
-                const radius = Math.hypot(dx, dy) / 2;
-                const centerX = start.x + dx/2, centerY = start.y + dy/2;
-                for (let i=0; i <= 360; i+=10) {
-                    const angle = i * Math.PI / 180;
-                    newPoints.push({ x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) });
-                }
+                const radius = Math.hypot(pos.x - start.x, pos.y - start.y) / 2;
+                const centerX = start.x + (pos.x - start.x) / 2, centerY = start.y + (pos.y - start.y) / 2;
+                for (let i = 0; i <= 360; i += 10) newPoints.push({ x: centerX + radius * Math.cos(i * Math.PI / 180), y: centerY + radius * Math.sin(i * Math.PI / 180) });
             } else if (activeTool === 'arrow') {
                 const headlen = 10 + getLineWidth();
                 const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
                 newPoints.push(start, pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)}, pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
-            } else if (activeTool === 'triangle') {
-                newPoints.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
-            }
+            } else if (activeTool === 'triangle') newPoints.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
         }
-        setCurrentDrawingPath(prev => prev ? {...prev, points: newPoints} : null);
-        canvas.style.cursor = 'crosshair';
-    } else if (isDrawingLasso) {
-        if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
-        setLassoPath(prev => [...prev, pos]);
-        canvas.style.cursor = 'crosshair';
-    } else if (isDraggingSelection && dragStartOffsetRef.current) {
-        if (event instanceof TouchEvent || (event.type === 'touchmove')) event.preventDefault();
+        currentDrawingPathRef.current.points = newPoints!;
+        drawPath(contextRef.current, currentDrawingPathRef.current);
+    } else if (operationStateRef.current === 'lassoing') {
+        lassoPathRef.current.push(pos);
+        contextRef.current.beginPath();
+        contextRef.current.moveTo(lassoPathRef.current[0].x, lassoPathRef.current[0].y);
+        lassoPathRef.current.forEach(p => contextRef.current!.lineTo(p.x, p.y));
+        contextRef.current.strokeStyle = "rgba(0, 123, 255, 0.7)";
+        contextRef.current.lineWidth = 1;
+        contextRef.current.setLineDash([4, 2]);
+        contextRef.current.stroke();
+        contextRef.current.setLineDash([]);
+    } else if (operationStateRef.current === 'dragging' && dragStartOffsetRef.current) {
         const deltaX = pos.x - dragStartOffsetRef.current.x, deltaY = pos.y - dragStartOffsetRef.current.y;
-        setDrawnPaths(prevPaths => prevPaths.map(path => {
-            if (selectedPathIds.includes(path.id)) {
-                const initialPoints = dragStartOffsetRef.current!.pathOffsets.get(path.id)!;
-                return { ...path, points: initialPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY })) };
-            }
-            return path;
-        }));
-        setDrawnTextObjects(prevTexts => prevTexts.map(text => {
-            if (selectedTextObjectIds.includes(text.id)) {
-                const initialPos = dragStartOffsetRef.current!.textOffsets.get(text.id)!;
-                return { ...text, x: initialPos.x + deltaX, y: initialPos.y + deltaY };
-            }
-            return text;
-        }));
-        canvas.style.cursor = 'grabbing';
-    } else {
-      let cursor = isTypingText || activeTool === 'text' ? 'text' : activeTool === 'select' ? 'crosshair' : (activeTool && (drawingTools.includes(activeTool) || activeTool === 'erase')) ? 'crosshair' : 'default';
-      if(activeTool === 'select') {
-        const onSelected = selectedPathIds.some(id => drawnPaths.find(p => p.id === id)?.points.some(point => Math.hypot(point.x - pos.x, point.y - pos.y) < 10)) || selectedTextObjectIds.some(id => { const obj = drawnTextObjects.find(t => t.id === id); return obj && pos.x >= obj.x && pos.x <= obj.x + obj.width && pos.y >= obj.y && pos.y <= obj.y + obj.height; });
-        if(onSelected) cursor = 'grab';
-      }
-      canvas.style.cursor = cursor;
+        const tempMovedItems: (DrawnPath | TextElement)[] = [];
+        dragStartOffsetRef.current.pathOffsets.forEach((initialPoints, id) => {
+            const originalPath = drawnPaths.find(p => p.id === id)!;
+            tempMovedItems.push({ ...originalPath, points: initialPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY })) });
+        });
+        dragStartOffsetRef.current.textOffsets.forEach((initialPos, id) => {
+            const originalText = drawnTextObjects.find(t => t.id === id)!;
+            tempMovedItems.push({ ...originalText, x: initialPos.x + deltaX, y: initialPos.y + deltaY });
+        });
+        tempMovedItems.forEach(item => 'points' in item ? drawPath(contextRef.current!, item) : drawText(contextRef.current!, item));
+        drawSelectionBox(contextRef.current, tempMovedItems);
     }
-  }, [getPointerPosition, isDrawingRef.current, currentDrawingPath, activeTool, getLineWidth, isDrawingLasso, isDraggingSelection, selectedPathIds, selectedTextObjectIds, drawnPaths, drawnTextObjects]);
+  }, [getPointerPosition, activeTool, getLineWidth, drawPath, drawText, drawSelectionBox, drawnPaths, drawnTextObjects]);
 
   const isPointInPolygon = (point: {x: number, y: number}, polygon: {x: number, y: number}[]) => {
-      let isInside = false;
-      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-          const intersect = ((polygon[i].y > point.y) !== (polygon[j].y > point.y)) && (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x);
-          if (intersect) isInside = !isInside;
-      }
-      return isInside;
+    let isInside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) && (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) isInside = !isInside;
+    }
+    return isInside;
   };
 
-  const handlePointerUp = useCallback(() => {
-    if (isDrawingRef.current && currentDrawingPath) {
-        const newPaths = [...drawnPaths, currentDrawingPath];
+  const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
+    const pos = getPointerPosition(event);
+    if (!pos || !contextRef.current) return;
+
+    if (operationStateRef.current === 'drawing' && currentDrawingPathRef.current) {
+        const newPaths = [...drawnPaths, currentDrawingPathRef.current];
         setDrawnPaths(newPaths);
         saveStateToHistory(newPaths, drawnTextObjects);
-    }
-    isDrawingRef.current = false;
-    setCurrentDrawingPath(null);
-    shapeStartPointRef.current = null;
-    
-    if (isDrawingLasso) {
-        const selectedPaths = drawnPaths.filter(path => path.points.some(p => isPointInPolygon(p, lassoPath))).map(p => p.id);
+    } else if (operationStateRef.current === 'lassoing') {
+        const finalLassoPath = lassoPathRef.current;
+        const selectedPaths = drawnPaths.filter(path => path.points.some(p => isPointInPolygon(p, finalLassoPath))).map(p => p.id);
+        const selectedTexts = drawnTextObjects.filter(obj => isPointInPolygon({x: obj.x + obj.width/2, y: obj.y + obj.height/2}, finalLassoPath)).map(t => t.id);
         setSelectedPathIds(selectedPaths);
-        const selectedTexts = drawnTextObjects.filter(obj => isPointInPolygon({x: obj.x + obj.width/2, y: obj.y + obj.height/2}, lassoPath)).map(t => t.id);
         setSelectedTextObjectIds(selectedTexts);
-        setIsDrawingLasso(false);
-        setLassoPath([]);
+    } else if (operationStateRef.current === 'dragging' && dragStartOffsetRef.current) {
+        const deltaX = pos.x - dragStartOffsetRef.current.x, deltaY = pos.y - dragStartOffsetRef.current.y;
+        const finalPaths = drawnPaths.map(path => {
+            if (selectedPathIds.includes(path.id)) return { ...path, points: dragStartOffsetRef.current!.pathOffsets.get(path.id)!.map(p => ({ x: p.x + deltaX, y: p.y + deltaY })) };
+            return path;
+        });
+        const finalTexts = drawnTextObjects.map(text => {
+            if (selectedTextObjectIds.includes(text.id)) return { ...text, x: dragStartOffsetRef.current!.textOffsets.get(text.id)!.x + deltaX, y: dragStartOffsetRef.current!.textOffsets.get(text.id)!.y + deltaY };
+            return text;
+        });
+        setDrawnPaths(finalPaths);
+        setDrawnTextObjects(finalTexts);
+        saveStateToHistory(finalPaths, finalTexts);
     }
 
-    if (isDraggingSelection) {
-        setIsDraggingSelection(false);
-        dragStartOffsetRef.current = null;
-        saveStateToHistory(drawnPaths, drawnTextObjects);
-    }
-  }, [currentDrawingPath, drawnPaths, drawnTextObjects, saveStateToHistory, isDrawingLasso, lassoPath, isDraggingSelection]);
-  
+    operationStateRef.current = 'idle';
+    currentDrawingPathRef.current = null;
+    shapeStartPointRef.current = null;
+    canvasSnapshotRef.current = null;
+    dragStartOffsetRef.current = null;
+    lassoPathRef.current = [];
+    
+    // Final redraw to ensure canvas is clean
+    redrawCanvasContent();
+
+  }, [getPointerPosition, drawnPaths, drawnTextObjects, saveStateToHistory, redrawCanvasContent, selectedPathIds, selectedTextObjectIds]);
+
+  const handleToolClick = (toolName: string) => {
+    if (isTypingText) finalizeLiveText();
+    const isOptionsTool = drawingTools.includes(toolName) || ['erase', 'text', 'select'].includes(toolName);
+    if (activeTool === toolName && isOptionsTool) setShowDrawingToolOptions(prev => !prev);
+    else { setActiveTool(toolName); setShowDrawingToolOptions(isOptionsTool); }
+    if (toolName !== 'select') { setSelectedPathIds([]); setSelectedTextObjectIds([]); }
+  };
+
+  const handleUndo = useCallback(() => {
+    if (isTypingText) finalizeLiveText();
+    if (historyStep > 0) {
+      const prevStep = historyStep - 1;
+      setHistoryStep(prevStep);
+      setDrawnPaths(history[prevStep].paths);
+      setDrawnTextObjects(history[prevStep].texts);
+    } else toast({ title: "Nothing to undo", duration: 2000 });
+  }, [historyStep, history, toast, finalizeLiveText]);
+
+  const handleRedo = useCallback(() => {
+    if (isTypingText) finalizeLiveText();
+    if (historyStep < history.length - 1) {
+      const nextStep = historyStep + 1;
+      setHistoryStep(nextStep);
+      setDrawnPaths(history[nextStep].paths);
+      setDrawnTextObjects(history[nextStep].texts);
+    } else toast({ title: "Nothing to redo", duration: 2000 });
+  }, [historyStep, history, toast, finalizeLiveText]);
+
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const eventOptions = { passive: false };
-    canvas.addEventListener('mousemove', handlePointerMove);
-    canvas.addEventListener('mouseup', handlePointerUp);
-    canvas.addEventListener('mouseout', handlePointerUp);
-    canvas.addEventListener('touchmove', handlePointerMove, eventOptions);
-    canvas.addEventListener('touchend', handlePointerUp, eventOptions);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
     return () => {
-        canvas.removeEventListener('mousemove', handlePointerMove);
-        canvas.removeEventListener('mouseup', handlePointerUp);
-        canvas.removeEventListener('mouseout', handlePointerUp);
-        canvas.removeEventListener('touchmove', handlePointerMove);
-        canvas.removeEventListener('touchend', handlePointerUp);
+        window.removeEventListener('mousemove', handlePointerMove);
+        window.removeEventListener('mouseup', handlePointerUp);
+        window.removeEventListener('touchmove', handlePointerMove);
+        window.removeEventListener('touchend', handlePointerUp);
     };
   }, [handlePointerMove, handlePointerUp]);
 
-  const handleToolClick = (toolName: string) => {
-    const toolId = toolName.toLowerCase().replace(/\s+/g, '');
-    if (isTypingText && toolId !== 'text') finalizeLiveText();
-    const isOptionsTool = drawingTools.includes(toolId) || ['erase', 'text', 'select'].includes(toolId);
-    if (activeTool === toolId && isOptionsTool) {
-      setShowDrawingToolOptions(prev => !prev);
-    } else {
-      setActiveTool(toolId);
-      setShowDrawingToolOptions(isOptionsTool);
-    }
-    if (toolId !== 'select') {
-        setSelectedPathIds([]);
-        setSelectedTextObjectIds([]);
-    }
-  };
-  
-  const handleConfirmClearAll = () => {
-    setDrawnPaths([]);
-    setDrawnTextObjects([]);
-    finalizeLiveText();
-    saveStateToHistory([], []);
-    setShowClearConfirmDialog(false);
-  };
-  
-  const handleUndo = useCallback(() => {
-    finalizeLiveText();
-    if (historyStep > 0) setHistoryStep(prev => prev - 1);
-    else toast({ title: "Nothing to undo", duration: 2000 });
-  }, [historyStep, toast, finalizeLiveText]);
+  useEffect(() => {
+    const storedBg = localStorage.getItem("teachmeet-whiteboard-bg-color"); if (storedBg) setCanvasBackgroundColor(storedBg);
+    const storedPen = localStorage.getItem("teachmeet-whiteboard-pen-color"); if (storedPen) setSelectedColor(storedPen);
+  }, []);
 
-  const handleRedo = useCallback(() => {
-    finalizeLiveText();
-    if (historyStep < history.length - 1) setHistoryStep(prev => prev + 1);
-    else toast({ title: "Nothing to redo", duration: 2000 });
-  }, [historyStep, history.length, toast, finalizeLiveText]);
+  useEffect(() => {
+    setHeaderContent(<div className="flex items-center justify-between w-full"><div className="flex items-center gap-3"><Edit3 className="h-7 w-7 text-primary" /><h1 className="text-xl font-semibold truncate">TeachMeet Whiteboard</h1></div>{meetingId && <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior><Button variant="outline" size="sm" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" />Back</Button></Link>}</div>);
+    return () => setHeaderContent(null);
+  }, [setHeaderContent, meetingId]);
 
   return (
     <>
@@ -546,31 +465,34 @@ export default function WhiteboardPage() {
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-             <ToolButton icon={Lasso} label="Lasso Select" onClick={() => handleToolClick("select")} isActive={activeTool === "select"} data-options-toggler={true}/>
-             <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("draw")} isActive={drawingTools.includes(activeTool || "") && activeTool !== "erase"} data-options-toggler={true}/>
-             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("Text")} isActive={activeTool === "text"} data-options-toggler={true}/>
-             <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("Erase")} isActive={activeTool === "erase"} data-options-toggler={true}/>
+             <ToolButton icon={Lasso} label="Lasso Select" onClick={() => handleToolClick("select")} isActive={activeTool === "select"}/>
+             <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("draw")} isActive={drawingTools.includes(activeTool || "") && activeTool !== "erase"} />
+             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("text")} isActive={activeTool === "text"}/>
+             <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} disabled={historyStep <= 0} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} disabled={historyStep >= history.length - 1}/>
-             <AlertDialog open={showClearConfirmDialog} onOpenChange={setShowClearConfirmDialog}><AlertDialogTrigger asChild><Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear"><Trash2 className="h-5 w-5 mb-0.5" /></Button></AlertDialogTrigger><AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will clear the entire whiteboard. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmClearAll} className="rounded-lg">Clear Whiteboard</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+             <AlertDialog>
+                <AlertDialogTrigger asChild><Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear"><Trash2 className="h-5 w-5 mb-0.5" /></Button></AlertDialogTrigger>
+                <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will clear the entire whiteboard. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { setDrawnPaths([]); setDrawnTextObjects([]); saveStateToHistory([], []); }} className="rounded-lg">Clear Whiteboard</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+             </AlertDialog>
           </div>
         </div>
 
-        {showDrawingToolOptions && activeTool && (drawingTools.includes(activeTool) || ['erase', 'text', 'select'].includes(activeTool)) && (
-           <div ref={drawingOptionsToolbarRef} className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg">
+        {showDrawingToolOptions && activeTool && (
+           <div className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg">
              <div className="container mx-auto">
                 {activeTool === 'select' ? ( <div className="text-center"><p className="text-sm text-muted-foreground">Lasso Select active. Drag to select items.</p>{(selectedPathIds.length + selectedTextObjectIds.length) > 0 && <p className="text-xs text-primary">{(selectedPathIds.length + selectedTextObjectIds.length)} item(s) selected. Drag to move.</p>}</div> ) 
                 : activeTool === 'text' ? (
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                       <div><span className="text-xs font-medium text-muted-foreground">Color:</span><div className="flex flex-wrap gap-2 mt-1">{availableColors.map(c => (<ColorSwatch key={c} color={c} onClick={() => setSelectedColor(c)} isSelected={selectedColor === c} />))}</div></div>
-                      <div><span className="text-xs font-medium text-muted-foreground">Text Size:</span><div className="flex gap-2 mt-1">{textSizes.map(s => (<Button key={s.name} variant={selectedTextSize === s.name ? "default" : "outline"} size="sm" className="rounded-lg" onClick={() => setSelectedTextSize(s.name)}>{s.label.split(' ')[0]}</Button>))}</div></div>
+                      <div><span className="text-xs font-medium text-muted-foreground">Text Size:</span><div className="flex gap-2 mt-1">{textSizes.map(s => (<Button key={s.name} variant={selectedTextSize === s.name ? "default" : "outline"} size="sm" className="rounded-lg" onClick={() => setSelectedTextSize(s.name)}>{s.name.charAt(0).toUpperCase() + s.name.slice(1)}</Button>))}</div></div>
                     </div>
                 ) : activeTool === 'erase' ? (
-                    <div><span className="text-xs font-medium text-muted-foreground">Eraser Size:</span><div className="flex gap-2 mt-1">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><b.icon className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
+                    <div><span className="text-xs font-medium text-muted-foreground">Eraser Size:</span><div className="flex gap-2 mt-1">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
                 ) : (
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                         <div><span className="text-xs font-medium text-muted-foreground">Color:</span><div className="flex flex-wrap gap-2 mt-1">{availableColors.map(c => (<ColorSwatch key={c} color={c} onClick={() => setSelectedColor(c)} isSelected={selectedColor === c} />))}</div></div>
-                        <div><span className="text-xs font-medium text-muted-foreground">Size:</span><div className="flex gap-2 mt-1">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><b.icon className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
+                        <div><span className="text-xs font-medium text-muted-foreground">Size:</span><div className="flex gap-2 mt-1">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
                         <div><span className="text-xs font-medium text-muted-foreground">Shape:</span><div className="flex flex-wrap gap-2 mt-1">{[ {tool: "draw", icon: Edit3, label: "Freehand"}, {tool: "line", icon: Minus, label: "Line"}, {tool: "arrow", icon: ArrowRight, label: "Arrow"}, {tool: "circle", icon: CircleIconShape, label: "Circle"}, {tool: "square", icon: SquareIconShape, label: "Square"}, {tool: "triangle", icon: TriangleIcon, label: "Triangle"} ].map(t => (<ToolButton key={t.tool} icon={t.icon} label={t.label} onClick={() => setActiveTool(t.tool)} isActive={activeTool === t.tool}/>))}</div></div>
                     </div>
                 )}
@@ -581,7 +503,14 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0"> 
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0"> 
-              <canvas ref={canvasRef} onMouseDown={handlePointerDown} onTouchStart={handlePointerDown} className="touch-none w-full h-full block" style={{ backgroundColor: canvasBackgroundColor }} />
+              <canvas 
+                ref={canvasRef} 
+                onMouseDown={handlePointerDown} 
+                onTouchStart={handlePointerDown} 
+                width={800} height={600} 
+                className="touch-none w-full h-full block" 
+                style={{ backgroundColor: canvasBackgroundColor }} 
+              />
             </CardContent>
           </Card>
         </main>
@@ -592,3 +521,5 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
+    
