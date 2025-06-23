@@ -28,7 +28,6 @@ interface ToolButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
   onClick: () => void;
   isActive?: boolean;
   disabled?: boolean;
-  'data-options-toggler'?: boolean;
 }
 
 const ToolButton = React.forwardRef<HTMLButtonElement, ToolButtonProps>(
@@ -98,12 +97,10 @@ export default function WhiteboardPage() {
   const router = useRouter();
   const { setHeaderContent } = useDynamicHeader();
 
-  // --- Refs for Performance-Critical Operations ---
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
   
-  // Refs to track current operation state without causing re-renders
   const operationStateRef = useRef<'idle' | 'drawing' | 'lassoing' | 'dragging'>('idle');
   const shapeStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const currentDrawingPathRef = useRef<DrawnPath | null>(null);
@@ -111,27 +108,22 @@ export default function WhiteboardPage() {
   const canvasSnapshotRef = useRef<ImageData | null>(null);
   const dragStartOffsetRef = useRef<{ x: number, y: number, pathOffsets: Map<string, {x: number, y: number}[]>, textOffsets: Map<string, {x: number, y: number}> } | null>(null);
 
-  // --- React State for UI and Committed Data ---
-  const [activeTool, setActiveTool] = useState<string | null>("draw");
-  const [selectedColor, setSelectedColorsetSelectedColor] = useState<string>("#000000");
+  const [activeTool, setActiveTool] = useState<string>("draw");
+  const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [selectedTextSize, setSelectedTextSize] = useState<string>("medium");
   const [showDrawingToolOptions, setShowDrawingToolOptions] = useState<boolean>(true);
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState<string>("#FFFFFF");
   
-  // State for committed drawings and text, and selection state
   const [drawnPaths, setDrawnPaths] = useState<DrawnPath[]>([]);
   const [drawnTextObjects, setDrawnTextObjects] = useState<TextElement[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
   const [selectedTextObjectIds, setSelectedTextObjectIds] = useState<string[]>([]);
   
-  // State for live text input
   const [isTypingText, setIsTypingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number, y: number } | null>(null);
-  const [cursorBlinkVisible, setCursorBlinkVisible] = useState(true);
 
-  // State for Undo/Redo
   const [history, setHistory] = useState<HistoryState[]>([{ paths: [], texts: [] }]);
   const [historyStep, setHistoryStep] = useState<number>(0);
 
@@ -156,7 +148,7 @@ export default function WhiteboardPage() {
   }, [historyStep]);
 
   const drawPath = useCallback((ctx: CanvasRenderingContext2D, path: DrawnPath) => {
-      if (path.points.length < 2) return;
+      if (path.points.length < 1) return;
       ctx.beginPath();
       ctx.strokeStyle = path.color;
       ctx.lineWidth = path.lineWidth;
@@ -177,12 +169,12 @@ export default function WhiteboardPage() {
       if (items.length === 0) return;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       items.forEach(item => {
-          if ('points' in item) { // It's a path
+          if ('points' in item) {
               item.points.forEach(p => {
                   minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
                   maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
               });
-          } else { // It's text
+          } else {
               minX = Math.min(minX, item.x); minY = Math.min(minY, item.y);
               maxX = Math.max(maxX, item.x + item.width); maxY = Math.max(maxY, item.y + item.height);
           }
@@ -264,6 +256,14 @@ export default function WhiteboardPage() {
       return { x: clientX - rect.left, y: clientY - rect.top };
   }, []);
 
+  const isPointInPolygon = (point: {x: number, y: number}, polygon: {x: number, y: number}[]) => {
+    let isInside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) && (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) isInside = !isInside;
+    }
+    return isInside;
+  };
+  
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
       if ((event as React.MouseEvent).button !== 0) return;
       const pos = getPointerPosition(event);
@@ -286,7 +286,10 @@ export default function WhiteboardPage() {
           if (clickedOnSelection) {
               operationStateRef.current = 'dragging';
               const pathOffsets = new Map(selectedPathIds.map(id => [id, drawnPaths.find(p => p.id === id)!.points]));
-              const textOffsets = new Map(selectedTextObjectIds.map(id => [id, {x: drawnTextObjects.find(t=>t.id===id)!.x, y: drawnTextObjects.find(t=>t.id===id)!.y}]));
+              const textOffsets = new Map(selectedTextObjectIds.map(id => {
+                  const textObj = drawnTextObjects.find(t=>t.id===id)!;
+                  return [id, {x: textObj.x, y: textObj.y}]
+              }));
               dragStartOffsetRef.current = { x: pos.x, y: pos.y, pathOffsets, textOffsets };
           } else {
               operationStateRef.current = 'lassoing';
@@ -359,14 +362,6 @@ export default function WhiteboardPage() {
     }
   }, [getPointerPosition, activeTool, getLineWidth, drawPath, drawText, drawSelectionBox, drawnPaths, drawnTextObjects]);
 
-  const isPointInPolygon = (point: {x: number, y: number}, polygon: {x: number, y: number}[]) => {
-    let isInside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) && (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) isInside = !isInside;
-    }
-    return isInside;
-  };
-
   const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
     const pos = getPointerPosition(event);
     if (!pos || !contextRef.current) return;
@@ -403,9 +398,7 @@ export default function WhiteboardPage() {
     dragStartOffsetRef.current = null;
     lassoPathRef.current = [];
     
-    // Final redraw to ensure canvas is clean
     redrawCanvasContent();
-
   }, [getPointerPosition, drawnPaths, drawnTextObjects, saveStateToHistory, redrawCanvasContent, selectedPathIds, selectedTextObjectIds]);
 
   const handleToolClick = (toolName: string) => {
@@ -437,15 +430,18 @@ export default function WhiteboardPage() {
   }, [historyStep, history, toast, finalizeLiveText]);
 
   useEffect(() => {
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('touchmove', handlePointerMove, { passive: false });
-    window.addEventListener('touchend', handlePointerUp);
+    const handleGlobalPointerMove = (e: MouseEvent | TouchEvent) => handlePointerMove(e);
+    const handleGlobalPointerUp = (e: MouseEvent | TouchEvent) => handlePointerUp(e);
+    
+    window.addEventListener('mousemove', handleGlobalPointerMove);
+    window.addEventListener('mouseup', handleGlobalPointerUp);
+    window.addEventListener('touchmove', handleGlobalPointerMove, { passive: false });
+    window.addEventListener('touchend', handleGlobalPointerUp);
     return () => {
-        window.removeEventListener('mousemove', handlePointerMove);
-        window.removeEventListener('mouseup', handlePointerUp);
-        window.removeEventListener('touchmove', handlePointerMove);
-        window.removeEventListener('touchend', handlePointerUp);
+        window.removeEventListener('mousemove', handleGlobalPointerMove);
+        window.removeEventListener('mouseup', handleGlobalPointerUp);
+        window.removeEventListener('touchmove', handleGlobalPointerMove);
+        window.removeEventListener('touchend', handleGlobalPointerUp);
     };
   }, [handlePointerMove, handlePointerUp]);
 
@@ -521,5 +517,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
-    
