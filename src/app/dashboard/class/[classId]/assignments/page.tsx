@@ -91,6 +91,7 @@ export default function ClassAssignmentsPage() {
   const [assignmentToDelete, setAssignmentToDelete] = useState<StudentSubmission | null>(null);
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth state to be determined
     if (!classId || !db) return;
     setLoading(true);
     const assignmentsColRef = collection(db, "classrooms", classId, "assignments");
@@ -119,9 +120,10 @@ export default function ClassAssignmentsPage() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [classId, toast, user]);
+  }, [classId, toast, user, authLoading]);
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth state
     if (!classId || !user || !db || assignmentDefinitions.length === 0) {
         if (assignmentDefinitions.length > 0 && !user) setLoading(false); 
         return;
@@ -166,7 +168,7 @@ export default function ClassAssignmentsPage() {
     
     fetchSubmissions();
 
-  }, [classId, user, assignmentDefinitions, toast]);
+  }, [classId, user, assignmentDefinitions, toast, authLoading]);
 
   useEffect(() => {
     if (assignmentDefinitions.length === 0) {

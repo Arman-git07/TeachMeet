@@ -99,6 +99,7 @@ export default function WhiteboardPage() {
 
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const tempCanvasRef = useRef<HTMLCanvasElement>(null);
+  const snapshotCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mainContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const tempContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
@@ -125,8 +126,7 @@ export default function WhiteboardPage() {
   const [isTypingText, setIsTypingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [textInputPosition, setTextInputPosition] = useState<{ x: number, y: number } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-
+  
   const [history, setHistory] = useState<HistoryState[]>([{ paths: [], texts: [] }]);
   const [historyStep, setHistoryStep] = useState<number>(0);
 
@@ -201,13 +201,9 @@ export default function WhiteboardPage() {
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = canvasBackgroundColor;
     context.fillRect(0, 0, canvas.width, canvas.height);
-
-    const pathsToDraw = drawnPaths.filter(p => !(isDragging && selectedPathIds.includes(p.id)));
-    const textsToDraw = drawnTextObjects.filter(t => !(isDragging && selectedTextObjectIds.includes(t.id)));
-
-    pathsToDraw.forEach(path => drawPath(context, path));
-    textsToDraw.forEach(textObj => drawText(context, textObj));
-  }, [canvasBackgroundColor, drawnPaths, drawnTextObjects, drawPath, drawText, isDragging, selectedPathIds, selectedTextObjectIds]);
+    drawnPaths.forEach(path => drawPath(context, path));
+    drawnTextObjects.forEach(textObj => drawText(context, textObj));
+  }, [canvasBackgroundColor, drawnPaths, drawnTextObjects, drawPath, drawText]);
 
   const drawSelectionOnTempCanvas = useCallback(() => {
     if (!tempContextRef.current) return;
@@ -220,6 +216,30 @@ export default function WhiteboardPage() {
       drawSelectionBox(tempContextRef.current, selectedItems);
     }
   }, [drawnPaths, drawnTextObjects, selectedPathIds, selectedTextObjectIds, drawSelectionBox, clearTempCanvas]);
+
+  const takeSnapshot = useCallback(() => {
+    if (!mainCanvasRef.current || !tempCanvasRef.current || !tempContextRef.current) return;
+    snapshotCanvasRef.current = document.createElement('canvas');
+    snapshotCanvasRef.current.width = mainCanvasRef.current.width;
+    snapshotCanvasRef.current.height = mainCanvasRef.current.height;
+    const snapshotCtx = snapshotCanvasRef.current.getContext('2d');
+    if (snapshotCtx) {
+        snapshotCtx.drawImage(mainCanvasRef.current, 0, 0);
+    }
+  }, []);
+
+  const restoreSnapshot = useCallback(() => {
+    if (!snapshotCanvasRef.current || !tempContextRef.current) return;
+    clearTempCanvas();
+    tempContextRef.current.drawImage(snapshotCanvasRef.current, 0, 0);
+  }, [clearTempCanvas]);
+
+  const stampTempCanvasOnMain = useCallback(() => {
+    if (!tempCanvasRef.current || !mainContextRef.current) return;
+    mainContextRef.current.drawImage(tempCanvasRef.current, 0, 0);
+    clearTempCanvas();
+  }, [clearTempCanvas]);
+
 
   useEffect(() => {
     redrawMainCanvas();
@@ -300,6 +320,7 @@ export default function WhiteboardPage() {
       if (isTypingText) finalizeLiveText();
       
       shapeStartPointRef.current = pos;
+      takeSnapshot();
 
       if (activeTool === 'select') {
           const clickedOnSelection = [
@@ -312,13 +333,15 @@ export default function WhiteboardPage() {
 
           if (clickedOnSelection) {
               operationStateRef.current = 'dragging';
-              setIsDragging(true); // Triggers main canvas redraw without selected items
               const pathOffsets = new Map(selectedPathIds.map(id => [id, drawnPaths.find(p => p.id === id)!.points]));
               const textOffsets = new Map(selectedTextObjectIds.map(id => {
                   const textObj = drawnTextObjects.find(t=>t.id===id)!;
                   return [id, {x: textObj.x, y: textObj.y}]
               }));
               dragStartOffsetRef.current = { x: pos.x, y: pos.y, pathOffsets, textOffsets };
+              const pathsToKeep = drawnPaths.filter(p => !selectedPathIds.includes(p.id));
+              const textsToKeep = drawnTextObjects.filter(t => !selectedTextObjectIds.includes(t.id));
+              redrawMainCanvasWith(pathsToKeep, textsToKeep);
           } else {
               operationStateRef.current = 'lassoing';
               lassoPathRef.current = [pos];
@@ -334,7 +357,19 @@ export default function WhiteboardPage() {
           operationStateRef.current = 'drawing';
           currentDrawingPathRef.current = { id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor, lineWidth: getLineWidth() };
       }
-  }, [getPointerPosition, isTypingText, finalizeLiveText, activeTool, selectedPathIds, selectedTextObjectIds, drawnPaths, drawnTextObjects, canvasBackgroundColor, selectedColor, getLineWidth]);
+  }, [getPointerPosition, isTypingText, finalizeLiveText, activeTool, selectedPathIds, selectedTextObjectIds, drawnPaths, drawnTextObjects, canvasBackgroundColor, selectedColor, getLineWidth, takeSnapshot]);
+  
+  const redrawMainCanvasWith = (paths: DrawnPath[], texts: TextElement[]) => {
+    if (!mainContextRef.current || !mainCanvasRef.current) return;
+    const canvas = mainCanvasRef.current;
+    const context = mainContextRef.current;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = canvasBackgroundColor;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    paths.forEach(path => drawPath(context, path));
+    texts.forEach(textObj => drawText(context, textObj));
+  };
+
 
   const handlePointerMove = useCallback((event: MouseEvent | TouchEvent) => {
     if (operationStateRef.current === 'idle') return;
@@ -342,15 +377,14 @@ export default function WhiteboardPage() {
     if (!pos || !tempContextRef.current || !tempCanvasRef.current) return;
     
     const tempCtx = tempContextRef.current;
-    clearTempCanvas();
+    restoreSnapshot();
 
     if (operationStateRef.current === 'drawing' && currentDrawingPathRef.current) {
         const start = shapeStartPointRef.current!;
-        let newPoints: {x: number, y: number}[];
+        let newPoints: {x: number, y: number}[] = [];
         if (activeTool === 'draw' || activeTool === 'erase') {
             newPoints = [...currentDrawingPathRef.current.points, pos];
         } else {
-            newPoints = [];
             if (activeTool === 'line') newPoints.push(start, pos);
             else if (activeTool === 'square') newPoints.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
             else if (activeTool === 'circle') {
@@ -389,13 +423,15 @@ export default function WhiteboardPage() {
         tempMovedItems.forEach(item => 'points' in item ? drawPath(tempCtx, item) : drawText(tempCtx, item));
         drawSelectionBox(tempCtx, tempMovedItems);
     }
-  }, [getPointerPosition, activeTool, getLineWidth, drawPath, drawText, drawSelectionBox, drawnPaths, drawnTextObjects, clearTempCanvas]);
+  }, [getPointerPosition, activeTool, getLineWidth, drawPath, drawText, drawSelectionBox, drawnPaths, drawnTextObjects, restoreSnapshot, restoreSnapshot]);
 
   const handlePointerUp = useCallback((event: MouseEvent | TouchEvent) => {
+    if(operationStateRef.current === 'idle') return;
     const pos = getPointerPosition(event);
     if (!pos || !mainContextRef.current) return;
-
+    
     if (operationStateRef.current === 'drawing' && currentDrawingPathRef.current) {
+        stampTempCanvasOnMain();
         const newPaths = [...drawnPaths, currentDrawingPathRef.current];
         setDrawnPaths(newPaths);
         saveStateToHistory(newPaths, drawnTextObjects);
@@ -406,7 +442,6 @@ export default function WhiteboardPage() {
         setSelectedPathIds(selectedPaths);
         setSelectedTextObjectIds(selectedTexts);
     } else if (operationStateRef.current === 'dragging' && dragStartOffsetRef.current) {
-        setIsDragging(false); // Stop hiding items on main canvas
         const deltaX = pos.x - dragStartOffsetRef.current.x, deltaY = pos.y - dragStartOffsetRef.current.y;
         const finalPaths = drawnPaths.map(path => {
             if (selectedPathIds.includes(path.id)) return { ...path, points: dragStartOffsetRef.current!.pathOffsets.get(path.id)!.map(p => ({ x: p.x + deltaX, y: p.y + deltaY })) };
@@ -419,6 +454,7 @@ export default function WhiteboardPage() {
         setDrawnPaths(finalPaths);
         setDrawnTextObjects(finalTexts);
         saveStateToHistory(finalPaths, finalTexts);
+        redrawMainCanvasWith(finalPaths, finalTexts);
     }
 
     operationStateRef.current = 'idle';
@@ -428,7 +464,7 @@ export default function WhiteboardPage() {
     lassoPathRef.current = [];
     
     clearTempCanvas();
-  }, [getPointerPosition, drawnPaths, drawnTextObjects, saveStateToHistory, clearTempCanvas, selectedPathIds, selectedTextObjectIds]);
+  }, [getPointerPosition, drawnPaths, drawnTextObjects, saveStateToHistory, clearTempCanvas, selectedPathIds, selectedTextObjectIds, stampTempCanvasOnMain]);
 
   const handleToolClick = (toolName: string) => {
     if (isTypingText) finalizeLiveText();
@@ -486,7 +522,6 @@ export default function WhiteboardPage() {
 
   return (
     <>
-      <textarea ref={liveTextInputRef} value={currentText} onChange={e => setCurrentText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); setCurrentText(prev => prev + '\n'); }}} onBlur={finalizeLiveText} style={{ position: 'absolute', opacity: 0, width: 1, height: 1, border: 'none', padding: 0, top: -9999, left: -9999 }} tabIndex={-1} />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
@@ -508,22 +543,22 @@ export default function WhiteboardPage() {
         </div>
 
         {showDrawingToolOptions && activeTool && (
-           <div className="p-3 border-b bg-muted/50 absolute top-32 left-0 right-0 z-10 shadow-lg">
-             <div className="container mx-auto">
+           <div className="p-3 border-b bg-muted/50 shadow-lg flex flex-col items-center justify-center md:flex-row md:items-start gap-4">
+             <div className="flex flex-col md:flex-row md:items-center md:justify-center flex-wrap gap-x-6 gap-y-4">
                 {activeTool === 'select' ? ( <div className="text-center"><p className="text-sm text-muted-foreground">Lasso Select active. Drag to select items.</p>{(selectedPathIds.length + selectedTextObjectIds.length) > 0 && <p className="text-xs text-primary">{(selectedPathIds.length + selectedTextObjectIds.length)} item(s) selected. Drag to move.</p>}</div> ) 
                 : activeTool === 'text' ? (
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-center flex-wrap gap-x-6 gap-y-4">
+                    <>
                       <div><span className="text-xs font-medium text-muted-foreground">Color:</span><div className="flex flex-wrap gap-2 mt-1">{availableColors.map(c => (<ColorSwatch key={c} color={c} onClick={() => setSelectedColor(c)} isSelected={selectedColor === c} />))}</div></div>
                       <div><span className="text-xs font-medium text-muted-foreground">Text Size:</span><div className="flex gap-2 mt-1">{textSizes.map(s => (<Button key={s.name} variant={selectedTextSize === s.name ? "default" : "outline"} size="sm" className="rounded-lg" onClick={() => setSelectedTextSize(s.name)}>{s.name.charAt(0).toUpperCase() + s.name.slice(1)}</Button>))}</div></div>
-                    </div>
+                    </>
                 ) : activeTool === 'erase' ? (
-                    <div className="flex flex-col items-center justify-center"><span className="text-xs font-medium text-muted-foreground">Eraser Size:</span><div className="flex gap-2 mt-1">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={()={() => setSelectedBrushSize(b.name)}}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
+                    <div className="flex flex-col items-center justify-center"><span className="text-xs font-medium text-muted-foreground">Eraser Size:</span><div className="flex gap-2 mt-1">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center md:flex-row md:items-start md:justify-between gap-4">
+                    <>
                         <div><span className="text-xs font-medium text-muted-foreground">Color:</span><div className="flex flex-wrap gap-2 mt-1">{availableColors.map(c => (<ColorSwatch key={c} color={c} onClick={() => setSelectedColor(c)} isSelected={selectedColor === c} />))}</div></div>
                         <div><span className="text-xs font-medium text-muted-foreground">Size:</span><div className="flex gap-2 mt-1">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
                         <div><span className="text-xs font-medium text-muted-foreground">Shape:</span><div className="flex flex-wrap gap-2 mt-1">{[ {tool: "draw", icon: Edit3, label: "Freehand"}, {tool: "line", icon: Minus, label: "Line"}, {tool: "arrow", icon: ArrowRight, label: "Arrow"}, {tool: "circle", icon: CircleIconShape, label: "Circle"}, {tool: "square", icon: SquareIconShape, label: "Square"}, {tool: "triangle", icon: TriangleIcon, label: "Triangle"} ].map(t => (<ToolButton key={t.tool} icon={t.icon} label={t.label} onClick={() => setActiveTool(t.tool)} isActive={activeTool === t.tool}/>))}</div></div>
-                    </div>
+                    </>
                 )}
              </div>
            </div>
@@ -546,6 +581,35 @@ export default function WhiteboardPage() {
                     className="touch-none w-full h-full block absolute top-0 left-0" 
                     style={{ zIndex: 2 }}
                 />
+                 {isTypingText && textInputPosition && (
+                  <textarea
+                    ref={liveTextInputRef}
+                    value={currentText}
+                    onChange={e => setCurrentText(e.target.value)}
+                    onBlur={finalizeLiveText}
+                    onKeyDown={e => {
+                        if (e.key === 'Escape') finalizeLiveText();
+                    }}
+                    style={{
+                        position: 'absolute',
+                        top: textInputPosition.y,
+                        left: textInputPosition.x,
+                        background: 'transparent',
+                        border: '1px dashed hsl(var(--primary))',
+                        outline: 'none',
+                        color: selectedColor,
+                        font: `${getFontSize()}px sans-serif`,
+                        lineHeight: `${getFontSize() * 1.2}px`,
+                        zIndex: 3,
+                        minWidth: '50px',
+                        minHeight: `${getFontSize() * 1.2}px`,
+                        resize: 'none',
+                        overflow: 'hidden',
+                        whiteSpace: 'pre',
+                    }}
+                    autoFocus
+                  />
+                )}
             </CardContent>
           </Card>
         </main>

@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase'; // Import db
 import { collection, query, onSnapshot } from 'firebase/firestore'; // Firestore imports
+import { useAuth } from '@/hooks/useAuth';
 
 interface Material {
   id: string;
@@ -35,6 +36,7 @@ export default function ClassMaterialsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { loading: authLoading } = useAuth();
 
   const classId = params.classId as string;
   const className = searchParams.get('name') || "Class";
@@ -43,6 +45,7 @@ export default function ClassMaterialsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth state to be determined
     if (!classId || !db) return;
     setLoading(true);
     const materialsColRef = collection(db, "classrooms", classId, "materials");
@@ -70,7 +73,7 @@ export default function ClassMaterialsPage() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [classId, className, toast]);
+  }, [classId, className, toast, authLoading]);
 
   const handleMaterialAction = (material: Material) => {
     if (material.url) {
@@ -92,7 +95,7 @@ export default function ClassMaterialsPage() {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />

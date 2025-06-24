@@ -42,7 +42,7 @@ interface Exam {
 
 export default function ExamsPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams(); // For potential classId filter from URL
   const filterClassId = searchParams.get('classId');
@@ -52,16 +52,30 @@ export default function ExamsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth state to be determined
     if (!db) return;
-    setIsLoading(true);
     
+    // If not authenticated and no specific class is being filtered, there's nothing to show.
+    if (!user && !filterClassId) {
+        setExams([]);
+        setIsLoading(false);
+        return;
+    }
+
+    setIsLoading(true);
     let examsQuery;
+
     if (filterClassId) {
+      // Fetch all exams for a specific class (publicly viewable list)
       examsQuery = query(collection(db, "exams"), where("classId", "==", filterClassId), orderBy("scheduledDateTime", "desc"));
-    } else if (user) { // Show exams created by user or where user might be a participant (more complex, for now just created by)
+    } else if (user) {
+      // Fetch all exams created by the current user if no class filter is applied
       examsQuery = query(collection(db, "exams"), where("teacherId", "==", user.uid), orderBy("scheduledDateTime", "desc"));
-    } else { // No user, no filter - maybe show public exams if that's a feature, or empty for now
-      examsQuery = query(collection(db, "exams"), orderBy("scheduledDateTime", "desc")); // Example: Fetch all
+    } else {
+      // This case should be handled by the guard above, but as a fallback, don't query.
+      setExams([]);
+      setIsLoading(false);
+      return;
     }
 
     const unsubscribe = onSnapshot(examsQuery, (snapshot) => {
@@ -95,7 +109,7 @@ export default function ExamsPage() {
     });
 
     return () => unsubscribe();
-  }, [user, filterClassId, toast]);
+  }, [user, authLoading, filterClassId, toast]);
 
   const handleExamCreated = (newExam: Exam) => {
     // If CreateExamDialog saves to Firestore, this might just be a toast or UI refresh trigger
@@ -127,7 +141,7 @@ export default function ExamsPage() {
     toast({ title: "Edit Exam (Not Implemented)", description: `Editing functionality for "${exam.title}" is planned.`});
   };
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return ( /* Skeleton loader from original */ <div className="space-y-8 p-4 md:p-8 h-full flex flex-col"><div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"><div><div className="h-9 w-64 bg-muted rounded-md mb-1"></div><div className="h-5 w-80 bg-muted rounded-md"></div></div><div className="h-11 w-48 bg-muted rounded-lg"></div></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">{[...Array(3)].map((_, i) => (<Card key={i} className="flex flex-col rounded-xl shadow-lg border-border/50"><CardHeader className="pb-3"><div className="h-6 w-3/4 bg-muted rounded-md mb-1"></div><div className="h-4 w-1/2 bg-muted rounded-md"></div></CardHeader><CardContent className="flex-grow space-y-1.5"><div className="h-4 w-full bg-muted rounded-md"></div><div className="h-4 w-5/6 bg-muted rounded-md"></div><div className="h-4 w-4/6 bg-muted rounded-md"></div></CardContent><CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2"><div className="h-9 w-full bg-muted rounded-lg"></div></CardFooter></Card>))}</div></div>);
   }
 

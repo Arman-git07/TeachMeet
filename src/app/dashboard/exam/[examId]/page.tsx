@@ -62,6 +62,7 @@ export default function ExamTakingPage() {
   const [timeLeft, setTimeLeft] = useState<string>("");
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth state to be determined
     if (!examId || !db) return;
     setLoading(true);
     const examDocRef = doc(db, "exams", examId);
@@ -87,9 +88,10 @@ export default function ExamTakingPage() {
     }).finally(() => {
       setLoading(false);
     });
-  }, [examId, router, toast]);
+  }, [examId, router, toast, authLoading]);
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth state
     if (!examId || !user || !db) return;
     const submissionDocRef = doc(db, "exams", examId, "submissions", user.uid);
     getDoc(submissionDocRef).then(docSnap => {
@@ -97,7 +99,7 @@ export default function ExamTakingPage() {
         setSubmissionStatus('submitted');
       }
     }).catch(error => console.error("Error checking existing submission:", error));
-  }, [examId, user]);
+  }, [examId, user, authLoading]);
 
 
   useEffect(() => {
