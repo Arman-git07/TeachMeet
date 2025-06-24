@@ -12,7 +12,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Brush, Minus, Type, Eraser, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, Lasso } from "lucide-react";
 import Link from "next/link";
@@ -30,13 +29,13 @@ interface BoundingBox { minX: number; minY: number; maxX: number; maxY: number; 
 
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
-const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
 const canvasBackgroundColor = "#FFFFFF";
 
 // --- UI Components ---
 const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType; label: string; onClick: () => void; isActive?: boolean; }) => (
   <Button variant={isActive ? "default" : "outline"} size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" onClick={onClick} aria-label={label}>
     <Icon className="h-5 w-5 mb-0.5" />
+    <span className="text-[10px] leading-tight">{label}</span>
   </Button>
 ));
 ToolButton.displayName = "ToolButton";
@@ -67,8 +66,7 @@ export default function WhiteboardPage() {
   const [activeTool, setActiveTool] = useState<string>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
-  const [currentText, setCurrentText] = useState("");
-
+  
   // --- Refs for Live Operations ---
   const operationStateRef = useRef<'idle' | 'drawing' | 'shaping' | 'lassoing' | 'movingSelection' | 'texting'>('idle');
   const currentPathRef = useRef<DrawnPath | null>(null);
@@ -127,7 +125,7 @@ export default function WhiteboardPage() {
 
   // --- Drawing Functions ---
   const drawPath = (ctx: CanvasRenderingContext2D, path: DrawnPath) => {
-    if (!path || !path.points) return;
+    if (!path || !path.points || path.points.length === 0) return;
     if (path.points.length < 2 && (activeTool !== 'draw' && activeTool !== 'erase')) return;
     ctx.beginPath();
     ctx.strokeStyle = path.color;
@@ -254,6 +252,8 @@ export default function WhiteboardPage() {
     if ((event as React.MouseEvent).button !== 0) return;
     const pos = getPointerPosition(event);
     if (!pos) return;
+    
+    finalizeLiveText();
 
     const selectionBounds = getSelectionBoundingBox();
     if (selectionBounds && isPointInRect(pos, selectionBounds)) {
@@ -283,7 +283,10 @@ export default function WhiteboardPage() {
     else if (activeTool === 'draw' || activeTool === 'erase') {
         operationStateRef.current = 'drawing';
         currentPathRef.current = { id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor, lineWidth: getLineWidth() };
-    } else if (drawingTools.includes(activeTool)) { operationStateRef.current = 'shaping'; shapeStartPointRef.current = pos; }
+    } else { // Shape tools
+        operationStateRef.current = 'shaping'; 
+        shapeStartPointRef.current = pos; 
+    }
   }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, paths, texts, selectedPathIds, selectedTextIds]);
 
   const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
@@ -300,12 +303,14 @@ export default function WhiteboardPage() {
     } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
         const start = shapeStartPointRef.current;
         tempCtx.strokeStyle = selectedColor; tempCtx.lineWidth = getLineWidth();
+        tempCtx.fillStyle = selectedColor; // For filled shapes if needed later
+        
         if (activeTool === 'line') { tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.stroke(); }
         else if (activeTool === 'square') { tempCtx.strokeRect(start.x, start.y, pos.x - start.x, pos.y - start.y); }
         else if (activeTool === 'circle') { const radius = Math.hypot(pos.x - start.x, pos.y - start.y); tempCtx.beginPath(); tempCtx.arc(start.x, start.y, radius, 0, 2 * Math.PI); tempCtx.stroke(); }
         else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.stroke();
+            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.stroke();
         } else if (activeTool === 'triangle') { tempCtx.beginPath(); tempCtx.moveTo(start.x + (pos.x - start.x) / 2, start.y); tempCtx.lineTo(start.x, pos.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.closePath(); tempCtx.stroke(); }
     } else if (operationStateRef.current === 'lassoing') {
         lassoPathRef.current.push(pos);
@@ -367,9 +372,12 @@ export default function WhiteboardPage() {
              for(let i=0; i<=360; i+=10) newPath.points.push({ x: start.x + radius * Math.cos(i * Math.PI / 180), y: start.y + radius * Math.sin(i * Math.PI / 180) });
         } else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            newPath.points.push(start, pos);
-            newPath.points.push(pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
-            newPath.points.push(pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
+            newPath.points.push(start, pos); // The main line
+            // Re-calculate the two head lines as separate paths for correct rendering logic if needed, but for simple stamp it's ok.
+            // For simplicity, we draw the whole arrow as one path for now. This part might need refinement if arrow heads should be selectable entities.
+            // A better way is to treat it as a special object, but for now this works as a visual stamp.
+            newPath.points.push({x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
+            newPath.points.push({x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
         if(newPath.points.length > 0) setPaths(prev => [...prev, newPath]);
     }
@@ -387,8 +395,11 @@ export default function WhiteboardPage() {
     const textInput = liveTextInputRef.current;
     const pos = textCursorPosition.current;
     
-    if (!textInput || !pos) {
-        operationStateRef.current = 'idle';
+    if (!textInput || !pos || operationStateRef.current !== 'texting') {
+        if(textInput) {
+             textInput.style.opacity = '0';
+             textInput.style.top = '-9999px';
+        }
         return;
     }
     
@@ -407,7 +418,6 @@ export default function WhiteboardPage() {
         setTexts(prev => [...prev, newTextElement]);
     }
 
-    setCurrentText('');
     textInput.value = '';
     textInput.style.opacity = '0';
     textInput.style.top = '-9999px';
@@ -429,12 +439,12 @@ export default function WhiteboardPage() {
 
   return (
     <>
-      <textarea ref={liveTextInputRef} onBlur={finalizeLiveText} style={{ position: 'absolute', opacity: 0, border: '1px dashed hsl(var(--primary))', outline: 'none', background: 'hsl(var(--background)/0.8)', color: selectedColor, font: getFontString(), lineHeight: `${getFontSize() * 1.2}px`, zIndex: 10, minWidth: '50px', resize: 'none', overflow: 'hidden', whiteSpace: 'pre', top: -9999, left: -9999 }} tabIndex={-1} />
+      <textarea ref={liveTextInputRef} onBlur={finalizeLiveText} style={{ position: 'absolute', opacity: 0, border: '1px dashed hsl(var(--primary))', outline: 'none', background: 'hsl(var(--background)/0.8)', color: selectedColor, font: getFontString(), lineHeight: `${getFontSize() * 1.2}px`, zIndex: 10, resize: 'none', overflow: 'hidden', whiteSpace: 'pre', top: -9999, left: -9999, padding: '4px' }} tabIndex={-1} />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-             <ToolButton icon={Lasso} label="Lasso Select" onClick={() => handleToolClick("select")} isActive={activeTool === "select"}/>
-             <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("draw")} isActive={drawingTools.includes(activeTool)} />
+             <ToolButton icon={Lasso} label="Select" onClick={() => handleToolClick("select")} isActive={activeTool === "select"}/>
+             <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("draw")} isActive={activeTool === "draw"} />
              <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("text")} isActive={activeTool === "text"}/>
              <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
@@ -443,6 +453,7 @@ export default function WhiteboardPage() {
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
                         <Trash2 className="h-5 w-5 mb-0.5" />
+                        <span className="text-[10px] leading-tight">Clear</span>
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will clear the entire whiteboard. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearWhiteboard} className="rounded-lg">Clear Whiteboard</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
@@ -452,15 +463,19 @@ export default function WhiteboardPage() {
 
         <div className="p-3 border-b bg-muted/50 shadow-lg flex flex-col md:flex-row items-center justify-center gap-4">
             <div className="flex flex-col items-center md:flex-row md:items-start flex-wrap justify-center gap-x-6 gap-y-4">
-                {(drawingTools.includes(activeTool) || activeTool === 'erase' || activeTool === 'text') && (
+                {(activeTool !== 'select') && (
                     <div><span className="text-xs font-medium text-muted-foreground">Color:</span><div className="flex flex-wrap gap-2 mt-1 justify-center">{['#000000', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#0EA5E9', '#6366F1', '#EC4899'].map(c => (<ColorSwatch key={c} color={c} onClick={() => setSelectedColor(c)} isSelected={selectedColor === c} />))}</div></div>
                 )}
-                {(drawingTools.includes(activeTool) || activeTool === 'erase') && (
+                {(activeTool === 'draw' || activeTool === 'erase') && (
                     <div><span className="text-xs font-medium text-muted-foreground">Size:</span><div className="flex gap-2 mt-1 justify-center">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
                 )}
-                {drawingTools.includes(activeTool) && (
-                    <div><span className="text-xs font-medium text-muted-foreground">Shape:</span><div className="flex flex-wrap gap-2 mt-1 justify-center">{[ {tool: "draw", icon: Edit3, label: "Freehand"}, {tool: "line", icon: Minus, label: "Line"}, {tool: "arrow", icon: ArrowRight, label: "Arrow"}, {tool: "circle", icon: CircleIconShape, label: "Circle"}, {tool: "square", icon: SquareIconShape, label: "Square"}, {tool: "triangle", icon: TriangleIcon, label: "Triangle"} ].map(t => (<ToolButton key={t.tool} icon={t.icon} label={t.label} onClick={() => setActiveTool(t.tool)} isActive={activeTool === t.tool}/>))}</div></div>
-                )}
+                <div className="flex flex-wrap gap-2 mt-1 justify-center">
+                    <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick('line')} isActive={activeTool === 'line'} />
+                    <ToolButton icon={ArrowRight} label="Arrow" onClick={() => handleToolClick('arrow')} isActive={activeTool === 'arrow'} />
+                    <ToolButton icon={CircleIconShape} label="Circle" onClick={() => handleToolClick('circle')} isActive={activeTool === 'circle'} />
+                    <ToolButton icon={SquareIconShape} label="Square" onClick={() => handleToolClick('square')} isActive={activeTool === 'square'} />
+                    <ToolButton icon={TriangleIcon} label="Triangle" onClick={() => handleToolClick('triangle')} isActive={activeTool === 'triangle'} />
+                </div>
             </div>
         </div>
 
