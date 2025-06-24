@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Brush, Minus, Type, Eraser, Trash2, Circle as CircleIconShape, Square as SquareIconShape, Edit3, ArrowRight, Triangle as TriangleIcon, Undo2, Redo2, Lasso } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,6 @@ ColorSwatch.displayName = "ColorSwatch";
 export default function WhiteboardPage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
-  const { toast } = useToast();
   const { setHeaderContent } = useDynamicHeader();
 
   // --- Canvas and Context Refs ---
@@ -85,6 +84,7 @@ export default function WhiteboardPage() {
   const textObjectsRef = useRef<TextElement[]>([]);
   const historyRef = useRef<HistoryState[]>([{ paths: [], texts: [] }]);
   const historyStepRef = useRef<number>(0);
+  const currentPathRef = useRef<DrawnPath | null>(null);
 
   // --- UI State (managed with useState to trigger UI updates) ---
   const [activeTool, setActiveTool] = useState<string>("draw");
@@ -96,7 +96,7 @@ export default function WhiteboardPage() {
   const [isRedoable, setIsRedoable] = useState(false);
   
   // --- Operation State (managed with refs for high-frequency events) ---
-  const operationStateRef = useRef<'idle' | 'drawing' | 'lassoing' | 'dragging' | 'typing'>('idle');
+  const operationStateRef = useRef<'idle' | 'drawing' | 'shaping' | 'lassoing' | 'dragging' | 'typing'>('idle');
   const shapeStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const lassoPathRef = useRef<{x: number, y: number}[]>([]);
   const dragStartPointRef = useRef<{ x: number; y: number } | null>(null);
@@ -115,7 +115,7 @@ export default function WhiteboardPage() {
 
   // --- Core Drawing Functions ---
   const drawPath = useCallback((ctx: CanvasRenderingContext2D, path: DrawnPath) => {
-    if (path.points.length < 1) return;
+    if (path.points.length < 2) return;
     ctx.beginPath();
     ctx.strokeStyle = path.color;
     ctx.lineWidth = path.lineWidth;
@@ -214,11 +214,8 @@ export default function WhiteboardPage() {
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event as React.MouseEvent).button !== 0) return;
     const pos = getPointerPosition(event);
-    if (!pos || !tempContextRef.current) return;
+    if (!pos) return;
     
-    tempContextRef.current.strokeStyle = selectedColor;
-    tempContextRef.current.lineWidth = getLineWidth();
-
     if (activeTool === 'select') {
       const clickedOnSelection = [
         ...pathsRef.current.filter(p => selectedElementIds.paths.includes(p.id)),
@@ -243,48 +240,45 @@ export default function WhiteboardPage() {
         setCurrentText('');
         operationStateRef.current = 'typing';
         setTimeout(() => liveTextInputRef.current?.focus(), 0);
-    } else {
+    } else if (activeTool === 'draw' || activeTool === 'erase') {
         operationStateRef.current = 'drawing';
+        currentPathRef.current = {
+            id: Date.now().toString(),
+            points: [pos],
+            color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor,
+            lineWidth: getLineWidth()
+        };
+    } else if (drawingTools.includes(activeTool)) {
+        operationStateRef.current = 'shaping';
         shapeStartPointRef.current = pos;
-        if(activeTool === 'erase') {
-          tempContextRef.current.strokeStyle = canvasBackgroundColor;
-        }
     }
   }, [getPointerPosition, activeTool, selectedElementIds, redrawMainCanvas, selectedColor, getLineWidth, canvasBackgroundColor]);
 
   const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if (operationStateRef.current === 'idle' || operationStateRef.current === 'typing') return;
     const pos = getPointerPosition(event);
-    if (!pos || !tempContextRef.current || !tempCanvasRef.current) return;
+    if (!pos || !tempContextRef.current) return;
     
     const tempCtx = tempContextRef.current;
     clearCanvas(tempCtx);
 
-    if (operationStateRef.current === 'drawing' && shapeStartPointRef.current) {
+    if (operationStateRef.current === 'drawing' && currentPathRef.current) {
+        currentPathRef.current.points.push(pos);
+        drawPath(tempCtx, currentPathRef.current);
+    } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
       const start = shapeStartPointRef.current;
-      const tempPath: DrawnPath = { id: '', points: [], color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor, lineWidth: getLineWidth()};
-      if (activeTool === 'draw' || activeTool === 'erase') {
-          shapeStartPointRef.current = pos;
-          mainContextRef.current!.strokeStyle = tempPath.color;
-          mainContextRef.current!.lineWidth = tempPath.lineWidth;
-          mainContextRef.current!.beginPath();
-          mainContextRef.current!.moveTo(start.x, start.y);
-          mainContextRef.current!.lineTo(pos.x, pos.y);
-          mainContextRef.current!.stroke();
-          pathsRef.current.push({ ...tempPath, points: [start, pos] });
-      } else {
-        if (activeTool === 'line') tempPath.points.push(start, pos);
-        else if (activeTool === 'square') tempPath.points.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
-        else if (activeTool === 'circle') {
-            const radius = Math.hypot(pos.x - start.x, pos.y - start.y) / 2;
-            const centerX = start.x + (pos.x - start.x) / 2, centerY = start.y + (pos.y - start.y) / 2;
-            for (let i = 0; i <= 360; i += 10) tempPath.points.push({ x: centerX + radius * Math.cos(i * Math.PI / 180), y: centerY + radius * Math.sin(i * Math.PI / 180) });
-        } else if (activeTool === 'arrow') {
-            const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            tempPath.points.push(start, pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}, pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
-        } else if (activeTool === 'triangle') tempPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
-        drawPath(tempCtx, tempPath);
-      }
+      const tempPath: DrawnPath = { id: '', points: [], color: selectedColor, lineWidth: getLineWidth()};
+      if (activeTool === 'line') tempPath.points.push(start, pos);
+      else if (activeTool === 'square') tempPath.points.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
+      else if (activeTool === 'circle') {
+          const radius = Math.hypot(pos.x - start.x, pos.y - start.y) / 2;
+          const centerX = start.x + (pos.x - start.x) / 2, centerY = start.y + (pos.y - start.y) / 2;
+          for (let i = 0; i <= 360; i += 10) tempPath.points.push({ x: centerX + radius * Math.cos(i * Math.PI / 180), y: centerY + radius * Math.sin(i * Math.PI / 180) });
+      } else if (activeTool === 'arrow') {
+          const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
+          tempPath.points.push(start, pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)}, pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
+      } else if (activeTool === 'triangle') tempPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
+      drawPath(tempCtx, tempPath);
     } else if (operationStateRef.current === 'lassoing') {
         lassoPathRef.current.push(pos);
         tempCtx.beginPath(); tempCtx.moveTo(lassoPathRef.current[0].x, lassoPathRef.current[0].y);
@@ -295,34 +289,43 @@ export default function WhiteboardPage() {
         selectionSnapshotRef.current.paths.forEach(p => drawPath(tempCtx, {...p, points: p.points.map(pt => ({ x: pt.x + deltaX, y: pt.y + deltaY}))}));
         selectionSnapshotRef.current.texts.forEach(t => drawText(tempCtx, {...t, x: t.x + deltaX, y: t.y + deltaY}));
     }
-  }, [getPointerPosition, activeTool, getLineWidth, drawPath, drawText, clearCanvas, selectedColor, canvasBackgroundColor]);
+  }, [getPointerPosition, activeTool, getLineWidth, drawPath, drawText, clearCanvas, selectedColor]);
 
   const handlePointerUp = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     const tempCtx = tempContextRef.current;
-    if (!tempCtx?.canvas || operationStateRef.current === 'idle' || operationStateRef.current === 'typing') return;
+    if (!tempCtx || operationStateRef.current === 'idle' || operationStateRef.current === 'typing') return;
     
     if (operationStateRef.current === 'drawing') {
-        if(activeTool !== 'draw' && activeTool !== 'erase') {
-          mainContextRef.current?.drawImage(tempCtx.canvas, 0, 0);
-          const start = shapeStartPointRef.current!;
-          const pos = getPointerPosition(event)!;
-          const tempPath: DrawnPath = { id: Date.now().toString(), points: [], color: selectedColor, lineWidth: getLineWidth() };
-          if (activeTool === 'line') tempPath.points.push(start, pos);
-          else if (activeTool === 'square') tempPath.points.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
-          else if (activeTool === 'circle') {
-              const radius = Math.hypot(pos.x - start.x, pos.y - start.y) / 2;
-              const centerX = start.x + (pos.x - start.x) / 2, centerY = start.y + (pos.y - start.y) / 2;
-              for (let i = 0; i <= 360; i += 10) tempPath.points.push({ x: centerX + radius * Math.cos(i * Math.PI / 180), y: centerY + radius * Math.sin(i * Math.PI / 180) });
-          } else if (activeTool === 'arrow') {
-              const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-              tempPath.points.push(start, pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}, pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
-          } else if (activeTool === 'triangle') tempPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
-          pathsRef.current.push(tempPath);
+        if (currentPathRef.current && currentPathRef.current.points.length > 1) {
+            pathsRef.current.push(currentPathRef.current);
+            saveStateToHistory();
+            redrawMainCanvas(); // Redraw main canvas with the new path
         }
-        saveStateToHistory();
+        currentPathRef.current = null;
+    } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
+        const start = shapeStartPointRef.current;
+        const pos = getPointerPosition(event)!;
+        const newPath: DrawnPath = { id: Date.now().toString(), points: [], color: selectedColor, lineWidth: getLineWidth() };
+        if (activeTool === 'line') newPath.points.push(start, pos);
+        else if (activeTool === 'square') newPath.points.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
+        else if (activeTool === 'circle') {
+            const radius = Math.hypot(pos.x - start.x, pos.y - start.y) / 2;
+            const centerX = start.x + (pos.x - start.x) / 2, centerY = start.y + (pos.y - start.y) / 2;
+            for (let i = 0; i <= 360; i += 10) newPath.points.push({ x: centerX + radius * Math.cos(i * Math.PI / 180), y: centerY + radius * Math.sin(i * Math.PI / 180) });
+        } else if (activeTool === 'arrow') {
+            const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
+            newPath.points.push(start, pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)}, pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
+        } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
+        
+        if (newPath.points.length > 0) {
+            pathsRef.current.push(newPath);
+            saveStateToHistory();
+            redrawMainCanvas();
+        }
     } else if (operationStateRef.current === 'lassoing') {
         const finalLassoPath = lassoPathRef.current;
         const isPointInPolygon = (point: {x: number, y: number}, polygon: {x: number, y: number}[]) => {
+          if (polygon.length < 3) return false;
           let isInside = false;
           for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) { if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) && (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) isInside = !isInside; }
           return isInside;
@@ -353,9 +356,11 @@ export default function WhiteboardPage() {
     if (mainCanvas && tempCanvas) {
         const resizeCanvases = () => {
           const { width, height } = mainCanvas.getBoundingClientRect();
-          mainCanvas.width = width; mainCanvas.height = height;
-          tempCanvas.width = width; tempCanvas.height = height;
-          redrawMainCanvas();
+          if (width > 0 && height > 0) {
+            mainCanvas.width = width; mainCanvas.height = height;
+            tempCanvas.width = width; tempCanvas.height = height;
+            redrawMainCanvas();
+          }
         };
         resizeCanvases();
         mainContextRef.current = mainCanvas.getContext("2d");
@@ -398,11 +403,11 @@ export default function WhiteboardPage() {
 
   return (
     <>
-      {textInputPosition && (
+      {textInputPosition && mainCanvasRef.current && (
           <textarea
               ref={liveTextInputRef} value={currentText} onChange={e => setCurrentText(e.target.value)}
               onBlur={finalizeLiveText} onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); finalizeLiveText(); } }}
-              style={{ position: 'absolute', top: textInputPosition.y + mainCanvasRef.current!.getBoundingClientRect().top, left: textInputPosition.x + mainCanvasRef.current!.getBoundingClientRect().left,
+              style={{ position: 'absolute', top: textInputPosition.y + mainCanvasRef.current.getBoundingClientRect().top, left: textInputPosition.x + mainCanvasRef.current.getBoundingClientRect().left,
                        background: 'transparent', border: '1px dashed hsl(var(--primary))', outline: 'none', color: selectedColor,
                        font: `${getFontSize()}px sans-serif`, lineHeight: `${getFontSize() * 1.2}px`, zIndex: 10,
                        minWidth: '50px', resize: 'none', overflow: 'hidden', whiteSpace: 'pre-wrap' }}
@@ -413,7 +418,7 @@ export default function WhiteboardPage() {
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
              <ToolButton icon={Lasso} label="Lasso Select" onClick={() => handleToolClick("select")} isActive={activeTool === "select"}/>
-             <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("draw")} isActive={drawingTools.includes(activeTool || "") && activeTool !== "erase"} />
+             <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("draw")} isActive={drawingTools.includes(activeTool) && activeTool !== "erase"} />
              <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("text")} isActive={activeTool === "text"}/>
              <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} disabled={!isUndoable} />
@@ -454,7 +459,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0"> 
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0"> 
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1, backgroundColor: canvasBackgroundColor }} />
                 <canvas ref={tempCanvasRef} onMouseDown={handlePointerDown} onMouseMove={handlePointerMove} onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp} onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 2 }} />
             </CardContent>
           </Card>
@@ -466,3 +471,5 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
+    
