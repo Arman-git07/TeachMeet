@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -127,7 +128,7 @@ export default function WhiteboardPage() {
 
   // --- Drawing Functions ---
   const drawPath = (ctx: CanvasRenderingContext2D, path: DrawnPath) => {
-    if (!path || !path.points) return;
+    if (!path || !path.points) return; // Guard against null/undefined paths
     if (path.points.length < 2 && (activeTool !== 'draw' && activeTool !== 'erase')) return;
     ctx.beginPath();
     ctx.strokeStyle = path.color;
@@ -161,8 +162,9 @@ export default function WhiteboardPage() {
       clearCanvas(mainCtx);
       mainCtx.fillStyle = isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor;
       mainCtx.fillRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
-      paths.forEach(path => drawPath(mainCtx, path));
-      texts.forEach(text => drawText(mainCtx, text));
+      // Add filter(Boolean) to safely skip any null/undefined entries in the state arrays
+      paths.filter(Boolean).forEach(path => drawPath(mainCtx, path));
+      texts.filter(Boolean).forEach(text => drawText(mainCtx, text));
     };
 
     const resizeCanvases = () => {
@@ -197,15 +199,15 @@ export default function WhiteboardPage() {
     }
   }, [selectedPathIds, selectedTextIds, getSelectionBoundingBox]);
 
-  const pushToHistory = useCallback(() => {
+  const pushToHistory = useCallback((newPaths: DrawnPath[], newTexts: TextElement[]) => {
     historyStepRef.current++;
     historyRef.current.splice(historyStepRef.current);
-    historyRef.current.push({ paths: [...paths], texts: [...texts] });
+    historyRef.current.push({ paths: newPaths, texts: newTexts });
     if (historyRef.current.length > MAX_HISTORY_STEPS) {
       historyRef.current.shift();
       historyStepRef.current--;
     }
-  }, [paths, texts]);
+  }, []);
 
   const handleUndo = () => {
     if (historyStepRef.current > 0) {
@@ -268,8 +270,12 @@ export default function WhiteboardPage() {
         const totalHeight = lines.length * (getFontSize() * 1.2);
         
         const newTextElement: TextElement = { id: Date.now().toString(), text: textInput.value, x: pos.x, y: pos.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
-        setTexts(prev => [...prev, newTextElement]);
-        pushToHistory();
+        
+        setTexts(prev => {
+           const newTexts = [...prev, newTextElement];
+           pushToHistory(paths, newTexts);
+           return newTexts;
+        });
     }
 
     textInput.value = '';
@@ -277,7 +283,7 @@ export default function WhiteboardPage() {
     textInput.style.top = '-9999px';
     operationStateRef.current = 'idle';
     textCursorPosition.current = null;
-  }, [selectedColor, pushToHistory, getFontString]);
+  }, [selectedColor, pushToHistory, getFontString, paths]);
 
   // --- Event Handlers ---
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
@@ -377,11 +383,11 @@ export default function WhiteboardPage() {
     if (operationStateRef.current === 'lassoing') {
         const newSelectedPathIds = new Set<string>();
         const newSelectedTextIds = new Set<string>();
-        paths.forEach(path => {
+        paths.filter(Boolean).forEach(path => {
             const box = getPathBoundingBox(path);
             if (path.points.some(p => isPointInPolygon(p, lassoPathRef.current)) || isPointInPolygon({x: box.minX, y: box.minY}, lassoPathRef.current)) newSelectedPathIds.add(path.id);
         });
-        texts.forEach(text => {
+        texts.filter(Boolean).forEach(text => {
             const box = getTextBoundingBox(text);
             const corners = [{x:box.minX, y:box.minY}, {x:box.maxX, y:box.minY}, {x:box.maxX, y:box.maxY}, {x:box.minX, y:box.maxY}];
             if (corners.some(c => isPointInPolygon(c, lassoPathRef.current))) newSelectedTextIds.add(text.id);
@@ -392,19 +398,41 @@ export default function WhiteboardPage() {
         const pos = getPointerPosition(event)!;
         const dx = pos.x - moveStartPointRef.current.x; const dy = pos.y - moveStartPointRef.current.y;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-            const newPaths = paths.map(path => selectedPathIds.has(path.id) ? { ...path, points: originalPositionsRef.current!.paths.get(path.id)!.map(p => ({ x: p.x + dx, y: p.y + dy })) } : path);
-            const newTexts = texts.map(text => selectedTextIds.has(text.id) ? { ...text, x: originalPositionsRef.current!.texts.get(text.id)!.x + dx, y: originalPositionsRef.current!.texts.get(text.id)!.y + dy } : text);
-            setPaths(newPaths);
-            setTexts(newTexts);
-            pushToHistory();
+            setPaths(prevPaths => {
+                const newPaths = prevPaths.map(path => {
+                    if (selectedPathIds.has(path.id)) {
+                        const originalPoints = originalPositionsRef.current!.paths.get(path.id);
+                        if (!originalPoints) return path;
+                        return { ...path, points: originalPoints.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+                    }
+                    return path;
+                });
+                setTexts(prevTexts => {
+                    const newTexts = prevTexts.map(text => {
+                        if (selectedTextIds.has(text.id)) {
+                            const originalPos = originalPositionsRef.current!.texts.get(text.id);
+                            if (!originalPos) return text;
+                            return { ...text, x: originalPos.x + dx, y: originalPos.y + dy };
+                        }
+                        return text;
+                    });
+                    pushToHistory(newPaths, newTexts);
+                    return newTexts;
+                });
+                return newPaths;
+            });
         }
     } else if (currentPathRef.current && currentPathRef.current.points.length > 1 && operationStateRef.current === 'drawing') {
-        setPaths(prev => [...prev, currentPathRef.current!]);
-        pushToHistory();
+        const finalPath = currentPathRef.current;
+        setPaths(prev => {
+            const newPaths = [...prev, finalPath];
+            pushToHistory(newPaths, texts);
+            return newPaths;
+        });
     } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
         const start = shapeStartPointRef.current;
         const pos = getPointerPosition(event)!;
-        if (Math.hypot(pos.x - start.x, pos.y - start.y) < getLineWidth()) { // Ignore tiny shapes
+        if (Math.hypot(pos.x - start.x, pos.y - start.y) < getLineWidth()) {
              operationStateRef.current = 'idle'; clearCanvas(tempCtx); return;
         }
 
@@ -425,8 +453,11 @@ export default function WhiteboardPage() {
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
         
         if (newPath.points.length > 0) {
-            setPaths(prev => [...prev, newPath, ...additionalPaths]);
-            pushToHistory();
+            setPaths(prev => {
+                const finalNewPaths = [...prev, newPath, ...additionalPaths];
+                pushToHistory(finalNewPaths, texts);
+                return finalNewPaths;
+            });
         }
     }
 
@@ -437,19 +468,18 @@ export default function WhiteboardPage() {
     lassoPathRef.current = [];
     moveStartPointRef.current = null;
     originalPositionsRef.current = null;
-  }, [getLineWidth, selectedColor, getPointerPosition, activeTool, paths, texts, selectedPathIds, selectedTextIds, pushToHistory]);
+  }, [getPointerPosition, activeTool, getLineWidth, selectedColor, texts, selectedPathIds, selectedTextIds, pushToHistory]);
 
   const handleClearWhiteboard = () => { 
     setPaths([]); 
     setTexts([]); 
     setSelectedPathIds(new Set()); 
     setSelectedTextIds(new Set());
-    pushToHistory(); 
+    pushToHistory([], []);
   };
 
   useEffect(() => {
-    // Initial history entry
-    pushToHistory();
+    pushToHistory(paths, texts);
 
     setHeaderContent(
       <div className="flex items-center justify-between w-full">
@@ -465,7 +495,7 @@ export default function WhiteboardPage() {
       setHeaderContent(null);
       mql.removeEventListener('change', listener);
     }
-  }, [setHeaderContent, meetingId]); // Removed pushToHistory from here
+  }, [setHeaderContent, meetingId]);
 
   const drawingTools = ['draw', 'line', 'arrow', 'circle', 'square', 'triangle'];
 
