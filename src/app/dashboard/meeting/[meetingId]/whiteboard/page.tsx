@@ -158,6 +158,14 @@ export default function WhiteboardPage() {
     const mainCtx = mainCanvas.getContext('2d');
     if (!mainCtx) return;
 
+    const redrawMainCanvas = () => {
+      clearCanvas(mainCtx);
+      mainCtx.fillStyle = isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor;
+      mainCtx.fillRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
+      paths.forEach(path => drawPath(mainCtx, path));
+      texts.forEach(text => drawText(mainCtx, text));
+    };
+
     const resizeCanvases = () => {
         const { width, height } = mainCanvas.getBoundingClientRect();
         if (mainCanvas.width !== width || mainCanvas.height !== height) {
@@ -167,14 +175,6 @@ export default function WhiteboardPage() {
         }
     };
       
-    const redrawMainCanvas = () => {
-      clearCanvas(mainCtx);
-      mainCtx.fillStyle = isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor;
-      mainCtx.fillRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
-      paths.forEach(path => drawPath(mainCtx, path));
-      texts.forEach(text => drawText(mainCtx, text));
-    };
-
     resizeCanvases();
     redrawMainCanvas();
     window.addEventListener('resize', resizeCanvases);
@@ -198,15 +198,17 @@ export default function WhiteboardPage() {
     }
   }, [selectedPathIds, selectedTextIds, getSelectionBoundingBox]);
 
-  const pushToHistory = useCallback(() => {
+  const pushToHistory = useCallback((currentPaths: DrawnPath[], currentTexts: TextElement[]) => {
     const newHistory = historyRef.current.slice(0, historyStepRef.current + 1);
-    const newState = { paths, texts };
-    const lastState = newHistory[newHistory.length-1];
-    if (JSON.stringify(newState) !== JSON.stringify(lastState)) {
-      historyRef.current = [...newHistory, newState].slice(-MAX_HISTORY_STEPS);
-      historyStepRef.current = historyRef.current.length - 1;
-    }
-  }, [paths, texts]);
+    const newState = { paths: currentPaths, texts: currentTexts };
+    historyRef.current = [...newHistory, newState].slice(-MAX_HISTORY_STEPS);
+    historyStepRef.current = historyRef.current.length - 1;
+  }, []);
+
+  useEffect(() => {
+    pushToHistory(paths, texts);
+  }, [paths, texts, pushToHistory]);
+
 
   const handleUndo = () => {
     if (historyStepRef.current > 0) {
@@ -342,7 +344,7 @@ export default function WhiteboardPage() {
         else if (activeTool === 'circle') { const radius = Math.hypot(pos.x - start.x, pos.y - start.y); tempCtx.beginPath(); tempCtx.arc(start.x, start.y, radius, 0, 2 * Math.PI); tempCtx.stroke(); }
         else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.stroke();
+            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.stroke();
         } else if (activeTool === 'triangle') { tempCtx.beginPath(); tempCtx.moveTo(start.x + (pos.x - start.x) / 2, start.y); tempCtx.lineTo(start.x, pos.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.closePath(); tempCtx.stroke(); }
     } else if (operationStateRef.current === 'lassoing') {
         lassoPathRef.current.push(pos);
@@ -370,8 +372,6 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (!tempCtx || operationStateRef.current === 'idle' || operationStateRef.current === 'texting') return;
     
-    pushToHistory(); // Push previous state before modification
-
     if (operationStateRef.current === 'lassoing') {
         const newSelectedPathIds = new Set<string>();
         const newSelectedTextIds = new Set<string>();
@@ -411,12 +411,15 @@ export default function WhiteboardPage() {
         } else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
             newPath.points.push(start, pos); 
-            const path2 = { id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
+            const path2 = { id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
             const path3 = { id: (Date.now()+2).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
             setPaths(prev => [...prev, newPath, path2, path3]);
             operationStateRef.current = 'idle'; clearCanvas(tempCtx); return;
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
-        setPaths(prev => [...prev, newPath]);
+        
+        if (newPath.points.length > 0) {
+            setPaths(prev => [...prev, newPath]);
+        }
     }
 
     clearCanvas(tempCtx);
@@ -426,7 +429,7 @@ export default function WhiteboardPage() {
     lassoPathRef.current = [];
     moveStartPointRef.current = null;
     originalPositionsRef.current = null;
-  }, [getLineWidth, selectedColor, getPointerPosition, activeTool, paths, texts, selectedPathIds, selectedTextIds, pushToHistory]);
+  }, [getLineWidth, selectedColor, getPointerPosition, activeTool, paths, texts, selectedPathIds, selectedTextIds]);
 
   const handleClearWhiteboard = () => { setPaths([]); setTexts([]); setSelectedPathIds(new Set()); setSelectedTextIds(new Set()); };
 
