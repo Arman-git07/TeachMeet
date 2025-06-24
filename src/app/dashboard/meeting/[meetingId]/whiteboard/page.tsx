@@ -126,6 +126,9 @@ export default function WhiteboardPage() {
 
   // --- Drawing Functions ---
   const drawPath = (ctx: CanvasRenderingContext2D, path: DrawnPath) => {
+    // Add a guard to ensure path and its points are valid before drawing.
+    if (!path || !path.points || path.points.length === 0) return;
+
     if (path.points.length < 2 && (activeTool !== 'draw' && activeTool !== 'erase')) return;
     ctx.beginPath();
     ctx.strokeStyle = path.color;
@@ -137,6 +140,8 @@ export default function WhiteboardPage() {
     ctx.stroke();
   };
   const drawText = (ctx: CanvasRenderingContext2D, textObj: TextElement) => {
+    // Add a guard to ensure text object is valid before drawing.
+    if (!textObj || !textObj.text) return;
     ctx.fillStyle = textObj.color;
     ctx.font = textObj.font;
     ctx.textAlign = "left";
@@ -296,7 +301,7 @@ export default function WhiteboardPage() {
         else if (activeTool === 'circle') { const radius = Math.hypot(pos.x - start.x, pos.y - start.y); tempCtx.beginPath(); tempCtx.arc(start.x, start.y, radius, 0, 2 * Math.PI); tempCtx.stroke(); }
         else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.stroke();
+            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.stroke();
         } else if (activeTool === 'triangle') { tempCtx.beginPath(); tempCtx.moveTo(start.x + (pos.x - start.x) / 2, start.y); tempCtx.lineTo(start.x, pos.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.closePath(); tempCtx.stroke(); }
     } else if (operationStateRef.current === 'lassoing') {
         lassoPathRef.current.push(pos);
@@ -360,7 +365,7 @@ export default function WhiteboardPage() {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
             newPath.points.push(start, pos);
             newPath.points.push(pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
-            newPath.points.push(pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
+            newPath.points.push(pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
         setPaths(prev => [...prev, newPath]);
     }
@@ -467,5 +472,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
-    
