@@ -1,7 +1,6 @@
-
 'use client';
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -80,8 +79,8 @@ export default function WhiteboardPage() {
   const textCursorPosition = useRef<Point | null>(null);
 
   // --- History State ---
-  const historyRef = useRef<HistoryState[]>([{ paths: [], texts: [] }]);
-  const historyStepRef = useRef(0);
+  const historyRef = useRef<HistoryState[]>([]);
+  const historyStepRef = useRef(-1);
 
   // --- Brush/Font Size Mappings ---
   const brushSizes = [{ name: 'tiny', lineWidth: 1 }, { name: 'small', lineWidth: 3 }, { name: 'medium', lineWidth: 6 }, { name: 'large', lineWidth: 10 }, { name: 'xlarge', lineWidth: 15 }];
@@ -128,8 +127,8 @@ export default function WhiteboardPage() {
 
   // --- Drawing Functions ---
   const drawPath = (ctx: CanvasRenderingContext2D, path: DrawnPath) => {
-    if (!path || !path.points || path.points.length === 0) return;
-    if (path.points.length < 2 && activeTool !== 'draw' && activeTool !== 'erase') return;
+    if (!path || !path.points) return;
+    if (path.points.length < 2 && (activeTool !== 'draw' && activeTool !== 'erase')) return;
     ctx.beginPath();
     ctx.strokeStyle = path.color;
     ctx.lineWidth = path.lineWidth;
@@ -199,18 +198,14 @@ export default function WhiteboardPage() {
   }, [selectedPathIds, selectedTextIds, getSelectionBoundingBox]);
 
   const pushToHistory = useCallback(() => {
-    // This function now just reads the latest state when called.
-    setPaths(currentPaths => {
-        setTexts(currentTexts => {
-            const newHistory = historyRef.current.slice(0, historyStepRef.current + 1);
-            const newState = { paths: currentPaths, texts: currentTexts };
-            historyRef.current = [...newHistory, newState].slice(-MAX_HISTORY_STEPS);
-            historyStepRef.current = historyRef.current.length - 1;
-            return currentTexts; // No change to texts, just using the callback to get latest state
-        });
-        return currentPaths; // No change to paths
-    });
-  }, []);
+    historyStepRef.current++;
+    historyRef.current.splice(historyStepRef.current);
+    historyRef.current.push({ paths: [...paths], texts: [...texts] });
+    if (historyRef.current.length > MAX_HISTORY_STEPS) {
+      historyRef.current.shift();
+      historyStepRef.current--;
+    }
+  }, [paths, texts]);
 
   const handleUndo = () => {
     if (historyStepRef.current > 0) {
@@ -273,11 +268,8 @@ export default function WhiteboardPage() {
         const totalHeight = lines.length * (getFontSize() * 1.2);
         
         const newTextElement: TextElement = { id: Date.now().toString(), text: textInput.value, x: pos.x, y: pos.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
-        setTexts(prev => {
-            const updatedTexts = [...prev, newTextElement];
-            pushToHistory(); // Call history push after state is updated
-            return updatedTexts;
-        });
+        setTexts(prev => [...prev, newTextElement]);
+        pushToHistory();
     }
 
     textInput.value = '';
@@ -285,7 +277,7 @@ export default function WhiteboardPage() {
     textInput.style.top = '-9999px';
     operationStateRef.current = 'idle';
     textCursorPosition.current = null;
-  }, [selectedColor, pushToHistory]);
+  }, [selectedColor, pushToHistory, getFontString]);
 
   // --- Event Handlers ---
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
@@ -400,22 +392,15 @@ export default function WhiteboardPage() {
         const pos = getPointerPosition(event)!;
         const dx = pos.x - moveStartPointRef.current.x; const dy = pos.y - moveStartPointRef.current.y;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-            setPaths(prev => {
-                const updatedPaths = prev.map(path => selectedPathIds.has(path.id) ? { ...path, points: originalPositionsRef.current!.paths.get(path.id)!.map(p => ({ x: p.x + dx, y: p.y + dy })) } : path);
-                setTexts(prevTexts => {
-                    const updatedTexts = prevTexts.map(text => selectedTextIds.has(text.id) ? { ...text, x: originalPositionsRef.current!.texts.get(text.id)!.x + dx, y: originalPositionsRef.current!.texts.get(text.id)!.y + dy } : text);
-                    pushToHistory();
-                    return updatedTexts;
-                });
-                return updatedPaths;
-            });
+            const newPaths = paths.map(path => selectedPathIds.has(path.id) ? { ...path, points: originalPositionsRef.current!.paths.get(path.id)!.map(p => ({ x: p.x + dx, y: p.y + dy })) } : path);
+            const newTexts = texts.map(text => selectedTextIds.has(text.id) ? { ...text, x: originalPositionsRef.current!.texts.get(text.id)!.x + dx, y: originalPositionsRef.current!.texts.get(text.id)!.y + dy } : text);
+            setPaths(newPaths);
+            setTexts(newTexts);
+            pushToHistory();
         }
     } else if (currentPathRef.current && currentPathRef.current.points.length > 1 && operationStateRef.current === 'drawing') {
-        setPaths(prev => {
-            const updatedPaths = [...prev, currentPathRef.current!];
-            pushToHistory();
-            return updatedPaths;
-        });
+        setPaths(prev => [...prev, currentPathRef.current!]);
+        pushToHistory();
     } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
         const start = shapeStartPointRef.current;
         const pos = getPointerPosition(event)!;
@@ -440,11 +425,8 @@ export default function WhiteboardPage() {
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
         
         if (newPath.points.length > 0) {
-            setPaths(prev => {
-                const updatedPaths = [...prev, newPath, ...additionalPaths];
-                pushToHistory();
-                return updatedPaths;
-            });
+            setPaths(prev => [...prev, newPath, ...additionalPaths]);
+            pushToHistory();
         }
     }
 
@@ -466,6 +448,9 @@ export default function WhiteboardPage() {
   };
 
   useEffect(() => {
+    // Initial history entry
+    pushToHistory();
+
     setHeaderContent(
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3"><Edit3 className="h-7 w-7 text-primary" /><h1 className="text-xl font-semibold truncate">TeachMeet Whiteboard</h1></div>
@@ -480,7 +465,9 @@ export default function WhiteboardPage() {
       setHeaderContent(null);
       mql.removeEventListener('change', listener);
     }
-  }, [setHeaderContent, meetingId]);
+  }, [setHeaderContent, meetingId]); // Removed pushToHistory from here
+
+  const drawingTools = ['draw', 'line', 'arrow', 'circle', 'square', 'triangle'];
 
   return (
     <>
@@ -508,19 +495,21 @@ export default function WhiteboardPage() {
 
         <div className="p-3 border-b bg-muted/50 shadow-lg flex flex-col md:flex-row items-center justify-center gap-4">
             <div className="flex flex-col items-center md:flex-row md:items-start flex-wrap justify-center gap-x-6 gap-y-4">
-                {(activeTool !== 'select') && (
+                {(!['select', 'erase'].includes(activeTool)) && (
                     <div><span className="text-xs font-medium text-muted-foreground">Color:</span><div className="flex flex-wrap gap-2 mt-1 justify-center">{['#000000', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#0EA5E9', '#6366F1', '#EC4899'].map(c => (<ColorSwatch key={c} color={c} onClick={() => setSelectedColor(c)} isSelected={selectedColor === c} />))}</div></div>
                 )}
                 {(activeTool === 'draw' || activeTool === 'erase') && (
                     <div><span className="text-xs font-medium text-muted-foreground">Size:</span><div className="flex gap-2 mt-1 justify-center">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
                 )}
-                <div className="flex flex-wrap gap-2 mt-1 justify-center">
-                    <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick('line')} isActive={activeTool === 'line'} />
-                    <ToolButton icon={ArrowRight} label="Arrow" onClick={() => handleToolClick('arrow')} isActive={activeTool === 'arrow'} />
-                    <ToolButton icon={CircleIconShape} label="Circle" onClick={() => handleToolClick('circle')} isActive={activeTool === 'circle'} />
-                    <ToolButton icon={SquareIconShape} label="Square" onClick={() => handleToolClick('square')} isActive={activeTool === 'square'} />
-                    <ToolButton icon={TriangleIcon} label="Triangle" onClick={() => handleToolClick('triangle')} isActive={activeTool === 'triangle'} />
-                </div>
+                {drawingTools.includes(activeTool) && (
+                    <div className="flex flex-wrap gap-2 mt-1 justify-center">
+                        <ToolButton icon={Minus} label="Line" onClick={() => handleToolClick('line')} isActive={activeTool === 'line'} />
+                        <ToolButton icon={ArrowRight} label="Arrow" onClick={() => handleToolClick('arrow')} isActive={activeTool === 'arrow'} />
+                        <ToolButton icon={CircleIconShape} label="Circle" onClick={() => handleToolClick('circle')} isActive={activeTool === 'circle'} />
+                        <ToolButton icon={SquareIconShape} label="Square" onClick={() => handleToolClick('square')} isActive={activeTool === 'square'} />
+                        <ToolButton icon={TriangleIcon} label="Triangle" onClick={() => handleToolClick('triangle')} isActive={activeTool === 'triangle'} />
+                    </div>
+                )}
             </div>
         </div>
 
