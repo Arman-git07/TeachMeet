@@ -70,7 +70,7 @@ export default function WhiteboardPage() {
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // --- Refs for Live Operations (do not trigger re-renders) ---
+  // --- Refs for Live Operations & State Snapshots (do not trigger re-renders) ---
   const operationStateRef = useRef<'idle' | 'drawing' | 'shaping' | 'lassoing' | 'movingSelection' | 'texting'>('idle');
   const currentPathRef = useRef<DrawnPath | null>(null);
   const shapeStartPointRef = useRef<Point | null>(null);
@@ -82,7 +82,6 @@ export default function WhiteboardPage() {
   // --- History State ---
   const historyRef = useRef<HistoryState[]>([{ paths: [], texts: [] }]);
   const historyStepRef = useRef(0);
-  const isNavigatingHistory = useRef(false);
 
   // --- Brush/Font Size Mappings ---
   const brushSizes = [{ name: 'tiny', lineWidth: 1 }, { name: 'small', lineWidth: 3 }, { name: 'medium', lineWidth: 6 }, { name: 'large', lineWidth: 10 }, { name: 'xlarge', lineWidth: 15 }];
@@ -130,7 +129,7 @@ export default function WhiteboardPage() {
   // --- Drawing Functions ---
   const drawPath = (ctx: CanvasRenderingContext2D, path: DrawnPath) => {
     if (!path || !path.points || path.points.length === 0) return;
-    if (path.points.length < 2 && (activeTool !== 'draw' && activeTool !== 'erase')) return;
+    if (path.points.length < 2 && activeTool !== 'draw' && activeTool !== 'erase') return;
     ctx.beginPath();
     ctx.strokeStyle = path.color;
     ctx.lineWidth = path.lineWidth;
@@ -150,37 +149,39 @@ export default function WhiteboardPage() {
   };
   const clearCanvas = (ctx: CanvasRenderingContext2D) => ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   
-  const redrawMainCanvas = useCallback(() => {
-    const mainCtx = mainCanvasRef.current?.getContext('2d');
-    if (!mainCtx) return;
-    clearCanvas(mainCtx);
-    mainCtx.fillStyle = isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor;
-    mainCtx.fillRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
-    paths.forEach(path => drawPath(mainCtx, path));
-    texts.forEach(text => drawText(mainCtx, text));
-  }, [paths, texts, isDarkMode]);
-
   // --- Main Render & Resize Effect ---
   useEffect(() => {
     const mainCanvas = mainCanvasRef.current;
     const tempCanvas = tempCanvasRef.current;
-    if (mainCanvas && tempCanvas) {
-      const resizeCanvases = () => {
+    if (!mainCanvas || !tempCanvas) return;
+    
+    const mainCtx = mainCanvas.getContext('2d');
+    if (!mainCtx) return;
+
+    const resizeCanvases = () => {
         const { width, height } = mainCanvas.getBoundingClientRect();
         if (mainCanvas.width !== width || mainCanvas.height !== height) {
           mainCanvas.width = width; mainCanvas.height = height;
           tempCanvas.width = width; tempCanvas.height = height;
           redrawMainCanvas();
         }
-      };
-      resizeCanvases();
-      window.addEventListener('resize', resizeCanvases);
-      return () => window.removeEventListener('resize', resizeCanvases);
-    }
-  }, [redrawMainCanvas]);
-  
-  useEffect(redrawMainCanvas, [paths, texts, redrawMainCanvas]);
+    };
+      
+    const redrawMainCanvas = () => {
+      clearCanvas(mainCtx);
+      mainCtx.fillStyle = isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor;
+      mainCtx.fillRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
+      paths.forEach(path => drawPath(mainCtx, path));
+      texts.forEach(text => drawText(mainCtx, text));
+    };
 
+    resizeCanvases();
+    redrawMainCanvas();
+    window.addEventListener('resize', resizeCanvases);
+    
+    return () => window.removeEventListener('resize', resizeCanvases);
+  }, [paths, texts, isDarkMode]);
+  
 
   // --- Selection Box Drawing Effect ---
   useEffect(() => {
@@ -197,25 +198,18 @@ export default function WhiteboardPage() {
     }
   }, [selectedPathIds, selectedTextIds, getSelectionBoundingBox]);
 
-  // --- History Management ---
-  useEffect(() => {
-    if (isNavigatingHistory.current) {
-        isNavigatingHistory.current = false;
-        return;
-    }
-    const currentHistory = historyRef.current.slice(0, historyStepRef.current + 1);
+  const pushToHistory = useCallback(() => {
+    const newHistory = historyRef.current.slice(0, historyStepRef.current + 1);
     const newState = { paths, texts };
-    const lastState = currentHistory[currentHistory.length-1];
+    const lastState = newHistory[newHistory.length-1];
     if (JSON.stringify(newState) !== JSON.stringify(lastState)) {
-        const newHistory = [...currentHistory, newState];
-        historyRef.current = newHistory.slice(-MAX_HISTORY_STEPS);
-        historyStepRef.current = historyRef.current.length - 1;
+      historyRef.current = [...newHistory, newState].slice(-MAX_HISTORY_STEPS);
+      historyStepRef.current = historyRef.current.length - 1;
     }
   }, [paths, texts]);
 
   const handleUndo = () => {
     if (historyStepRef.current > 0) {
-      isNavigatingHistory.current = true;
       historyStepRef.current--;
       const { paths: prevPaths, texts: prevTexts } = historyRef.current[historyStepRef.current];
       setPaths(prevPaths);
@@ -226,7 +220,6 @@ export default function WhiteboardPage() {
   };
   const handleRedo = () => {
     if (historyStepRef.current < historyRef.current.length - 1) {
-      isNavigatingHistory.current = true;
       historyStepRef.current++;
       const { paths: nextPaths, texts: nextTexts } = historyRef.current[historyStepRef.current];
       setPaths(nextPaths);
@@ -349,7 +342,7 @@ export default function WhiteboardPage() {
         else if (activeTool === 'circle') { const radius = Math.hypot(pos.x - start.x, pos.y - start.y); tempCtx.beginPath(); tempCtx.arc(start.x, start.y, radius, 0, 2 * Math.PI); tempCtx.stroke(); }
         else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.stroke();
+            tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.stroke();
         } else if (activeTool === 'triangle') { tempCtx.beginPath(); tempCtx.moveTo(start.x + (pos.x - start.x) / 2, start.y); tempCtx.lineTo(start.x, pos.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.closePath(); tempCtx.stroke(); }
     } else if (operationStateRef.current === 'lassoing') {
         lassoPathRef.current.push(pos);
@@ -376,6 +369,8 @@ export default function WhiteboardPage() {
   const handlePointerUp = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (!tempCtx || operationStateRef.current === 'idle' || operationStateRef.current === 'texting') return;
+    
+    pushToHistory(); // Push previous state before modification
 
     if (operationStateRef.current === 'lassoing') {
         const newSelectedPathIds = new Set<string>();
@@ -404,7 +399,7 @@ export default function WhiteboardPage() {
         const start = shapeStartPointRef.current;
         const pos = getPointerPosition(event)!;
         if (Math.hypot(pos.x - start.x, pos.y - start.y) < getLineWidth()) { // Ignore tiny shapes
-             operationStateRef.current = 'idle'; return;
+             operationStateRef.current = 'idle'; clearCanvas(tempCtx); return;
         }
 
         const newPath: DrawnPath = { id: Date.now().toString(), points: [], color: selectedColor, lineWidth: getLineWidth() };
@@ -416,10 +411,10 @@ export default function WhiteboardPage() {
         } else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
             newPath.points.push(start, pos); 
-            const path2 = { id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
+            const path2 = { id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
             const path3 = { id: (Date.now()+2).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
             setPaths(prev => [...prev, newPath, path2, path3]);
-            operationStateRef.current = 'idle'; return;
+            operationStateRef.current = 'idle'; clearCanvas(tempCtx); return;
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
         setPaths(prev => [...prev, newPath]);
     }
@@ -431,7 +426,7 @@ export default function WhiteboardPage() {
     lassoPathRef.current = [];
     moveStartPointRef.current = null;
     originalPositionsRef.current = null;
-  }, [getLineWidth, selectedColor, getPointerPosition, activeTool, paths, texts, selectedPathIds, selectedTextIds]);
+  }, [getLineWidth, selectedColor, getPointerPosition, activeTool, paths, texts, selectedPathIds, selectedTextIds, pushToHistory]);
 
   const handleClearWhiteboard = () => { setPaths([]); setTexts([]); setSelectedPathIds(new Set()); setSelectedTextIds(new Set()); };
 
@@ -497,7 +492,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1, backgroundColor: isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
                 <canvas ref={tempCanvasRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 2 }} />
             </CardContent>
           </Card>
