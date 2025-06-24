@@ -31,6 +31,7 @@ interface BoundingBox { minX: number; minY: number; maxX: number; maxY: number; 
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
 const drawingTools = ['draw', 'line', 'circle', 'square', 'arrow', 'triangle'];
+const canvasBackgroundColor = "#FFFFFF";
 
 // --- UI Components ---
 const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType; label: string; onClick: () => void; isActive?: boolean; }) => (
@@ -66,7 +67,7 @@ export default function WhiteboardPage() {
   const [activeTool, setActiveTool] = useState<string>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
-  const canvasBackgroundColor = "#FFFFFF";
+  const [currentText, setCurrentText] = useState("");
 
   // --- Refs for Live Operations ---
   const operationStateRef = useRef<'idle' | 'drawing' | 'shaping' | 'lassoing' | 'movingSelection' | 'texting'>('idle');
@@ -85,7 +86,7 @@ export default function WhiteboardPage() {
   // --- Brush/Font Size Mappings ---
   const brushSizes = [{ name: 'tiny', lineWidth: 1 }, { name: 'small', lineWidth: 3 }, { name: 'medium', lineWidth: 6 }, { name: 'large', lineWidth: 10 }, { name: 'xlarge', lineWidth: 15 }];
   const getLineWidth = useCallback(() => brushSizes.find(b => b.name === selectedBrushSize)?.lineWidth || 6, [selectedBrushSize]);
-  const getFontSize = () => 16; 
+  const getFontSize = () => 16;
   const getFontString = () => `${getFontSize()}px sans-serif`;
 
   // --- Geometry and Bounding Box Helpers ---
@@ -126,9 +127,7 @@ export default function WhiteboardPage() {
 
   // --- Drawing Functions ---
   const drawPath = (ctx: CanvasRenderingContext2D, path: DrawnPath) => {
-    // Add a guard to ensure path and its points are valid before drawing.
-    if (!path || !path.points || path.points.length === 0) return;
-
+    if (!path || !path.points) return;
     if (path.points.length < 2 && (activeTool !== 'draw' && activeTool !== 'erase')) return;
     ctx.beginPath();
     ctx.strokeStyle = path.color;
@@ -140,7 +139,6 @@ export default function WhiteboardPage() {
     ctx.stroke();
   };
   const drawText = (ctx: CanvasRenderingContext2D, textObj: TextElement) => {
-    // Add a guard to ensure text object is valid before drawing.
     if (!textObj || !textObj.text) return;
     ctx.fillStyle = textObj.color;
     ctx.font = textObj.font;
@@ -157,7 +155,7 @@ export default function WhiteboardPage() {
     mainCtx.fillRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
     paths.forEach(path => drawPath(mainCtx, path));
     texts.forEach(text => drawText(mainCtx, text));
-  }, [paths, texts, canvasBackgroundColor]);
+  }, [paths, texts]);
 
   // --- Main Render & Resize Effect ---
   useEffect(() => {
@@ -244,6 +242,12 @@ export default function WhiteboardPage() {
       const clientY = 'touches' in nativeEvent ? (nativeEvent.touches[0] || nativeEvent.changedTouches[0]).clientY : (nativeEvent as MouseEvent).clientY;
       return { x: clientX - rect.left, y: clientY - rect.top };
   }, []);
+
+  const handleToolClick = (tool: string) => {
+    setActiveTool(tool);
+    setSelectedPathIds(new Set());
+    setSelectedTextIds(new Set());
+  };
   
   // --- Event Handlers ---
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
@@ -270,8 +274,8 @@ export default function WhiteboardPage() {
         operationStateRef.current = 'texting';
         textCursorPosition.current = pos;
         if(liveTextInputRef.current) {
-            liveTextInputRef.current.style.top = `${pos.y + mainCanvasRef.current!.getBoundingClientRect().top}px`;
-            liveTextInputRef.current.style.left = `${pos.x + mainCanvasRef.current!.getBoundingClientRect().left}px`;
+            liveTextInputRef.current.style.top = `${pos.y}px`;
+            liveTextInputRef.current.style.left = `${pos.x}px`;
             liveTextInputRef.current.style.opacity = '1';
             liveTextInputRef.current.focus();
         }
@@ -280,7 +284,7 @@ export default function WhiteboardPage() {
         operationStateRef.current = 'drawing';
         currentPathRef.current = { id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor, lineWidth: getLineWidth() };
     } else if (drawingTools.includes(activeTool)) { operationStateRef.current = 'shaping'; shapeStartPointRef.current = pos; }
-  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, canvasBackgroundColor, getSelectionBoundingBox, paths, texts, selectedPathIds, selectedTextIds]);
+  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, paths, texts, selectedPathIds, selectedTextIds]);
 
   const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if (operationStateRef.current === 'idle' || operationStateRef.current === 'texting') return;
@@ -367,9 +371,9 @@ export default function WhiteboardPage() {
             newPath.points.push(pos, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
             newPath.points.push(pos, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
-        setPaths(prev => [...prev, newPath]);
+        if(newPath.points.length > 0) setPaths(prev => [...prev, newPath]);
     }
-    
+
     clearCanvas(tempCtx);
     operationStateRef.current = 'idle';
     currentPathRef.current = null;
@@ -382,25 +386,28 @@ export default function WhiteboardPage() {
   const finalizeLiveText = useCallback(() => {
     const textInput = liveTextInputRef.current;
     const pos = textCursorPosition.current;
-    if (!textInput || !pos || !textInput.value.trim()) {
-        if(textInput) textInput.value = '';
+    
+    if (!textInput || !pos) {
         operationStateRef.current = 'idle';
-        textCursorPosition.current = null;
         return;
     }
-    const tempCtx = tempCanvasRef.current?.getContext('2d');
-    if(!tempCtx) return;
-
-    const font = getFontString();
-    tempCtx.font = font;
-    const lines = textInput.value.split('\n');
-    const textMetrics = lines.map(line => tempCtx.measureText(line));
-    const maxWidth = Math.max(...textMetrics.map(m => m.width));
-    const totalHeight = lines.length * (getFontSize() * 1.2);
     
-    const newTextElement: TextElement = { id: Date.now().toString(), text: textInput.value, x: pos.x, y: pos.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
-    setTexts(prev => [...prev, newTextElement]);
+    if (textInput.value.trim()){
+        const tempCtx = tempCanvasRef.current?.getContext('2d');
+        if(!tempCtx) return;
 
+        const font = getFontString();
+        tempCtx.font = font;
+        const lines = textInput.value.split('\n');
+        const textMetrics = lines.map(line => tempCtx.measureText(line));
+        const maxWidth = Math.max(...textMetrics.map(m => m.width));
+        const totalHeight = lines.length * (getFontSize() * 1.2);
+        
+        const newTextElement: TextElement = { id: Date.now().toString(), text: textInput.value, x: pos.x, y: pos.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
+        setTexts(prev => [...prev, newTextElement]);
+    }
+
+    setCurrentText('');
     textInput.value = '';
     textInput.style.opacity = '0';
     textInput.style.top = '-9999px';
@@ -426,10 +433,10 @@ export default function WhiteboardPage() {
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-             <ToolButton icon={Lasso} label="Lasso Select" onClick={() => setActiveTool("select")} isActive={activeTool === "select"}/>
-             <ToolButton icon={Brush} label="Draw" onClick={() => setActiveTool("draw")} isActive={drawingTools.includes(activeTool)} />
-             <ToolButton icon={Type} label="Text" onClick={() => setActiveTool("text")} isActive={activeTool === "text"}/>
-             <ToolButton icon={Eraser} label="Erase" onClick={() => setActiveTool("erase")} isActive={activeTool === "erase"}/>
+             <ToolButton icon={Lasso} label="Lasso Select" onClick={() => handleToolClick("select")} isActive={activeTool === "select"}/>
+             <ToolButton icon={Brush} label="Draw" onClick={() => handleToolClick("draw")} isActive={drawingTools.includes(activeTool)} />
+             <ToolButton icon={Type} label="Text" onClick={() => handleToolClick("text")} isActive={activeTool === "text"}/>
+             <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolClick("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
              <AlertDialog>
@@ -457,10 +464,10 @@ export default function WhiteboardPage() {
             </div>
         </div>
 
-        <main className="flex-grow flex flex-col overflow-hidden min-h-0"> 
+        <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
-            <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0"> 
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
+            <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1, background: canvasBackgroundColor }} />
                 <canvas ref={tempCanvasRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 2 }} />
             </CardContent>
           </Card>
