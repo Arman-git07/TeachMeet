@@ -23,13 +23,14 @@ import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 // --- Type Definitions ---
 interface Point { x: number; y: number; }
 interface DrawnPath { id: string; points: Point[]; color: string; lineWidth: number; }
-interface TextElement { id: string; text: string; x: number; y: number; color: string; font: string; width: number; height: number; }
+interface TextElement { id:string; text: string; x: number; y: number; color: string; font: string; width: number; height: number; }
 interface HistoryState { paths: DrawnPath[]; texts: TextElement[]; }
 interface BoundingBox { minX: number; minY: number; maxX: number; maxY: number; }
 
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
-const canvasBackgroundColor = "#FFFFFF";
+const canvasBackgroundColor = "hsl(0 0% 100%)";
+const darkCanvasBackgroundColor = "hsl(202 34% 21%)";
 
 // --- UI Components ---
 const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType; label: string; onClick: () => void; isActive?: boolean; }) => (
@@ -51,12 +52,12 @@ export default function WhiteboardPage() {
   const meetingId = params.meetingId as string;
   const { setHeaderContent } = useDynamicHeader();
 
-  // --- Refs for Canvases ---
+  // --- Refs for Canvases & DOM elements ---
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const tempCanvasRef = useRef<HTMLCanvasElement>(null);
   const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // --- Core Data State ---
+  // --- Core Data State (triggers re-renders) ---
   const [paths, setPaths] = useState<DrawnPath[]>([]);
   const [texts, setTexts] = useState<TextElement[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState(new Set<string>());
@@ -66,8 +67,9 @@ export default function WhiteboardPage() {
   const [activeTool, setActiveTool] = useState<string>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [selectedBrushSize, setSelectedBrushSize] = useState<string>("medium");
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // --- Refs for Live Operations ---
+  // --- Refs for Live Operations (do not trigger re-renders) ---
   const operationStateRef = useRef<'idle' | 'drawing' | 'shaping' | 'lassoing' | 'movingSelection' | 'texting'>('idle');
   const currentPathRef = useRef<DrawnPath | null>(null);
   const shapeStartPointRef = useRef<Point | null>(null);
@@ -89,6 +91,7 @@ export default function WhiteboardPage() {
 
   // --- Geometry and Bounding Box Helpers ---
   const getPathBoundingBox = (path: DrawnPath): BoundingBox => {
+    if (!path || !path.points || path.points.length === 0) return {minX: 0, minY: 0, maxX: 0, maxY: 0};
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     path.points.forEach(p => {
       minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
@@ -145,19 +148,19 @@ export default function WhiteboardPage() {
     textObj.text.split('\n').forEach((line, index) => ctx.fillText(line, textObj.x, textObj.y + (index * (getFontSize() * 1.2))));
   };
   const clearCanvas = (ctx: CanvasRenderingContext2D) => ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  
   const redrawMainCanvas = useCallback(() => {
     const mainCtx = mainCanvasRef.current?.getContext('2d');
     if (!mainCtx) return;
     clearCanvas(mainCtx);
-    mainCtx.fillStyle = canvasBackgroundColor;
+    mainCtx.fillStyle = isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor;
     mainCtx.fillRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
     paths.forEach(path => drawPath(mainCtx, path));
     texts.forEach(text => drawText(mainCtx, text));
-  }, [paths, texts]);
+  }, [paths, texts, isDarkMode]);
 
   // --- Main Render & Resize Effect ---
   useEffect(() => {
-    redrawMainCanvas();
     const mainCanvas = mainCanvasRef.current;
     const tempCanvas = tempCanvasRef.current;
     if (mainCanvas && tempCanvas) {
@@ -173,7 +176,10 @@ export default function WhiteboardPage() {
       window.addEventListener('resize', resizeCanvases);
       return () => window.removeEventListener('resize', resizeCanvases);
     }
-  }, [paths, texts, redrawMainCanvas]);
+  }, [redrawMainCanvas]);
+  
+  useEffect(redrawMainCanvas, [paths, texts, redrawMainCanvas]);
+
 
   // --- Selection Box Drawing Effect ---
   useEffect(() => {
@@ -200,10 +206,8 @@ export default function WhiteboardPage() {
     const newState = { paths, texts };
     const lastState = currentHistory[currentHistory.length-1];
     if (JSON.stringify(newState) !== JSON.stringify(lastState)) {
-        historyRef.current = [...currentHistory, newState];
-        if (historyRef.current.length > MAX_HISTORY_STEPS) {
-            historyRef.current.shift();
-        }
+        const newHistory = [...currentHistory, newState];
+        historyRef.current = newHistory.slice(-MAX_HISTORY_STEPS);
         historyStepRef.current = historyRef.current.length - 1;
     }
   }, [paths, texts]);
@@ -247,6 +251,40 @@ export default function WhiteboardPage() {
     setSelectedTextIds(new Set());
   };
   
+  const finalizeLiveText = useCallback(() => {
+    const textInput = liveTextInputRef.current;
+    const pos = textCursorPosition.current;
+    
+    if (!textInput || !pos || operationStateRef.current !== 'texting') {
+        if(textInput) {
+             textInput.style.opacity = '0';
+             textInput.style.top = '-9999px';
+        }
+        return;
+    }
+    
+    if (textInput.value.trim()){
+        const tempCtx = tempCanvasRef.current?.getContext('2d');
+        if(!tempCtx) return;
+
+        const font = getFontString();
+        tempCtx.font = font;
+        const lines = textInput.value.split('\n');
+        const textMetrics = lines.map(line => tempCtx.measureText(line));
+        const maxWidth = Math.max(...textMetrics.map(m => m.width));
+        const totalHeight = lines.length * (getFontSize() * 1.2);
+        
+        const newTextElement: TextElement = { id: Date.now().toString(), text: textInput.value, x: pos.x, y: pos.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
+        setTexts(prev => [...prev, newTextElement]);
+    }
+
+    textInput.value = '';
+    textInput.style.opacity = '0';
+    textInput.style.top = '-9999px';
+    operationStateRef.current = 'idle';
+    textCursorPosition.current = null;
+  }, [selectedColor]);
+
   // --- Event Handlers ---
   const handlePointerDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event as React.MouseEvent).button !== 0) return;
@@ -256,7 +294,7 @@ export default function WhiteboardPage() {
     finalizeLiveText();
 
     const selectionBounds = getSelectionBoundingBox();
-    if (selectionBounds && isPointInRect(pos, selectionBounds)) {
+    if (activeTool === 'select' && selectionBounds && isPointInRect(pos, selectionBounds)) {
         operationStateRef.current = 'movingSelection';
         moveStartPointRef.current = pos;
         const originalPaths = new Map<string, Point[]>();
@@ -277,17 +315,18 @@ export default function WhiteboardPage() {
             liveTextInputRef.current.style.top = `${pos.y}px`;
             liveTextInputRef.current.style.left = `${pos.x}px`;
             liveTextInputRef.current.style.opacity = '1';
+            liveTextInputRef.current.style.color = selectedColor;
             liveTextInputRef.current.focus();
         }
     }
     else if (activeTool === 'draw' || activeTool === 'erase') {
         operationStateRef.current = 'drawing';
-        currentPathRef.current = { id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? canvasBackgroundColor : selectedColor, lineWidth: getLineWidth() };
+        currentPathRef.current = { id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? (isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor) : selectedColor, lineWidth: getLineWidth() };
     } else { // Shape tools
         operationStateRef.current = 'shaping'; 
         shapeStartPointRef.current = pos; 
     }
-  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, paths, texts, selectedPathIds, selectedTextIds]);
+  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, paths, texts, selectedPathIds, selectedTextIds, finalizeLiveText, isDarkMode]);
 
   const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     if (operationStateRef.current === 'idle' || operationStateRef.current === 'texting') return;
@@ -303,7 +342,6 @@ export default function WhiteboardPage() {
     } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
         const start = shapeStartPointRef.current;
         tempCtx.strokeStyle = selectedColor; tempCtx.lineWidth = getLineWidth();
-        tempCtx.fillStyle = selectedColor; // For filled shapes if needed later
         
         if (activeTool === 'line') { tempCtx.beginPath(); tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.stroke(); }
         else if (activeTool === 'square') { tempCtx.strokeRect(start.x, start.y, pos.x - start.x, pos.y - start.y); }
@@ -359,11 +397,15 @@ export default function WhiteboardPage() {
             setPaths(prev => prev.map(path => selectedPathIds.has(path.id) ? { ...path, points: originalPositionsRef.current!.paths.get(path.id)!.map(p => ({ x: p.x + dx, y: p.y + dy })) } : path));
             setTexts(prev => prev.map(text => selectedTextIds.has(text.id) ? { ...text, x: originalPositionsRef.current!.texts.get(text.id)!.x + dx, y: originalPositionsRef.current!.texts.get(text.id)!.y + dy } : text));
         }
-    } else if (currentPathRef.current) {
-        if(currentPathRef.current.points.length > 1) setPaths(prev => [...prev, currentPathRef.current!]);
-    } else if (shapeStartPointRef.current) {
+    } else if (currentPathRef.current && currentPathRef.current.points.length > 1) {
+        setPaths(prev => [...prev, currentPathRef.current!]);
+    } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
         const start = shapeStartPointRef.current;
         const pos = getPointerPosition(event)!;
+        if (Math.hypot(pos.x - start.x, pos.y - start.y) < getLineWidth()) { // Ignore tiny shapes
+             operationStateRef.current = 'idle'; return;
+        }
+
         const newPath: DrawnPath = { id: Date.now().toString(), points: [], color: selectedColor, lineWidth: getLineWidth() };
         if (activeTool === 'line') newPath.points.push(start, pos);
         else if (activeTool === 'square') newPath.points.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
@@ -372,14 +414,13 @@ export default function WhiteboardPage() {
              for(let i=0; i<=360; i+=10) newPath.points.push({ x: start.x + radius * Math.cos(i * Math.PI / 180), y: start.y + radius * Math.sin(i * Math.PI / 180) });
         } else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            newPath.points.push(start, pos); // The main line
-            // Re-calculate the two head lines as separate paths for correct rendering logic if needed, but for simple stamp it's ok.
-            // For simplicity, we draw the whole arrow as one path for now. This part might need refinement if arrow heads should be selectable entities.
-            // A better way is to treat it as a special object, but for now this works as a visual stamp.
-            newPath.points.push({x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)});
-            newPath.points.push({x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)});
+            newPath.points.push(start, pos); 
+            const path2 = { id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
+            const path3 = { id: (Date.now()+2).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
+            setPaths(prev => [...prev, newPath, path2, path3]);
+            operationStateRef.current = 'idle'; return;
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
-        if(newPath.points.length > 0) setPaths(prev => [...prev, newPath]);
+        setPaths(prev => [...prev, newPath]);
     }
 
     clearCanvas(tempCtx);
@@ -391,40 +432,6 @@ export default function WhiteboardPage() {
     originalPositionsRef.current = null;
   }, [getLineWidth, selectedColor, getPointerPosition, activeTool, paths, texts, selectedPathIds, selectedTextIds]);
 
-  const finalizeLiveText = useCallback(() => {
-    const textInput = liveTextInputRef.current;
-    const pos = textCursorPosition.current;
-    
-    if (!textInput || !pos || operationStateRef.current !== 'texting') {
-        if(textInput) {
-             textInput.style.opacity = '0';
-             textInput.style.top = '-9999px';
-        }
-        return;
-    }
-    
-    if (textInput.value.trim()){
-        const tempCtx = tempCanvasRef.current?.getContext('2d');
-        if(!tempCtx) return;
-
-        const font = getFontString();
-        tempCtx.font = font;
-        const lines = textInput.value.split('\n');
-        const textMetrics = lines.map(line => tempCtx.measureText(line));
-        const maxWidth = Math.max(...textMetrics.map(m => m.width));
-        const totalHeight = lines.length * (getFontSize() * 1.2);
-        
-        const newTextElement: TextElement = { id: Date.now().toString(), text: textInput.value, x: pos.x, y: pos.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
-        setTexts(prev => [...prev, newTextElement]);
-    }
-
-    textInput.value = '';
-    textInput.style.opacity = '0';
-    textInput.style.top = '-9999px';
-    operationStateRef.current = 'idle';
-    textCursorPosition.current = null;
-  }, [selectedColor]);
-
   const handleClearWhiteboard = () => { setPaths([]); setTexts([]); setSelectedPathIds(new Set()); setSelectedTextIds(new Set()); };
 
   useEffect(() => {
@@ -434,12 +441,19 @@ export default function WhiteboardPage() {
         {meetingId && <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior><Button variant="outline" size="sm" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" />Back</Button></Link>}
       </div>
     );
-    return () => setHeaderContent(null);
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(mql.matches);
+    const listener = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
+    mql.addEventListener('change', listener);
+    return () => {
+      setHeaderContent(null);
+      mql.removeEventListener('change', listener);
+    }
   }, [setHeaderContent, meetingId]);
 
   return (
     <>
-      <textarea ref={liveTextInputRef} onBlur={finalizeLiveText} style={{ position: 'absolute', opacity: 0, border: '1px dashed hsl(var(--primary))', outline: 'none', background: 'hsl(var(--background)/0.8)', color: selectedColor, font: getFontString(), lineHeight: `${getFontSize() * 1.2}px`, zIndex: 10, resize: 'none', overflow: 'hidden', whiteSpace: 'pre', top: -9999, left: -9999, padding: '4px' }} tabIndex={-1} />
+      <textarea ref={liveTextInputRef} onBlur={finalizeLiveText} style={{ position: 'absolute', opacity: 0, border: '1px dashed hsl(var(--primary))', outline: 'none', background: 'hsl(var(--background)/0.8)', font: getFontString(), lineHeight: `${getFontSize() * 1.2}px`, zIndex: 10, resize: 'none', overflow: 'hidden', whiteSpace: 'pre', top: -9999, left: -9999, padding: '4px' }} tabIndex={-1} />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
@@ -482,7 +496,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1, background: canvasBackgroundColor }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1, backgroundColor: isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor }} />
                 <canvas ref={tempCanvasRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 2 }} />
             </CardContent>
           </Card>
