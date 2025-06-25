@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -211,7 +210,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             )}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-30">
               <Button
-                variant={isMicActive ? "secondary" : "destructive"}
+                variant={isMicActive ? "default" : "destructive"}
                 size="icon"
                 className="rounded-full shadow-md"
                 onClick={handleToggleMic}
@@ -220,7 +219,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
                 {isMicActive ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
               </Button>
               <Button
-                variant={isCameraActive ? "secondary" : "destructive"}
+                variant={isCameraActive ? "default" : "destructive"}
                 size="icon"
                 className="rounded-full shadow-md"
                 onClick={handleToggleCamera}

@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
@@ -651,7 +650,7 @@ export default function MeetingPage() {
             variant={localHandRaised ? "default" : "destructive"}
             className={cn(
               "rounded-full w-10 h-10 sm:w-12 sm:h-12",
-              localHandRaised && "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent"
+              localHandRaised && "ring-2 ring-offset-2 ring-offset-background ring-primary"
             )}
             onClick={toggleHandRaise}
             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
