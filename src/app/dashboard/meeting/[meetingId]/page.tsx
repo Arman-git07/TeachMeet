@@ -233,8 +233,7 @@ export default function MeetingPage() {
   const [joinStatus, setJoinStatus] = useState<'pending' | 'joining' | 'joined' | 'failed'>('pending');
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const localAudioStreamRef = useRef<MediaStream | null>(null);
-  const currentLocalStreamRef = useRef<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
 
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -429,13 +428,12 @@ export default function MeetingPage() {
       const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
 
       try {
-        // Check if the main meeting document exists, create if not (e.g., for class meetings)
         const meetingDocSnap = await getDoc(meetingDocRef);
         if (!meetingDocSnap.exists()) {
           console.log(`[MeetingPage] Main meeting document for ${meetingId} does not exist. Creating it.`);
           const meetingTopicFromURL = searchParamsHook.get('topic') || `Meeting ${meetingId}`;
           await setDoc(meetingDocRef, {
-            creatorId: currentUser.uid, // The first one to join effectively creates it
+            creatorId: currentUser.uid, 
             topic: meetingTopicFromURL,
             createdAt: serverTimestamp(),
           });
@@ -519,90 +517,61 @@ export default function MeetingPage() {
   }, [meetingId, toast, joinStatus]);
 
   useEffect(() => {
-    if (joinStatus !== 'joined') return;
+    if (joinStatus !== 'joined' || isScreenSharingActive) return;
 
-    const initializeCameraAndPermissions = async () => {
-      if (!localCameraOff) {
-        console.log("[MeetingPage] Attempting to initialize camera (localCameraOff is false).");
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          currentLocalStreamRef.current = stream;
-          if (localVideoRef.current && !isScreenSharingActive) {
-            localVideoRef.current.srcObject = stream;
-          }
-          setHasCameraPermission(true);
-          console.log("[MeetingPage] Camera initialized successfully.");
-        } catch (err) {
-          console.error("[MeetingPage] Failed to get camera on mount:", err);
+    const initializeMedia = async () => {
+      console.log("[MeetingPage] Initializing media devices.");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true
+        });
+        localStreamRef.current = stream;
+        setHasCameraPermission(true);
+        setHasMicPermission(true);
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) {
+          videoTrack.enabled = !localCameraOff;
+        }
+        
+        const audioTrack = stream.getAudioTracks()[0];
+        if (audioTrack) {
+          audioTrack.enabled = !localMicMuted;
+        }
+        console.log("[MeetingPage] Media initialized successfully.");
+
+      } catch (err) {
+        console.error("[MeetingPage] Failed to get media on mount:", err);
+        if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+          toast({ variant: 'destructive', title: 'Permissions Denied', description: 'Camera and microphone access was denied. Please enable them in your browser settings.' });
           setHasCameraPermission(false);
+          setHasMicPermission(false);
           setLocalCameraOff(true);
-          await updateUserStatusInFirestore({ isCameraOff: true });
-          toast({
-            variant: 'destructive',
-            title: 'Camera Access Denied',
-            description: 'Please enable camera permissions in your browser settings.',
-          });
-        }
-      } else {
-        console.log("[MeetingPage] Camera is set to off, checking permissions silently.");
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop());
-          setHasCameraPermission(true);
-          console.log("[MeetingPage] Camera permission exists (checked silently).");
-        } catch {
-          setHasCameraPermission(false);
-          console.log("[MeetingPage] Camera permission denied (checked silently).");
-        }
-         if (currentLocalStreamRef.current) {
-            currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
-            currentLocalStreamRef.current = null;
-            if(localVideoRef.current) localVideoRef.current.srcObject = null;
-        }
-      }
-    };
-
-    initializeCameraAndPermissions();
-
-  }, [localCameraOff, toast, joinStatus, isScreenSharingActive]); // Added isScreenSharingActive dependency
-
-  useEffect(() => {
-    const initializeMicrophone = async () => {
-      if (joinStatus !== 'joined') return;
-
-      if (!localMicMuted) {
-        console.log("[MeetingPage] Initializing microphone (localMicMuted is false).");
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          localAudioStreamRef.current = stream;
-          setHasMicPermission(true);
-          console.log("[MeetingPage] Microphone initialized successfully and is ON.");
-        } catch (err) {
-          console.error("[MeetingPage] Failed to get microphone on initial setup:", err);
-          setHasMicPermission(false);
           setLocalMicMuted(true);
-          await updateUserStatusInFirestore({ isMicMuted: true });
-          toast({
-            variant: 'destructive',
-            title: 'Microphone Access Denied',
-            description: 'Please enable microphone permissions in your browser settings.',
-          });
-        }
-      } else {
-        console.log("[MeetingPage] Microphone is initially OFF. Checking permissions silently.");
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getTracks().forEach(track => track.stop());
-          setHasMicPermission(true);
-        } catch {
-          setHasMicPermission(false);
+          await updateUserStatusInFirestore({ isCameraOff: true, isMicMuted: true });
+        } else {
+            toast({ variant: 'destructive', title: 'Media Device Error', description: 'Could not find a camera or microphone. Please check your devices.' });
+            setHasCameraPermission(false);
+            setHasMicPermission(false);
         }
       }
     };
 
-    initializeMicrophone();
-  }, [joinStatus, localMicMuted, toast]);
+    initializeMedia();
 
+    return () => {
+      if (localStreamRef.current) {
+        console.log("[MeetingPage] Cleaning up media stream on re-render/unmount.");
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
+      }
+    };
+  }, [joinStatus, isScreenSharingActive]);
 
    useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
@@ -614,9 +583,8 @@ export default function MeetingPage() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
+      localStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
-      localAudioStreamRef.current?.getTracks().forEach(track => track.stop());
       console.log("[MeetingPage] Cleaned up media streams on unmount.");
     };
   }, [meetingId]);
@@ -640,46 +608,17 @@ export default function MeetingPage() {
 
   const toggleMic = async () => {
     const newMicStateIsMuted = !localMicMuted;
-    console.log(`[MeetingPage] Toggling mic. New state is muted: ${newMicStateIsMuted}`);
-
     setLocalMicMuted(newMicStateIsMuted);
     await updateUserStatusInFirestore({ isMicMuted: newMicStateIsMuted });
 
-    if (!newMicStateIsMuted) {
-      if (localAudioStreamRef.current) {
-        localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
-        console.log("[MeetingPage] Mic ON: Enabled existing audio tracks.");
-        toast({ title: "Microphone ON" });
-      } else {
-        if (hasMicPermission === false) {
-          toast({ variant: 'destructive', title: 'Microphone Permission Denied', description: 'Please enable microphone permissions in browser settings.' });
-          setLocalMicMuted(true);
-          await updateUserStatusInFirestore({ isMicMuted: true });
-          return;
-        }
-        try {
-          console.log("[MeetingPage] Mic ON: Requesting audio stream.");
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          localAudioStreamRef.current = stream;
-          setHasMicPermission(true);
-          console.log("[MeetingPage] Mic ON: Audio stream acquired.");
-          toast({ title: "Microphone ON" });
-        } catch (err) {
-          console.error("[MeetingPage] Error getting audio stream for mic ON:", err);
-          setHasMicPermission(false);
-          setLocalMicMuted(true);
-          await updateUserStatusInFirestore({ isMicMuted: true });
-          toast({ variant: 'destructive', title: 'Microphone Access Failed', description: 'Could not access microphone.' });
-        }
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !newMicStateIsMuted;
+        toast({ title: newMicStateIsMuted ? "Microphone OFF" : "Microphone ON" });
       }
     } else {
-      if (localAudioStreamRef.current) {
-        localAudioStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
-        console.log("[MeetingPage] Mic OFF: Disabled audio tracks.");
-        toast({ title: "Microphone OFF" });
-      } else {
-        console.log("[MeetingPage] Mic OFF: No active audio stream to disable tracks on.");
-      }
+        toast({ variant: "destructive", title: "No Audio Stream", description: "Could not find an active microphone stream to toggle."})
     }
   };
 
@@ -693,78 +632,28 @@ export default function MeetingPage() {
     await updateUserStatusInFirestore({ isScreenSharing: false });
 
     if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null;
+      localVideoRef.current.srcObject = localStreamRef.current;
     }
     if (showToast) {
         toast({ title: "Screen Sharing Stopped" });
     }
-
-    if (!localCameraOff && currentLocalStreamRef.current && currentLocalStreamRef.current.active) {
-        if (localVideoRef.current) {
-            localVideoRef.current.srcObject = currentLocalStreamRef.current;
-            console.log("[MeetingPage] Restored active camera stream after stopping screen share.");
-        }
-    } else if (!localCameraOff && hasCameraPermission) {
-        console.log("[MeetingPage] Re-initializing camera after screen share stop (camera was set to on).");
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          currentLocalStreamRef.current = stream;
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
-          console.log("[MeetingPage] Camera re-initialized after screen share.");
-        } catch (err) {
-          console.error("[MeetingPage] Failed to re-initialize camera after screen share stop:", err);
-          setLocalCameraOff(true);
-          await updateUserStatusInFirestore({ isCameraOff: true });
-        }
-    }
   };
 
   const toggleCamera = async () => {
-    const newCameraStateIsOff = !localCameraOff;
-    console.log(`[MeetingPage] Toggling camera. New state is off: ${newCameraStateIsOff}`);
-
     if (isScreenSharingActive) {
       console.log("[MeetingPage] Screen sharing is active, stopping it before toggling camera.");
       await stopScreenShare(false);
     }
-
+    
+    const newCameraStateIsOff = !localCameraOff;
     setLocalCameraOff(newCameraStateIsOff);
+    await updateUserStatusInFirestore({ isCameraOff: newCameraStateIsOff });
 
-    if (!newCameraStateIsOff) {
-      if (hasCameraPermission === false) {
-        toast({ variant: 'destructive', title: 'Camera Permission Denied', description: 'Please enable camera permissions in browser settings.' });
-        setLocalCameraOff(true);
-        return;
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !newCameraStateIsOff;
       }
-      try {
-        console.log("[MeetingPage] Turning camera ON.");
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        currentLocalStreamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-        setHasCameraPermission(true);
-        await updateUserStatusInFirestore({ isCameraOff: false });
-        console.log("[MeetingPage] Camera turned ON successfully.");
-      } catch (err) {
-        console.error("[MeetingPage] Failed to get camera on toggle:", err);
-        setHasCameraPermission(false);
-        setLocalCameraOff(true);
-        await updateUserStatusInFirestore({ isCameraOff: true });
-        toast({ variant: 'destructive', title: 'Camera Access Failed', description: 'Could not access camera.' });
-        return;
-      }
-    } else {
-      console.log("[MeetingPage] Turning camera OFF.");
-      currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
-      currentLocalStreamRef.current = null;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null;
-      }
-      await updateUserStatusInFirestore({ isCameraOff: true });
-      console.log("[MeetingPage] Camera turned OFF successfully.");
     }
   };
 
@@ -787,9 +676,7 @@ export default function MeetingPage() {
       console.error("[MeetingPage] Error stopping screen share on leave:", e);
     }
 
-    currentLocalStreamRef.current?.getTracks().forEach(track => track.stop());
-    localAudioStreamRef.current?.getTracks().forEach(track => track.stop());
-    localAudioStreamRef.current = null;
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
 
 
     if (currentUser && meetingId && db) {
@@ -852,11 +739,9 @@ export default function MeetingPage() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       console.log("[MeetingPage] Screen share stream acquired.");
 
-      if (currentLocalStreamRef.current) {
-        console.log("[MeetingPage] Stopping existing camera stream before starting screen share.");
-        currentLocalStreamRef.current.getTracks().forEach(track => track.stop());
-        currentLocalStreamRef.current = null;
-        if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      if (localStreamRef.current) {
+        const videoTrack = localStreamRef.current.getVideoTracks()[0];
+        if (videoTrack) videoTrack.enabled = false;
       }
 
       screenShareStreamRef.current = stream;
@@ -864,7 +749,6 @@ export default function MeetingPage() {
         localVideoRef.current.srcObject = stream;
       }
       setIsScreenSharingActive(true);
-      setLocalCameraOff(true);
       await updateUserStatusInFirestore({ isScreenSharing: true, isCameraOff: true });
       toast({ title: "Screen Sharing Started" });
 
