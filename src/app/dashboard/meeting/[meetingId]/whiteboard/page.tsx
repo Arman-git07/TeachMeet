@@ -12,6 +12,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso } from "lucide-react";
 import Link from "next/link";
@@ -39,7 +40,7 @@ interface OriginalPositions {
 
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
-const ERASER_THRESHOLD = 10;
+const ERASER_THRESHOLD = 15; // Increased threshold for easier clicking
 const SELECTION_PADDING = 5;
 
 // --- Helper Functions ---
@@ -127,7 +128,7 @@ export default function WhiteboardPage() {
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
 
-  const operationStateRef = useRef<'idle' | 'drawing' | 'texting' | 'erasing' | 'lassoing' | 'dragging'>('idle');
+  const operationStateRef = useRef<'idle' | 'drawing' | 'texting' | 'erasing' | 'lassoing' | 'dragging' | 'erasing_down'>('idle');
   const currentPathRef = useRef<Point[] | null>(null);
   const textCursorPosition = useRef<Point | null>(null);
   const lassoPathRef = useRef<Point[] | null>(null);
@@ -328,7 +329,7 @@ export default function WhiteboardPage() {
             }
             break;
         case 'erase':
-            operationStateRef.current = 'erasing';
+            operationStateRef.current = 'erasing_down';
             break;
         case 'lasso':
             operationStateRef.current = 'lassoing';
@@ -386,6 +387,7 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (!tempCtx) return;
     const endPos = getPointerPosition(event);
+    const startPos = pointerDownPositionRef.current;
 
     switch(operationStateRef.current) {
         case 'drawing':
@@ -398,8 +400,11 @@ export default function WhiteboardPage() {
                 });
             }
             break;
-        case 'erasing':
-             if (!endPos) break;
+        case 'erasing_down':
+             if (!endPos || !startPos) break;
+             const isClick = Math.hypot(endPos.x - startPos.x, endPos.y - startPos.y) < 5;
+             if (!isClick) break;
+
              let elementToDeleteId: string | null = null;
              for (let i = whiteboardState.elements.length - 1; i >= 0; i--) {
                 const element = whiteboardState.elements[i];
@@ -447,7 +452,7 @@ export default function WhiteboardPage() {
             }
             break;
         case 'dragging':
-            if(pointerDownPositionRef.current && endPos){
+            if(pointerDownPositionRef.current && endPos && originalPositionsRef.current){
                 const dx = endPos.x - pointerDownPositionRef.current.x;
                 const dy = endPos.y - pointerDownPositionRef.current.y;
                 if(dx !== 0 || dy !== 0) {
@@ -455,9 +460,13 @@ export default function WhiteboardPage() {
                         const newElements = prevState.elements.map(element => {
                             if(prevState.selectedElementIds.has(element.id)) {
                                 if (element.type === 'path') {
-                                    return { ...element, points: element.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+                                    const originalPoints = originalPositionsRef.current!.paths.get(element.id);
+                                    if(!originalPoints) return element;
+                                    return { ...element, points: originalPoints.map(p => ({ x: p.x + dx, y: p.y + dy })) };
                                 } else if (element.type === 'text') {
-                                    return { ...element, x: element.x + dx, y: element.y + dy };
+                                    const originalPos = originalPositionsRef.current!.texts.get(element.id);
+                                    if(!originalPos) return element;
+                                    return { ...element, x: originalPos.x + dx, y: originalPos.y + dy };
                                 }
                             }
                             return element;
@@ -535,4 +544,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
