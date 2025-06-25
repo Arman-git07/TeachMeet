@@ -299,11 +299,11 @@ export default function WhiteboardPage() {
     const pos = getPointerPosition(event);
     if (!pos) return;
     
-    pointerDownPositionRef.current = pos;
     finalizeLiveText();
     
-    if ((activeTool === 'lasso' || activeTool === 'select') && selectionBoundingBoxRef.current && isPointInRect(pos, selectionBoundingBoxRef.current)) {
+    if (activeTool === 'select' && selectionBoundingBoxRef.current && isPointInRect(pos, selectionBoundingBoxRef.current)) {
         operationStateRef.current = 'dragging';
+        pointerDownPositionRef.current = pos;
         
         const selectedOriginals = new Map<string, WhiteboardElement>();
         whiteboardState.elements.forEach(el => {
@@ -319,6 +319,8 @@ export default function WhiteboardPage() {
       setWhiteboardState(s => ({ ...s, selectedElementIds: new Set() }));
     }
     
+    pointerDownPositionRef.current = pos;
+
     switch(activeTool) {
         case 'draw':
             operationStateRef.current = 'drawing';
@@ -376,14 +378,14 @@ export default function WhiteboardPage() {
         const dx = pos.x - startPos.x;
         const dy = pos.y - startPos.y;
 
-        originalPositions.forEach((originalElement) => {
+        for (const originalElement of originalPositions.values()) {
             if (originalElement.type === 'path') {
                 const newPoints = originalElement.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
                 drawElement(tempCtx, { ...originalElement, points: newPoints });
             } else if (originalElement.type === 'text') {
                 drawElement(tempCtx, { ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy });
             }
-        });
+        }
     }
   }, [getPointerPosition, selectedColor, lineWidth, drawElement]);
 
@@ -392,13 +394,14 @@ export default function WhiteboardPage() {
     if (!tempCtx) return;
     
     const startPos = pointerDownPositionRef.current;
+    const endPos = getPointerPosition(event);
 
     switch(operationStateRef.current) {
         case 'drawing':
             if (currentPathRef.current && currentPathRef.current.length > 1) {
                 const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: currentPathRef.current, color: selectedColor, lineWidth };
                 setWhiteboardState(prevState => {
-                    const newState = { ...prevState, elements: [...prevState.elements, newPath] };
+                    const newState = { ...prevState, elements: [...prevState.elements, newPath], selectedElementIds: new Set() };
                     pushToHistory(newState);
                     return newState;
                 });
@@ -442,25 +445,16 @@ export default function WhiteboardPage() {
                 whiteboardState.elements.forEach(element => {
                     const elementBox = getElementBoundingBox(element);
                     if(!elementBox) return;
-
-                    if(lassoBox && !boxesIntersect(lassoBox, elementBox)){
-                        return;
-                    }
+                    if(lassoBox && !boxesIntersect(lassoBox, elementBox)){ return; }
 
                     if (element.type === 'path') {
-                        if (element.points.some(p => isPointInPolygon(p, lassoPolygon))) {
-                            newSelectedIds.add(element.id);
-                        }
+                        if (element.points.some(p => isPointInPolygon(p, lassoPolygon))) { newSelectedIds.add(element.id); }
                     } else if (element.type === 'text') {
                         const corners = [
-                            {x: elementBox.minX, y: elementBox.minY},
-                            {x: elementBox.maxX, y: elementBox.minY},
-                            {x: elementBox.maxX, y: elementBox.maxY},
-                            {x: elementBox.minX, y: elementBox.maxY}
+                            {x: elementBox.minX, y: elementBox.minY}, {x: elementBox.maxX, y: elementBox.minY},
+                            {x: elementBox.maxX, y: elementBox.maxY}, {x: elementBox.minX, y: elementBox.maxY}
                         ];
-                        if (corners.some(p => isPointInPolygon(p, lassoPolygon))) {
-                            newSelectedIds.add(element.id);
-                        }
+                        if (corners.some(p => isPointInPolygon(p, lassoPolygon))) { newSelectedIds.add(element.id); }
                     }
                 });
 
@@ -471,35 +465,35 @@ export default function WhiteboardPage() {
             }
             break;
         case 'dragging':
-            const endPos = getPointerPosition(event);
-            if(startPos && endPos) {
-                const originalPositions = originalPositionsRef.current;
-                if (!originalPositions || originalPositions.size === 0) break;
+            if (!startPos || !endPos) break;
+            
+            const originalPositions = originalPositionsRef.current;
+            if (!originalPositions || originalPositions.size === 0) break;
+            
+            const dx = endPos.x - startPos.x;
+            const dy = endPos.y - startPos.y;
 
-                const dx = endPos.x - startPos.x;
-                const dy = endPos.y - startPos.y;
+            if (Math.abs(dx) < 2 && Math.abs(dy) < 2) break;
 
-                if(Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-                     setWhiteboardState(prevState => {
-                        const newElements = prevState.elements.map(element => {
-                            if(prevState.selectedElementIds.has(element.id)) {
-                                const originalElement = originalPositions.get(element.id);
-                                if (!originalElement) return element;
+            setWhiteboardState(prevState => {
+                const newElements = prevState.elements.map(element => {
+                    if (prevState.selectedElementIds.has(element.id)) {
+                        const originalElement = originalPositions.get(element.id);
+                        if (!originalElement) return element;
 
-                                if (originalElement.type === 'path') {
-                                    return { ...originalElement, points: originalElement.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
-                                } else if (originalElement.type === 'text') {
-                                    return { ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy };
-                                }
-                            }
-                            return element;
-                        });
-                        const newState = { ...prevState, elements: newElements };
-                        pushToHistory(newState);
-                        return newState;
-                     });
-                }
-            }
+                        if (originalElement.type === 'path') {
+                            return { ...originalElement, points: originalElement.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+                        } else if (originalElement.type === 'text') {
+                            return { ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy };
+                        }
+                    }
+                    return element;
+                });
+
+                const newState = { ...prevState, elements: newElements };
+                pushToHistory(newState);
+                return newState;
+            });
             break;
     }
 
@@ -575,5 +569,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
-    
