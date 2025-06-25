@@ -635,11 +635,11 @@ export default function MeetingPage() {
             <Mic className={cn("h-5 w-5 sm:h-6 sm:w-6", localMicMuted && "hidden")} />
           </Button>
           <Button
-             variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
+             variant={localCameraOff ? "destructive" : "default"}
              size="icon"
              className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
              onClick={toggleCamera}
-             aria-label={(localCameraOff && !isScreenSharingActive) ? "Turn Camera On" : "Turn Camera Off"}
+             aria-label={localCameraOff ? "Turn Camera On" : "Turn Camera Off"}
              disabled={isScreenSharingActive}
           >
              <VideoOff className={cn("h-5 w-5 sm:h-6 sm:w-6", !localCameraOff || isScreenSharingActive && "hidden")} />
@@ -648,7 +648,7 @@ export default function MeetingPage() {
 
            <Button
             size="icon"
-            variant={localHandRaised ? "default" : "secondary"}
+            variant={localHandRaised ? "default" : "destructive"}
             className={cn(
               "rounded-full w-10 h-10 sm:w-12 sm:h-12",
               localHandRaised && "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent"
