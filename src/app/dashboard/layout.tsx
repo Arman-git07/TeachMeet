@@ -1,13 +1,14 @@
 
-'use client'; // Required for using hooks like useAuth, useRouter, and useSidebar
+'use client'; 
 
 import { useSidebar, SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PanelLeftOpen } from 'lucide-react';
 import { DynamicHeaderProvider, useDynamicHeader } from '@/contexts/DynamicHeaderContext';
+import { cn } from '@/lib/utils';
 
 // New component to render the header content dynamically
 function DashboardHeaderContentInternal() {
@@ -66,12 +67,16 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.replace('/auth/signin');
     }
   }, [isAuthenticated, loading, router]);
+
+  // Check if the current page is a meeting page to apply different styles
+  const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
 
   // Simplified loading condition
   if (loading || !isAuthenticated) {
@@ -96,7 +101,10 @@ export default function DashboardLayout({
     <DynamicHeaderProvider>
       <div className="flex flex-col flex-1">
         <DashboardHeaderContentInternal />
-        <main className="flex flex-col flex-1 p-4 md:p-8 bg-background">
+        <main className={cn(
+          "flex flex-col flex-1 bg-background",
+          !isMeetingPage && "p-4 md:p-8" // Conditionally apply padding
+        )}>
           {children}
         </main>
       </div>

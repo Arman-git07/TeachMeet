@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -604,7 +605,7 @@ export default function MeetingPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background/95 relative overflow-hidden">
+    <div className="h-full flex flex-col bg-background/95 relative overflow-hidden">
       <main className="flex-1 p-2 sm:p-4">
         <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
             {mainGridParticipants.map(participant => (
