@@ -14,17 +14,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 
 // --- Type Definitions ---
 interface Point { x: number; y: number; }
 type PathElement = { type: 'path'; id: string; points: Point[]; color: string; lineWidth: number; };
 type TextElement = { type: 'text'; id: string; text: string; x: number; y: number; color: string; font: string; width: number; height: number; };
-type WhiteboardElement = PathElement | TextElement;
+type ShapeElement = { type: 'shape'; id: string; shapeType: 'rectangle' | 'circle' | 'line'; x1: number; y1: number; x2: number; y2: number; color: string; lineWidth: number; };
+type WhiteboardElement = PathElement | TextElement | ShapeElement;
 
 interface ElementState {
   elements: WhiteboardElement[];
@@ -36,6 +41,7 @@ interface BoundingBox { minX: number; minY: number; maxX: number; maxY: number; 
 type OperationState = 
   | { type: 'idle' }
   | { type: 'drawing'; currentPath: Point[] }
+  | { type: 'shaping'; startPoint: Point, currentPoint: Point }
   | { type: 'texting'; position: Point }
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
@@ -80,6 +86,12 @@ function getElementBoundingBox(element: WhiteboardElement): BoundingBox | null {
         return { minX, minY, maxX, maxY };
     } else if (element.type === 'text') {
         return { minX: element.x, minY: element.y, maxX: element.x + element.width, maxY: element.y + element.height };
+    } else if (element.type === 'shape') {
+        const minX = Math.min(element.x1, element.x2);
+        const minY = Math.min(element.y1, element.y2);
+        const maxX = Math.max(element.x1, element.x2);
+        const maxY = Math.max(element.y1, element.y2);
+        return { minX, minY, maxX, maxY };
     }
     return null;
 }
@@ -132,6 +144,7 @@ export default function WhiteboardPage() {
   const [activeTool, setActiveTool] = useState<string>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
+  const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
 
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
@@ -174,6 +187,27 @@ export default function WhiteboardPage() {
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       element.text.split('\n').forEach((line, index) => ctx.fillText(line, element.x, element.y + (index * (getFontSize() * 1.2))));
+    } else if (element.type === 'shape') {
+      ctx.strokeStyle = element.color;
+      ctx.lineWidth = element.lineWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      const { x1, y1, x2, y2, shapeType } = element;
+      if (shapeType === 'rectangle') {
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      } else if (shapeType === 'line') {
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      } else if (shapeType === 'circle') {
+        const radiusX = Math.abs(x2 - x1) / 2;
+        const radiusY = Math.abs(y2 - y1) / 2;
+        const centerX = x1 + (x2 - x1) / 2;
+        const centerY = y1 + (y2 - y1) / 2;
+        ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
     }
   }, []);
   
@@ -208,6 +242,8 @@ export default function WhiteboardPage() {
     const opState = operationStateRef.current;
     if (opState.type === 'drawing') {
       drawElement(tempCtx, { type: 'path', id: '', points: opState.currentPath, color: selectedColor, lineWidth });
+    } else if (opState.type === 'shaping') {
+       drawElement(tempCtx, { type: 'shape', id: '', shapeType: selectedShape, x1: opState.startPoint.x, y1: opState.startPoint.y, x2: opState.currentPoint.x, y2: opState.currentPoint.y, color: selectedColor, lineWidth });
     } else if (opState.type === 'lassoing') {
       tempCtx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
       tempCtx.lineWidth = 1;
@@ -222,7 +258,7 @@ export default function WhiteboardPage() {
     } else if (opState.type === 'dragging') {
         tempDragPreview.forEach(el => drawElement(tempCtx, el));
     }
-  }, [selectedColor, lineWidth, drawElement, tempDragPreview]);
+  }, [selectedColor, lineWidth, drawElement, tempDragPreview, selectedShape]);
 
   useEffect(() => {
     const mainCanvas = mainCanvasRef.current;
@@ -332,6 +368,9 @@ export default function WhiteboardPage() {
         case 'draw':
             operationStateRef.current = { type: 'drawing', currentPath: [pos] };
             break;
+        case 'shape':
+            operationStateRef.current = { type: 'shaping', startPoint: pos, currentPoint: pos };
+            break;
         case 'text':
             operationStateRef.current = { type: 'texting', position: pos };
             if (liveTextInputRef.current) {
@@ -343,7 +382,6 @@ export default function WhiteboardPage() {
             }
             break;
         case 'erase':
-            // Eraser works on pointer up (click)
             break;
         case 'lasso':
         case 'select':
@@ -359,6 +397,9 @@ export default function WhiteboardPage() {
     if (opState.type === 'drawing') {
         opState.currentPath.push(pos);
         redrawTempCanvas();
+    } else if (opState.type === 'shaping') {
+        opState.currentPoint = pos;
+        redrawTempCanvas();
     } else if (opState.type === 'lassoing') {
         opState.lassoPath.push(pos);
         redrawTempCanvas();
@@ -372,6 +413,8 @@ export default function WhiteboardPage() {
                 draggedElements.push({ ...originalElement, points: originalElement.points.map(p => ({ x: p.x + dx, y: p.y + dy })) });
             } else if (originalElement.type === 'text') {
                 draggedElements.push({ ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy });
+            } else if (originalElement.type === 'shape') {
+                draggedElements.push({ ...originalElement, x1: originalElement.x1 + dx, y1: originalElement.y1 + dy, x2: originalElement.x2 + dx, y2: originalElement.y2 + dy });
             }
         }
         setTempDragPreview(draggedElements);
@@ -379,73 +422,81 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, redrawTempCanvas]);
 
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
-    const pos = getPointerPosition(event);
     const opState = operationStateRef.current;
+    
+    if (opState.type === 'drawing') {
+        if (opState.currentPath.length > 1) {
+            const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
+            setWhiteboardState(prevState => {
+                const newState = { ...prevState, elements: [...prevState.elements, newPath], selectedElementIds: new Set() };
+                pushToHistory(newState);
+                return newState;
+            });
+        }
+    } else if (opState.type === 'shaping') {
+        const { startPoint, currentPoint } = opState;
+        if (Math.hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y) > 2) {
+             const newShape: ShapeElement = { type: 'shape', id: `shape_${Date.now()}`, shapeType: selectedShape, x1: startPoint.x, y1: startPoint.y, x2: currentPoint.x, y2: currentPoint.y, color: selectedColor, lineWidth };
+             setWhiteboardState(prevState => {
+                 const newState = { ...prevState, elements: [...prevState.elements, newShape], selectedElementIds: new Set() };
+                 pushToHistory(newState);
+                 return newState;
+             });
+        }
+    } else if (opState.type === 'lassoing') {
+        if (opState.lassoPath.length > 2) {
+            const newSelectedIds = new Set<string>();
+            const lassoPolygon = opState.lassoPath;
+            const lassoBox = getElementBoundingBox({type:'path', id:'', points:lassoPolygon, color:'', lineWidth:1});
 
-    switch(opState.type) {
-        case 'drawing':
-            if (opState.currentPath.length > 1) {
-                const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
-                setWhiteboardState(prevState => {
-                    const newState = { ...prevState, elements: [...prevState.elements, newPath], selectedElementIds: new Set() };
-                    pushToHistory(newState);
-                    return newState;
-                });
-            }
-            break;
-        case 'erasing': // This case is handled in 'select' tool logic now
-            break;
-        case 'lassoing':
-            if (opState.lassoPath.length > 2) {
-                const newSelectedIds = new Set<string>();
-                const lassoPolygon = opState.lassoPath;
-                const lassoBox = getElementBoundingBox({type:'path', id:'', points:lassoPolygon, color:'', lineWidth:1});
-
-                whiteboardState.elements.forEach(element => {
-                    const elementBox = getElementBoundingBox(element);
-                    if(!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
-                    
-                    if (element.type === 'path' ? element.points.some(p => isPointInPolygon(p, lassoPolygon)) : isPointInPolygon({x: element.x, y: element.y}, lassoPolygon)) {
-                        newSelectedIds.add(element.id);
-                    }
-                });
-
-                if (newSelectedIds.size > 0) {
-                    setWhiteboardState(prevState => ({...prevState, selectedElementIds: newSelectedIds}));
-                    setActiveTool('select');
+            whiteboardState.elements.forEach(element => {
+                const elementBox = getElementBoundingBox(element);
+                if(!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
+                
+                if (element.type === 'path' ? element.points.some(p => isPointInPolygon(p, lassoPolygon)) : isPointInPolygon({x: element.x, y: element.y}, lassoPolygon)) {
+                    newSelectedIds.add(element.id);
                 }
-            }
-            break;
-        case 'dragging':
-            const dx = pos.x - opState.startPos.x;
-            const dy = pos.y - opState.startPos.y;
+            });
 
-            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-                setWhiteboardState(prevState => {
-                    const newElements = prevState.elements.map(el => {
-                        if (prevState.selectedElementIds.has(el.id)) {
-                            const originalElement = opState.originalElements.get(el.id);
-                            if (!originalElement) return el;
-                            if (originalElement.type === 'path') {
-                                return { ...originalElement, points: originalElement.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
-                            } else if (originalElement.type === 'text') {
-                                return { ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy };
-                            }
-                        }
-                        return el;
-                    });
-                    const newState = { ...prevState, elements: newElements };
-                    pushToHistory(newState);
-                    return newState;
-                });
+            if (newSelectedIds.size > 0) {
+                setWhiteboardState(prevState => ({...prevState, selectedElementIds: newSelectedIds}));
+                setActiveTool('select');
             }
-            setTempDragPreview([]);
-            break;
+        }
+    } else if (opState.type === 'dragging') {
+        const { startPos, originalElements } = opState;
+        const pos = getPointerPosition(event);
+        const dx = pos.x - startPos.x;
+        const dy = pos.y - startPos.y;
+
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            setWhiteboardState(prevState => {
+                const newElements = prevState.elements.map(el => {
+                    if (prevState.selectedElementIds.has(el.id)) {
+                        const originalElement = originalElements.get(el.id);
+                        if (!originalElement) return el;
+                        if (originalElement.type === 'path') {
+                            return { ...originalElement, points: originalElement.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+                        } else if (originalElement.type === 'text') {
+                            return { ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy };
+                        } else if (originalElement.type === 'shape') {
+                            return { ...originalElement, x1: originalElement.x1 + dx, y1: originalElement.y1 + dy, x2: originalElement.x2 + dx, y2: originalElement.y2 + dy };
+                        }
+                    }
+                    return el;
+                });
+                const newState = { ...prevState, elements: newElements };
+                pushToHistory(newState);
+                return newState;
+            });
+        }
+        setTempDragPreview([]);
     }
     
     // Eraser Click Logic
     if (activeTool === 'erase' && opState.type === 'idle') {
          let elementToDeleteId: string | null = null;
+         const pos = getPointerPosition(event);
          for (let i = whiteboardState.elements.length - 1; i >= 0; i--) {
             const element = whiteboardState.elements[i];
             if (element.type === 'path') {
@@ -454,10 +505,13 @@ export default function WhiteboardPage() {
                         elementToDeleteId = element.id; break;
                     }
                 }
-            } else if (element.type === 'text') {
+            } else if (element.type === 'text' || element.type === 'shape') {
                 const box = getElementBoundingBox(element);
-                if(box && isPointInRect(pos, box)) {
-                    elementToDeleteId = element.id;
+                if(box) {
+                    const inflatedBox = { minX: box.minX - ERASER_THRESHOLD, minY: box.minY - ERASER_THRESHOLD, maxX: box.maxX + ERASER_THRESHOLD, maxY: box.maxY + ERASER_THRESHOLD };
+                    if(isPointInRect(pos, inflatedBox)) {
+                        elementToDeleteId = element.id;
+                    }
                 }
             }
             if (elementToDeleteId) break;
@@ -477,7 +531,7 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (tempCtx) clearCanvas(tempCtx);
 
-  }, [getPointerPosition, selectedColor, lineWidth, whiteboardState, activeTool, pushToHistory]);
+  }, [getPointerPosition, selectedColor, lineWidth, whiteboardState, activeTool, pushToHistory, selectedShape]);
 
   const handleClearWhiteboard = () => { 
     setWhiteboardState({ elements: [], selectedElementIds: new Set() });
@@ -502,7 +556,47 @@ export default function WhiteboardPage() {
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-             <ToolButton icon={Brush} label="Draw" onClick={() => setActiveTool("draw")} isActive={activeTool === "draw"}/>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant={activeTool === 'draw' || activeTool === 'shape' ? "default" : "outline"} size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Drawing Tools">
+                  <Brush className="h-5 w-5 mb-0.5" />
+                  <span className="text-[10px] leading-tight">Draw</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
+                <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">COLOR</Label>
+                    <div className="flex flex-wrap gap-2 items-center">
+                        {['#000000', '#ef4444', '#3b82f6', '#22c55e', '#facc15', '#f97316'].map(color => (
+                            <button key={color} style={{ backgroundColor: color }} className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', selectedColor === color ? 'border-primary ring-2 ring-offset-2 ring-offset-background ring-primary' : 'border-background')} onClick={() => setSelectedColor(color)} />
+                        ))}
+                        <div className="w-8 h-8 rounded-full border-2 border-border overflow-hidden inline-flex items-center justify-center">
+                            <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
+                        </div>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">LINE WIDTH</Label>
+                    <div className="flex items-center gap-2">
+                        <Slider
+                          value={[lineWidth]}
+                          onValueChange={(value) => setLineWidth(value[0])}
+                          min={1} max={50} step={1}
+                        />
+                        <span className="text-sm font-mono w-8 text-center">{lineWidth}</span>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">TOOLS</Label>
+                    <div className="flex gap-2">
+                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('draw')}><Brush className="h-5 w-5" /></Button>
+                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('rectangle');}}><RectangleHorizontal className="h-5 w-5" /></Button>
+                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('circle');}}><Circle className="h-5 w-5" /></Button>
+                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('line');}}><Minus className="h-5 w-5" /></Button>
+                    </div>
+                </div>
+              </PopoverContent>
+            </Popover>
              <ToolButton icon={Lasso} label="Select" onClick={() => setActiveTool("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
              <ToolButton icon={Type} label="Text" onClick={() => setActiveTool("text")} isActive={activeTool === "text"}/>
              <ToolButton icon={Eraser} label="Erase" onClick={() => setActiveTool("erase")} isActive={activeTool === "erase"}/>
@@ -531,7 +625,7 @@ export default function WhiteboardPage() {
                     onPointerUp={handlePointerUp} 
                     onPointerLeave={handlePointerUp} 
                     className="touch-none w-full h-full block absolute top-0 left-0" 
-                    style={{ zIndex: 2, cursor: activeTool === 'select' ? 'default' : (activeTool === 'lasso' || activeTool === 'draw' || activeTool === 'erase' ? 'crosshair' : 'text') }} 
+                    style={{ zIndex: 2, cursor: activeTool === 'select' ? 'default' : (activeTool === 'lasso' || activeTool === 'draw' || activeTool === 'erase' || activeTool === 'shape' ? 'crosshair' : 'text') }} 
                 />
             </CardContent>
           </Card>
