@@ -13,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +44,9 @@ import {
   StopCircle,
   Loader2,
   Share2,
+  LayoutGrid,
+  PanelRight,
+  GalleryVertical,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -52,9 +54,6 @@ import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc } from 'firebase/firestore';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
-
-
-const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
 
 interface Participant {
   id: string;
@@ -167,11 +166,6 @@ const ParticipantView = React.memo(function ParticipantView({
 });
 ParticipantView.displayName = 'ParticipantView';
 
-const PlaceholderView = () => (
-    <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 bg-muted/20 w-full h-full flex items-center justify-center">
-        <Users className="w-16 h-16 text-muted-foreground/30" />
-    </Card>
-);
 
 export default function MeetingPage() {
   const params = useParams();
@@ -197,26 +191,17 @@ export default function MeetingPage() {
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
-
+  
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
   
-  const combinedParticipants: Participant[] = currentUser
-    ? [
-        {
-          id: currentUser.uid,
-          name: currentUser.displayName || currentUser.email?.split('@')[0] || "You",
-          isMe: true,
-          isMicMuted: localMicMuted,
-          isCameraOff: isScreenSharingActive ? true : localCameraOff,
-          stream: isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current,
-          isHandRaisedForView: localHandRaised,
-          isScreenSharing: isScreenSharingActive,
-          photoURL: currentUser.photoURL
-        },
-        ...realtimeParticipants.filter(p => p.id !== currentUser.uid)
-      ]
-    : realtimeParticipants;
+  const selfView = realtimeParticipants.find(p => p.id === currentUser?.uid);
+  const remoteParticipants = realtimeParticipants.filter(p => p.id !== currentUser?.uid);
+
+  const host = remoteParticipants.find(p => p.id === meetingCreatorId);
+  const otherParticipants = remoteParticipants.filter(p => p.id !== meetingCreatorId);
+
+  const mainGridParticipants = (host ? [host] : []).concat(otherParticipants).slice(0, 4);
 
   const handleReportIssue = () => {
     toast({
@@ -266,9 +251,9 @@ export default function MeetingPage() {
           <h2 className="text-base sm:text-lg font-semibold text-foreground truncate" title={displayTitle}>
             {displayTitle}
           </h2>
-          {combinedParticipants.length > 0 && (
+          {realtimeParticipants.length > 0 && (
             <span className="text-xs sm:text-sm text-muted-foreground">
-              {combinedParticipants.length} Participant{combinedParticipants.length === 1 ? '' : 's'}
+              {realtimeParticipants.length} Participant{realtimeParticipants.length === 1 ? '' : 's'}
             </span>
           )}
         </div>
@@ -313,7 +298,7 @@ export default function MeetingPage() {
   }, [
       setHeaderContent, 
       displayTitle, 
-      combinedParticipants.length, 
+      realtimeParticipants.length, 
       isScreenSharingActive, 
       router, 
     ]);
@@ -382,14 +367,19 @@ export default function MeetingPage() {
       const fetchedParticipants: Participant[] = [];
       querySnapshot.forEach((docSnap: DocumentData) => {
         const data = docSnap.data();
+        const participantId = docSnap.id;
+        const isCurrentUser = currentUser?.uid === participantId;
+        
         fetchedParticipants.push({
-          id: docSnap.id,
+          id: participantId,
           name: data.name || "Guest",
           photoURL: data.photoURL,
-          isMicMuted: data.isMicMuted,
-          isCameraOff: data.isCameraOff,
+          isMicMuted: isCurrentUser ? localMicMuted : data.isMicMuted,
+          isCameraOff: isCurrentUser ? (isScreenSharingActive ? true : localCameraOff) : data.isCameraOff,
           isHandRaisedForView: data.isHandRaised,
           isScreenSharing: data.isScreenSharing,
+          isMe: isCurrentUser,
+          stream: isCurrentUser ? (isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current) : null,
         });
       });
       setRealtimeParticipants(fetchedParticipants);
@@ -406,7 +396,8 @@ export default function MeetingPage() {
     return () => {
       unsubscribeParticipants();
     };
-  }, [meetingId, toast, joinStatus]);
+  }, [meetingId, toast, joinStatus, currentUser, localMicMuted, localCameraOff, isScreenSharingActive]);
+
 
   useEffect(() => {
     if (joinStatus !== 'joined' || isScreenSharingActive) return;
@@ -539,22 +530,8 @@ export default function MeetingPage() {
     }
 
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
-    try {
-      if (typeof window !== 'undefined' && meetingId) {
-        const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
-        let dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
-        if (!Array.isArray(dismissedIds)) dismissedIds = [];
-        if (!dismissedIds.includes(meetingId)) {
-          dismissedIds.push(meetingId);
-          localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
-        }
-      }
-    } catch (e) {
-      console.error("[MeetingPage] Error updating localStorage on leave:", e);
-    }
     router.push('/');
   };
-
 
   const handleConfirmShareScreen = async () => {
     setIsShareScreenDialogVisible(false);
@@ -626,14 +603,6 @@ export default function MeetingPage() {
     );
   }
 
-  const selfView = combinedParticipants.find(p => p.isMe);
-  const remoteParticipants = combinedParticipants.filter(p => !p.isMe);
-  const host = remoteParticipants.find(p => p.id === meetingCreatorId);
-  const otherParticipants = remoteParticipants.filter(p => p.id !== meetingCreatorId);
-  const mainGridParticipants = (host ? [host] : []).concat(otherParticipants).slice(0, 4);
-  const placeholderCount = Math.max(0, 4 - mainGridParticipants.length);
-
-
   return (
     <div className="h-screen flex flex-col bg-background/95 relative overflow-hidden">
       <main className="flex-1 p-2 sm:p-4">
@@ -643,16 +612,11 @@ export default function MeetingPage() {
                 <ParticipantView {...participant} />
               </div>
             ))}
-            {[...Array(placeholderCount)].map((_, i) => (
-                <div key={`placeholder-${i}`} className="min-h-0">
-                    <PlaceholderView />
-                </div>
-            ))}
         </div>
       </main>
       
       {selfView && (
-          <div className="absolute bottom-20 md:bottom-24 right-2 sm:right-4 w-32 h-20 sm:w-40 sm:h-28 md:w-56 md:h-36 rounded-xl overflow-hidden z-20 shadow-2xl border-2 border-background">
+          <div className="absolute bottom-20 md:bottom-24 right-2 sm:right-4 w-40 h-28 md:w-56 md:h-36 rounded-xl overflow-hidden z-20 shadow-2xl border-2 border-background">
             <ParticipantView {...selfView} />
           </div>
       )}
@@ -660,7 +624,7 @@ export default function MeetingPage() {
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
         <div className="flex items-center justify-center gap-2 sm:gap-4 bg-card/80 backdrop-blur-md p-2 sm:p-3 rounded-full shadow-2xl border">
           <Button
-            variant={localMicMuted ? "destructive" : "secondary"}
+            variant={localMicMuted ? "destructive" : "default"}
             size="icon"
             className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
             onClick={toggleMic}
@@ -670,7 +634,7 @@ export default function MeetingPage() {
             <Mic className={cn("h-5 w-5 sm:h-6 sm:w-6", localMicMuted && "hidden")} />
           </Button>
           <Button
-             variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "secondary"}
+             variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
              size="icon"
              className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
              onClick={toggleCamera}
@@ -725,5 +689,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
-    
