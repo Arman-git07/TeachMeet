@@ -6,19 +6,11 @@ import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,10 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Badge } from '@/components/ui/badge';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
-import { Skeleton } from '@/components/ui/skeleton';
-
 
 import {
   Mic,
@@ -49,7 +38,6 @@ import {
   MoreVertical,
   Hand,
   Maximize,
-  Columns,
   Edit3,
   AlertTriangle,
   AlertCircle,
@@ -62,7 +50,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
-import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc } from 'firebase/firestore';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
@@ -129,7 +116,7 @@ const ParticipantView = React.memo(function ParticipantView({
         muted={isMe}
         autoPlay
         playsInline
-        className={cn("w-full h-full object-cover bg-muted", !showVideo && "hidden")}
+        className={cn("w-full h-full object-cover bg-black", !showVideo && "hidden")}
       />
       
       {!showVideo && (
@@ -183,6 +170,11 @@ const ParticipantView = React.memo(function ParticipantView({
 });
 ParticipantView.displayName = 'ParticipantView';
 
+const PlaceholderView = () => (
+    <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 bg-muted/20 w-full h-full flex items-center justify-center">
+        <Users className="w-16 h-16 text-muted-foreground/30" />
+    </Card>
+);
 
 export default function MeetingPage() {
   const params = useParams();
@@ -195,20 +187,8 @@ export default function MeetingPage() {
   const currentUser = auth.currentUser;
   const { setHeaderContent } = useDynamicHeader();
 
-  const [localMicMuted, setLocalMicMuted] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const desiredState = localStorage.getItem('teachmeet-desired-mic-state');
-      return desiredState === 'off';
-    }
-    return false;
-  });
-  const [localCameraOff, setLocalCameraOff] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const desiredState = localStorage.getItem('teachmeet-desired-camera-state');
-      return desiredState === 'off';
-    }
-    return true;
-  });
+  const [localMicMuted, setLocalMicMuted] = useState(true);
+  const [localCameraOff, setLocalCameraOff] = useState(true);
   const [localHandRaised, setLocalHandRaised] = useState(false);
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
   const [joinStatus, setJoinStatus] = useState<'pending' | 'joining' | 'joined' | 'failed'>('pending');
@@ -220,8 +200,8 @@ export default function MeetingPage() {
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
-  const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
@@ -285,12 +265,6 @@ export default function MeetingPage() {
     router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
   };
 
-  const handleSetLayout = (layout: string) => {
-    setCurrentLayout(layout);
-    toast({ title: "Layout Changed", description: `Switched to ${layout.replace('-', ' ')} view.` });
-  };
-
-
   useEffect(() => {
     const newHeaderContent = (
       <div className="flex items-center justify-between w-full gap-2 sm:gap-4">
@@ -326,24 +300,6 @@ export default function MeetingPage() {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleOpenParticipants} className="cursor-pointer"><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Columns className="mr-2 h-4 w-4" />
-                <span>Change Layout</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="rounded-lg">
-                <DropdownMenuItem onClick={() => handleSetLayout('grid')} className="rounded-md cursor-pointer">
-                  Grid View
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSetLayout('speaker')} className="rounded-md cursor-pointer">
-                  Speaker View
-                </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => handleSetLayout('gallery')} className="rounded-md cursor-pointer">
-                  Gallery View
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleReportIssue} className="text-destructive focus:text-destructive cursor-pointer">
               <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
             </DropdownMenuItem>
@@ -370,54 +326,40 @@ export default function MeetingPage() {
 
 
   useEffect(() => {
-    console.log("[MeetingPage] Firestore join effect triggered. Status:", joinStatus, "User:", currentUser?.uid, "MeetingID:", meetingId);
     if (!currentUser || !meetingId || !db) {
-      if (!currentUser) console.warn("[MeetingPage] Firestore join: Current user not available.");
-      if (!meetingId) console.warn("[MeetingPage] Firestore join: MeetingId not available.");
-      if (!db) console.warn("[MeetingPage] Firestore join: DB not available.");
       if (joinStatus === 'pending') setJoinStatus('failed');
       return;
     }
 
     const joinMeetingRoom = async () => {
       setJoinStatus('joining');
-      console.log(`[MeetingPage] User ${currentUser.uid} attempting to join meeting ${meetingId}. Status: joining`);
-
       const meetingDocRef = doc(db, "meetings", meetingId);
       const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
 
       try {
         const meetingDocSnap = await getDoc(meetingDocRef);
         if (!meetingDocSnap.exists()) {
-          console.log(`[MeetingPage] Main meeting document for ${meetingId} does not exist. Creating it.`);
           const meetingTopicFromURL = searchParamsHook.get('topic') || `Meeting ${meetingId}`;
           await setDoc(meetingDocRef, {
             creatorId: currentUser.uid, 
             topic: meetingTopicFromURL,
             createdAt: serverTimestamp(),
           });
-          console.log(`[MeetingPage] Successfully created main meeting document for ${meetingId}.`);
-        } else {
-          console.log(`[MeetingPage] Main meeting document for ${meetingId} already exists.`);
         }
-
-        const initialCameraOffFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
-        const initialMicMutedFromStorage = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') === 'off' : false;
+        setMeetingCreatorId(meetingDocSnap.data()?.creatorId || currentUser.uid);
         
         const participantData = {
           userId: currentUser.uid,
           name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
           photoURL: currentUser.photoURL,
-          isMicMuted: initialMicMutedFromStorage,
-          isCameraOff: initialCameraOffFromStorage,
+          isMicMuted: localMicMuted,
+          isCameraOff: localCameraOff,
           isHandRaised: false,
           isScreenSharing: false,
           joinedAt: serverTimestamp(),
         };
 
-        console.log("[MeetingPage] Participant data to write to Firestore:", participantData);
         await setDoc(participantDocRef, participantData, { merge: true });
-        console.log("[MeetingPage] Successfully added/updated self in participant list in Firestore.");
         setJoinStatus('joined');
 
       } catch (error) {
@@ -435,12 +377,11 @@ export default function MeetingPage() {
     if (joinStatus === 'pending') {
       joinMeetingRoom();
     }
-  }, [currentUser, meetingId, db, toast, joinStatus, searchParamsHook]);
+  }, [currentUser, meetingId, db, toast, joinStatus, searchParamsHook, localMicMuted, localCameraOff]);
 
   useEffect(() => {
     if (joinStatus !== 'joined' || !meetingId || !db) return;
 
-    console.log(`[MeetingPage] Setting up Firestore listener for participants in meeting ${meetingId}`);
     const participantsColRef = collection(db, "meetings", meetingId, "participants");
     const q = query(participantsColRef);
     const unsubscribeParticipants = onSnapshot(q, (querySnapshot) => {
@@ -457,7 +398,6 @@ export default function MeetingPage() {
           isScreenSharing: data.isScreenSharing,
         });
       });
-      console.log("[MeetingPage] Fetched participants from Firestore:", fetchedParticipants);
       setRealtimeParticipants(fetchedParticipants);
     }, (error) => {
         console.error("[MeetingPage] Error fetching participants from Firestore:", error);
@@ -470,7 +410,6 @@ export default function MeetingPage() {
     });
 
     return () => {
-      console.log(`[MeetingPage] Cleaning up Firestore listener for participants in meeting ${meetingId}`);
       unsubscribeParticipants();
     };
   }, [meetingId, toast, joinStatus]);
@@ -479,7 +418,6 @@ export default function MeetingPage() {
     if (joinStatus !== 'joined' || isScreenSharingActive) return;
 
     const initializeMedia = async () => {
-      console.log("[MeetingPage] Initializing media devices.");
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
@@ -498,7 +436,6 @@ export default function MeetingPage() {
         if (audioTrack) {
           audioTrack.enabled = !localMicMuted;
         }
-        console.log("[MeetingPage] Media initialized successfully.");
 
       } catch (err) {
         console.error("[MeetingPage] Failed to get media on mount:", err);
@@ -521,7 +458,6 @@ export default function MeetingPage() {
 
     return () => {
       if (localStreamRef.current) {
-        console.log("[MeetingPage] Cleaning up media stream on re-render/unmount.");
         localStreamRef.current.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
       }
@@ -531,7 +467,6 @@ export default function MeetingPage() {
    useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
       if (auth.currentUser && meetingId && db) {
-        console.log(`[MeetingPage] beforeunload: Removing user ${auth.currentUser.uid} from meeting ${meetingId}`);
         await deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid));
       }
     };
@@ -540,21 +475,15 @@ export default function MeetingPage() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       localStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
-      console.log("[MeetingPage] Cleaned up media streams on unmount.");
     };
   }, [meetingId]);
 
 
   const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'stream' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
-    if (!currentUser || !meetingId || !db || joinStatus !== 'joined') {
-      console.warn("[MeetingPage] Skipping Firestore update: User not ready or not joined.", {currentUserPresent: !!currentUser, meetingId, dbPresent: !!db, joinStatus});
-      return;
-    }
+    if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
     const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
     try {
-      console.log(`[MeetingPage] Updating user ${currentUser.uid} status in Firestore:`, updates);
       await updateDoc(userDocRef, updates);
-      console.log(`[MeetingPage] Successfully updated user ${currentUser.uid} status.`);
     } catch (error) {
       console.error("[MeetingPage] Error updating user status in Firestore:", error);
       toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
@@ -572,13 +501,10 @@ export default function MeetingPage() {
         audioTrack.enabled = !newMicStateIsMuted;
         toast({ title: newMicStateIsMuted ? "Microphone OFF" : "Microphone ON" });
       }
-    } else {
-        toast({ variant: "destructive", title: "No Audio Stream", description: "Could not find an active microphone stream to toggle."})
     }
   };
 
   const stopScreenShare = async (showToast = true) => {
-    console.log("[MeetingPage] Attempting to stop screen share.");
     if (screenShareStreamRef.current) {
       screenShareStreamRef.current.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current = null;
@@ -593,7 +519,6 @@ export default function MeetingPage() {
 
   const toggleCamera = async () => {
     if (isScreenSharingActive) {
-      console.log("[MeetingPage] Screen sharing is active, stopping it before toggling camera.");
       await stopScreenShare(false);
     }
     
@@ -621,48 +546,26 @@ export default function MeetingPage() {
   };
 
   const leaveMeeting = async () => {
-    console.log("[MeetingPage] User leaving meeting.");
-    try {
-      await stopScreenShare(false);
-    } catch (e) {
-      console.error("[MeetingPage] Error stopping screen share on leave:", e);
-    }
-
+    await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
     localStreamRef.current?.getTracks().forEach(track => track.stop());
 
-
     if (currentUser && meetingId && db) {
-      const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
       try {
-        console.log(`[MeetingPage] Deleting participant ${currentUser.uid} from Firestore for meeting ${meetingId}.`);
-        await deleteDoc(userDocRef);
-        console.log(`[MeetingPage] Successfully deleted participant ${currentUser.uid}.`);
+        await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
       } catch (error) {
         console.error("[MeetingPage] Error removing participant from Firestore on leave:", error);
       }
     }
 
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
-
     try {
       if (typeof window !== 'undefined' && meetingId) {
         const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
-        let dismissedIds: string[] = [];
-        try {
-          dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
-        } catch (e) {
-          console.error("[MeetingPage] Error parsing dismissed meetings from localStorage on leave:", e);
-          localStorage.removeItem(DISMISSED_MEETINGS_KEY);
-        }
-
-        if (!Array.isArray(dismissedIds)) {
-            dismissedIds = [];
-        }
-
+        let dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
+        if (!Array.isArray(dismissedIds)) dismissedIds = [];
         if (!dismissedIds.includes(meetingId)) {
           dismissedIds.push(meetingId);
           localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
-          console.log(`[MeetingPage] Added meeting ${meetingId} to dismissed list in localStorage.`);
         }
       }
     } catch (e) {
@@ -687,9 +590,7 @@ export default function MeetingPage() {
     }
 
     try {
-      console.log("[MeetingPage] Requesting screen share stream.");
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      console.log("[MeetingPage] Screen share stream acquired.");
 
       if (localStreamRef.current) {
         const videoTrack = localStreamRef.current.getVideoTracks()[0];
@@ -702,10 +603,7 @@ export default function MeetingPage() {
       await updateUserStatusInFirestore({ isScreenSharing: true, isCameraOff: true });
       toast({ title: "Screen Sharing Started" });
 
-      stream.getVideoTracks()[0].onended = () => {
-        console.log("[MeetingPage] Screen share stream ended (e.g., user clicked 'Stop sharing' in browser UI).");
-        stopScreenShare();
-      };
+      stream.getVideoTracks()[0].onended = () => stopScreenShare();
 
     } catch (err) {
       console.error("[MeetingPage] Error starting screen share:", err);
@@ -747,99 +645,39 @@ export default function MeetingPage() {
     );
   }
 
-  const renderLayout = () => {
-    if (combinedParticipants.length === 0) {
-      return (
-        <div className="flex-1 flex items-center justify-center">
-          <p>Waiting for participants to join...</p>
-        </div>
-      );
-    }
-  
-    switch (currentLayout) {
-      case 'speaker':
-        const speaker = combinedParticipants.find(p => p.isScreenSharing) || combinedParticipants.find(p => !p.isMe) || combinedParticipants[0];
-        const otherParticipants = combinedParticipants.filter(p => p.id !== speaker.id);
-        return (
-          <div className="flex-1 flex flex-col md:flex-row gap-4 h-full">
-            <div className="flex-grow rounded-lg overflow-hidden bg-black flex items-center justify-center">
-              <ParticipantView {...speaker} />
-            </div>
-            {otherParticipants.length > 0 && (
-              <div className="w-full md:w-48 lg:w-64 flex-shrink-0 flex md:flex-col gap-4 overflow-x-auto md:overflow-y-auto pb-2 md:pb-0">
-                {otherParticipants.map(p => (
-                  <div key={p.id} className="aspect-video rounded-lg overflow-hidden flex-shrink-0 md:flex-shrink-1 w-40 md:w-full">
-                    <ParticipantView {...p} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-  
-      case 'gallery':
-        return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {combinedParticipants.map(participant => (
-              <div key={participant.id} className="aspect-video rounded-lg overflow-hidden">
-                <ParticipantView {...participant} />
-              </div>
-            ))}
-          </div>
-        );
-  
-      case 'grid':
-      default:
-        const total = combinedParticipants.length;
-        let cols = 'grid-cols-1';
-        if (total >= 2) cols = 'grid-cols-1 sm:grid-cols-2';
-        if (total >= 5) cols = 'grid-cols-2 md:grid-cols-3';
-        if (total >= 7) cols = 'grid-cols-2 md:grid-cols-4';
-        if (total >= 10) cols = 'grid-cols-3 md:grid-cols-4';
-
-        return (
-          <div className={cn('grid gap-4 flex-1', cols)}>
-            {combinedParticipants.map(participant => (
-              <div key={participant.id} className="min-h-[180px] rounded-lg overflow-hidden">
-                <ParticipantView {...participant} />
-              </div>
-            ))}
-          </div>
-        );
-    }
-  };
+  const selfView = combinedParticipants.find(p => p.isMe);
+  const remoteParticipants = combinedParticipants.filter(p => !p.isMe);
+  const host = remoteParticipants.find(p => p.id === meetingCreatorId);
+  const otherParticipants = remoteParticipants.filter(p => p.id !== meetingCreatorId);
+  const mainGridParticipants = (host ? [host] : []).concat(otherParticipants).slice(0, 4);
+  const placeholderCount = Math.max(0, 4 - mainGridParticipants.length);
 
 
   return (
-    <div className="flex flex-col h-full bg-background relative">
+    <div className="flex flex-col h-full bg-background/95 relative overflow-hidden">
       
-      <main className="flex-1 p-2 sm:p-4 flex flex-col overflow-hidden">
-        {hasCameraPermission === false && !isScreenSharingActive && (
-           <Alert variant="destructive" className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Camera Permission Required</AlertTitle>
-              <AlertDescription>
-                TeachMeet needs access to your camera to share your video.
-                Please enable camera permissions in your browser settings.
-              </AlertDescription>
-            </Alert>
-        )}
-        {hasMicPermission === false && (
-           <Alert variant="destructive" className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Microphone Permission Required</AlertTitle>
-              <AlertDescription>
-                TeachMeet needs access to your microphone to share your audio.
-                Please enable microphone permissions in your browser settings.
-              </AlertDescription>
-            </Alert>
-        )}
-         
-        {renderLayout()}
-
+      <main className="flex-1 p-4 flex items-center justify-center">
+        <div className="w-full h-full max-w-7xl mx-auto grid grid-cols-2 grid-rows-2 gap-4">
+            {mainGridParticipants.map(participant => (
+              <div key={participant.id} className="min-h-0">
+                <ParticipantView {...participant} />
+              </div>
+            ))}
+            {[...Array(placeholderCount)].map((_, i) => (
+                <div key={`placeholder-${i}`} className="min-h-0">
+                    <PlaceholderView />
+                </div>
+            ))}
+        </div>
       </main>
+      
+      {selfView && (
+          <div className="absolute bottom-24 right-4 w-40 h-28 md:w-56 md:h-36 rounded-xl overflow-hidden z-20 shadow-2xl border-2 border-background">
+            <ParticipantView {...selfView} />
+          </div>
+      )}
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
         <div className="flex items-center justify-center gap-4 bg-card/80 backdrop-blur-md p-3 rounded-full shadow-2xl border">
           <Button
             variant={localMicMuted ? "destructive" : "secondary"}
@@ -905,3 +743,4 @@ export default function MeetingPage() {
     </div>
   );
 }
+
