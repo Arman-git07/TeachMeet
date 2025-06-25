@@ -1,15 +1,15 @@
 rules_version = '2';
 
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // This rule allows any authenticated user to read and write all data.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // This rule allows any authenticated user to read and write all files.
     // WARNING: This is permissive and not recommended for production.
     // You should secure your data with more granular rules.
-    // For example:
-    // match /users/{userId} {
+    // For example, only allow users to upload to their own folder:
+    // match /avatars/{userId}/{allPaths=**} {
     //   allow read, write: if request.auth != null && request.auth.uid == userId;
     // }
-    match /{document=**} {
+    match /{allPaths=**} {
       allow read, write: if request.auth != null;
     }
   }
