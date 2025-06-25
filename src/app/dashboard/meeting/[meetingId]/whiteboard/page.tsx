@@ -396,10 +396,19 @@ export default function WhiteboardPage() {
         const pos = getPointerPosition(event)!;
         const dx = pos.x - moveStartPointRef.current.x; const dy = pos.y - moveStartPointRef.current.y;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            // FIX: Add a guard clause to ensure originalPositionsRef.current is not null
+            if (!originalPositionsRef.current) {
+                console.error("Whiteboard Error: Attempted to move selection with null originalPositionsRef. Aborting move.");
+                // Reset state to prevent further errors
+                operationStateRef.current = 'idle';
+                moveStartPointRef.current = null;
+                clearCanvas(tempCtx);
+                return;
+            }
             setWhiteboardState(prevState => {
                 const newPaths = prevState.paths.map(path => {
                     if (selectedPathIds.has(path.id)) {
-                        const originalPoints = originalPositionsRef.current!.paths.get(path.id);
+                        const originalPoints = originalPositionsRef.current.paths.get(path.id);
                         if (!originalPoints) return path;
                         return { ...path, points: originalPoints.map(p => ({ x: p.x + dx, y: p.y + dy })) };
                     }
@@ -407,7 +416,7 @@ export default function WhiteboardPage() {
                 });
                 const newTexts = prevState.texts.map(text => {
                     if (selectedTextIds.has(text.id)) {
-                        const originalPos = originalPositionsRef.current!.texts.get(text.id);
+                        const originalPos = originalPositionsRef.current.texts.get(text.id);
                         if (!originalPos) return text;
                         return { ...text, x: originalPos.x + dx, y: originalPos.y + dy };
                     }
