@@ -1,6 +1,6 @@
 
 'use client';
-import React, { useState, useEffect, useRef, use } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,6 @@ const ParticipantView = React.memo(function ParticipantView({
   isHandRaisedForView,
   isScreenSharing,
   photoURL,
-  hasCameraPermissionForView,
 }: Participant) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -133,9 +132,7 @@ const ParticipantView = React.memo(function ParticipantView({
                         <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
                     </Avatar>
                     <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
-                    {isMe && hasCameraPermissionForView === false ? (
-                      <p className="text-xs text-destructive-foreground bg-destructive px-2 py-1 rounded-md mt-1">Camera permission denied</p>
-                    ) : (isCameraOff || !stream) && (
+                    {isCameraOff || !stream && (
                       <VideoOff className="w-7 h-7 text-muted-foreground mt-1" title="Camera off"/>
                     )}
                 </>
@@ -196,8 +193,6 @@ export default function MeetingPage() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
 
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
@@ -215,7 +210,6 @@ export default function MeetingPage() {
           isMicMuted: localMicMuted,
           isCameraOff: isScreenSharingActive ? true : localCameraOff,
           stream: isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current,
-          hasCameraPermissionForView: hasCameraPermission,
           isHandRaisedForView: localHandRaised,
           isScreenSharing: isScreenSharingActive,
           photoURL: currentUser.photoURL
@@ -424,8 +418,6 @@ export default function MeetingPage() {
           video: true
         });
         localStreamRef.current = stream;
-        setHasCameraPermission(true);
-        setHasMicPermission(true);
         
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
@@ -441,27 +433,16 @@ export default function MeetingPage() {
         console.error("[MeetingPage] Failed to get media on mount:", err);
         if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
           toast({ variant: 'destructive', title: 'Permissions Denied', description: 'Camera and microphone access was denied. Please enable them in your browser settings.' });
-          setHasCameraPermission(false);
-          setHasMicPermission(false);
           setLocalCameraOff(true);
           setLocalMicMuted(true);
           await updateUserStatusInFirestore({ isCameraOff: true, isMicMuted: true });
         } else {
             toast({ variant: 'destructive', title: 'Media Device Error', description: 'Could not find a camera or microphone. Please check your devices.' });
-            setHasCameraPermission(false);
-            setHasMicPermission(false);
         }
       }
     };
 
     initializeMedia();
-
-    return () => {
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-        localStreamRef.current = null;
-      }
-    };
   }, [joinStatus, isScreenSharingActive]);
 
    useEffect(() => {
@@ -654,10 +635,9 @@ export default function MeetingPage() {
 
 
   return (
-    <div className="flex flex-col h-full bg-background/95 relative overflow-hidden">
-      
-      <main className="flex-1 p-4 flex items-center justify-center">
-        <div className="w-full h-full max-w-7xl mx-auto grid grid-cols-2 grid-rows-2 gap-4">
+    <div className="h-screen flex flex-col bg-background/95 relative overflow-hidden">
+      <main className="flex-1 p-2 sm:p-4">
+        <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
             {mainGridParticipants.map(participant => (
               <div key={participant.id} className="min-h-0">
                 <ParticipantView {...participant} />
@@ -672,48 +652,50 @@ export default function MeetingPage() {
       </main>
       
       {selfView && (
-          <div className="absolute bottom-24 right-4 w-40 h-28 md:w-56 md:h-36 rounded-xl overflow-hidden z-20 shadow-2xl border-2 border-background">
+          <div className="absolute bottom-20 md:bottom-24 right-2 sm:right-4 w-32 h-20 sm:w-40 sm:h-28 md:w-56 md:h-36 rounded-xl overflow-hidden z-20 shadow-2xl border-2 border-background">
             <ParticipantView {...selfView} />
           </div>
       )}
 
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
-        <div className="flex items-center justify-center gap-4 bg-card/80 backdrop-blur-md p-3 rounded-full shadow-2xl border">
+        <div className="flex items-center justify-center gap-2 sm:gap-4 bg-card/80 backdrop-blur-md p-2 sm:p-3 rounded-full shadow-2xl border">
           <Button
             variant={localMicMuted ? "destructive" : "secondary"}
             size="icon"
-            className="rounded-full w-12 h-12"
+            className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
             onClick={toggleMic}
             aria-label={localMicMuted ? "Unmute Microphone" : "Mute Microphone"}
           >
-            {localMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+            <MicOff className={cn("h-5 w-5 sm:h-6 sm:w-6", !localMicMuted && "hidden")} />
+            <Mic className={cn("h-5 w-5 sm:h-6 sm:w-6", localMicMuted && "hidden")} />
           </Button>
           <Button
              variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "secondary"}
              size="icon"
-             className="rounded-full w-12 h-12"
+             className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
              onClick={toggleCamera}
              aria-label={(localCameraOff && !isScreenSharingActive) ? "Turn Camera On" : "Turn Camera Off"}
              disabled={isScreenSharingActive}
           >
-            {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+             <VideoOff className={cn("h-5 w-5 sm:h-6 sm:w-6", !localCameraOff || isScreenSharingActive && "hidden")} />
+             <Video className={cn("h-5 w-5 sm:h-6 sm:w-6", localCameraOff && !isScreenSharingActive && "hidden")} />
           </Button>
 
            <Button
             size="icon"
             variant={localHandRaised ? "default" : "secondary"}
             className={cn(
-              "rounded-full w-12 h-12",
+              "rounded-full w-10 h-10 sm:w-12 sm:h-12",
               localHandRaised && "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent"
             )}
             onClick={toggleHandRaise}
             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
           >
-            <Hand className="h-6 w-6" />
+            <Hand className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
           
-          <Button variant="destructive" size="lg" className="rounded-full px-6 h-12" onClick={leaveMeeting} aria-label="Leave Meeting">
-            <PhoneOff className="h-6 w-6" />
+          <Button variant="destructive" size="lg" className="rounded-full px-4 sm:px-6 h-10 sm:h-12" onClick={leaveMeeting} aria-label="Leave Meeting">
+            <PhoneOff className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
         </div>
       </div>
@@ -744,3 +726,4 @@ export default function MeetingPage() {
   );
 }
 
+    
