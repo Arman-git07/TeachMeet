@@ -302,21 +302,19 @@ export default function WhiteboardPage() {
     pointerDownPositionRef.current = pos;
     finalizeLiveText();
     
-    // Check if clicking inside an existing selection to start a drag
     if ((activeTool === 'lasso' || activeTool === 'select') && selectionBoundingBoxRef.current && isPointInRect(pos, selectionBoundingBoxRef.current)) {
         operationStateRef.current = 'dragging';
         
         const selectedOriginals = new Map<string, WhiteboardElement>();
         whiteboardState.elements.forEach(el => {
             if(whiteboardState.selectedElementIds.has(el.id)){
-                selectedOriginals.set(el.id, JSON.parse(JSON.stringify(el))); // Deep copy
+                selectedOriginals.set(el.id, JSON.parse(JSON.stringify(el)));
             }
         });
         originalPositionsRef.current = selectedOriginals;
         return;
     }
 
-    // If not dragging, any click should clear the selection
     if (whiteboardState.selectedElementIds.size > 0) {
       setWhiteboardState(s => ({ ...s, selectedElementIds: new Set() }));
     }
@@ -389,7 +387,7 @@ export default function WhiteboardPage() {
     }
   }, [getPointerPosition, selectedColor, lineWidth, drawElement]);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((event: React.MouseEvent | React.TouchEvent) => {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (!tempCtx) return;
     
@@ -445,12 +443,10 @@ export default function WhiteboardPage() {
                     const elementBox = getElementBoundingBox(element);
                     if(!elementBox) return;
 
-                    // Broad phase check
                     if(lassoBox && !boxesIntersect(lassoBox, elementBox)){
                         return;
                     }
 
-                    // Narrow phase check
                     if (element.type === 'path') {
                         if (element.points.some(p => isPointInPolygon(p, lassoPolygon))) {
                             newSelectedIds.add(element.id);
@@ -475,7 +471,7 @@ export default function WhiteboardPage() {
             }
             break;
         case 'dragging':
-            const endPos = getPointerPosition({ nativeEvent: new MouseEvent('mouseup') } as React.MouseEvent); // HACK: get current pos
+            const endPos = getPointerPosition(event);
             if(startPos && endPos) {
                 const originalPositions = originalPositionsRef.current;
                 if (!originalPositions || originalPositions.size === 0) break;
@@ -579,3 +575,5 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
+    
