@@ -75,7 +75,7 @@ interface Participant {
   isMe?: boolean;
   isMicMuted?: boolean;
   isCameraOff?: boolean;
-  videoRef?: React.RefObject<HTMLVideoElement>;
+  stream?: MediaStream | null;
   hasCameraPermissionForView?: boolean | null;
   isHandRaisedForView?: boolean;
   isScreenSharing?: boolean;
@@ -87,94 +87,75 @@ const ParticipantView = React.memo(function ParticipantView({
   isMe = false,
   isMicMuted = false,
   isCameraOff = false,
-  videoRef,
-  hasCameraPermissionForView,
+  stream,
   isHandRaisedForView,
   isScreenSharing,
-  photoURL
+  photoURL,
+  hasCameraPermissionForView,
 }: Participant) {
   const { toast } = useToast();
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream || null;
+    }
+  }, [stream]);
 
   const handleFullScreenClick = () => {
-    const targetElement = isScreenSharing && videoRef?.current?.srcObject ? videoRef.current : videoRef?.current;
-
+    const targetElement = videoRef.current;
     if (targetElement && targetElement.srcObject) {
-        if (targetElement.requestFullscreen) {
-            targetElement.requestFullscreen().catch(err => {
-            console.error("Error entering fullscreen:", err);
-            toast({ variant: 'destructive', title: 'Fullscreen Error', description: 'Could not enter fullscreen mode.' });
-            });
-        } else {
-            toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
-        }
-    } else if (isScreenSharing && !targetElement?.srcObject) {
-        toast({ title: 'Screen Share Active', description: 'Screen is being shared. Fullscreen will apply to the shared content when available.' });
+      if (targetElement.requestFullscreen) {
+        targetElement.requestFullscreen().catch((err) => {
+          console.error("Error entering fullscreen:", err);
+          toast({ variant: 'destructive', title: 'Fullscreen Error', description: 'Could not enter fullscreen mode.' });
+        });
+      } else {
+        toast({ variant: 'destructive', title: 'Fullscreen Not Supported', description: 'Your browser does not support this fullscreen action.' });
+      }
     } else {
-        toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream or screen share.' });
+      toast({ title: 'No Video Stream', description: 'Cannot enter full screen without an active video stream.' });
     }
   };
 
   const avatarFallbackName = name ? name.charAt(0).toUpperCase() : 'U';
   const avatarSrc = photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`;
+  const showVideo = !!stream && !isCameraOff && !isScreenSharing;
 
   return (
     <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
-      {isMe ? (
-        <>
-          <video
-            ref={videoRef}
-            muted
-            autoPlay
-            playsInline
-            className={cn("w-full h-full object-contain bg-muted", { 'hidden': !videoRef?.current?.srcObject && !isScreenSharing}, { 'block': isScreenSharing && videoRef?.current?.srcObject})}
-          />
-          {((isCameraOff && !isScreenSharing) || hasCameraPermissionForView === false || (!videoRef?.current?.srcObject && !isScreenSharing)) && (
-            <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
-              <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
-                <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user" />
-                <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
-              </Avatar>
-              {hasCameraPermissionForView === false && <VideoOff className="w-7 h-7 text-muted-foreground mb-1" />}
-              <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
-              {hasCameraPermissionForView === false && <p className="text-xs text-muted-foreground">Camera permission denied</p>}
-            </div>
-          )}
-           {isScreenSharing && !videoRef?.current?.srcObject && (
-             <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
-                <ScreenShare className="w-16 h-16 text-muted-foreground mb-2"/>
-                <p className="text-base font-medium text-foreground">Sharing Screen...</p>
-             </div>
-           )}
-        </>
-      ) : isScreenSharing ? (
-        <div className="w-full h-full bg-muted/80 flex flex-col items-center justify-center p-4 text-center">
-          <ScreenShare className="w-16 h-16 text-primary mb-3" />
-          <p className="text-lg font-semibold text-foreground mb-1">{name}</p>
-          <p className="text-sm text-muted-foreground">is sharing their screen</p>
-          <Avatar className="mt-3 w-10 h-10 border-2 border-background shadow-sm">
-            <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user" />
-            <AvatarFallback>{avatarFallbackName}</AvatarFallback>
-          </Avatar>
-        </div>
-      ) : isCameraOff || !photoURL ? (
-        <div className="w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
-          <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
-             <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user"/>
-             <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
-          </Avatar>
-          <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
-          <VideoOff className="w-7 h-7 text-muted-foreground mt-1" title="Camera off"/>
-        </div>
-      ) : (
-        <div className="w-full h-full bg-muted flex flex-col items-center justify-center p-4 text-center">
-          <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
-             <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user"/>
-             <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
-          </Avatar>
-           <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
-           <Video className="w-7 h-7 text-muted-foreground mt-1" title="Camera on"/>
+      <video
+        ref={videoRef}
+        muted={isMe}
+        autoPlay
+        playsInline
+        className={cn("w-full h-full object-contain bg-muted", !showVideo && "hidden")}
+      />
+      
+      {!showVideo && (
+        <div className="absolute inset-0 w-full h-full bg-muted/70 flex flex-col items-center justify-center p-4 text-center">
+            {isScreenSharing ? (
+                <>
+                    <ScreenShare className="w-16 h-16 text-muted-foreground mb-2"/>
+                    <p className="text-base font-medium text-foreground">{isMe ? "You are sharing your screen" : `${name} is sharing`}</p>
+                </>
+            ) : (
+                <>
+                    <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
+                        <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user" />
+                        <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
+                    </Avatar>
+                    <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
+                    {isMe && hasCameraPermissionForView === false ? (
+                      <p className="text-xs text-destructive-foreground bg-destructive px-2 py-1 rounded-md mt-1">Camera permission denied</p>
+                    ) : (isCameraOff || !stream) && (
+                      <VideoOff className="w-7 h-7 text-muted-foreground mt-1" title="Camera off"/>
+                    )}
+                </>
+            )}
         </div>
       )}
+
       <div className="absolute bottom-2 left-2 bg-gradient-to-r from-black/70 to-transparent px-3 py-1.5 rounded-md backdrop-blur-sm">
         <p className="text-sm font-medium text-white shadow-sm">{name} {isMe && <span className="text-xs opacity-80">(You)</span>}</p>
       </div>
@@ -232,7 +213,6 @@ export default function MeetingPage() {
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
   const [joinStatus, setJoinStatus] = useState<'pending' | 'joining' | 'joined' | 'failed'>('pending');
 
-  const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
 
@@ -267,7 +247,7 @@ export default function MeetingPage() {
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
   
-  const combinedParticipants = currentUser
+  const combinedParticipants: Participant[] = currentUser
     ? [
         {
           id: currentUser.uid,
@@ -275,7 +255,7 @@ export default function MeetingPage() {
           isMe: true,
           isMicMuted: localMicMuted,
           isCameraOff: isScreenSharingActive ? true : localCameraOff,
-          videoRef: localVideoRef,
+          stream: isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current,
           hasCameraPermissionForView: hasCameraPermission,
           isHandRaisedForView: localHandRaised,
           isScreenSharing: isScreenSharingActive,
@@ -529,10 +509,6 @@ export default function MeetingPage() {
         localStreamRef.current = stream;
         setHasCameraPermission(true);
         setHasMicPermission(true);
-
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
         
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
@@ -590,7 +566,7 @@ export default function MeetingPage() {
   }, [meetingId]);
 
 
-  const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'videoRef' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
+  const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'stream' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
     if (!currentUser || !meetingId || !db || joinStatus !== 'joined') {
       console.warn("[MeetingPage] Skipping Firestore update: User not ready or not joined.", {currentUserPresent: !!currentUser, meetingId, dbPresent: !!db, joinStatus});
       return;
@@ -631,9 +607,6 @@ export default function MeetingPage() {
     setIsScreenSharingActive(false);
     await updateUserStatusInFirestore({ isScreenSharing: false });
 
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
-    }
     if (showToast) {
         toast({ title: "Screen Sharing Stopped" });
     }
@@ -745,9 +718,7 @@ export default function MeetingPage() {
       }
 
       screenShareStreamRef.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
+      
       setIsScreenSharingActive(true);
       await updateUserStatusInFirestore({ isScreenSharing: true, isCameraOff: true });
       toast({ title: "Screen Sharing Started" });
@@ -933,4 +904,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
