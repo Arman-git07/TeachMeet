@@ -26,7 +26,7 @@ interface Point { x: number; y: number; }
 type DrawingElement = { type: 'path'; id: string; points: Point[]; color: string; lineWidth: number; };
 type TextElement = { type: 'text'; id:string; text: string; x: number; y: number; color: string; font: string; width: number; height: number; };
 type WhiteboardElement = DrawingElement | TextElement;
-interface WhiteboardState { elements: WhiteboardElement[]; }
+interface WhiteboardState { elements: (WhiteboardElement | null)[]; }
 
 interface BoundingBox { minX: number; minY: number; maxX: number; maxY: number; }
 
@@ -34,6 +34,20 @@ interface BoundingBox { minX: number; minY: number; maxX: number; maxY: number; 
 const MAX_HISTORY_STEPS = 50;
 const canvasBackgroundColor = "hsl(0 0% 100%)";
 const darkCanvasBackgroundColor = "hsl(202 34% 21%)";
+
+// --- Helper Functions ---
+const isPointInRect = (point: Point, rect: BoundingBox) => (point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY);
+const isPointInPolygon = (point: Point, polygon: Point[]): boolean => {
+    let isInside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+      if (intersect) isInside = !isInside;
+    }
+    return isInside;
+};
+
 
 // --- UI Components ---
 const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType; label: string; onClick: () => void; isActive?: boolean; }) => (
@@ -89,7 +103,8 @@ export default function WhiteboardPage() {
   const getFontString = () => `${getFontSize()}px sans-serif`;
 
   // --- Geometry and Bounding Box Helpers ---
-  const getElementBoundingBox = (element: WhiteboardElement): BoundingBox => {
+  const getElementBoundingBox = useCallback((element: WhiteboardElement | null): BoundingBox => {
+    if (!element) return {minX: 0, minY: 0, maxX: 0, maxY: 0};
     if (element.type === 'path') {
       if (!element.points || element.points.length === 0) return {minX: 0, minY: 0, maxX: 0, maxY: 0};
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -101,26 +116,14 @@ export default function WhiteboardPage() {
     }
     // else it's a TextElement
     return { minX: element.x, minY: element.y, maxX: element.x + element.width, maxY: element.y + element.height };
-  };
+  }, []);
   
-  const isPointInRect = (point: Point, rect: BoundingBox) => (point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY);
-  const isPointInPolygon = (point: Point, polygon: Point[]): boolean => {
-    let isInside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].x, yi = polygon[i].y;
-      const xj = polygon[j].x, yj = polygon[j].y;
-      const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-      if (intersect) isInside = !isInside;
-    }
-    return isInside;
-  };
-
   const getSelectionBoundingBox = useCallback((): BoundingBox | null => {
     if (selectedElementIds.size === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
     selectedElementIds.forEach(id => {
-      const element = whiteboardState.elements.find(el => el.id === id);
+      const element = whiteboardState.elements.find(el => el && el.id === id);
       if (element) {
         const box = getElementBoundingBox(element);
         minX = Math.min(minX, box.minX);
@@ -131,7 +134,7 @@ export default function WhiteboardPage() {
     });
 
     return (minX === Infinity) ? null : { minX, minY, maxX, maxY };
-  }, [whiteboardState.elements, selectedElementIds]);
+  }, [whiteboardState.elements, selectedElementIds, getElementBoundingBox]);
 
 
   // --- Drawing Functions ---
@@ -277,7 +280,8 @@ export default function WhiteboardPage() {
         const newTextElement: TextElement = { type: 'text', id: Date.now().toString(), text: textInput.value, x: pos.x, y: pos.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
         
         setWhiteboardState(prevState => {
-           const newState = { elements: [...prevState.elements, newTextElement] };
+           const newElements = [...prevState.elements, newTextElement];
+           const newState = { elements: newElements.filter(Boolean) };
            pushToHistory(newState);
            return newState;
         });
@@ -295,16 +299,53 @@ export default function WhiteboardPage() {
     if ((event as React.MouseEvent).button !== 0) return;
     const pos = getPointerPosition(event);
     if (!pos) return;
+
+    if (activeTool === 'erase') {
+        let elementToDeleteId: string | null = null;
+        // Iterate in reverse to check top-most elements first
+        for (let i = whiteboardState.elements.length - 1; i >= 0; i--) {
+            const element = whiteboardState.elements[i];
+            if (!element) continue;
+
+            const box = getElementBoundingBox(element);
+            if (isPointInRect(pos, box)) { // Coarse check first
+                if (element.type === 'path') {
+                    // Refined check for paths by checking distance to points
+                    const threshold = Math.max(10, element.lineWidth / 2 + 3);
+                    for (const point of element.points) {
+                        if (Math.hypot(point.x - pos.x, point.y - pos.y) < threshold) {
+                            elementToDeleteId = element.id;
+                            break;
+                        }
+                    }
+                    if (elementToDeleteId) break;
+                } else { // For text elements, bounding box is enough
+                    elementToDeleteId = element.id;
+                    break;
+                }
+            }
+        }
+
+        if (elementToDeleteId) {
+            setWhiteboardState(prevState => {
+                const newElements = prevState.elements.filter(el => el && el.id !== elementToDeleteId);
+                const newState = { elements: newElements };
+                pushToHistory(newState);
+                return newState;
+            });
+        }
+        return; // Stop further processing for the eraser tool
+    }
     
     finalizeLiveText();
-
     const selectionBounds = getSelectionBoundingBox();
+
     if (activeTool === 'select' && selectionBounds && isPointInRect(pos, selectionBounds)) {
         operationStateRef.current = 'movingSelection';
         moveStartPointRef.current = pos;
         const originalElements = new Map<string, { x: number; y: number } | Point[]>();
         whiteboardState.elements.forEach(element => {
-            if (selectedElementIds.has(element.id)) {
+            if (element && selectedElementIds.has(element.id)) {
                 if (element.type === 'path') {
                     originalElements.set(element.id, element.points.map(p => ({...p})));
                 } else {
@@ -318,7 +359,10 @@ export default function WhiteboardPage() {
 
     setSelectedElementIds(new Set());
 
-    if (activeTool === 'select') { operationStateRef.current = 'lassoing'; lassoPathRef.current = [pos]; } 
+    if (activeTool === 'select') { 
+        operationStateRef.current = 'lassoing'; 
+        lassoPathRef.current = [pos]; 
+    } 
     else if (activeTool === 'text') {
         operationStateRef.current = 'texting';
         textCursorPosition.current = pos;
@@ -330,17 +374,17 @@ export default function WhiteboardPage() {
             liveTextInputRef.current.focus();
         }
     }
-    else if (activeTool === 'draw' || activeTool === 'erase') {
+    else if (activeTool === 'draw') {
         operationStateRef.current = 'drawing';
-        currentPathRef.current = { type: 'path', id: Date.now().toString(), points: [pos], color: activeTool === 'erase' ? (isDarkMode ? darkCanvasBackgroundColor : canvasBackgroundColor) : selectedColor, lineWidth: getLineWidth() };
+        currentPathRef.current = { type: 'path', id: Date.now().toString(), points: [pos], color: selectedColor, lineWidth: getLineWidth() };
     } else { // Shape tools
         operationStateRef.current = 'shaping'; 
         shapeStartPointRef.current = pos; 
     }
-  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, whiteboardState.elements, selectedElementIds, finalizeLiveText, isDarkMode]);
+  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, whiteboardState.elements, selectedElementIds, finalizeLiveText, pushToHistory, getElementBoundingBox]);
 
   const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if (operationStateRef.current === 'idle' || operationStateRef.current === 'texting') return;
+    if (operationStateRef.current === 'idle' || operationStateRef.current === 'texting' || activeTool === 'erase') return;
     const pos = getPointerPosition(event);
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (!pos || !tempCtx) return;
@@ -359,7 +403,7 @@ export default function WhiteboardPage() {
         else if (activeTool === 'circle') { const radius = Math.hypot(pos.x - start.x, pos.y - start.y); tempCtx.arc(start.x, start.y, radius, 0, 2 * Math.PI); }
         else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6));
+            tempCtx.moveTo(start.x, start.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6)); tempCtx.moveTo(pos.x, pos.y); tempCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6));
         } else if (activeTool === 'triangle') { tempCtx.moveTo(start.x + (pos.x - start.x) / 2, start.y); tempCtx.lineTo(start.x, pos.y); tempCtx.lineTo(pos.x, pos.y); tempCtx.closePath(); }
         tempCtx.stroke();
     } else if (operationStateRef.current === 'lassoing') {
@@ -373,7 +417,7 @@ export default function WhiteboardPage() {
         const dx = pos.x - moveStartPointRef.current.x; const dy = pos.y - moveStartPointRef.current.y;
         tempCtx.globalAlpha = 0.7;
         originalPositionsRef.current.elements.forEach((originalData, id) => {
-            const element = whiteboardState.elements.find(el => el.id === id);
+            const element = whiteboardState.elements.find(el => el && el.id === id);
             if (element) {
               if (element.type === 'path') {
                 drawElement(tempCtx, { ...element, points: (originalData as Point[]).map(p => ({ x: p.x + dx, y: p.y + dy })) });
@@ -387,12 +431,18 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, activeTool, getLineWidth, selectedColor, whiteboardState.elements]);
 
   const handlePointerUp = useCallback((event: React.MouseEvent | React.TouchEvent) => {
+    if (activeTool === 'erase') {
+        operationStateRef.current = 'idle';
+        return;
+    }
+
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (!tempCtx || operationStateRef.current === 'idle' || operationStateRef.current === 'texting') return;
     
     if (operationStateRef.current === 'lassoing') {
         const newSelectedIds = new Set<string>();
         whiteboardState.elements.forEach(element => {
+            if (!element) return;
             const box = getElementBoundingBox(element);
             const corners = [{x:box.minX, y:box.minY}, {x:box.maxX, y:box.minY}, {x:box.maxX, y:box.maxY}, {x:box.minX, y:box.maxY}];
             if (corners.some(c => isPointInPolygon(c, lassoPathRef.current))) {
@@ -404,11 +454,12 @@ export default function WhiteboardPage() {
         const pos = getPointerPosition(event)!;
         const dx = pos.x - moveStartPointRef.current.x;
         const dy = pos.y - moveStartPointRef.current.y;
-        const originalPositions = originalPositionsRef.current; // Capture ref value
+        const originalPositions = originalPositionsRef.current;
 
         if ((Math.abs(dx) > 1 || Math.abs(dy) > 1) && originalPositions) {
             setWhiteboardState(prevState => {
                 const newElements = prevState.elements.map(element => {
+                    if (!element) return null;
                     if (selectedElementIds.has(element.id)) {
                         const originalData = originalPositions.elements.get(element.id);
                         if (!originalData) return element;
@@ -428,7 +479,8 @@ export default function WhiteboardPage() {
     } else if (currentPathRef.current && currentPathRef.current.points.length > 1 && operationStateRef.current === 'drawing') {
         const finalPath = currentPathRef.current;
         setWhiteboardState(prevState => {
-            const newState = { elements: [...prevState.elements, finalPath] };
+            const newElements = [...prevState.elements, finalPath];
+            const newState = { elements: newElements.filter(Boolean) };
             pushToHistory(newState);
             return newState;
         });
@@ -450,14 +502,15 @@ export default function WhiteboardPage() {
         } else if (activeTool === 'arrow') {
             const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
             newPath.points.push(start, pos); 
-            const path2: DrawingElement = { type: 'path', id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle - Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
+            const path2: DrawingElement = { type: 'path', id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
             const path3: DrawingElement = { type: 'path', id: (Date.now()+2).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
             additionalPaths = [path2, path3];
         } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
         
         if (newPath.points.length > 0) {
             setWhiteboardState(prevState => {
-                const newState = { elements: [...prevState.elements, newPath, ...additionalPaths]};
+                const newElements = [...prevState.elements, newPath, ...additionalPaths];
+                const newState = { elements: newElements.filter(Boolean) };
                 pushToHistory(newState);
                 return newState;
             });
@@ -471,7 +524,7 @@ export default function WhiteboardPage() {
     lassoPathRef.current = [];
     moveStartPointRef.current = null;
     originalPositionsRef.current = null;
-  }, [getPointerPosition, activeTool, getLineWidth, selectedColor, whiteboardState, selectedElementIds, pushToHistory]);
+  }, [getPointerPosition, activeTool, getLineWidth, selectedColor, whiteboardState, selectedElementIds, pushToHistory, getElementBoundingBox]);
 
   const handleClearWhiteboard = () => { 
     setWhiteboardState({ elements: [] });
@@ -531,7 +584,7 @@ export default function WhiteboardPage() {
                 {(!['select', 'erase'].includes(activeTool)) && (
                     <div><span className="text-xs font-medium text-muted-foreground">Color:</span><div className="flex flex-wrap gap-2 mt-1 justify-center">{['#000000', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#0EA5E9', '#6366F1', '#EC4899'].map(c => (<ColorSwatch key={c} color={c} onClick={() => setSelectedColor(c)} isSelected={selectedColor === c} />))}</div></div>
                 )}
-                {(activeTool === 'draw' || activeTool === 'erase') && (
+                {(activeTool === 'draw') && (
                     <div><span className="text-xs font-medium text-muted-foreground">Size:</span><div className="flex gap-2 mt-1 justify-center">{brushSizes.map(b => (<Button key={b.name} variant={selectedBrushSize === b.name ? "default" : "outline"} size="icon" className="rounded-lg w-10 h-10" onClick={() => setSelectedBrushSize(b.name)}><CircleIconShape className={cn("h-5 w-5", b.name === 'tiny' && 'h-2 w-2', b.name === 'small' && 'h-3 w-3', b.name === 'large' && 'h-6 w-6', b.name === 'xlarge' && 'h-7 w-7')} /></Button>))}</div></div>
                 )}
                 {showShapeOptions && (
