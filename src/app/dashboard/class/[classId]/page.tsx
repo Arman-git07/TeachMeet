@@ -267,9 +267,11 @@ export default function ClassDetailsPage() {
     }));
 
     const examsColRef = collection(db, "exams");
-    const examsQuery = query(examsColRef, where("classId", "==", classId), orderBy("dueDateTime", "desc"));
+    const examsQuery = query(examsColRef, where("classId", "==", classId));
      unsubFunctions.push(onSnapshot(examsQuery, (snapshot) => {
-        setExams(snapshot.docs.map(d => ({ id: d.id, ...d.data(), dueDateTime: d.data().dueDateTime?.toDate() } as ClassExam)));
+        const fetchedExams = snapshot.docs.map(d => ({ id: d.id, ...d.data(), dueDateTime: d.data().dueDateTime?.toDate() } as ClassExam));
+        fetchedExams.sort((a, b) => new Date(b.dueDateTime).getTime() - new Date(a.dueDateTime).getTime());
+        setExams(fetchedExams);
     }));
 
 

@@ -67,10 +67,10 @@ export default function ExamsPage() {
 
     if (filterClassId) {
       // Fetch all exams for a specific class (publicly viewable list)
-      examsQuery = query(collection(db, "exams"), where("classId", "==", filterClassId), orderBy("scheduledDateTime", "desc"));
+      examsQuery = query(collection(db, "exams"), where("classId", "==", filterClassId));
     } else if (user) {
       // Fetch all exams created by the current user if no class filter is applied
-      examsQuery = query(collection(db, "exams"), where("teacherId", "==", user.uid), orderBy("scheduledDateTime", "desc"));
+      examsQuery = query(collection(db, "exams"), where("teacherId", "==", user.uid));
     } else {
       // This case should be handled by the guard above, but as a fallback, don't query.
       setExams([]);
@@ -100,6 +100,9 @@ export default function ExamsPage() {
             status: status 
         } as Exam);
       });
+      
+      fetchedExams.sort((a, b) => new Date(b.scheduledDateTime).getTime() - new Date(a.scheduledDateTime).getTime());
+      
       setExams(fetchedExams);
       setIsLoading(false);
     }, (error) => {

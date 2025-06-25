@@ -98,9 +98,7 @@ export default function ClassesPage() {
 
   useEffect(() => {
     const fetchClassrooms = async () => {
-      // Add guard to ensure this doesn't run while auth is loading or if trying a user-specific filter without being authenticated
       if (authLoading || (activeFilter !== 'all' && !isAuthenticated)) {
-        // If not authenticated and trying to view a protected filter, clear list and stop loading.
         if (!isAuthenticated) {
             setClassrooms([]);
             setInitialLoading(false);
@@ -111,7 +109,7 @@ export default function ClassesPage() {
       try {
         let q;
         if (activeFilter === 'teaching' && user) {
-          q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"));
+          q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid));
         } else {
           q = query(collection(db, "classrooms"), orderBy("createdAt", "desc"));
         }
@@ -149,13 +147,19 @@ export default function ClassesPage() {
           }
           return classroomData;
         });
-        const fetchedClassrooms = await Promise.all(fetchedClassroomsPromises);
+        
+        let fetchedClassrooms = await Promise.all(fetchedClassroomsPromises);
+
+        if (activeFilter === 'teaching') {
+          fetchedClassrooms.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+        }
+
         setClassrooms(fetchedClassrooms);
       } catch (error: any) {
         console.error("Error fetching classrooms: ", error);
         let desc = "Could not fetch classrooms.";
-        if (error.code === 'permission-denied') {
-          desc = "Permission denied fetching classrooms. Please check Firestore security rules.";
+        if (error.code === 'permission-denied' || error.message.includes('index')) {
+          desc = "Permission denied or a required database index is missing. Please check Firestore security rules and indexes.";
         }
         toast({ variant: "destructive", title: "Error", description: desc });
       } finally {
