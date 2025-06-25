@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save, Loader2, UploadCloud, Users as UsersIcon, Edit as EditIcon, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, Loader2, UploadCloud, Users as UsersIcon, Edit as EditIcon, AlertTriangle, BookOpen, PlusCircle, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +19,12 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore'; // Firestore import
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
+interface Subject {
+  subjectName: string;
+  teacherId: string;
+  teacherName: string; // Keep this for display, even if it's a placeholder initially
+}
+
 interface ClassroomEditableDetails {
   id: string;
   name: string;
@@ -26,6 +32,7 @@ interface ClassroomEditableDetails {
   thumbnailUrl: string;
   dataAiHint?: string;
   teacherId: string; 
+  subjects?: Subject[];
 }
 
 const MAX_IMAGE_SIZE_MB = 5;
@@ -56,6 +63,10 @@ export default function EditClassPage() {
   const [editClassImagePreview, setEditClassImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [newTeacherId, setNewTeacherId] = useState('');
 
   useEffect(() => {
     if (classId && !authLoading) {
@@ -76,6 +87,7 @@ export default function EditClassPage() {
           setEditClassName(fetchedClass.name);
           setEditClassDescription(fetchedClass.description);
           setEditClassImagePreview(fetchedClass.thumbnailUrl);
+          setSubjects(fetchedClass.subjects || []);
         } else {
           toast({ variant: "destructive", title: "Error", description: "Could not load class details." });
           router.push('/dashboard/classes');
@@ -111,6 +123,31 @@ export default function EditClassPage() {
       setEditClassImagePreview(classroom?.thumbnailUrl || null);
     }
   };
+  
+  const handleAddSubject = () => {
+    if (!newSubjectName.trim() || !newTeacherId.trim()) {
+      toast({ variant: 'destructive', title: 'Missing Info', description: 'Please provide both a subject name and a teacher ID.' });
+      return;
+    }
+    // Note: In a production app, you would likely fetch teacher's name using their ID.
+    // For this prototype, a placeholder name is used.
+    const newSubject: Subject = {
+      subjectName: newSubjectName.trim(),
+      teacherId: newTeacherId.trim(),
+      teacherName: `Teacher (${newTeacherId.trim().substring(0, 5)}...)`
+    };
+    setSubjects(prev => [...prev, newSubject]);
+    setNewSubjectName('');
+    setNewTeacherId('');
+    toast({ title: 'Subject Added', description: `${newSubject.subjectName} added to the list. Click "Save Changes" to confirm.` });
+  };
+  
+  const handleRemoveSubject = (indexToRemove: number) => {
+    const subjectToRemove = subjects[indexToRemove];
+    setSubjects(prev => prev.filter((_, index) => index !== indexToRemove));
+    toast({ title: 'Subject Removed', description: `${subjectToRemove.subjectName} removed from the list. Click "Save Changes" to confirm.` });
+  };
+
 
   const uploadImageToStorage = async (imageFile: File, userId: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
     const imageFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
@@ -178,6 +215,7 @@ export default function EditClassPage() {
         description: editClassDescription.trim(),
         thumbnailUrl: updatedThumbnailUrl,
         dataAiHint: updatedDataAiHint, // Will be undefined if new image uploaded, or same if placeholder updated
+        subjects: subjects,
       });
 
       toast({ title: "Class Updated!", description: `"${editClassName.trim()}" has been successfully updated.` });
@@ -262,17 +300,70 @@ export default function EditClassPage() {
           </div>
           {canEdit && (
             <Button variant="outline" className="w-full rounded-lg" onClick={handleManageMembers} disabled={isSaving}>
-                <UsersIcon className="mr-2 h-4 w-4" /> Manage Members
+                <UsersIcon className="mr-2 h-4 w-4" /> Manage Class Roster
             </Button>
           )}
         </CardContent>
-        <CardFooter>
-          <Button type="button" onClick={handleUpdateClass} className="w-full btn-gel rounded-lg" disabled={isSaving || !editClassName.trim() || !canEdit}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {isSaving ? (editClassImageFile ? 'Uploading & Saving...' : 'Saving...') : 'Save Changes'}
-          </Button>
-        </CardFooter>
+        {/* Save button is now at the bottom of the page */}
       </Card>
+      
+      {canEdit && (
+        <Card className="rounded-xl shadow-xl border-border/50 max-w-2xl mx-auto" id="subjects">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-7 w-7 text-primary" />
+              <CardTitle>Manage Subjects &amp; Teachers</CardTitle>
+            </div>
+            <CardDescription>Add or remove subjects and assign teachers to this class.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {subjects && subjects.length > 0 ? (
+              <div className="space-y-2">
+                {subjects.map((subject, index) => (
+                  <div key={index} className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/30">
+                    <div>
+                      <p className="font-medium text-foreground">{subject.subjectName}</p>
+                      <p className="text-xs text-muted-foreground">Teacher ID: {subject.teacherId}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleRemoveSubject(index)} disabled={isSaving}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-center text-muted-foreground py-4">No subjects added yet.</p>
+            )}
+            <div className="pt-4 border-t mt-4 space-y-3">
+              <h4 className="font-medium text-foreground">Add New Subject</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className='space-y-1.5'>
+                  <Label htmlFor='newSubjectName'>Subject Name</Label>
+                  <Input id='newSubjectName' value={newSubjectName} onChange={e => setNewSubjectName(e.target.value)} placeholder="e.g., Physics 101" className="rounded-lg" disabled={isSaving}/>
+                </div>
+                <div className='space-y-1.5'>
+                  <Label htmlFor='newTeacherId'>Teacher's User ID</Label>
+                  <Input id='newTeacherId' value={newTeacherId} onChange={e => setNewTeacherId(e.target.value)} placeholder="e.g., abCDe12fgH..." className="rounded-lg" disabled={isSaving}/>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Note: In a full app, you would search for a teacher by email. For now, please enter their unique User ID.</p>
+              <Button onClick={handleAddSubject} className="w-full mt-2 btn-gel rounded-lg" disabled={isSaving}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Subject
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {canEdit && (
+        <div className="max-w-2xl mx-auto w-full">
+            <Button type="button" onClick={handleUpdateClass} className="w-full btn-gel rounded-lg text-lg py-3" disabled={isSaving || !editClassName.trim() || !canEdit}>
+                {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+                {isSaving ? (editClassImageFile ? 'Uploading & Saving...' : 'Saving Changes...') : 'Save All Changes'}
+            </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2 } from "lucide-react";
+import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +49,7 @@ interface Classroom {
   createdAt: any;
   joinRequests?: { [userId: string]: boolean };
   members?: { [userId: string]: { role: 'student' | 'teacher' } };
+  subjects?: { subjectName: string; teacherName: string; teacherId: string; }[];
 }
 
 
@@ -128,6 +129,7 @@ export default function ClassesPage() {
             thumbnailUrl: data.thumbnailUrl,
             dataAiHint: data.dataAiHint,
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+            subjects: data.subjects || [],
             joinRequests: {},
             members: {},
           };
@@ -298,6 +300,7 @@ export default function ClassesPage() {
         createdAt: serverTimestamp(),
         thumbnailUrl: imageDetails.thumbnailUrl,
         dataAiHint: imageDetails.dataAiHint,
+        subjects: [], // Initialize with empty subjects array
       };
 
       const docRef = await addDoc(collection(db, "classrooms"), newClassData);
@@ -725,7 +728,7 @@ export default function ClassesPage() {
                         <AvatarImage src={classroom.teacherAvatar} alt={classroom.teacherName} data-ai-hint="teacher avatar"/>
                         <AvatarFallback>{getInitialsFromName(classroom.teacherName, "T")}</AvatarFallback>
                     </Avatar>
-                    <CardDescription className="text-xs text-muted-foreground truncate">Taught by {classroom.teacherName}</CardDescription>
+                    <CardDescription className="text-xs text-muted-foreground truncate">Managed by {classroom.teacherName}</CardDescription>
                 </div>
               </CardHeader>
               {/* Card Content with Description */}
@@ -736,15 +739,12 @@ export default function ClassesPage() {
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span className="flex items-center"><UsersIcon className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
-                    {/* Display formatted date if createdAt exists */}
+                    {classroom.subjects && classroom.subjects.length > 0 && (
+                      <span className="flex items-center"><BookOpen className="mr-1.5 h-3.5 w-3.5" /> {classroom.subjects.length} Subjects</span>
+                    )}
                     {classroom.createdAt && <span className="text-xs text-muted-foreground/80">{new Date(classroom.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </div>
                 {actionButton}
-                 {/* Alternative/Additional "View Details" button, if primary action is something else.
-                <Button onClick={() => handleViewClass(classroom.id, classroom.name)} variant="outline" className="w-full rounded-lg text-sm">
-                    View Details
-                </Button>
-                */}
               </CardFooter>
             </Card>
           );

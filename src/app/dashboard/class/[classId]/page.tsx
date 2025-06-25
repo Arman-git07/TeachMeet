@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import {
     ArrowLeft, CalendarDays, DollarSign, Users, AlertTriangle,
     Megaphone, ClipboardList, Link as LinkIconLucide, FileText as FileIcon, Video as VideoIconLucide, MessageSquare, Info, Video, PlusCircle,
-    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Hash, Landmark as LandmarkIcon, Undo2, Edit3
+    ClipboardCheck as ExamIcon, Eye, UploadCloud, ChevronsUpDown, CreditCard, Smartphone, Banknote, Edit2, Trash2, Link2, FileUp, Building, Hash, Landmark as LandmarkIcon, Undo2, Edit3, BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { db, storage } from '@/lib/firebase'; 
 import { doc, getDoc, updateDoc, addDoc, collection, query, orderBy, onSnapshot, deleteDoc, serverTimestamp, Timestamp, writeBatch, where } from 'firebase/firestore'; 
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from 'firebase/storage'; 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 interface Announcement {
@@ -79,11 +80,18 @@ interface ScheduleItem {
   topic?: string;
 }
 
+interface Subject {
+  subjectName: string;
+  teacherId: string;
+  teacherName: string;
+  teacherAvatar?: string;
+}
+
 interface ClassroomDetails {
   id: string;
   name: string;
   description: string;
-  teacherId: string;
+  teacherId: string; // This is the class manager/owner
   teacherName: string;
   teacherAvatar?: string;
   memberCount: number;
@@ -97,6 +105,7 @@ interface ClassroomDetails {
   teacherBankIfsc?: string;
   teacherBankName?: string;
   createdAt?: any; 
+  subjects?: Subject[];
 }
 
 const getStatusColor = (status: Assignment['status'] | ClassExam['status']) => {
@@ -216,6 +225,7 @@ export default function ClassDetailsPage() {
           scheduleLastUpdated: data.scheduleLastUpdated?.toDate ? data.scheduleLastUpdated.toDate() : new Date(),
           feeDetails: data.feeDetails || { totalFee: 0, paidAmount: 0, currency: 'USD' },
           schedule: data.schedule || [],
+          subjects: data.subjects || [],
         };
         setClassroom(classData);
 
@@ -684,7 +694,7 @@ export default function ClassDetailsPage() {
             <h1 className="text-3xl md:text-4xl font-bold text-white shadow-md">{classroom.name}</h1>
             <div className="flex items-center mt-2">
                 {classroom.teacherAvatar && <Image src={classroom.teacherAvatar} alt={classroom.teacherName} width={32} height={32} className="rounded-full border-2 border-white/50 mr-2" data-ai-hint="teacher avatar"/>}
-                <p className="text-sm text-slate-200 shadow-sm">Taught by {classroom.teacherName}</p>
+                <p className="text-sm text-slate-200 shadow-sm">Managed by {classroom.teacherName}</p>
             </div>
           </div>
           <div className="absolute top-4 right-4"><Badge variant="secondary" className="text-xs shadow-md rounded-md"><Users className="mr-1.5 h-3.5 w-3.5"/> {classroom.memberCount} Members</Badge></div>
@@ -692,6 +702,26 @@ export default function ClassDetailsPage() {
 
         <CardContent className="p-6 space-y-8">
           <div><h2 className="text-xl font-semibold text-foreground mb-2">About this Class</h2><p className="text-muted-foreground whitespace-pre-line">{classroom.description}</p></div>
+          
+          <Card className="rounded-lg shadow-md border-border/30">
+            <CardHeader><CardTitle className="flex items-center text-lg"><BookOpen className="mr-2 h-5 w-5 text-primary" />Subjects &amp; Teachers</CardTitle></CardHeader>
+            <CardContent className="space-y-3 text-sm max-h-72 overflow-y-auto">
+              {(classroom.subjects && classroom.subjects.length > 0) ? classroom.subjects.map((subject, index) => (
+                <div key={index} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
+                  <p className="font-semibold text-foreground">{subject.subjectName}</p>
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={subject.teacherAvatar} alt={subject.teacherName} data-ai-hint="teacher avatar" />
+                      <AvatarFallback>{subject.teacherName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-muted-foreground">{subject.teacherName}</span>
+                  </div>
+                </div>
+              )) : <p className="text-muted-foreground text-center py-2">No subjects or teachers assigned yet.</p>}
+            </CardContent>
+            {isCurrentUserTeacher && (<CardFooter><Button asChild variant="outline" className="w-full rounded-lg text-sm"><Link href={`/dashboard/class/${classId}/edit?name=${encodeURIComponent(classroom.name)}#subjects`}><Edit2 className="mr-2 h-4 w-4" /> Manage Subjects & Teachers</Link></Button></CardFooter>)}
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="rounded-lg shadow-md border-border/30">
               <CardHeader><CardTitle className="flex items-center text-lg"><Megaphone className="mr-2 h-5 w-5 text-primary" />Announcements</CardTitle></CardHeader>
