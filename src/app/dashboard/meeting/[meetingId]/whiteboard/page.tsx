@@ -84,7 +84,7 @@ export default function WhiteboardPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   // --- Refs for Live Operations & State Snapshots (do not trigger re-renders) ---
-  const operationStateRef = useRef<'idle' | 'drawing' | 'shaping' | 'lassoing' | 'movingSelection' | 'texting'>('idle');
+  const operationStateRef = useRef<'idle' | 'drawing' | 'shaping' | 'lassoing' | 'movingSelection' | 'texting' | 'erasing'>('idle');
   const currentPathRef = useRef<DrawingElement | null>(null);
   const shapeStartPointRef = useRef<Point | null>(null);
   const lassoPathRef = useRef<Point[]>([]);
@@ -301,40 +301,8 @@ export default function WhiteboardPage() {
     if (!pos) return;
 
     if (activeTool === 'erase') {
-        let elementToDeleteId: string | null = null;
-        // Iterate in reverse to check top-most elements first
-        for (let i = whiteboardState.elements.length - 1; i >= 0; i--) {
-            const element = whiteboardState.elements[i];
-            if (!element) continue;
-
-            const box = getElementBoundingBox(element);
-            if (isPointInRect(pos, box)) { // Coarse check first
-                if (element.type === 'path') {
-                    // Refined check for paths by checking distance to points
-                    const threshold = Math.max(10, element.lineWidth / 2 + 3);
-                    for (const point of element.points) {
-                        if (Math.hypot(point.x - pos.x, point.y - pos.y) < threshold) {
-                            elementToDeleteId = element.id;
-                            break;
-                        }
-                    }
-                    if (elementToDeleteId) break;
-                } else { // For text elements, bounding box is enough
-                    elementToDeleteId = element.id;
-                    break;
-                }
-            }
-        }
-
-        if (elementToDeleteId) {
-            setWhiteboardState(prevState => {
-                const newElements = prevState.elements.filter(el => el && el.id !== elementToDeleteId);
-                const newState = { elements: newElements };
-                pushToHistory(newState);
-                return newState;
-            });
-        }
-        return; // Stop further processing for the eraser tool
+        operationStateRef.current = 'erasing';
+        return;
     }
     
     finalizeLiveText();
@@ -381,10 +349,10 @@ export default function WhiteboardPage() {
         operationStateRef.current = 'shaping'; 
         shapeStartPointRef.current = pos; 
     }
-  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, whiteboardState.elements, selectedElementIds, finalizeLiveText, pushToHistory, getElementBoundingBox]);
+  }, [getPointerPosition, activeTool, selectedColor, getLineWidth, getSelectionBoundingBox, whiteboardState.elements, selectedElementIds, finalizeLiveText]);
 
   const handlePointerMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if (operationStateRef.current === 'idle' || operationStateRef.current === 'texting' || activeTool === 'erase') return;
+    if (operationStateRef.current === 'idle' || operationStateRef.current === 'texting' || operationStateRef.current === 'erasing') return;
     const pos = getPointerPosition(event);
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (!pos || !tempCtx) return;
@@ -431,7 +399,43 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, activeTool, getLineWidth, selectedColor, whiteboardState.elements]);
 
   const handlePointerUp = useCallback((event: React.MouseEvent | React.TouchEvent) => {
-    if (activeTool === 'erase') {
+    const pos = getPointerPosition(event);
+    if (!pos) {
+        operationStateRef.current = 'idle';
+        return;
+    }
+    
+    if (operationStateRef.current === 'erasing') {
+        let elementToDeleteId: string | null = null;
+        for (let i = whiteboardState.elements.length - 1; i >= 0; i--) {
+            const element = whiteboardState.elements[i];
+            if (!element) continue;
+            const box = getElementBoundingBox(element);
+            if (isPointInRect(pos, box)) {
+                if (element.type === 'path') {
+                    const threshold = Math.max(10, element.lineWidth / 2 + 3);
+                    for (const point of element.points) {
+                        if (Math.hypot(point.x - pos.x, point.y - pos.y) < threshold) {
+                            elementToDeleteId = element.id;
+                            break;
+                        }
+                    }
+                    if (elementToDeleteId) break;
+                } else {
+                    elementToDeleteId = element.id;
+                    break;
+                }
+            }
+        }
+
+        if (elementToDeleteId) {
+            setWhiteboardState(prevState => {
+                const newElements = prevState.elements.filter(el => el && el.id !== elementToDeleteId);
+                const newState = { elements: newElements };
+                pushToHistory(newState);
+                return newState;
+            });
+        }
         operationStateRef.current = 'idle';
         return;
     }
@@ -451,9 +455,9 @@ export default function WhiteboardPage() {
         });
         setSelectedElementIds(newSelectedIds);
     } else if (operationStateRef.current === 'movingSelection' && moveStartPointRef.current) {
-        const pos = getPointerPosition(event)!;
-        const dx = pos.x - moveStartPointRef.current.x;
-        const dy = pos.y - moveStartPointRef.current.y;
+        const movePos = getPointerPosition(event)!;
+        const dx = movePos.x - moveStartPointRef.current.x;
+        const dy = movePos.y - moveStartPointRef.current.y;
         const originalPositions = originalPositionsRef.current;
 
         if ((Math.abs(dx) > 1 || Math.abs(dy) > 1) && originalPositions) {
@@ -486,26 +490,26 @@ export default function WhiteboardPage() {
         });
     } else if (operationStateRef.current === 'shaping' && shapeStartPointRef.current) {
         const start = shapeStartPointRef.current;
-        const pos = getPointerPosition(event)!;
-        if (Math.hypot(pos.x - start.x, pos.y - start.y) < getLineWidth()) {
+        const endPos = getPointerPosition(event)!;
+        if (Math.hypot(endPos.x - start.x, endPos.y - start.y) < getLineWidth()) {
              operationStateRef.current = 'idle'; clearCanvas(tempCtx); return;
         }
 
         const newPath: DrawingElement = { type: 'path', id: Date.now().toString(), points: [], color: selectedColor, lineWidth: getLineWidth() };
         let additionalPaths: DrawingElement[] = [];
 
-        if (activeTool === 'line') newPath.points.push(start, pos);
-        else if (activeTool === 'square') newPath.points.push(start, {x: pos.x, y: start.y}, pos, {x: start.x, y: pos.y}, start);
+        if (activeTool === 'line') newPath.points.push(start, endPos);
+        else if (activeTool === 'square') newPath.points.push(start, {x: endPos.x, y: start.y}, endPos, {x: start.x, y: endPos.y}, start);
         else if (activeTool === 'circle') {
-             const radius = Math.hypot(pos.x - start.x, pos.y - start.y);
+             const radius = Math.hypot(endPos.x - start.x, endPos.y - start.y);
              for(let i=0; i<=360; i+=10) newPath.points.push({ x: start.x + radius * Math.cos(i * Math.PI / 180), y: start.y + radius * Math.sin(i * Math.PI / 180) });
         } else if (activeTool === 'arrow') {
-            const headlen = 10 + getLineWidth(); const angle = Math.atan2(pos.y - start.y, pos.x - start.x);
-            newPath.points.push(start, pos); 
-            const path2: DrawingElement = { type: 'path', id: (Date.now()+1).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle - Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
-            const path3: DrawingElement = { type: 'path', id: (Date.now()+2).toString(), points: [{x: pos.x, y: pos.y}, {x: pos.x - headlen * Math.cos(angle + Math.PI / 6), y: pos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
+            const headlen = 10 + getLineWidth(); const angle = Math.atan2(endPos.y - start.y, endPos.x - start.x);
+            newPath.points.push(start, endPos); 
+            const path2: DrawingElement = { type: 'path', id: (Date.now()+1).toString(), points: [{x: endPos.x, y: endPos.y}, {x: endPos.x - headlen * Math.cos(angle - Math.PI / 6), y: endPos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
+            const path3: DrawingElement = { type: 'path', id: (Date.now()+2).toString(), points: [{x: endPos.x, y: endPos.y}, {x: endPos.x - headlen * Math.cos(angle + Math.PI / 6), y: endPos.y - headlen * Math.sin(angle + Math.PI / 6)}], color: selectedColor, lineWidth: getLineWidth() };
             additionalPaths = [path2, path3];
-        } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (pos.x - start.x) / 2, y: start.y }, { x: start.x, y: pos.y }, { x: pos.x, y: pos.y }, { x: start.x + (pos.x - start.x) / 2, y: start.y });
+        } else if (activeTool === 'triangle') newPath.points.push({ x: start.x + (endPos.x - start.x) / 2, y: start.y }, { x: start.x, y: endPos.y }, { x: endPos.x, y: endPos.y }, { x: start.x + (endPos.x - start.x) / 2, y: start.y });
         
         if (newPath.points.length > 0) {
             setWhiteboardState(prevState => {
