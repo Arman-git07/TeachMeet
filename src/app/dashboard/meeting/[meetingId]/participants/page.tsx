@@ -210,8 +210,8 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
   const isCurrentUserTheHost = currentUserId === meetingCreatorId;
 
   return (
-    <div className="flex flex-col h-screen bg-muted/30">
-      <header className="flex-none p-3 border-b bg-background shadow-sm sticky top-0 z-20">
+    <div className="flex flex-col h-full bg-muted/30">
+      <header className="flex-none p-3 border-b bg-background shadow-sm">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <UsersIcon className="h-7 w-7 text-primary" />
@@ -229,7 +229,7 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
         </div>
       </header>
       
-      <main className="flex-grow flex flex-col overflow-hidden pt-[65px]"> {/* Adjust pt if header height changes */}
+      <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardHeader className="border-b">
             <CardTitle className="text-lg">Participants ({realtimeParticipants.length})</CardTitle>

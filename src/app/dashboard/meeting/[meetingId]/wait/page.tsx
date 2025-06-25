@@ -178,7 +178,7 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
   const filterDisplayName = appliedFilter === "none" ? "No filter" : appliedFilter.charAt(0).toUpperCase() + appliedFilter.slice(1).replace(/([A-Z])/g, ' $1');;
 
   return (
-    <div className="container mx-auto py-8 flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
+    <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
       <Card className="w-full max-w-2xl shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <UserIcon className="mx-auto h-12 w-12 text-primary mb-3" />

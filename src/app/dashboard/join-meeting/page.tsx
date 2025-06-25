@@ -173,7 +173,7 @@ export default function JoinMeetingPage() {
 
 
   return (
-    <div className="container mx-auto py-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
+    <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
       <Card className="w-full max-w-lg shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <LogIn className="mx-auto h-12 w-12 text-primary mb-3" />

@@ -79,8 +79,8 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
   const backToClassDetailsLink = `/dashboard/class/${classId}?name=${encodeURIComponent(className)}`;
 
   return (
-    <div className="flex flex-col h-screen bg-muted/30">
-      <header className="flex-none p-3 border-b bg-background shadow-sm sticky top-0 z-20">
+    <div className="flex flex-col h-full bg-muted/30">
+      <header className="flex-none p-3 border-b bg-background shadow-sm">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <MessageSquareIcon className="h-7 w-7 text-primary flex-shrink-0" />
@@ -100,7 +100,7 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
         </div>
       </header>
 
-      <main className="flex-grow flex flex-col overflow-hidden pt-[calc(65px+8px)]"> {/* Adjusted pt for header height + a bit of space */}
+      <main className="flex-grow flex flex-col overflow-hidden"> {/* Adjusted pt for header height + a bit of space */}
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
@@ -187,4 +187,3 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
     </div>
   );
 }
-

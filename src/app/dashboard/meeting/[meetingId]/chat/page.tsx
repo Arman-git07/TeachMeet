@@ -85,8 +85,8 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
     : `/dashboard/meeting/${meetingId}`;
 
   return (
-    <div className="flex flex-col h-screen bg-muted/30">
-      <header className="flex-none p-3 border-b bg-background shadow-sm sticky top-0 z-20">
+    <div className="flex flex-col h-full bg-muted/30">
+      <header className="flex-none p-3 border-b bg-background shadow-sm">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-7 w-7 text-primary" />
@@ -104,7 +104,7 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
         </div>
       </header>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-none sticky top-[65px] z-10 bg-background shadow-md">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-none bg-background shadow-md">
         <TabsList className="container mx-auto rounded-none border-b p-0 h-12">
           <TabsTrigger value="public" className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
             <Users className="mr-2 h-5 w-5" /> Public Chat
@@ -113,7 +113,7 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
         </TabsList>
       </Tabs>
       
-      <main className="flex-grow flex flex-col overflow-hidden" style={{ paddingTop: '113px' /* Consider if this static padding is still ideal or should adjust if tabs height changes */ }}>
+      <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
