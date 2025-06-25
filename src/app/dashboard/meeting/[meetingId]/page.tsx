@@ -129,7 +129,7 @@ const ParticipantView = React.memo(function ParticipantView({
         muted={isMe}
         autoPlay
         playsInline
-        className={cn("w-full h-full object-contain bg-muted", !showVideo && "hidden")}
+        className={cn("w-full h-full object-cover bg-muted", !showVideo && "hidden")}
       />
       
       {!showVideo && (
@@ -222,27 +222,6 @@ export default function MeetingPage() {
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('grid');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-
-
-  const [deviceAspectRatio, setDeviceAspectRatio] = useState<number | undefined>(undefined);
-
-  useEffect(() => {
-    const calculateAndSetAspectRatio = () => {
-      if (typeof window !== 'undefined') {
-        if (window.innerHeight > 0 && window.innerWidth > 0) {
-          setDeviceAspectRatio(window.innerWidth / window.innerHeight);
-        } else {
-          setDeviceAspectRatio(16 / 9); 
-        }
-      }
-    };
-
-    calculateAndSetAspectRatio();
-    window.addEventListener('resize', calculateAndSetAspectRatio);
-    return () => {
-      window.removeEventListener('resize', calculateAndSetAspectRatio);
-    };
-  }, []);
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
@@ -768,11 +747,73 @@ export default function MeetingPage() {
     );
   }
 
+  const renderLayout = () => {
+    if (combinedParticipants.length === 0) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <p>Waiting for participants to join...</p>
+        </div>
+      );
+    }
+  
+    switch (currentLayout) {
+      case 'speaker':
+        const speaker = combinedParticipants.find(p => p.isScreenSharing) || combinedParticipants.find(p => !p.isMe) || combinedParticipants[0];
+        const otherParticipants = combinedParticipants.filter(p => p.id !== speaker.id);
+        return (
+          <div className="flex-1 flex flex-col md:flex-row gap-4 h-full">
+            <div className="flex-grow rounded-lg overflow-hidden bg-black flex items-center justify-center">
+              <ParticipantView {...speaker} />
+            </div>
+            {otherParticipants.length > 0 && (
+              <div className="w-full md:w-48 lg:w-64 flex-shrink-0 flex md:flex-col gap-4 overflow-x-auto md:overflow-y-auto pb-2 md:pb-0">
+                {otherParticipants.map(p => (
+                  <div key={p.id} className="aspect-video rounded-lg overflow-hidden flex-shrink-0 md:flex-shrink-1 w-40 md:w-full">
+                    <ParticipantView {...p} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+  
+      case 'gallery':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {combinedParticipants.map(participant => (
+              <div key={participant.id} className="aspect-video rounded-lg overflow-hidden">
+                <ParticipantView {...participant} />
+              </div>
+            ))}
+          </div>
+        );
+  
+      case 'grid':
+      default:
+        const total = combinedParticipants.length;
+        let cols = 'grid-cols-1';
+        if (total >= 2) cols = 'grid-cols-1 sm:grid-cols-2';
+        if (total >= 5) cols = 'grid-cols-2 md:grid-cols-3';
+        if (total >= 7) cols = 'grid-cols-2 md:grid-cols-4';
+        if (total >= 10) cols = 'grid-cols-3 md:grid-cols-4';
+
+        return (
+          <div className={cn('grid gap-4 flex-1', cols)}>
+            {combinedParticipants.map(participant => (
+              <div key={participant.id} className="min-h-[180px] rounded-lg overflow-hidden">
+                <ParticipantView {...participant} />
+              </div>
+            ))}
+          </div>
+        );
+    }
+  };
+
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background relative">
       
-      <main className="flex-1 p-4 flex flex-col">
+      <main className="flex-1 p-2 sm:p-4 flex flex-col overflow-hidden">
         {hasCameraPermission === false && !isScreenSharingActive && (
            <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
@@ -793,91 +834,51 @@ export default function MeetingPage() {
               </AlertDescription>
             </Alert>
         )}
-         {combinedParticipants.length === 1 && combinedParticipants[0].isMe ? (
-            <div className={cn(
-                "flex-grow flex items-center justify-center",
-                currentLayout === 'speaker' && "p-4 bg-muted rounded-lg",
-                currentLayout === 'gallery' && "p-4 bg-accent/20 rounded-lg",
-                currentLayout === 'grid' && "p-0"
-            )}>
-                <div
-                  className="w-full h-full max-w-5xl max-h-[calc(100vh-15rem)] relative"
-                  style={deviceAspectRatio ? { aspectRatio: deviceAspectRatio } : {}}
-                >
-                 {currentLayout === 'speaker' && (
-                    <Badge variant="default" className="absolute top-2 left-2 z-20 bg-primary/80 text-primary-foreground backdrop-blur-sm">Speaker View Active</Badge>
-                )}
-                {currentLayout === 'gallery' && (
-                    <Badge variant="default" className="absolute top-2 left-2 z-20 bg-accent/80 text-accent-foreground backdrop-blur-sm">Gallery View Active</Badge>
-                )}
-                <ParticipantView
-                    {...combinedParticipants[0]}
-                />
-                </div>
-            </div>
-            ) : (
-            <div className={cn(
-                "grid gap-4 flex-1",
-                combinedParticipants.length === 0 ? "grid-cols-1" :
-                combinedParticipants.length === 1 ? "grid-cols-1" :
-                combinedParticipants.length === 2 ? "grid-cols-1 sm:grid-cols-2 lg:max-w-4xl mx-auto" :
-                combinedParticipants.length === 3 ? "grid-cols-1 sm:grid-cols-3 lg:max-w-6xl mx-auto" :
-                combinedParticipants.length >= 4 ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" :
-                "grid-cols-1"
-            )}>
-                {combinedParticipants.map(participant => (
-                <ParticipantView key={participant.id} {...participant} />
-                ))}
-            </div>
-            )}
+         
+        {renderLayout()}
+
       </main>
 
-      <footer className="p-4 border-t border-border bg-background/80 backdrop-blur-md sticky bottom-0">
-        <div className="max-w-xl mx-auto flex justify-around items-center">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+        <div className="flex items-center justify-center gap-4 bg-card/80 backdrop-blur-md p-3 rounded-full shadow-2xl border">
           <Button
-            variant={localMicMuted ? "destructive" : "default"}
-            size="lg"
-            className="rounded-full p-3 btn-gel"
+            variant={localMicMuted ? "destructive" : "secondary"}
+            size="icon"
+            className="rounded-full w-12 h-12"
             onClick={toggleMic}
             aria-label={localMicMuted ? "Unmute Microphone" : "Mute Microphone"}
           >
-            {localMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            {localMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
           </Button>
           <Button
-             variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "default"}
-             size="lg"
-             className={cn(
-                "rounded-full p-3",
-                isScreenSharingActive ? "opacity-50 cursor-not-allowed" : "btn-gel"
-             )}
+             variant={(localCameraOff && !isScreenSharingActive) ? "destructive" : "secondary"}
+             size="icon"
+             className="rounded-full w-12 h-12"
              onClick={toggleCamera}
              aria-label={(localCameraOff && !isScreenSharingActive) ? "Turn Camera On" : "Turn Camera Off"}
              disabled={isScreenSharingActive}
           >
-            {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+            {(localCameraOff && !isScreenSharingActive) ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </Button>
-          
 
            <Button
-            size="lg"
-            variant={localHandRaised ? "default" : "default"}
+            size="icon"
+            variant={localHandRaised ? "default" : "secondary"}
             className={cn(
-              "rounded-full p-3",
-              localHandRaised
-                ? "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent shadow-lg"
-                : "btn-gel shadow-md"
+              "rounded-full w-12 h-12",
+              localHandRaised && "bg-accent text-accent-foreground ring-2 ring-offset-2 ring-offset-background ring-accent"
             )}
             onClick={toggleHandRaise}
             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
           >
-            <Hand className="h-5 w-5" />
+            <Hand className="h-6 w-6" />
           </Button>
           
-          <Button variant="destructive" size="lg" className="rounded-full p-3" onClick={leaveMeeting} aria-label="Leave Meeting">
-            <PhoneOff className="h-5 w-5" />
+          <Button variant="destructive" size="lg" className="rounded-full px-6 h-12" onClick={leaveMeeting} aria-label="Leave Meeting">
+            <PhoneOff className="h-6 w-6" />
           </Button>
         </div>
-      </footer>
+      </div>
 
       <AlertDialog open={isShareScreenDialogVisible} onOpenChange={setIsShareScreenDialogVisible}>
         <AlertDialogContent className="rounded-xl">
