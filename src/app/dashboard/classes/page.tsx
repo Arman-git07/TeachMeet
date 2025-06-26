@@ -23,15 +23,6 @@ import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import dynamic from 'next/dynamic';
-
-const StartMeetingDialogContent = dynamic(() =>
-  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
-  {
-    ssr: false,
-    loading: () => <p className="p-4 text-center">Loading dialog...</p>
-  }
-);
 
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
@@ -424,7 +415,7 @@ export default function ClassesPage() {
       toast({
         variant: "info",
         title: "Subcollections & Files",
-        description: "Note: Class members, announcements, materials, assignments, and their files are not automatically deleted. Please clean them up manually or set up a Cloud Function for cascading deletes.",
+        description: "Note: Class members, announcements, materials, assignments, and their uploaded files are not automatically deleted. Please clean them up manually or set up a Cloud Function for cascading deletes.",
         duration: 10000,
       });
 
