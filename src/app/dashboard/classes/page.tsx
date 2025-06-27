@@ -42,6 +42,7 @@ interface Classroom {
   joinRequests?: { [userId: string]: boolean };
   members?: { [userId: string]: { role: 'student' | 'teacher' } };
   subjects?: { subjectName: string; teacherName: string; teacherId: string; }[];
+  pendingRequestCount?: number;
 }
 
 
@@ -63,7 +64,7 @@ const filterOptionsConfig = [
     { value: "all", label: "Explore All Classes", icon: Filter, requiresAuth: false, requiresTeacher: false },
     { value: "teaching", label: "My Teaching", icon: UsersIcon, requiresAuth: true, requiresTeacher: true },
     { value: "joined", label: "My Joined Classes", icon: UsersIcon, requiresAuth: true, requiresTeacher: false },
-    { value: "requested", label: "My Requests", icon: UserCheck, requiresAuth: true, requiresTeacher: true },
+    { value: "requested", label: "My Requests", icon: UserCheck, requiresAuth: true, requiresTeacher: false }, // Available to students too
 ];
 
 
@@ -105,6 +106,7 @@ export default function ClassesPage() {
   }, [user]);
 
   const currentFilterOptions = filterOptionsConfig.filter(opt => {
+    if (opt.value === 'requested') { return isAuthenticated; } // Available to all logged in users now
     if (opt.requiresTeacher) {
       return isAuthenticated && hasTeacherCard;
     }
@@ -168,19 +170,29 @@ export default function ClassesPage() {
             subjects: data.subjects || [],
             joinRequests: {},
             members: {},
+            pendingRequestCount: 0,
           };
 
           if (user) {
+            // Check if current user has requested to join THIS class (for student view)
             const joinRequestRef = doc(db, "classrooms", docSnap.id, "joinRequests", user.uid);
             const joinRequestSnap = await getDoc(joinRequestRef);
             if (joinRequestSnap.exists()) {
               classroomData.joinRequests![user.uid] = true;
             }
 
+            // Check if current user is a member of THIS class (for student view)
             const memberRef = doc(db, "classrooms", docSnap.id, "members", user.uid);
             const memberSnap = await getDoc(memberRef);
             if (memberSnap.exists()) {
               classroomData.members![user.uid] = { role: memberSnap.data()?.role || 'student' };
+            }
+            
+            // Check for pending requests IF current user is the teacher (for teacher view)
+            if (data.teacherId === user.uid) {
+                const requestsQuery = query(collection(db, "classrooms", docSnap.id, "joinRequests"));
+                const requestsSnapshot = await getDocs(requestsQuery);
+                classroomData.pendingRequestCount = requestsSnapshot.size;
             }
           }
           return classroomData;
@@ -217,14 +229,18 @@ export default function ClassesPage() {
     let filteredClassrooms = classrooms;
 
     if (activeFilter === 'requested' && user) {
-      filteredClassrooms = classrooms.filter(cls => cls.joinRequests && cls.joinRequests![user.uid] && cls.teacherId !== user.uid);
+        if (hasTeacherCard) { // Teacher's view of "My Requests"
+            filteredClassrooms = classrooms.filter(cls => cls.teacherId === user.uid && (cls.pendingRequestCount || 0) > 0);
+        } else { // Student's view of "My Requests"
+            filteredClassrooms = classrooms.filter(cls => cls.joinRequests && cls.joinRequests![user.uid] && cls.teacherId !== user.uid);
+        }
     } else if (activeFilter === 'joined' && user) {
       filteredClassrooms = classrooms.filter(cls => cls.members && cls.members![user.uid] && cls.teacherId !== user.uid);
     }
 
     setDisplayClassrooms(filteredClassrooms);
 
-  }, [classrooms, user, activeFilter, initialLoading, authLoading]);
+  }, [classrooms, user, activeFilter, initialLoading, authLoading, hasTeacherCard]);
 
 
   const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -662,16 +678,18 @@ export default function ClassesPage() {
           <CardHeader>
             <UsersIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <CardTitle className="text-2xl">
-              {activeFilter === 'teaching' && "No Classes Taught"}
-              {(activeFilter === 'requested' || activeFilter === 'joined') && "No Matching Classes"}
-              {activeFilter === 'all' && classrooms.length > 0 && "No Classes for this Filter"}
-              {activeFilter === 'all' && classrooms.length === 0 && "No Classes Available"}
+                {activeFilter === 'teaching' && "No Classes Taught"}
+                {activeFilter === 'joined' && "No Matching Classes"}
+                {activeFilter === 'requested' && (hasTeacherCard ? "No Pending Requests" : "No Matching Classes")}
+                {activeFilter === 'all' && classrooms.length > 0 && "No Classes for this Filter"}
+                {activeFilter === 'all' && classrooms.length === 0 && "No Classes Available"}
             </CardTitle>
             <CardDescription>
-              {activeFilter === 'teaching' && "You haven't created any classes yet. Start one now!"}
-              {(activeFilter === 'requested' || activeFilter === 'joined') && `You haven't ${activeFilter === 'requested' ? 'requested to join' : 'joined'} any classes that match this filter, or your requests have been processed.`}
-              {activeFilter === 'all' && classrooms.length > 0 && "Try a different filter or check back later."}
-              {activeFilter === 'all' && classrooms.length === 0 && "There are no classes listed right now. Be the first to create one!"}
+                {activeFilter === 'teaching' && "You haven't created any classes yet. Start one now!"}
+                {activeFilter === 'joined' && `You haven't joined any classes that match this filter.`}
+                {activeFilter === 'requested' && (hasTeacherCard ? "There are no new student requests to join your classes." : "You haven't requested to join any classes, or your requests have been processed.")}
+                {activeFilter === 'all' && classrooms.length > 0 && "Try a different filter or check back later."}
+                {activeFilter === 'all' && classrooms.length === 0 && "There are no classes listed right now. Be the first to create one!"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -720,6 +738,8 @@ export default function ClassesPage() {
 
             const showPendingBadge = isRequested && !isMember && !isTeacher;
             const showJoinedBadge = isMember && !isTeacher;
+            
+            const hasPendingRequests = isTeacher && (classroom.pendingRequestCount || 0) > 0;
 
             let actionButton;
 
@@ -755,7 +775,8 @@ export default function ClassesPage() {
               <div className="absolute top-2 right-2 z-10">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-card/70 hover:bg-muted text-muted-foreground hover:text-foreground">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-card/70 hover:bg-muted text-muted-foreground hover:text-foreground relative">
+                        {hasPendingRequests && <div className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-card" title={`${classroom.pendingRequestCount} pending requests`} />}
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -769,8 +790,9 @@ export default function ClassesPage() {
                             <Edit className="mr-2 h-4 w-4" /> Edit Class
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/class/${classroom.id}/manage-members?name=${encodeURIComponent(classroom.name)}`} className="rounded-md w-full">
+                            <Link href={`/dashboard/class/${classroom.id}/manage-members?name=${encodeURIComponent(classroom.name)}`} className="rounded-md w-full relative flex items-center cursor-default">
                                 <UsersIcon className="mr-2 h-4 w-4" /> Manage Roster
+                                {hasPendingRequests && <Badge variant="destructive" className="absolute right-2 top-1/2 -translate-y-1/2 h-5 px-1.5 text-xs">{classroom.pendingRequestCount}</Badge>}
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
