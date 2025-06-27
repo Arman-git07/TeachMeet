@@ -754,6 +754,11 @@ export default function ClassesPage() {
                           <DropdownMenuItem onClick={() => handleNavigateToEditClass(classroom)} className="rounded-md">
                             <Edit className="mr-2 h-4 w-4" /> Edit Class
                           </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/class/${classroom.id}/manage-members?name=${encodeURIComponent(classroom.name)}`} className="rounded-md w-full">
+                                <UsersIcon className="mr-2 h-4 w-4" /> Manage Roster
+                            </Link>
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => openDeleteClassDialog(classroom)} className="text-destructive focus:text-destructive rounded-md">
                             <Trash2 className="mr-2 h-4 w-4" /> Delete Class

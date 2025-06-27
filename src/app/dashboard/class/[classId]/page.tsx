@@ -680,9 +680,9 @@ export default function ClassDetailsPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <input type="file" ref={assignmentFileRef} onChange={handleFileSelectedForAssignment} accept=".pdf,.doc,.docx,.txt,image/*,video/*,audio/*" style={{ display: 'none' }} />
       <div className="flex items-center justify-between mb-6">
         <Button onClick={() => router.push('/dashboard/classes')} variant="outline" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" /> Back to All Classes</Button>
+        {isCurrentUserTeacher && <Button asChild variant="outline" className="rounded-lg"><Link href={`/dashboard/class/${classId}/manage-members?name=${encodeURIComponent(classroom.name)}`}><Users className="mr-2 h-4 w-4" /> Manage Roster</Link></Button>}
         <Button onClick={handleStartClassMeeting} variant="default" size="lg" className="btn-gel rounded-lg"><Video className="mr-2 h-5 w-5" /> Start/Join Class Meeting</Button>
       </div>
 
