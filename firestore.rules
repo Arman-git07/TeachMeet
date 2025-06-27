@@ -2,11 +2,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // This is a permissive rule for development. It allows any authenticated
-    // user to read and write to any document in the database.
-    // This is necessary to prevent permission errors while building features.
-    // WARNING: Before deploying to production, you MUST write more secure rules
-    // to protect your users' data.
+    // Allow read/write access to all documents for any authenticated user
+    // WARNING: This is for development only. Secure your data before production.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
