@@ -451,7 +451,7 @@ export default function ClassesPage() {
 
       // 3. Update local state
       setClassrooms(prev => prev.filter(c => c.id !== classToDelete!.id));
-      // displayClassrooms will update automatically via its useEffect dependency on classrooms
+      // displayClassrooms will update automatically via its useEffect dependency
     } catch (error: any) {
       console.error("Error deleting class:", error);
       let desc = "Could not delete class.";
@@ -497,42 +497,40 @@ export default function ClassesPage() {
                                 <PlusCircle className="mr-2 h-5 w-5" /> Create New Class
                             </Button>
                         </DialogTrigger>
-                        {isCreateClassDialogOpen && (
-                            <DialogContent className="sm:max-w-[520px] rounded-xl">
-                                <DialogHeader>
-                                    <DialogTitle id="create-class-dialog-title" className="text-xl">Create New Classroom</DialogTitle>
-                                    <DialogDescription id="create-class-dialog-description">
-                                        Fill in the details to set up your new class.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="newClassName">Class Name</Label>
-                                        <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="newClassDescription">Description</Label>
-                                        <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                                        <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingOrCreating}/>
-                                        {newClassImagePreview && (
-                                            <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
-                                                <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
-                                            </div>
-                                        )}
-                                    </div>
+                        <DialogContent className="sm:max-w-[520px] rounded-xl">
+                            <DialogHeader>
+                                <DialogTitle id="create-class-dialog-title" className="text-xl">Create New Classroom</DialogTitle>
+                                <DialogDescription id="create-class-dialog-description">
+                                    Fill in the details to set up your new class.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="newClassName">Class Name</Label>
+                                    <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/>
                                 </div>
-                                <DialogFooter>
-                                    <DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button></DialogClose>
-                                    <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>
-                                        {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                        {isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        )}
+                                <div className="grid gap-2">
+                                    <Label htmlFor="newClassDescription">Description</Label>
+                                    <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
+                                    <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingOrCreating}/>
+                                    {newClassImagePreview && (
+                                        <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
+                                            <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button></DialogClose>
+                                <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>
+                                    {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    {isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
                     </Dialog>
                 ) : (
                     <Dialog open={isTeacherCardDialogOpen} onOpenChange={setIsTeacherCardDialogOpen}>
@@ -674,7 +672,6 @@ export default function ClassesPage() {
                       Create a Class
                     </Button>
                   </DialogTrigger>
-                   {isCreateClassDialogOpen && ( // Conditionally render for state reset
                     <DialogContent className="sm:max-w-[520px] rounded-xl" aria-labelledby="create-class-dialog-title-modal" aria-describedby="create-class-dialog-description-modal">
                         {/* Content from above, re-rendered if dialog is open */}
                         <DialogHeader>
@@ -690,7 +687,6 @@ export default function ClassesPage() {
                         </div>
                         <DialogFooter><DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button></DialogClose><Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>{isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}{isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}</Button></DialogFooter>
                     </DialogContent>
-                  )}
                 </Dialog>
             )}
             {/* Button to explore all classes if current filter shows none */}
