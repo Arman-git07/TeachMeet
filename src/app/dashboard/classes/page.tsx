@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen } from "lucide-react";
+import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, Star, LogIn } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +23,7 @@ import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 const MAX_IMAGE_SIZE_MB = 5;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
@@ -85,8 +86,36 @@ export default function ClassesPage() {
 
   const [isDeleteClassConfirmOpen, setIsDeleteClassConfirmOpen] = useState(false);
   const [classToDelete, setClassToDelete] = useState<Classroom | null>(null);
+  
+  const [hasTeacherCard, setHasTeacherCard] = useState(false);
+  const [isTeacherCardDialogOpen, setIsTeacherCardDialogOpen] = useState(false);
 
   const currentFilterOptions = filterOptionsConfig.filter(opt => !opt.requiresAuth || isAuthenticated);
+
+  useEffect(() => {
+    if (user) {
+      // In a real app, you'd fetch this from the user's Firestore document.
+      // e.g., const userDoc = await getDoc(doc(db, "users", user.uid));
+      // if (userDoc.exists() && userDoc.data().teacherCardExpiresAt > Timestamp.now()) {
+      //   setHasTeacherCard(true);
+      // }
+      const mockTeacherStatus = localStorage.getItem('mock_teacher_card_status');
+      if (mockTeacherStatus === 'active') {
+          setHasTeacherCard(true);
+      }
+    }
+  }, [user]);
+
+  const handleActivateTeacherCard = () => {
+    toast({
+        title: "Payment Successful (Mock)",
+        description: "Your Teacher Card is now active for 1 month! Payments can be sent to developer's UPI: 07arman2004-1@oksbi",
+        duration: 8000
+    });
+    localStorage.setItem('mock_teacher_card_status', 'active');
+    setHasTeacherCard(true);
+    setIsTeacherCardDialogOpen(false);
+  }
 
   useEffect(() => {
     const fetchClassrooms = async () => {
@@ -457,53 +486,105 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <div className="flex items-center gap-2">
-            {isAuthenticated && (
-                <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
-                    if (!isOpen) resetCreateClassDialog(); // Reset when dialog is closed by any means
-                    setIsCreateClassDialogOpen(isOpen);
-                }}>
-                <DialogTrigger asChild>
-                    <Button className="btn-gel rounded-lg">
-                    <PlusCircle className="mr-2 h-5 w-5" /> Create New Class
-                    </Button>
-                </DialogTrigger>
-                {isCreateClassDialogOpen && ( // Conditionally render content to ensure state reset
-                  <DialogContent className="sm:max-w-[520px] rounded-xl">
-                    <DialogHeader>
-                        <DialogTitle id="create-class-dialog-title" className="text-xl">Create New Classroom</DialogTitle>
-                        <DialogDescription id="create-class-dialog-description">
-                          Fill in the details to set up your new class.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-                        <div className="grid gap-2">
-                          <Label htmlFor="newClassName">Class Name</Label>
-                          <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="newClassDescription">Description</Label>
-                          <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                          <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingOrCreating}/>
-                          {newClassImagePreview && (
-                            <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
-                              <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
+            {isAuthenticated ? (
+                hasTeacherCard ? (
+                    <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
+                        if (!isOpen) resetCreateClassDialog();
+                        setIsCreateClassDialogOpen(isOpen);
+                    }}>
+                        <DialogTrigger asChild>
+                            <Button className="btn-gel rounded-lg">
+                                <PlusCircle className="mr-2 h-5 w-5" /> Create New Class
+                            </Button>
+                        </DialogTrigger>
+                        {isCreateClassDialogOpen && (
+                            <DialogContent className="sm:max-w-[520px] rounded-xl">
+                                <DialogHeader>
+                                    <DialogTitle id="create-class-dialog-title" className="text-xl">Create New Classroom</DialogTitle>
+                                    <DialogDescription id="create-class-dialog-description">
+                                        Fill in the details to set up your new class.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="newClassName">Class Name</Label>
+                                        <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="newClassDescription">Description</Label>
+                                        <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
+                                        <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingOrCreating}/>
+                                        {newClassImagePreview && (
+                                            <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
+                                                <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button></DialogClose>
+                                    <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>
+                                        {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                        {isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        )}
+                    </Dialog>
+                ) : (
+                    <Dialog open={isTeacherCardDialogOpen} onOpenChange={setIsTeacherCardDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button className="btn-gel rounded-lg bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shadow-lg hover:shadow-cta-orange/50">
+                                <Sparkles className="mr-2 h-5 w-5" /> Get Teacher Card
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md rounded-xl">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center text-xl">
+                                    <Star className="mr-2 h-6 w-6 text-yellow-400" />
+                                    Unlock Teacher Features
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Subscribe to the Teacher Card to create classes and access all teaching tools.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4 space-y-4">
+                                <Card className="bg-muted/50 border-border/50">
+                                    <CardHeader>
+                                        <CardTitle className="text-lg">Teacher Card Benefits</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2 text-sm text-muted-foreground">
+                                        <p className="flex items-center"><CheckCircle className="mr-2 h-4 w-4 text-green-500" />Create and manage unlimited classes.</p>
+                                        <p className="flex items-center"><CheckCircle className="mr-2 h-4 w-4 text-green-500" />Post announcements and materials.</p>
+                                        <p className="flex items-center"><CheckCircle className="mr-2 h-4 w-4 text-green-500" />Create and grade assignments & exams.</p>
+                                    </CardContent>
+                                </Card>
+                                <div className="text-center">
+                                    <p className="text-3xl font-bold">$10<span className="text-base font-normal text-muted-foreground">/month (USD)</span></p>
+                                    <p className="text-lg font-bold">₹10<span className="text-xs font-normal text-muted-foreground">/month (INR)</span></p>
+                                    <p className="text-xs text-muted-foreground mt-2">Renews monthly. Cancel anytime.</p>
+                                </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button></DialogClose>
-                        <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>
-                          {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                          {isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
-                        </Button>
-                      </DialogFooter>
-                  </DialogContent>
-                )}
-                </Dialog>
+                            <DialogFooter className="flex-col gap-2">
+                                <Button onClick={handleActivateTeacherCard} className="w-full btn-gel rounded-lg">
+                                    Pay and Activate (Mock)
+                                </Button>
+                                <p className="text-center text-xs text-muted-foreground">
+                                    For manual payment, send to developer's UPI: <strong>07arman2004-1@oksbi</strong>
+                                </p>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )
+            ) : !authLoading && (
+                <Link href="/auth/signin" passHref legacyBehavior>
+                    <Button className="btn-gel rounded-lg">
+                        <LogIn className="mr-2 h-5 w-5" /> Sign In To Teach
+                    </Button>
+                </Link>
             )}
         </div>
       </div>
