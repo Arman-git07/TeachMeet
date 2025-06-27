@@ -60,10 +60,10 @@ const getInitialsFromName = (name: string, defaultInitial: string = 'P'): string
 };
 
 const filterOptionsConfig = [
-    { value: "all", label: "Explore All Classes", icon: Filter },
-    { value: "teaching", label: "My Teaching", icon: UsersIcon, requiresAuth: true },
-    { value: "joined", label: "My Joined Classes", icon: UsersIcon },
-    { value: "requested", label: "My Requests", icon: UserCheck },
+    { value: "all", label: "Explore All Classes", icon: Filter, requiresAuth: false, requiresTeacher: false },
+    { value: "teaching", label: "My Teaching", icon: UsersIcon, requiresAuth: true, requiresTeacher: true },
+    { value: "joined", label: "My Joined Classes", icon: UsersIcon, requiresAuth: true, requiresTeacher: false },
+    { value: "requested", label: "My Requests", icon: UserCheck, requiresAuth: true, requiresTeacher: true },
 ];
 
 
@@ -90,8 +90,6 @@ export default function ClassesPage() {
   const [hasTeacherCard, setHasTeacherCard] = useState(false);
   const [isTeacherCardDialogOpen, setIsTeacherCardDialogOpen] = useState(false);
 
-  const currentFilterOptions = filterOptionsConfig.filter(opt => !opt.requiresAuth || isAuthenticated);
-
   useEffect(() => {
     if (user) {
       // In a real app, you'd fetch this from the user's Firestore document.
@@ -105,6 +103,24 @@ export default function ClassesPage() {
       }
     }
   }, [user]);
+
+  const currentFilterOptions = filterOptionsConfig.filter(opt => {
+    if (opt.requiresTeacher) {
+      return isAuthenticated && hasTeacherCard;
+    }
+    if (opt.requiresAuth) {
+      return isAuthenticated;
+    }
+    return true; // For 'all' filter
+  });
+
+  useEffect(() => {
+    // If the active filter is no longer available in the options, reset to 'all'.
+    if (!currentFilterOptions.some(opt => opt.value === activeFilter)) {
+      setActiveFilter("all");
+    }
+  }, [currentFilterOptions, activeFilter]);
+
 
   const handleActivateTeacherCard = () => {
     toast({
@@ -598,8 +614,6 @@ export default function ClassesPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-60 rounded-xl">
             {currentFilterOptions.map(option => (
-                // Conditionally render "My Teaching" based on authentication
-                (option.value !== 'teaching' || isAuthenticated) &&
                 <DropdownMenuItem
                     key={option.value}
                     onClick={() => {
@@ -736,7 +750,7 @@ export default function ClassesPage() {
             }
 
             return (
-            <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 border-border/50 relative">
+            <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 ease-in-out border-border/50 relative">
               {/* Dropdown Menu for Actions */}
               <div className="absolute top-2 right-2 z-10">
                   <DropdownMenu>
