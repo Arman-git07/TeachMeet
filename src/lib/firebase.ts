@@ -44,25 +44,21 @@ if (appInitialized) {
     `\n\n====================================================================\n` +
     `  💡 FIREBASE & FIRESTORE: TROUBLESHOOTING GUIDE 💡\n` +
     `--------------------------------------------------------------------\n` +
-    `  If you see "Could not reach Cloud Firestore backend" or\n` +
-    `  "Missing or insufficient permissions" errors, please verify:\n\n` +
+    `  If you see "Missing or insufficient permissions" errors, the cause\n` +
+    `  is almost certainly your project setup, not your code's rules.\n` +
+    `  Please VERIFY these steps in your Google Cloud/Firebase console:\n\n` +
     `  1. ✅ Firestore Database is CREATED:\n` +
     `     Go to your Firebase Console -> Firestore Database, and click\n` +
-    `     "Create database". You MUST create it and choose a region.\n\n` +
+    `     "Create database". This step is REQUIRED.\n\n` +
     `  2. ✅ Firestore API is ENABLED:\n` +
     `     Go to this link for your project and ensure the API is enabled:\n` +
     `     https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${firebaseConfig.projectId}\n\n` +
     `  3. ✅ Correct Project ID:\n` +
-    `     The Project ID in your .env file must be exactly:\n` +
+    `     The Project ID in your .env file MUST be exactly:\n` +
     `     '${firebaseConfig.projectId}'\n\n` +
-     `  4. ✅ Security Rules are Deployed:\n` +
-    `     Ensure your 'firestore.rules' and 'storage.rules' files have been\n`+
-    `     deployed to Firebase. For development, they should be permissive:\n` +
-    `     // firestore.rules\n` +
-    `     rules_version = '2';\n` +
-    `     service cloud.firestore {\n` +
-    `       match /databases/{database}/documents { match /{document=**} { allow read, write: if true; } }\n` +
-    `     }\n` +
+     `  4. ✅ Security Rules are Deployed (Code is already public):\n` +
+    `     Your 'firestore.rules' are set to be public for development.\n`+
+    `     If issues persist, deploy them manually via the Firebase CLI.\n` +
     `====================================================================\n\n`
   );
 }
