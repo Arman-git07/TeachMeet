@@ -1,11 +1,8 @@
-rules_version = '2';
 
+rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
-      // WARNING: These rules are completely open for development.
-      // Anyone can read, write, and delete any data in your storage bucket.
-      // You MUST secure these rules before deploying to production.
       allow read, write: if true;
     }
   }
