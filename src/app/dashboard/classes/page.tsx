@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Users as UsersIcon, Edit, ArrowRight, Loader2, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn } from "lucide-react";
+import { Users as UsersIcon, Edit, ArrowRight, Loader2, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
