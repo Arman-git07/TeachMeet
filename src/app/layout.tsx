@@ -4,7 +4,7 @@ import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
-import { ClientLayout } from '@/components/common/ClientLayout';
+import { Providers } from '@/components/common/Providers';
 
 const geistSansFont = GeistSans;
 const geistMonoFont = GeistMono;
@@ -21,9 +21,9 @@ export default function RootLayout({
         geistMonoFont.variable,
         'font-sans antialiased min-h-screen flex flex-col' 
       )}>
-        <ClientLayout>
+        <Providers>
           {children}
-        </ClientLayout>
+        </Providers>
         <Toaster />
       </body>
     </html>
