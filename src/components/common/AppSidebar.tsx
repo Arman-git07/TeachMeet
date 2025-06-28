@@ -1,7 +1,6 @@
-
 'use client';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
+import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
 import React, { useState } from 'react'; // Added useState
 import {
   LogIn,
@@ -51,15 +50,6 @@ import {
   AlertDialogTrigger as SignOutAlertDialogTrigger, // Keep this specific alias if used elsewhere, or remove if only general trigger needed
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from '@/components/ui/button';
-
-
-const StartMeetingDialogContent = dynamic(() => 
-  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent), 
-  { 
-    ssr: false,
-    loading: () => <p className="p-4 text-center">Loading dialog...</p>
-  }
-);
 
 
 type NavItemProps = {
