@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, doc, deleteDoc, setDoc, getDoc, serverTimestamp, onSnapshot, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, doc, deleteDoc, setDoc, getDoc, serverTimestamp, onSnapshot, writeBatch, updateDoc } from 'firebase/firestore';
 
 interface Member {
   id: string; // userId
@@ -44,99 +44,75 @@ export default function ManageMembersPage() {
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<{ type: 'remove' | 'accept' | 'reject'; member: Member } | null>(null);
 
-  // Effect 1: Check authorization as soon as user and classId are available.
+  // This combined effect handles auth check and all data fetching via snapshots
   useEffect(() => {
     if (authLoading || !user || !classId) {
       if (!authLoading) setLoadingData(false);
       return;
     }
 
-    const checkAuthorization = async () => {
+    const classroomDocRef = doc(db, "classrooms", classId);
+
+    const unsubscribe = onSnapshot(classroomDocRef, (classroomSnap) => {
       setLoadingData(true);
-      try {
-        const classroomDocRef = doc(db, "classrooms", classId);
-        const classroomSnap = await getDoc(classroomDocRef);
-
-        if (!classroomSnap.exists()) {
-          toast({ variant: "destructive", title: "Error", description: "Class not found." });
-          router.push("/dashboard/classes");
-          return;
-        }
-        
-        const teacherId = classroomSnap.data().teacherId;
-        const isTeacher = user.uid === teacherId;
-        
-        setIsAuthorized(isTeacher);
-        
-        if (!isTeacher) {
-          toast({ variant: "destructive", title: "Access Denied", description: "You are not authorized to manage members for this class." });
-          router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
-        }
-      } catch (error) {
-        console.error("Error during authorization check:", error);
-        toast({ variant: "destructive", title: "Authorization Error", description: "Could not verify your permissions." });
-        setIsAuthorized(false);
+      if (!classroomSnap.exists()) {
+        toast({ variant: "destructive", title: "Error", description: "Class not found." });
+        router.push("/dashboard/classes");
+        return;
       }
-    };
-    
-    checkAuthorization();
-  }, [classId, user, authLoading, router, toast, className]);
 
-
-  // Effect 2: Fetch data ONLY if authorization has been confirmed.
-  useEffect(() => {
-    // Do not proceed until authorization status is explicitly true.
-    if (isAuthorized !== true || !classId) {
-      // If authorization is null (checking) or false (denied), don't fetch data.
-      if(isAuthorized === false) setLoadingData(false);
-      return;
-    }
-
-    setLoadingData(true);
-
-    const membersUnsub = onSnapshot(
-      query(collection(db, "classrooms", classId, "members")),
-      (snapshot) => {
-        const fetchedMembers: Member[] = [];
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          fetchedMembers.push({ 
-            id: docSnap.id, name: data.name, avatarUrl: data.avatarUrl, role: data.role,
-            joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt), email: data.email,
-          });
-        });
-        setMembers(fetchedMembers.sort((a, b) => (a.role === 'teacher' ? -1 : b.role === 'teacher' ? 1 : 0) || a.name.localeCompare(b.name)));
-      }, (error) => {
-        console.error("Error fetching members:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load members." });
+      const classroomData = classroomSnap.data();
+      const teacherId = classroomData.teacherId;
+      const isTeacher = user.uid === teacherId;
+      
+      if (isAuthorized === null && !isTeacher) { // Check only on first run
+        toast({ variant: "destructive", title: "Access Denied", description: "You are not authorized to manage members for this class." });
+        router.push(`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`);
       }
-    );
-    
-    const requestsUnsub = onSnapshot(
-      query(collection(db, "classrooms", classId, "joinRequests")),
-      (snapshot) => {
-        const fetchedRequests: Member[] = [];
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          fetchedRequests.push({ 
-            id: docSnap.id, name: data.userName, avatarUrl: data.userAvatar, role: 'student',
-            requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date(data.requestedAt), status: 'requested',
-          });
-        });
+      setIsAuthorized(isTeacher);
+      
+      if (isTeacher) {
+        // Fetch pending requests from the classroom document array
+        const requests = classroomData.joinRequests || [];
+        const fetchedRequests: Member[] = requests.map((req: any) => ({
+            id: req.userId,
+            name: req.userName,
+            avatarUrl: req.userAvatar,
+            role: 'student',
+            requestedAt: req.requestedAt?.toDate ? req.requestedAt.toDate() : new Date(), // Handle different timestamp types
+            status: 'requested',
+        }));
         setPendingRequests(fetchedRequests.sort((a,b) => (b.requestedAt?.getTime() || 0) - (a.requestedAt?.getTime() || 0) ));
-      }, (error) => {
-        console.error("Error fetching join requests:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load join requests." });
       }
-    );
-    
-    setLoadingData(false);
+      
+      // Fetch members from subcollection (this part remains the same)
+      const membersColRef = collection(db, "classrooms", classId, "members");
+      getDocs(query(membersColRef)).then(membersSnapshot => {
+         const fetchedMembers: Member[] = [];
+          membersSnapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            fetchedMembers.push({ 
+              id: docSnap.id, name: data.name, avatarUrl: data.avatarUrl, role: data.role,
+              joinedAt: data.joinedAt?.toDate ? data.joinedAt.toDate() : new Date(data.joinedAt), email: data.email,
+            });
+          });
+        setMembers(fetchedMembers.sort((a, b) => (a.role === 'teacher' ? -1 : b.role === 'teacher' ? 1 : 0) || a.name.localeCompare(b.name)));
+        setLoadingData(false);
+      }).catch(error => {
+        console.error("Error fetching members subcollection:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load members list." });
+        setLoadingData(false);
+      });
 
-    return () => {
-      membersUnsub();
-      requestsUnsub();
-    };
-  }, [isAuthorized, classId, toast]);
+    }, (error) => {
+      console.error("Error with classroom snapshot listener:", error);
+      toast({ variant: "destructive", title: "Real-time Error", description: "Could not listen for classroom updates." });
+      setIsAuthorized(false);
+      setLoadingData(false);
+    });
+
+    return () => unsubscribe();
+  }, [classId, user, authLoading, router, toast, className, isAuthorized]);
 
 
   const openConfirmationDialog = (type: 'remove' | 'accept' | 'reject', member: Member) => {
@@ -148,37 +124,48 @@ export default function ManageMembersPage() {
     if (!actionToConfirm || !classId || !isAuthorized) return;
     const { type, member } = actionToConfirm;
     
-    const batch = writeBatch(db);
-
+    const classroomRef = doc(db, "classrooms", classId);
+    
     try {
-      if (type === 'remove') {
-        if (member.role === 'teacher') {
-          toast({ variant: "destructive", title: "Action Not Allowed", description: "Teachers cannot be removed this way." }); return;
+        if (type === 'remove') {
+            if (member.role === 'teacher') {
+                toast({ variant: "destructive", title: "Action Not Allowed", description: "Teachers cannot be removed this way." }); return;
+            }
+            const memberRef = doc(db, "classrooms", classId, "members", member.id);
+            await deleteDoc(memberRef);
+            // Also decrement member count
+            const classroomSnap = await getDoc(classroomRef);
+            const currentCount = classroomSnap.data()?.memberCount || 1;
+            await updateDoc(classroomRef, { memberCount: Math.max(1, currentCount - 1) });
+            toast({ title: "Member Removed", description: `${member.name} has been removed from the class.` });
+        } else if (type === 'accept' || type === 'reject') {
+            const classroomSnap = await getDoc(classroomRef);
+            if (!classroomSnap.exists()) throw new Error("Classroom not found");
+            const currentRequests = classroomSnap.data().joinRequests || [];
+            const newRequests = currentRequests.filter((req: any) => req.userId !== member.id);
+            
+            const batch = writeBatch(db);
+            
+            if (type === 'accept') {
+                const memberRef = doc(db, "classrooms", classId, "members", member.id);
+                batch.update(classroomRef, { 
+                    joinRequests: newRequests,
+                    memberCount: (classroomSnap.data()?.memberCount || 0) + 1,
+                });
+                batch.set(memberRef, {
+                    userId: member.id,
+                    name: member.name,
+                    avatarUrl: member.avatarUrl,
+                    role: 'student',
+                    joinedAt: serverTimestamp(),
+                });
+                await batch.commit();
+                toast({ title: "Request Accepted", description: `${member.name}'s request to join has been accepted.` });
+            } else { // Reject
+                await updateDoc(classroomRef, { joinRequests: newRequests });
+                toast({ title: "Request Rejected", description: `${member.name}'s request to join has been rejected.` });
+            }
         }
-        const memberRef = doc(db, "classrooms", classId, "members", member.id);
-        batch.delete(memberRef);
-        await batch.commit();
-        toast({ title: "Member Removed", description: `${member.name} has been removed from the class.` });
-      } else if (type === 'accept') {
-        const requestRef = doc(db, "classrooms", classId, "joinRequests", member.id);
-        const memberRef = doc(db, "classrooms", classId, "members", member.id);
-        
-        batch.delete(requestRef);
-        batch.set(memberRef, {
-          userId: member.id,
-          name: member.name,
-          avatarUrl: member.avatarUrl,
-          role: 'student',
-          joinedAt: serverTimestamp(),
-        });
-        await batch.commit();
-        toast({ title: "Request Accepted", description: `${member.name}'s request to join has been accepted.` });
-      } else if (type === 'reject') {
-        const requestRef = doc(db, "classrooms", classId, "joinRequests", member.id);
-        batch.delete(requestRef);
-        await batch.commit();
-        toast({ title: "Request Rejected", description: `${member.name}'s request to join has been rejected.` });
-      }
     } catch (error) {
       console.error(`Error performing action ${type}:`, error);
       toast({ variant: "destructive", title: "Action Failed", description: (error as Error).message });
@@ -223,8 +210,8 @@ export default function ManageMembersPage() {
           </div>
         </div>
         <Button asChild variant="outline" className="rounded-lg">
-          <Link href={`/dashboard/class/${classId}?name=${encodeURIComponent(className)}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Class Details
+          <Link href={`/dashboard/class/${classId}/edit?name=${encodeURIComponent(className)}`}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Edit Class
           </Link>
         </Button>
       </div>

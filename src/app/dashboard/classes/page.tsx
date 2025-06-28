@@ -13,13 +13,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, Star, LogIn } from "lucide-react";
+import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from "firebase/storage";
-import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,9 +39,9 @@ interface Classroom {
   thumbnailUrl: string;
   dataAiHint?: string;
   createdAt: any;
-  joinRequests?: { [userId: string]: boolean };
+  isRequestedByCurrentUser?: boolean; // Client-side flag
+  joinRequestDetails?: { userId: string; userName: string; userAvatar?: string; requestedAt: any; }[]; // The actual request data
   members?: { [userId: string]: { role: 'student' | 'teacher' } };
-  subjects?: { subjectName: string; teacherName: string; teacherId: string; }[];
   pendingRequestCount?: number;
 }
 
@@ -148,7 +148,7 @@ export default function ClassesPage() {
       try {
         let q;
         if (activeFilter === 'teaching' && user) {
-          q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid));
+          q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"));
         } else {
           q = query(collection(db, "classrooms"), orderBy("createdAt", "desc"));
         }
@@ -156,6 +156,8 @@ export default function ClassesPage() {
         const querySnapshot = await getDocs(q);
         const fetchedClassroomsPromises = querySnapshot.docs.map(async (docSnap) => {
           const data = docSnap.data();
+          const joinRequestDetails = data.joinRequests || [];
+
           const classroomData: Classroom = {
             id: docSnap.id,
             name: data.name,
@@ -168,43 +170,32 @@ export default function ClassesPage() {
             dataAiHint: data.dataAiHint,
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
             subjects: data.subjects || [],
-            joinRequests: {},
             members: {},
-            pendingRequestCount: 0,
+            joinRequestDetails: joinRequestDetails,
           };
-
+          
           if (user) {
-            // Check if current user has requested to join THIS class (for student view)
-            const joinRequestRef = doc(db, "classrooms", docSnap.id, "joinRequests", user.uid);
-            const joinRequestSnap = await getDoc(joinRequestRef);
-            if (joinRequestSnap.exists()) {
-              classroomData.joinRequests![user.uid] = true;
-            }
+             // Check if current user has requested to join THIS class
+            classroomData.isRequestedByCurrentUser = joinRequestDetails.some((req: any) => req.userId === user.uid);
 
-            // Check if current user is a member of THIS class (for student view)
+            // Check if current user is a member of THIS class
             const memberRef = doc(db, "classrooms", docSnap.id, "members", user.uid);
             const memberSnap = await getDoc(memberRef);
             if (memberSnap.exists()) {
               classroomData.members![user.uid] = { role: memberSnap.data()?.role || 'student' };
             }
             
-            // Check for pending requests IF current user is the teacher (for teacher view)
+            // Set pending request count IF current user is the teacher
             if (data.teacherId === user.uid) {
-                const requestsQuery = query(collection(db, "classrooms", docSnap.id, "joinRequests"));
-                const requestsSnapshot = await getDocs(requestsQuery);
-                classroomData.pendingRequestCount = requestsSnapshot.size;
+                classroomData.pendingRequestCount = joinRequestDetails.length;
             }
           }
           return classroomData;
         });
         
         let fetchedClassrooms = await Promise.all(fetchedClassroomsPromises);
-
-        if (activeFilter === 'teaching') {
-          fetchedClassrooms.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-        }
-
         setClassrooms(fetchedClassrooms);
+
       } catch (error: any) {
         console.error("Error fetching classrooms: ", error);
         let desc = "Could not fetch classrooms.";
@@ -232,10 +223,12 @@ export default function ClassesPage() {
         if (hasTeacherCard) { // Teacher's view of "My Requests"
             filteredClassrooms = classrooms.filter(cls => cls.teacherId === user.uid && (cls.pendingRequestCount || 0) > 0);
         } else { // Student's view of "My Requests"
-            filteredClassrooms = classrooms.filter(cls => cls.joinRequests && cls.joinRequests![user.uid] && cls.teacherId !== user.uid);
+            filteredClassrooms = classrooms.filter(cls => cls.isRequestedByCurrentUser && cls.teacherId !== user.uid);
         }
     } else if (activeFilter === 'joined' && user) {
       filteredClassrooms = classrooms.filter(cls => cls.members && cls.members![user.uid] && cls.teacherId !== user.uid);
+    } else if (activeFilter === 'teaching' && user) {
+       filteredClassrooms = classrooms.filter(cls => cls.teacherId === user.uid);
     }
 
     setDisplayClassrooms(filteredClassrooms);
@@ -352,7 +345,8 @@ export default function ClassesPage() {
         createdAt: serverTimestamp(),
         thumbnailUrl: imageDetails.thumbnailUrl,
         dataAiHint: imageDetails.dataAiHint,
-        subjects: [], // Initialize with empty subjects array
+        subjects: [],
+        joinRequests: [], // Initialize with empty requests array
       };
 
       const docRef = await addDoc(collection(db, "classrooms"), newClassData);
@@ -365,17 +359,11 @@ export default function ClassesPage() {
         role: "teacher",
         joinedAt: serverTimestamp(),
       });
-
-      const createdClass: Classroom = {
-          ...newClassData,
-          id: docRef.id,
-          createdAt: new Date(), // Approximate, Firestore timestamp will be more accurate
-          members: { [user.uid]: { role: 'teacher'} },
-      };
-      setClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
-      if (activeFilter === 'all' || activeFilter === 'teaching') {
-        setDisplayClassrooms(prev => [createdClass, ...prev].sort((a,b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
-      }
+      
+      // No need to update local state optimistically, as onSnapshot will handle it.
+      // If we wanted to, we would do:
+      // const createdClass: Classroom = { ... };
+      // setClassrooms(prev => [createdClass, ...prev]);
 
       toast({ title: "Class Created!", description: `"${newClassName.trim()}" has been successfully created.` });
       resetCreateClassDialog();
@@ -395,38 +383,50 @@ export default function ClassesPage() {
       toast({ variant: "destructive", title: "Authentication Required", description: "Please sign in to request to join a class." });
       return;
     }
-
+  
     const classToUpdate = classrooms.find(c => c.id === classId);
-    if (classToUpdate?.members && classToUpdate.members[user.uid]) {
-        toast({ title: "Already a Member", description: `You are already a member of "${className}".`});
-        return;
+    if (!classToUpdate) {
+      toast({ variant: "destructive", title: "Error", description: "Class not found." });
+      return;
     }
-    if (classToUpdate?.joinRequests && classToUpdate.joinRequests[user.uid]) {
-        toast({ title: "Request Already Sent", description: `You have already requested to join "${className}".` });
-        return;
+  
+    if (classToUpdate.members && classToUpdate.members[user.uid]) {
+      toast({ title: "Already a Member", description: `You are already a member of "${className}".` });
+      return;
     }
-
+    if (classToUpdate.isRequestedByCurrentUser) {
+      toast({ title: "Request Already Sent", description: `You have already requested to join "${className}".` });
+      return;
+    }
+  
     try {
-      const requestRef = doc(db, "classrooms", classId, "joinRequests", user.uid);
-      await setDoc(requestRef, {
+      const classroomRef = doc(db, "classrooms", classId);
+      const requestPayload = {
         userId: user.uid,
         userName: user.displayName || user.email,
         userAvatar: user.photoURL,
-        requestedAt: serverTimestamp(),
+        requestedAt: new Date(), // Use client-side timestamp for arrayUnion
+      };
+      
+      await updateDoc(classroomRef, {
+        joinRequests: arrayUnion(requestPayload)
       });
-
-      // Update local state to reflect the request
+  
+      // Optimistically update local state
       setClassrooms(prev => prev.map(cls =>
-        cls.id === classId ? { ...cls, joinRequests: { ...cls.joinRequests, [user.uid]: true } } : cls
+        cls.id === classId ? { 
+          ...cls, 
+          isRequestedByCurrentUser: true, 
+          joinRequestDetails: [...(cls.joinRequestDetails || []), requestPayload]
+        } : cls
       ));
-      // displayClassrooms will update via its useEffect dependency
-
+  
       toast({ title: "Request Sent!", description: `Your request to join "${className}" has been sent.` });
     } catch (error: any) {
       console.error("Error sending join request:", error);
       let desc = (error as Error).message;
       if (error.code === 'permission-denied') {
-        desc = "Permission denied sending join request. Check Firestore security rules for 'classrooms/{classId}/joinRequests'.";
+        desc = "Permission denied sending join request. Check Firestore rules for 'classrooms' collection updates.";
       }
       toast({ variant: "destructive", title: "Request Failed", description: desc });
     }
@@ -613,7 +613,7 @@ export default function ClassesPage() {
           </CardHeader>
           <CardContent>
             {/* Show Create Class button in empty state only if user is authenticated and filter allows creation */}
-            {(activeFilter === 'all' || activeFilter === 'teaching') && classrooms.length === 0 && isAuthenticated && (
+            {activeFilter !== 'teaching' && hasTeacherCard && (
                  <Button size="lg" className="btn-gel rounded-lg" onClick={() => setIsCreateClassDialogOpen(true)}>
                       Create a Class
                  </Button>
@@ -630,7 +630,7 @@ export default function ClassesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {displayClassrooms.map(classroom => {
             const isTeacher = user && user.uid === classroom.teacherId;
-            const isRequested = user && classroom.joinRequests && classroom.joinRequests[user.uid];
+            const isRequested = classroom.isRequestedByCurrentUser;
             const isMember = user && classroom.members && classroom.members[user.uid];
 
             const showPendingBadge = isRequested && !isMember && !isTeacher;
@@ -641,7 +641,7 @@ export default function ClassesPage() {
             let actionButton;
 
             if (isTeacher) {
-                actionButton = ( // This button does not navigate to edit, it's for viewing details. Edit is in dropdown.
+                actionButton = (
                     <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
                          <ArrowRight className="mr-2 h-4 w-4" /> View Details
                     </Button>
@@ -803,7 +803,7 @@ export default function ClassesPage() {
         <DialogContent className="sm:max-w-md rounded-xl">
             <DialogHeader>
                 <DialogTitle className="flex items-center text-xl">
-                    <Star className="mr-2 h-6 w-6 text-yellow-400" />
+                    <Sparkles className="mr-2 h-6 w-6 text-yellow-400" />
                     Unlock Teacher Features
                 </DialogTitle>
                 <DialogDescription>
