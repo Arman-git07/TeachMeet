@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Users as UsersIcon, Edit, ArrowRight, Loader2, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn, CheckCircle } from "lucide-react";
@@ -304,7 +303,7 @@ export default function ClassesPage() {
       if (classToDelete.thumbnailUrl && !classToDelete.thumbnailUrl.includes('placehold.co')) {
         try {
           const thumbnailStorageRef = storageRef(storage, classToDelete.thumbnailUrl);
-          await deleteStorageObject(thumbnailStorageRef);
+          await deleteObject(thumbnailStorageRef);
         } catch (storageError: any) {
           if (storageError.code === 'storage/object-not-found') {
             console.warn(`[ClassesPage] Thumbnail not found, skipping deletion.`);
@@ -544,7 +543,7 @@ export default function ClassesPage() {
         </div>
       )}
 
-      <Dialog open={isTeacherCardDialogOpen} onOpenChange={setIsTeacherCardDialogOpen}>
+      <AlertDialog open={isTeacherCardDialogOpen} onOpenChange={setIsTeacherCardDialogOpen}>
         <DialogContent className="sm:max-w-md rounded-xl">
             <DialogHeader>
                 <DialogTitle className="flex items-center text-xl">
@@ -581,7 +580,7 @@ export default function ClassesPage() {
                 </p>
             </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </AlertDialog>
       
       <AlertDialog open={isDeleteClassConfirmOpen} onOpenChange={setIsDeleteClassConfirmOpen}>
         <AlertDialogContent className="rounded-xl">
