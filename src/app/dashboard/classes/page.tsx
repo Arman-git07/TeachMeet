@@ -15,7 +15,7 @@ import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
-import { ref as storageRef, deleteObject as deleteStorageObject } from "firebase/storage";
+import { ref as storageRef, deleteObject } from "firebase/storage";
 import { collection, query, where, getDocs, doc, orderBy, getDoc, deleteDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -298,36 +298,46 @@ export default function ClassesPage() {
       return;
     }
     setIsProcessingDelete(true);
-    try {
-      if (classToDelete.thumbnailUrl && !classToDelete.thumbnailUrl.includes('placehold.co')) {
-        try {
-          const thumbnailStorageRef = storageRef(storage, classToDelete.thumbnailUrl);
-          await deleteObject(thumbnailStorageRef);
-        } catch (storageError: any) {
-          if (storageError.code === 'storage/object-not-found') {
-            console.warn(`[ClassesPage] Thumbnail not found, skipping deletion.`);
-          } else {
-            console.error(`[ClassesPage] Error deleting thumbnail:`, storageError);
-            toast({ variant: "warning", title: "Thumbnail Deletion Issue", description: "Could not delete class image, but will proceed." });
-          }
+
+    // Step 1: Attempt to delete the storage object first. This is optional.
+    if (classToDelete.thumbnailUrl && !classToDelete.thumbnailUrl.includes('placehold.co')) {
+      try {
+        const thumbnailStorageRef = storageRef(storage, classToDelete.thumbnailUrl);
+        await deleteObject(thumbnailStorageRef);
+      } catch (storageError: any) {
+        if (storageError.code === 'storage/object-not-found') {
+          console.warn(`[ClassesPage] Thumbnail not found for class ${classToDelete.id}, skipping deletion.`);
+        } else {
+          console.error(`[ClassesPage] Error deleting thumbnail for class ${classToDelete.id}:`, storageError);
+          toast({
+            variant: "warning",
+            title: "Image Deletion Issue",
+            description: `Could not delete the class image due to an error: ${storageError.code}. The class will still be deleted.`,
+            duration: 7000,
+          });
         }
       }
+    }
 
+    // Step 2: Delete the Firestore document. This is the primary action.
+    try {
       await deleteDoc(doc(db, "classrooms", classToDelete.id));
-      toast({ title: "Class Deleted", description: `"${classToDelete.name}" has been deleted.` });
+      toast({ title: "Class Deleted", description: `"${classToDelete.name}" has been successfully deleted.` });
+      
       toast({
         variant: "info",
-        title: "Subcollections & Files",
-        description: "Note: Class members, announcements, materials, assignments, and their uploaded files are not automatically deleted.",
+        title: "Regarding Class Data",
+        description: "Note: Associated members, assignments, materials, etc., are not automatically deleted. This requires a Cloud Function for full cleanup.",
         duration: 10000,
       });
 
       setClassrooms(prev => prev.filter(c => c.id !== classToDelete!.id));
-    } catch (error: any) {
-      console.error("Error deleting class:", error);
-      let desc = "Could not delete class.";
-      if (error.code === 'permission-denied') {
-          desc = "Permission denied deleting class. Check Firestore/Storage rules.";
+
+    } catch (firestoreError: any) {
+      console.error(`[ClassesPage] Error deleting Firestore document for class ${classToDelete.id}:`, firestoreError);
+      let desc = "Could not delete class from the database.";
+      if (firestoreError.code === 'permission-denied') {
+        desc = "Permission denied when trying to delete the class document. Please check your Firestore security rules.";
       }
       toast({ variant: "destructive", title: "Deletion Failed", description: desc });
     } finally {
