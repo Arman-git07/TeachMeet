@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Users as UsersIcon, Edit, ArrowRight, Loader2, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn, CheckCircle } from "lucide-react";
 import Image from "next/image";
@@ -541,7 +542,7 @@ export default function ClassesPage() {
         </div>
       )}
 
-      <AlertDialog open={isTeacherCardDialogOpen} onOpenChange={setIsTeacherCardDialogOpen}>
+      <Dialog open={isTeacherCardDialogOpen} onOpenChange={setIsTeacherCardDialogOpen}>
         <DialogContent className="sm:max-w-md rounded-xl">
             <DialogHeader>
                 <DialogTitle className="flex items-center text-xl">
@@ -578,7 +579,7 @@ export default function ClassesPage() {
                 </p>
             </DialogFooter>
         </DialogContent>
-      </AlertDialog>
+      </Dialog>
       
       <AlertDialog open={isDeleteClassConfirmOpen} onOpenChange={setIsDeleteClassConfirmOpen}>
         <AlertDialogContent className="rounded-xl">
