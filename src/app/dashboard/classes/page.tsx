@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Users as UsersIcon, Edit, ArrowRight, Loader2, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn, CheckCircle } from "lucide-react";
 import Image from "next/image";
@@ -299,7 +299,6 @@ export default function ClassesPage() {
     }
     setIsProcessingDelete(true);
 
-    // Step 1: Attempt to delete the storage object first. This is optional.
     if (classToDelete.thumbnailUrl && !classToDelete.thumbnailUrl.includes('placehold.co')) {
       try {
         const thumbnailStorageRef = storageRef(storage, classToDelete.thumbnailUrl);
@@ -308,18 +307,21 @@ export default function ClassesPage() {
         if (storageError.code === 'storage/object-not-found') {
           console.warn(`[ClassesPage] Thumbnail not found for class ${classToDelete.id}, skipping deletion.`);
         } else {
+          let desc = `Could not delete the class image. The class will still be deleted.`;
+          if (storageError.code === 'storage/unauthorized' || storageError.code === 'permission-denied') {
+             desc = `Storage Permission Denied. This can be a CORS issue. A 'storage.cors.json' file has been provided to fix this. If the issue persists, check your Storage Rules in the Firebase Console. The class will still be deleted.`;
+          }
           console.error(`[ClassesPage] Error deleting thumbnail for class ${classToDelete.id}:`, storageError);
           toast({
             variant: "warning",
             title: "Image Deletion Issue",
-            description: `Could not delete the class image due to an error: ${storageError.code}. The class will still be deleted.`,
-            duration: 7000,
+            description: desc,
+            duration: 10000,
           });
         }
       }
     }
 
-    // Step 2: Delete the Firestore document. This is the primary action.
     try {
       await deleteDoc(doc(db, "classrooms", classToDelete.id));
       toast({ title: "Class Deleted", description: `"${classToDelete.name}" has been successfully deleted.` });
@@ -327,7 +329,7 @@ export default function ClassesPage() {
       toast({
         variant: "info",
         title: "Regarding Class Data",
-        description: "Note: Associated members, assignments, materials, etc., are not automatically deleted. This requires a Cloud Function for full cleanup.",
+        description: "Note: Associated members, announcements, materials, etc., are not automatically deleted. This requires a Cloud Function for full cleanup.",
         duration: 10000,
       });
 
@@ -337,9 +339,9 @@ export default function ClassesPage() {
       console.error(`[ClassesPage] Error deleting Firestore document for class ${classToDelete.id}:`, firestoreError);
       let desc = "Could not delete class from the database.";
       if (firestoreError.code === 'permission-denied') {
-        desc = "Permission denied when trying to delete the class document. Please check your Firestore security rules.";
+        desc = "Permission Denied. This is almost certainly a Firebase project configuration issue, NOT a code problem. Please RESTART your server and check the terminal logs for a troubleshooting guide on how to fix your project setup.";
       }
-      toast({ variant: "destructive", title: "Deletion Failed", description: desc });
+      toast({ variant: "destructive", title: "Deletion Failed", description: desc, duration: 15000 });
     } finally {
       setIsDeleteClassConfirmOpen(false);
       setClassToDelete(null);
@@ -559,9 +561,9 @@ export default function ClassesPage() {
                     <Sparkles className="mr-2 h-6 w-6 text-yellow-400" />
                     Unlock Teacher Features
                 </DialogTitle>
-                <DialogDescription>
+                <CardDescription>
                     Subscribe to the Teacher Card to create classes and access all teaching tools.
-                </DialogDescription>
+                </CardDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
                 <Card className="bg-muted/50 border-border/50">

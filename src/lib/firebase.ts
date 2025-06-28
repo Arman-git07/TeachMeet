@@ -24,42 +24,41 @@ if (
 ) {
   console.error(
     `\n\n============================================================\n` +
-    `  ⚠️ CRITICAL WARNING: MISSING FIREBASE CONFIGURATION ⚠️\n` +
+    `  ⛔️ CRITICAL ERROR: MISSING FIREBASE CONFIGURATION ⛔️\n` +
     `------------------------------------------------------------\n` +
-    `  Firebase services will NOT work.\n` +
-    `  Please ensure all required NEXT_PUBLIC_FIREBASE_* variables\n`+
-    `  are set in your .env file. You are missing one or more of:\n` +
+    `  Your .env file is missing required Firebase variables.\n` +
+    `  Firebase services will NOT work. Please ensure you have:\n` +
     `    - NEXT_PUBLIC_FIREBASE_API_KEY\n` +
     `    - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\n` +
     `    - NEXT_PUBLIC_FIREBASE_PROJECT_ID\n` +
     `============================================================\n\n`
   );
 } else {
-  console.log('✅ Firebase configuration variables found in environment.');
+  console.log('✅ Firebase configuration variables found in .env file.');
   appInitialized = true;
 }
 
 if (appInitialized) {
    console.info(
-    `\n\n====================================================================\n` +
-    `  💡 FIREBASE & FIRESTORE: TROUBLESHOOTING GUIDE 💡\n` +
-    `--------------------------------------------------------------------\n` +
-    `  If you see "Missing or insufficient permissions" errors, the cause\n` +
-    `  is almost certainly your project setup, not your code's rules.\n` +
-    `  Please VERIFY these steps in your Google Cloud/Firebase console:\n\n` +
-    `  1. ✅ Firestore Database is CREATED:\n` +
-    `     Go to your Firebase Console -> Firestore Database, and click\n` +
-    `     "Create database". This step is REQUIRED.\n\n` +
-    `  2. ✅ Firestore API is ENABLED:\n` +
-    `     Go to this link for your project and ensure the API is enabled:\n` +
-    `     https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${firebaseConfig.projectId}\n\n` +
-    `  3. ✅ Correct Project ID:\n` +
-    `     The Project ID in your .env file MUST be exactly:\n` +
-    `     '${firebaseConfig.projectId}'\n\n` +
-     `  4. ✅ Security Rules are Deployed (Code is already public):\n` +
-    `     Your 'firestore.rules' are set to be public for development.\n`+
-    `     If issues persist, deploy them manually via the Firebase CLI.\n` +
-    `====================================================================\n\n`
+    `\n\n=====================================================================================\n` +
+    `  🚨 READ THIS IF YOU SEE "Missing or insufficient permissions" 🚨\n` +
+    `-------------------------------------------------------------------------------------\n` +
+    `  The code's security rules are wide open for development. If you see this\n` +
+    `  error, the cause is your Firebase project's setup, not the code.\n\n` +
+    `  👉 PLEASE VERIFY THE FOLLOWING IN YOUR GOOGLE CLOUD/FIREBASE CONSOLE:\n\n` +
+    `  1. Firestore Database is CREATED:\n` +
+    `     - Go to your Firebase Console -> Firestore Database.\n` +
+    `     - If you see a "Create database" button, CLICK IT and create the database.\n` +
+    `     - This is the MOST COMMON cause of the error.\n\n` +
+    `  2. Cloud Firestore API is ENABLED:\n` +
+    `     - Go to this link and ensure the API is enabled for your project:\n` +
+    `       https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${firebaseConfig.projectId}\n\n` +
+    `  3. Correct Project ID in .env:\n` +
+    `     - Your NEXT_PUBLIC_FIREBASE_PROJECT_ID MUST be exactly:\n` +
+    `       '${firebaseConfig.projectId}'\n\n` +
+    `  This check runs every time you start the server. If the error persists,\n` +
+    `  one of these three steps has been missed.\n` +
+    `=====================================================================================\n\n`
   );
 }
 
