@@ -3,6 +3,8 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
+      // Allow read and write access to all files for any user
+      // WARNING: This is for development only and is not secure.
       allow read, write: if true;
     }
   }
