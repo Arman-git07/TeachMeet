@@ -1,3 +1,4 @@
+
 // src/app/dashboard/classes/page.tsx
 'use client';
 
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Users as UsersIcon, Edit, ArrowRight, Loader2, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn, CheckCircle } from "lucide-react";
 import Image from "next/image";
@@ -189,9 +190,9 @@ export default function ClassesPage() {
         console.error("Error fetching classrooms: ", error);
         let desc = "Could not fetch classrooms.";
         if (error.code === 'permission-denied' || (error.message && error.message.includes('index'))) {
-          desc = "Permission denied or a required database index is missing. Please check Firestore security rules and indexes.";
+          desc = "Permission denied. This is almost certainly a Firebase project configuration issue, NOT a code problem. Please RESTART your server and check the terminal logs for a troubleshooting guide on how to fix your project.";
         }
-        toast({ variant: "destructive", title: "Error", description: desc });
+        toast({ variant: "destructive", title: "Firebase Project Error", description: desc, duration: 15000 });
       } finally {
         setInitialLoading(false);
       }
@@ -271,9 +272,9 @@ export default function ClassesPage() {
       console.error("Error sending join request:", error);
       let desc = (error as Error).message;
       if (error.code === 'permission-denied') {
-        desc = "Permission denied sending join request. Check Firestore rules for 'classrooms' collection updates.";
+        desc = "Permission denied. This is a Firebase project configuration issue. Please RESTART your server and check the terminal logs for a setup guide.";
       }
-      toast({ variant: "destructive", title: "Request Failed", description: desc });
+      toast({ variant: "destructive", title: "Request Failed", description: desc, duration: 15000 });
     }
   };
 
@@ -308,7 +309,7 @@ export default function ClassesPage() {
         } else {
           let desc = `Could not delete the class image. The class will still be deleted.`;
           if (storageError.code === 'storage/unauthorized' || storageError.code === 'permission-denied') {
-             desc = `Storage Permission Denied. This can be a CORS issue. A 'storage.cors.json' file has been provided to fix this. If the issue persists, check your Storage Rules in the Firebase Console. The class will still be deleted.`;
+             desc = `Storage Permission Denied. This can be a CORS issue or Storage Rules. The 'storage.cors.json' file should fix CORS. If the issue persists, check your Storage Rules in the Firebase Console. The class will still be deleted.`;
           }
           console.error(`[ClassesPage] Error deleting thumbnail for class ${classToDelete.id}:`, storageError);
           toast({
@@ -338,9 +339,9 @@ export default function ClassesPage() {
       console.error(`[ClassesPage] Error deleting Firestore document for class ${classToDelete.id}:`, firestoreError);
       let desc = "Could not delete class from the database.";
       if (firestoreError.code === 'permission-denied') {
-        desc = "Permission Denied. This is almost certainly a Firebase project configuration issue, NOT a code problem. Please RESTART your server and check the terminal logs for a troubleshooting guide on how to fix your project setup.";
+        desc = "This is a Firebase project configuration issue. The app's code has open security rules. Please RESTART your server and follow the troubleshooting guide in the terminal logs to fix your project setup.";
       }
-      toast({ variant: "destructive", title: "Deletion Failed", description: desc, duration: 15000 });
+      toast({ variant: "destructive", title: "Deletion Failed: Firebase Project Error", description: desc, duration: 15000 });
     } finally {
       setIsDeleteClassConfirmOpen(false);
       setClassToDelete(null);

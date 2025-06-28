@@ -43,7 +43,7 @@ if (appInitialized) {
     `\n\n=====================================================================================\n` +
     `  🚨 READ THIS IF YOU SEE "Missing or insufficient permissions" 🚨\n` +
     `-------------------------------------------------------------------------------------\n` +
-    `  The code's security rules are wide open for development. If you see this\n` +
+    `  The app's security rules are wide open for development. If you see this\n` +
     `  error, the cause is your Firebase project's setup, not the code.\n\n` +
     `  👉 PLEASE VERIFY THE FOLLOWING IN YOUR GOOGLE CLOUD/FIREBASE CONSOLE:\n\n` +
     `  1. Firestore Database is CREATED:\n` +
