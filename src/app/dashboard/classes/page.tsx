@@ -2,31 +2,26 @@
 // src/app/dashboard/classes/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadAlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { PlusCircle, Users as UsersIcon, Edit, ArrowRight, UploadCloud, Loader2, Save, CheckCircle, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn } from "lucide-react";
+import { Users as UsersIcon, Edit, ArrowRight, Loader2, Filter, ChevronDown, MoreVertical, UserCheck, Trash2, BookOpen, Sparkles, LogIn } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject as deleteStorageObject } from "firebase/storage";
-import { collection, addDoc, query, where, getDocs, doc, setDoc, serverTimestamp, orderBy, getDoc, deleteDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { ref as storageRef, deleteObject as deleteStorageObject } from "firebase/storage";
+import { collection, query, where, getDocs, doc, orderBy, getDoc, deleteDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-
-const MAX_IMAGE_SIZE_MB = 5;
-const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+import { CreateClassDialog } from '@/components/class/CreateClassDialog';
 
 interface Classroom {
   id: string;
@@ -43,6 +38,7 @@ interface Classroom {
   joinRequestDetails?: { userId: string; userName: string; userAvatar?: string; requestedAt: any; }[]; // The actual request data
   members?: { [userId: string]: { role: 'student' | 'teacher' } };
   pendingRequestCount?: number;
+  subjects?: { subjectName: string }[];
 }
 
 
@@ -78,15 +74,9 @@ export default function ClassesPage() {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  const [isCreateClassDialogOpen, setIsCreateClassDialogOpen] = useState(false);
-  const [newClassName, setNewClassName] = useState('');
-  const [newClassDescription, setNewClassDescription] = useState('');
-  const [newClassImageFile, setNewClassImageFile] = useState<File | null>(null);
-  const [newClassImagePreview, setNewClassImagePreview] = useState<string | null>(null);
-  const [isUploadingOrCreating, setIsUploadingOrCreating] = useState(false);
-
   const [isDeleteClassConfirmOpen, setIsDeleteClassConfirmOpen] = useState(false);
   const [classToDelete, setClassToDelete] = useState<Classroom | null>(null);
+  const [isProcessingDelete, setIsProcessingDelete] = useState(false);
   
   const [hasTeacherCard, setHasTeacherCard] = useState(false);
   const [isTeacherCardDialogOpen, setIsTeacherCardDialogOpen] = useState(false);
@@ -94,10 +84,6 @@ export default function ClassesPage() {
   useEffect(() => {
     if (user) {
       // In a real app, you'd fetch this from the user's Firestore document.
-      // e.g., const userDoc = await getDoc(doc(db, "users", user.uid));
-      // if (userDoc.exists() && userDoc.data().teacherCardExpiresAt > Timestamp.now()) {
-      //   setHasTeacherCard(true);
-      // }
       const mockTeacherStatus = localStorage.getItem('mock_teacher_card_status');
       if (mockTeacherStatus === 'active') {
           setHasTeacherCard(true);
@@ -106,18 +92,17 @@ export default function ClassesPage() {
   }, [user]);
 
   const currentFilterOptions = filterOptionsConfig.filter(opt => {
-    if (opt.value === 'requested') { return isAuthenticated; } // Available to all logged in users now
+    if (opt.value === 'requested') { return isAuthenticated; }
     if (opt.requiresTeacher) {
       return isAuthenticated && hasTeacherCard;
     }
     if (opt.requiresAuth) {
       return isAuthenticated;
     }
-    return true; // For 'all' filter
+    return true;
   });
 
   useEffect(() => {
-    // If the active filter is no longer available in the options, reset to 'all'.
     if (!currentFilterOptions.some(opt => opt.value === activeFilter)) {
       setActiveFilter("all");
     }
@@ -175,17 +160,14 @@ export default function ClassesPage() {
           };
           
           if (user) {
-             // Check if current user has requested to join THIS class
             classroomData.isRequestedByCurrentUser = joinRequestDetails.some((req: any) => req.userId === user.uid);
-
-            // Check if current user is a member of THIS class
+            
             const memberRef = doc(db, "classrooms", docSnap.id, "members", user.uid);
             const memberSnap = await getDoc(memberRef);
             if (memberSnap.exists()) {
               classroomData.members![user.uid] = { role: memberSnap.data()?.role || 'student' };
             }
             
-            // Set pending request count IF current user is the teacher
             if (data.teacherId === user.uid) {
                 classroomData.pendingRequestCount = joinRequestDetails.length;
             }
@@ -220,9 +202,9 @@ export default function ClassesPage() {
     let filteredClassrooms = classrooms;
 
     if (activeFilter === 'requested' && user) {
-        if (hasTeacherCard) { // Teacher's view of "My Requests"
+        if (hasTeacherCard) {
             filteredClassrooms = classrooms.filter(cls => cls.teacherId === user.uid && (cls.pendingRequestCount || 0) > 0);
-        } else { // Student's view of "My Requests"
+        } else {
             filteredClassrooms = classrooms.filter(cls => cls.isRequestedByCurrentUser && cls.teacherId !== user.uid);
         }
     } else if (activeFilter === 'joined' && user) {
@@ -234,149 +216,6 @@ export default function ClassesPage() {
     setDisplayClassrooms(filteredClassrooms);
 
   }, [classrooms, user, activeFilter, initialLoading, authLoading, hasTeacherCard]);
-
-
-  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > MAX_IMAGE_SIZE_BYTES) {
-        toast({ variant: "destructive", title: "Image Too Large", description: `Please select an image smaller than ${MAX_IMAGE_SIZE_MB}MB.` });
-        setNewClassImageFile(null);
-        setNewClassImagePreview(null);
-        if (event.target) event.target.value = "";
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewClassImageFile(file);
-        setNewClassImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setNewClassImageFile(null);
-      setNewClassImagePreview(null);
-    }
-  };
-
-  const resetCreateClassDialog = () => {
-    setNewClassName('');
-    setNewClassDescription('');
-    setNewClassImageFile(null);
-    if (newClassImagePreview?.startsWith('blob:')) URL.revokeObjectURL(newClassImagePreview);
-    setNewClassImagePreview(null);
-    setIsUploadingOrCreating(false);
-    setIsCreateClassDialogOpen(false);
-  };
-
-  const uploadImageToStorage = async (imageFile: File, userId: string): Promise<{ thumbnailUrl: string; dataAiHint?: string }> => {
-    const imageFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
-    const imagePath = `class_thumbnails/${userId}/${imageFileName}`;
-    const imageFileRef = storageRef(storage, imagePath);
-    const toastId = `upload-class-image-${Date.now()}`;
-    toast({
-        id: toastId, title: "Uploading Class Image...",
-        description: <div className="flex items-center"><UploadCloud className="mr-2 h-4 w-4 animate-pulse" /><span>Starting upload...</span></div>,
-        duration: Infinity,
-    });
-    return new Promise((resolve, reject) => {
-      const uploadTask = uploadBytesResumable(imageFileRef, imageFile);
-      uploadTask.on('state_changed',
-        (snapshot) => { /* Progress handling if needed */ },
-        (error) => {
-          toast.dismiss(toastId);
-          let desc = `Could not upload. Error: ${error.message}`;
-          if (error.code && error.code.includes('storage/unauthorized')) {
-            desc = "Permission denied for image upload. Please check Firebase Storage security rules for 'class_thumbnails'.";
-          }
-          toast({ variant: "destructive", title: "Image Upload Failed", description: desc });
-          reject(error);
-        },
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            toast.dismiss(toastId);
-            toast({ title: "Image Uploaded!", description: `New image successfully uploaded.` });
-            resolve({ thumbnailUrl: downloadURL, dataAiHint: undefined });
-          } catch (getUrlError) {
-             toast.dismiss(toastId);
-             toast({ variant: "destructive", title: "Image URL Error", description: (getUrlError as Error).message });
-             reject(getUrlError);
-          }
-        }
-      );
-    });
-  };
-
-
-  const handleCreateClass = async () => {
-    if (!newClassName.trim() || !newClassDescription.trim()) {
-      toast({ variant: "destructive", title: "Missing Information", description: "Please provide a class name and description." });
-      return;
-    }
-    if (!user) {
-      toast({ variant: "destructive", title: "Authentication Error", description: "You must be logged in to create a class." });
-      return;
-    }
-
-    setIsUploadingOrCreating(true);
-    let imageDetails: { thumbnailUrl: string; dataAiHint?: string };
-
-    try {
-      if (newClassImageFile) {
-        imageDetails = await uploadImageToStorage(newClassImageFile, user.uid);
-      } else {
-        const classNameInitials = getInitialsFromName(newClassName.trim(), "C");
-        imageDetails = {
-          thumbnailUrl: `https://placehold.co/600x400.png?text=${classNameInitials}`,
-          dataAiHint: "education general"
-        };
-      }
-
-      const teacherInitials = getInitialsFromName(user.displayName || "User", "U");
-      const teacherAvatarUrl = user.photoURL || `https://placehold.co/40x40.png?text=${teacherInitials}`;
-
-      const newClassData = {
-        name: newClassName.trim(),
-        description: newClassDescription.trim(),
-        teacherName: user.displayName || "Teacher",
-        teacherId: user.uid,
-        teacherAvatar: teacherAvatarUrl,
-        memberCount: 1,
-        createdAt: serverTimestamp(),
-        thumbnailUrl: imageDetails.thumbnailUrl,
-        dataAiHint: imageDetails.dataAiHint,
-        subjects: [],
-        joinRequests: [], // Initialize with empty requests array
-      };
-
-      const docRef = await addDoc(collection(db, "classrooms"), newClassData);
-
-      const memberRef = doc(db, "classrooms", docRef.id, "members", user.uid);
-      await setDoc(memberRef, {
-        userId: user.uid,
-        name: user.displayName || "Teacher",
-        avatarUrl: teacherAvatarUrl,
-        role: "teacher",
-        joinedAt: serverTimestamp(),
-      });
-      
-      // No need to update local state optimistically, as onSnapshot will handle it.
-      // If we wanted to, we would do:
-      // const createdClass: Classroom = { ... };
-      // setClassrooms(prev => [createdClass, ...prev]);
-
-      toast({ title: "Class Created!", description: `"${newClassName.trim()}" has been successfully created.` });
-      resetCreateClassDialog();
-    } catch (error: any) {
-      console.error("Error creating class:", error);
-      let desc = (error as Error).message;
-      if (error.code === 'permission-denied') {
-        desc = "Permission denied creating class or adding member. Check Firestore security rules for 'classrooms' and 'classrooms/{classId}/members'.";
-      }
-      toast({ variant: "destructive", title: "Creation Failed", description: desc });
-      setIsUploadingOrCreating(false);
-    }
-  };
 
   const handleRequestToJoin = async (classId: string, className: string) => {
     if (!user) {
@@ -405,14 +244,13 @@ export default function ClassesPage() {
         userId: user.uid,
         userName: user.displayName || user.email,
         userAvatar: user.photoURL,
-        requestedAt: new Date(), // Use client-side timestamp for arrayUnion
+        requestedAt: new Date(),
       };
       
       await updateDoc(classroomRef, {
         joinRequests: arrayUnion(requestPayload)
       });
   
-      // Optimistically update local state
       setClassrooms(prev => prev.map(cls =>
         cls.id === classId ? { 
           ...cls, 
@@ -451,39 +289,32 @@ export default function ClassesPage() {
       toast({ variant: "destructive", title: "Error", description: "Cannot delete class." });
       return;
     }
-    setIsUploadingOrCreating(true); // Reuse state for loading indicator
+    setIsProcessingDelete(true);
     try {
-      // 1. Delete class thumbnail from Storage if it's not a placeholder
       if (classToDelete.thumbnailUrl && !classToDelete.thumbnailUrl.includes('placehold.co')) {
         try {
           const thumbnailStorageRef = storageRef(storage, classToDelete.thumbnailUrl);
           await deleteStorageObject(thumbnailStorageRef);
-          console.log(`[ClassesPage] Deleted thumbnail for class ${classToDelete.id}: ${classToDelete.thumbnailUrl}`);
         } catch (storageError: any) {
           if (storageError.code === 'storage/object-not-found') {
-            console.warn(`[ClassesPage] Thumbnail not found in storage for class ${classToDelete.id}, skipping deletion: ${classToDelete.thumbnailUrl}`);
+            console.warn(`[ClassesPage] Thumbnail not found, skipping deletion.`);
           } else {
-            console.error(`[ClassesPage] Error deleting thumbnail for class ${classToDelete.id}:`, storageError);
-            // Non-fatal, proceed with Firestore delete
-            toast({ variant: "warning", title: "Thumbnail Deletion Issue", description: "Could not delete class image, but will proceed with class deletion." });
+            console.error(`[ClassesPage] Error deleting thumbnail:`, storageError);
+            toast({ variant: "warning", title: "Thumbnail Deletion Issue", description: "Could not delete class image, but will proceed." });
           }
         }
       }
 
-      // 2. Delete the classroom document from Firestore
       await deleteDoc(doc(db, "classrooms", classToDelete.id));
       toast({ title: "Class Deleted", description: `"${classToDelete.name}" has been deleted.` });
       toast({
         variant: "info",
         title: "Subcollections & Files",
-        description: "Note: Class members, announcements, materials, assignments, and their uploaded files are not automatically deleted. Please clean them up manually or set up a Cloud Function for cascading deletes.",
+        description: "Note: Class members, announcements, materials, assignments, and their uploaded files are not automatically deleted.",
         duration: 10000,
       });
 
-
-      // 3. Update local state
       setClassrooms(prev => prev.filter(c => c.id !== classToDelete!.id));
-      // displayClassrooms will update automatically via its useEffect dependency
     } catch (error: any) {
       console.error("Error deleting class:", error);
       let desc = "Could not delete class.";
@@ -494,19 +325,9 @@ export default function ClassesPage() {
     } finally {
       setIsDeleteClassConfirmOpen(false);
       setClassToDelete(null);
-      setIsUploadingOrCreating(false);
+      setIsProcessingDelete(false);
     }
   };
-
-
-  // Cleanup for image preview URL
-  useEffect(() => {
-    return () => {
-      if (newClassImagePreview && newClassImagePreview.startsWith('blob:')) {
-        URL.revokeObjectURL(newClassImagePreview);
-      }
-    };
-  }, [newClassImagePreview]);
 
   const activeFilterLabel = currentFilterOptions.find(opt => opt.value === activeFilter)?.label || "Explore All Classes";
 
@@ -519,15 +340,7 @@ export default function ClassesPage() {
         </div>
         <div className="flex items-center gap-2">
             {isAuthenticated ? (
-                hasTeacherCard ? (
-                    <Button className="btn-gel rounded-lg" onClick={() => setIsCreateClassDialogOpen(true)}>
-                        <PlusCircle className="mr-2 h-5 w-5" /> Create New Class
-                    </Button>
-                ) : (
-                    <Button className="btn-gel rounded-lg bg-cta-orange text-cta-orange-foreground hover:bg-cta-orange/90 shadow-lg hover:shadow-cta-orange/50" onClick={() => setIsTeacherCardDialogOpen(true)}>
-                        <Sparkles className="mr-2 h-5 w-5" /> Get Teacher Card
-                    </Button>
-                )
+                <CreateClassDialog hasTeacherCard={hasTeacherCard} onOpenTeacherCardDialog={() => setIsTeacherCardDialogOpen(true)} />
             ) : !authLoading && (
                 <Link href="/auth/signin" passHref legacyBehavior>
                     <Button className="btn-gel rounded-lg">
@@ -538,7 +351,6 @@ export default function ClassesPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="my-4 flex items-center gap-2">
         <DropdownMenu open={isFilterDropdownOpen} onOpenChange={setIsFilterDropdownOpen}>
           <DropdownMenuTrigger asChild>
@@ -568,7 +380,6 @@ export default function ClassesPage() {
         </DropdownMenu>
       </div>
 
-      {/* Classrooms Grid / Loading / Empty State */}
       {(initialLoading || authLoading ) ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow overflow-y-auto pb-4">
           {[...Array(3)].map((_, i) => (
@@ -586,7 +397,6 @@ export default function ClassesPage() {
                 <Skeleton className="h-4 w-5/6 rounded-md" />
               </CardContent>
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
-                <Skeleton className="h-9 w-full rounded-lg" />
                 <Skeleton className="h-9 w-full rounded-lg" />
               </CardFooter>
             </Card>
@@ -612,13 +422,9 @@ export default function ClassesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Show Create Class button in empty state only if user is authenticated and filter allows creation */}
             {activeFilter !== 'teaching' && hasTeacherCard && (
-                 <Button size="lg" className="btn-gel rounded-lg" onClick={() => setIsCreateClassDialogOpen(true)}>
-                      Create a Class
-                 </Button>
+                 <CreateClassDialog hasTeacherCard={true} onOpenTeacherCardDialog={() => {}} triggerButton={<Button size="lg" className="btn-gel rounded-lg">Create a Class</Button>} />
             )}
-            {/* Button to explore all classes if current filter shows none */}
             {(activeFilter === 'requested' || activeFilter === 'joined') && (
                  <Button onClick={() => { setActiveFilter('all'); setIsFilterDropdownOpen(false); }} size="lg" variant="outline" className="rounded-lg">
                     Explore All Classes
@@ -632,24 +438,15 @@ export default function ClassesPage() {
             const isTeacher = user && user.uid === classroom.teacherId;
             const isRequested = classroom.isRequestedByCurrentUser;
             const isMember = user && classroom.members && classroom.members[user.uid];
-
             const showPendingBadge = isRequested && !isMember && !isTeacher;
             const showJoinedBadge = isMember && !isTeacher;
-            
             const hasPendingRequests = isTeacher && (classroom.pendingRequestCount || 0) > 0;
 
             let actionButton;
-
-            if (isTeacher) {
+            if (isTeacher || isMember) {
                 actionButton = (
                     <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
-                         <ArrowRight className="mr-2 h-4 w-4" /> View Details
-                    </Button>
-                );
-            } else if (isMember) {
-                actionButton = (
-                    <Button onClick={() => handleViewClass(classroom.id, classroom.name)} className="w-full btn-gel rounded-lg text-sm">
-                         <ArrowRight className="mr-2 h-4 w-4" /> View Class
+                         <ArrowRight className="mr-2 h-4 w-4" /> {isTeacher ? 'View Details' : 'View Class'}
                     </Button>
                 );
             } else if (isRequested) {
@@ -668,7 +465,6 @@ export default function ClassesPage() {
 
             return (
             <Card key={classroom.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-primary/20 transition-shadow duration-300 ease-in-out border-border/50 relative">
-              {/* Dropdown Menu for Actions */}
               <div className="absolute top-2 right-2 z-10">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -701,7 +497,6 @@ export default function ClassesPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              {/* Image and Badges */}
               <div className="relative h-40 w-full">
                  <Image
                     src={classroom.thumbnailUrl}
@@ -711,12 +506,11 @@ export default function ClassesPage() {
                     className="rounded-t-xl opacity-80 group-hover:opacity-100 transition-opacity"
                     data-ai-hint={classroom.thumbnailUrl.includes('placehold.co') && classroom.thumbnailUrl.includes('?text=') ? undefined : classroom.dataAiHint || "education classroom"}
                  />
-                {/* Badges for status */}
                 {showPendingBadge ? (
                     <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10 absolute top-2 left-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     Pending Request
                     </Badge>
-                ) : isTeacher && !showJoinedBadge ? ( // Show "My Class" only if not also joined (which shouldn't happen for teacher)
+                ) : isTeacher && !showJoinedBadge ? (
                     <Badge variant="secondary" className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-md shadow-sm">
                     My Class
                     </Badge>
@@ -726,7 +520,6 @@ export default function ClassesPage() {
                     </Badge>
                 ) : null}
               </div>
-              {/* Card Header with Title and Teacher Info */}
               <CardHeader className="pb-2 pt-4">
                 <CardTitle className="text-lg truncate leading-tight" title={classroom.name}>{classroom.name}</CardTitle>
                 <div className="flex items-center pt-1">
@@ -737,11 +530,9 @@ export default function ClassesPage() {
                     <CardDescription className="text-xs text-muted-foreground truncate">Managed by {classroom.teacherName}</CardDescription>
                 </div>
               </CardHeader>
-              {/* Card Content with Description */}
               <CardContent className="text-sm text-muted-foreground flex-grow min-h-[60px]">
                 <p className="line-clamp-3">{classroom.description}</p>
               </CardContent>
-              {/* Card Footer with Meta Info and Action Button */}
               <CardFooter className="border-t pt-3 flex flex-col items-stretch gap-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span className="flex items-center"><UsersIcon className="mr-1.5 h-3.5 w-3.5" /> {classroom.memberCount} Members</span>
@@ -758,47 +549,6 @@ export default function ClassesPage() {
         </div>
       )}
 
-      {/* MODALS / DIALOGS at the end of the main component for proper stacking context */}
-      <Dialog open={isCreateClassDialogOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) resetCreateClassDialog();
-          setIsCreateClassDialogOpen(isOpen);
-      }}>
-          <DialogContent className="sm:max-w-[520px] rounded-xl">
-              <DialogHeader>
-                  <DialogTitle>Create New Classroom</DialogTitle>
-                  <DialogDescription>
-                      Fill in the details to set up your new class.
-                  </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-                  <div className="grid gap-2">
-                      <Label htmlFor="newClassName">Class Name</Label>
-                      <Input id="newClassName" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g., Introduction to Algebra" className="rounded-lg" disabled={isUploadingOrCreating}/>
-                  </div>
-                  <div className="grid gap-2">
-                      <Label htmlFor="newClassDescription">Description</Label>
-                      <Textarea id="newClassDescription" value={newClassDescription} onChange={(e) => setNewClassDescription(e.target.value)} placeholder="Provide a brief description of your class..." className="rounded-lg min-h-[100px]" disabled={isUploadingOrCreating}/>
-                  </div>
-                  <div className="grid gap-2">
-                      <Label htmlFor="newClassImage">Class Image (Optional, Max {MAX_IMAGE_SIZE_MB}MB)</Label>
-                      <Input id="newClassImage" type="file" accept="image/*" onChange={handleImageFileChange} className="rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isUploadingOrCreating}/>
-                      {newClassImagePreview && (
-                          <div className="mt-2 relative w-full h-40 rounded-lg overflow-hidden border shadow-inner">
-                              <Image src={newClassImagePreview} alt="New class image preview" layout="fill" objectFit="cover" data-ai-hint="education classroom" />
-                          </div>
-                      )}
-                  </div>
-              </div>
-              <DialogFooter>
-                  <Button type="button" variant="outline" className="rounded-lg" onClick={resetCreateClassDialog} disabled={isUploadingOrCreating}>Cancel</Button>
-                  <Button type="button" onClick={handleCreateClass} className="btn-gel rounded-lg" disabled={isUploadingOrCreating || !newClassName.trim()}>
-                      {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                      {isUploadingOrCreating ? (newClassImageFile ? 'Uploading Image...' : 'Creating...') : 'Create Class'}
-                  </Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
-      
       <Dialog open={isTeacherCardDialogOpen} onOpenChange={setIsTeacherCardDialogOpen}>
         <DialogContent className="sm:max-w-md rounded-xl">
             <DialogHeader>
@@ -850,13 +600,12 @@ export default function ClassesPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setIsDeleteClassConfirmOpen(false)} className="rounded-lg">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteClass} className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))} disabled={isUploadingOrCreating}>
-              {isUploadingOrCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Class
+            <AlertDialogAction onClick={confirmDeleteClass} className={cn("bg-destructive text-destructive-foreground hover:bg-destructive/90", "rounded-lg")} disabled={isProcessingDelete}>
+              {isProcessingDelete ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Class
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }
