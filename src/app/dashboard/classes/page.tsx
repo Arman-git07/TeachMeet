@@ -131,14 +131,14 @@ export default function ClassesPage() {
       setInitialLoading(true);
       try {
         let q;
-        // The composite query (where + orderBy) requires a custom Firestore index.
-        // To avoid this "Missing or insufficient permissions" error for users,
-        // we'll fetch without ordering when a filter is applied, and then sort client-side.
+        // To permanently fix "insufficient permissions" errors caused by missing indexes,
+        // we will only apply filtering at the database level.
+        // ALL sorting will be handled on the client-side. This is more robust.
         if (activeFilter === 'teaching' && user) {
           q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid));
         } else {
-          // The 'all' filter can be ordered by a single field without a custom index.
-          q = query(collection(db, "classrooms"), orderBy("createdAt", "desc"));
+          // For all other filters, fetch all documents without ordering from the database.
+          q = query(collection(db, "classrooms"));
         }
 
         const querySnapshot = await getDocs(q);
@@ -180,10 +180,8 @@ export default function ClassesPage() {
         
         let fetchedClassrooms = await Promise.all(fetchedClassroomsPromises);
         
-        // Client-side sorting for the 'teaching' filter case.
-        if (activeFilter === 'teaching') {
-            fetchedClassrooms.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-        }
+        // Always sort client-side to ensure consistent ordering and avoid index issues.
+        fetchedClassrooms.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 
         setClassrooms(fetchedClassrooms);
 

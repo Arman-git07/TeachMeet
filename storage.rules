@@ -1,6 +1,12 @@
+
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
+    // PUBLIC ACCESS FOR DEVELOPMENT
+    // WARNING: This allows anyone to upload, view, and delete files.
+    // This is for development convenience ONLY.
+    // You MUST secure this before deploying to production.
     match /{allPaths=**} {
       allow read, write: if true;
     }
