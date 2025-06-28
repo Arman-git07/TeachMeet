@@ -14,18 +14,52 @@ const firebaseConfig: FirebaseOptions = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-if (!firebaseConfig.apiKey) {
+let appInitialized = false;
+
+// Check if all necessary Firebase config keys are present
+if (
+  !firebaseConfig.apiKey ||
+  !firebaseConfig.authDomain ||
+  !firebaseConfig.projectId
+) {
   console.warn(
-    `\n\n⚠️ WARNING: NEXT_PUBLIC_FIREBASE_API_KEY is not set in your environment variables. ⚠️\n` +
-    `Firebase authentication and other Firebase services will likely fail.\n` +
-    `To resolve this:\n` +
-    `1. Ensure you have a .env file in the root of your project.\n` +
-    `2. Add your Firebase configuration to the .env file. For example:\n` +
-    `   NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyYourActualApiKey\n` +
-    `   (and other NEXT_PUBLIC_FIREBASE_... variables)\n` +
-    `3. Restart your development server (e.g., 'npm run dev').\n\n`
+    `\n\n⚠️ WARNING: Missing Firebase configuration. ⚠️\n` +
+    `Please ensure all required NEXT_PUBLIC_FIREBASE_* variables are set in your .env file:\n` +
+    ` - NEXT_PUBLIC_FIREBASE_API_KEY\n` +
+    ` - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\n` +
+    ` - NEXT_PUBLIC_FIREBASE_PROJECT_ID\n` +
+    `Firebase services will not work without these.\n\n`
+  );
+} else {
+  console.log('✅ Firebase configuration variables found in environment.');
+  appInitialized = true;
+}
+
+if (appInitialized) {
+   console.info(
+    '\n\n💡 Firebase Tip: If you see "Could not reach Cloud Firestore backend" or permission errors, check the following:\n\n' +
+    '1. ✅ Firestore Database is CREATED:\n' +
+    '   Go to your Firebase Console -> Firestore Database -> Click "Create database".\n' +
+    '   You must create the database and choose a region (e.g., us-central) for it to be accessible.\n\n' +
+    '2. ✅ Firestore API is ENABLED:\n' +
+    `   Go to Google Cloud Console for project "${firebaseConfig.projectId}" or use this link:\n` +
+    `   https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${firebaseConfig.projectId}\n` +
+    '   Ensure the "Cloud Firestore API" is enabled.\n\n' +
+    '3. ✅ Correct Security Rules:\n' +
+    `   For development, ensure your 'firestore.rules' file allows reads/writes. A common dev rule is:\n` +
+    '   rules_version = "2";\n' +
+    '   service cloud.firestore {\n' +
+    '     match /databases/{database}/documents {\n' +
+    '       match /{document=**} {\n' +
+    '         allow read, write: if request.auth != null;\n' +
+    '       }\n' +
+    '     }\n' +
+    '   }\n\n' +
+    '4. ✅ Correct Project ID:\n' +
+    `   The Project ID in your .env file ('${firebaseConfig.projectId}') must exactly match your Firebase project's ID.\n`
   );
 }
+
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
