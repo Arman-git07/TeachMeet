@@ -132,9 +132,13 @@ export default function ClassesPage() {
       setInitialLoading(true);
       try {
         let q;
+        // The composite query (where + orderBy) requires a custom Firestore index.
+        // To avoid this "Missing or insufficient permissions" error for users,
+        // we'll fetch without ordering when a filter is applied, and then sort client-side.
         if (activeFilter === 'teaching' && user) {
-          q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"));
+          q = query(collection(db, "classrooms"), where("teacherId", "==", user.uid));
         } else {
+          // The 'all' filter can be ordered by a single field without a custom index.
           q = query(collection(db, "classrooms"), orderBy("createdAt", "desc"));
         }
 
@@ -176,12 +180,18 @@ export default function ClassesPage() {
         });
         
         let fetchedClassrooms = await Promise.all(fetchedClassroomsPromises);
+        
+        // Client-side sorting for the 'teaching' filter case.
+        if (activeFilter === 'teaching') {
+            fetchedClassrooms.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+        }
+
         setClassrooms(fetchedClassrooms);
 
       } catch (error: any) {
         console.error("Error fetching classrooms: ", error);
         let desc = "Could not fetch classrooms.";
-        if (error.code === 'permission-denied' || error.message.includes('index')) {
+        if (error.code === 'permission-denied' || (error.message && error.message.includes('index'))) {
           desc = "Permission denied or a required database index is missing. Please check Firestore security rules and indexes.";
         }
         toast({ variant: "destructive", title: "Error", description: desc });
@@ -339,15 +349,7 @@ export default function ClassesPage() {
           <p className="text-muted-foreground">Discover classrooms or create your own.</p>
         </div>
         <div className="flex items-center gap-2">
-            {isAuthenticated ? (
-                <CreateClassDialog hasTeacherCard={hasTeacherCard} onOpenTeacherCardDialog={() => setIsTeacherCardDialogOpen(true)} />
-            ) : !authLoading && (
-                <Link href="/auth/signin" passHref legacyBehavior>
-                    <Button className="btn-gel rounded-lg">
-                        <LogIn className="mr-2 h-5 w-5" /> Sign In To Teach
-                    </Button>
-                </Link>
-            )}
+             <CreateClassDialog hasTeacherCard={hasTeacherCard} onOpenTeacherCardDialog={() => setIsTeacherCardDialogOpen(true)} />
         </div>
       </div>
 
@@ -422,14 +424,7 @@ export default function ClassesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {activeFilter !== 'teaching' && hasTeacherCard && (
-                 <CreateClassDialog hasTeacherCard={true} onOpenTeacherCardDialog={() => {}} triggerButton={<Button size="lg" className="btn-gel rounded-lg">Create a Class</Button>} />
-            )}
-            {(activeFilter === 'requested' || activeFilter === 'joined') && (
-                 <Button onClick={() => { setActiveFilter('all'); setIsFilterDropdownOpen(false); }} size="lg" variant="outline" className="rounded-lg">
-                    Explore All Classes
-                </Button>
-            )}
+             <CreateClassDialog hasTeacherCard={hasTeacherCard} onOpenTeacherCardDialog={() => setIsTeacherCardDialogOpen(true)} triggerButton={<Button size="lg" className="btn-gel rounded-lg">Create a Class</Button>} />
           </CardContent>
         </Card>
       ) : (
