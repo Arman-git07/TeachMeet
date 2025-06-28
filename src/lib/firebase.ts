@@ -22,13 +22,17 @@ if (
   !firebaseConfig.authDomain ||
   !firebaseConfig.projectId
 ) {
-  console.warn(
-    `\n\n⚠️ WARNING: Missing Firebase configuration. ⚠️\n` +
-    `Please ensure all required NEXT_PUBLIC_FIREBASE_* variables are set in your .env file:\n` +
-    ` - NEXT_PUBLIC_FIREBASE_API_KEY\n` +
-    ` - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\n` +
-    ` - NEXT_PUBLIC_FIREBASE_PROJECT_ID\n` +
-    `Firebase services will not work without these.\n\n`
+  console.error(
+    `\n\n============================================================\n` +
+    `  ⚠️ CRITICAL WARNING: MISSING FIREBASE CONFIGURATION ⚠️\n` +
+    `------------------------------------------------------------\n` +
+    `  Firebase services will NOT work.\n` +
+    `  Please ensure all required NEXT_PUBLIC_FIREBASE_* variables\n`+
+    `  are set in your .env file. You are missing one or more of:\n` +
+    `    - NEXT_PUBLIC_FIREBASE_API_KEY\n` +
+    `    - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\n` +
+    `    - NEXT_PUBLIC_FIREBASE_PROJECT_ID\n` +
+    `============================================================\n\n`
   );
 } else {
   console.log('✅ Firebase configuration variables found in environment.');
@@ -37,26 +41,29 @@ if (
 
 if (appInitialized) {
    console.info(
-    '\n\n💡 Firebase Tip: If you see "Could not reach Cloud Firestore backend" or permission errors, check the following:\n\n' +
-    '1. ✅ Firestore Database is CREATED:\n' +
-    '   Go to your Firebase Console -> Firestore Database -> Click "Create database".\n' +
-    '   You must create the database and choose a region (e.g., us-central) for it to be accessible.\n\n' +
-    '2. ✅ Firestore API is ENABLED:\n' +
-    `   Go to Google Cloud Console for project "${firebaseConfig.projectId}" or use this link:\n` +
-    `   https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${firebaseConfig.projectId}\n` +
-    '   Ensure the "Cloud Firestore API" is enabled.\n\n' +
-    '3. ✅ Correct Security Rules:\n' +
-    `   For development, ensure your 'firestore.rules' file allows reads/writes. A common dev rule is:\n` +
-    '   rules_version = "2";\n' +
-    '   service cloud.firestore {\n' +
-    '     match /databases/{database}/documents {\n' +
-    '       match /{document=**} {\n' +
-    '         allow read, write: if request.auth != null;\n' +
-    '       }\n' +
-    '     }\n' +
-    '   }\n\n' +
-    '4. ✅ Correct Project ID:\n' +
-    `   The Project ID in your .env file ('${firebaseConfig.projectId}') must exactly match your Firebase project's ID.\n`
+    `\n\n====================================================================\n` +
+    `  💡 FIREBASE & FIRESTORE: TROUBLESHOOTING GUIDE 💡\n` +
+    `--------------------------------------------------------------------\n` +
+    `  If you see "Could not reach Cloud Firestore backend" or\n` +
+    `  "Missing or insufficient permissions" errors, please verify:\n\n` +
+    `  1. ✅ Firestore Database is CREATED:\n` +
+    `     Go to your Firebase Console -> Firestore Database, and click\n` +
+    `     "Create database". You MUST create it and choose a region.\n\n` +
+    `  2. ✅ Firestore API is ENABLED:\n` +
+    `     Go to this link for your project and ensure the API is enabled:\n` +
+    `     https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${firebaseConfig.projectId}\n\n` +
+    `  3. ✅ Correct Project ID:\n` +
+    `     The Project ID in your .env file must be exactly:\n` +
+    `     '${firebaseConfig.projectId}'\n\n` +
+     `  4. ✅ Security Rules are Deployed:\n` +
+    `     Ensure your 'firestore.rules' and 'storage.rules' files have been\n`+
+    `     deployed to Firebase. For development, they should be permissive:\n` +
+    `     // firestore.rules\n` +
+    `     rules_version = '2';\n` +
+    `     service cloud.firestore {\n` +
+    `       match /databases/{database}/documents { match /{document=**} { allow read, write: if true; } }\n` +
+    `     }\n` +
+    `====================================================================\n\n`
   );
 }
 
