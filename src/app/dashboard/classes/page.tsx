@@ -25,6 +25,7 @@ import {
   Dialog,
   DialogContent,
   DialogTrigger,
+  DialogClose,
 } from '@/components/ui/dialog';
 import { CreateClassDialogContent } from '@/components/class/CreateClassDialog';
 import { CreateExamDialogContent } from '@/components/exam/CreateExamDialog';
@@ -42,6 +43,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 // Mock class data
