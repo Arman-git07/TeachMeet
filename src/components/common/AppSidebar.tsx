@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
@@ -219,6 +220,11 @@ export function AppSidebar() {
     { href: "/community-guidelines", label: "Community Guidelines", icon: Users, target: "_blank" },
   ];
 
+  const classesAndExamsItems = [
+    { href: "/dashboard/classes", label: "My Classes", icon: Users },
+    { href: "/dashboard/exams", label: "My Exams", icon: ShieldAlert },
+  ];
+
   return (
     <>
     <Sidebar side="left" variant="sidebar" collapsible="icon">
@@ -249,6 +255,14 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
+              <NavItem 
+                icon={ClipboardCheck} 
+                currentPath={pathname} 
+                isDropdown 
+                dropdownItems={classesAndExamsItems}
+              >
+                Classes
+              </NavItem>
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
