@@ -1,4 +1,3 @@
-
 'use client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -46,8 +45,20 @@ export function SignInForm() {
         title: "Sign In Successful",
         description: "Welcome back!",
       });
-      router.push('/'); // Changed from '/dashboard' to '/'
+      router.push('/');
     } catch (error: any) {
+      // New specific check for the blocked API error
+      if (error.code && error.code.startsWith('auth/requests-to-this-api-identitytoolkit')) {
+        toast({
+          variant: "destructive",
+          title: "Project Setup Required",
+          description: "Email/Password sign-in is not enabled for this project. Please enable the 'Identity Toolkit API' in your Google Cloud Console.",
+          duration: 10000,
+        });
+        setIsLoading(false);
+        return; // Exit early
+      }
+
       const knownErrorCodes = [
         'auth/user-not-found', 
         'auth/wrong-password', 
