@@ -606,16 +606,30 @@ export default function MeetingPage() {
   return (
     <div className="h-full flex flex-col bg-background/95 relative overflow-hidden">
       <main className="flex-1 p-2 sm:p-4">
-        <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
-            {mainGridParticipants.map(participant => (
-              <div key={participant.id} className="min-h-0">
-                <ParticipantView {...participant} />
+        {remoteParticipants.length === 0 ? (
+          <div className="h-full w-full">
+            {selfView ? (
+              <ParticipantView {...selfView} />
+            ) : (
+              <div className="h-full w-full flex flex-col items-center justify-center text-center bg-muted rounded-xl">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground">Connecting your video...</p>
+                <p className="text-xs text-muted-foreground mt-2">Make sure you've granted camera permissions.</p>
               </div>
-            ))}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
+              {mainGridParticipants.map(participant => (
+                <div key={participant.id} className="min-h-0">
+                  <ParticipantView {...participant} />
+                </div>
+              ))}
+          </div>
+        )}
       </main>
       
-      {selfView && (
+      {remoteParticipants.length > 0 && selfView && (
           <div className="absolute bottom-20 md:bottom-24 right-2 sm:right-4 w-40 h-28 md:w-56 md:h-36 rounded-xl overflow-hidden z-20 shadow-2xl border-2 border-background">
             <ParticipantView {...selfView} />
           </div>
