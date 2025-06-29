@@ -1,11 +1,6 @@
-
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow read and write access to all files for development purposes.
-    // WARNING: This is insecure for production. You must secure your storage.
-    // See: https://firebase.google.com/docs/storage/security/start
     match /{allPaths=**} {
       allow read, write: if true;
     }
