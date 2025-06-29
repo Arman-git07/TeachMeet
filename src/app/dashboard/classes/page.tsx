@@ -45,27 +45,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
-
-// Mock class data
-const mockClasses = [
-    {
-        id: 'cls1',
-        name: 'Introduction to Biology',
-        subject: 'Science',
-        teacher: 'Dr. Alan Grant',
-        studentCount: 24,
-        bannerUrl: 'https://placehold.co/400x200.png',
-    },
-    {
-        id: 'cls2',
-        name: 'Advanced Mathematics',
-        subject: 'Math',
-        teacher: 'Dr. Ian Malcolm',
-        studentCount: 18,
-        bannerUrl: 'https://placehold.co/400x200.png',
-    },
-];
-
 interface ClassData {
     id: string;
     name: string;
@@ -90,13 +69,9 @@ export default function ClassesPage() {
     useEffect(() => {
         const checkTeacherStatus = async () => {
             if (user) {
-                // Mock check: In a real app, you would check a user role from your database.
-                // For this prototype, we'll assume the user is a teacher if they have classes.
                 if (classes.length > 0) {
                   setIsTeacherCardActive(true);
                 } else {
-                  // If they have no classes, we can keep the activation card visible
-                  // or check a specific 'isTeacher' flag. For now, let's keep it simple.
                   const storedStatus = localStorage.getItem(`teacher_status_${user.uid}`);
                   setIsTeacherCardActive(storedStatus === 'active');
                 }
@@ -108,7 +83,6 @@ export default function ClassesPage() {
 
     useEffect(() => {
         if (!user || authLoading) {
-            // If auth is loading or no user, don't fetch yet.
             if (!authLoading) setIsLoadingClasses(false);
             return;
         };
@@ -117,7 +91,6 @@ export default function ClassesPage() {
             setIsLoadingClasses(true);
             setError(null);
             try {
-                // Query for classes created by the current user
                 const q = query(collection(db, 'classes'), where('creatorId', '==', user.uid));
                 const querySnapshot = await getDocs(q);
                 const fetchedClasses: ClassData[] = [];
@@ -128,13 +101,12 @@ export default function ClassesPage() {
                         name: data.name,
                         subject: data.subject,
                         teacherName: data.teacherName,
-                        studentCount: data.studentCount || 0, // Default to 0
+                        studentCount: data.studentCount || 0,
                         bannerUrl: data.bannerUrl,
                         creatorId: data.creatorId,
                     });
                 });
                 setClasses(fetchedClasses);
-                console.log("[ClassesPage] Successfully fetched classes: ", fetchedClasses);
             } catch (err: any) {
                 console.error("[ClassesPage] Firestore Error fetching classes:", err);
                 if (err.code === 'permission-denied' || err.code === 'unauthenticated' || err.code === 'failed-precondition') {
@@ -142,7 +114,7 @@ export default function ClassesPage() {
                      toast({
                         variant: "destructive",
                         title: "Permissions Error",
-                        description: "Could not fetch classes due to a permissions issue. Ensure your Firestore security rules are correctly configured to allow reads from the 'classes' collection for authenticated users.",
+                        description: "Could not fetch classes due to a permissions issue. Ensure your Firestore security rules are correctly configured and your project setup is complete.",
                         duration: 10000,
                      });
                 } else {
@@ -163,9 +135,8 @@ export default function ClassesPage() {
     
     const handleActivateTeacherCard = async () => {
         if (!user) return;
-        // Mock payment & activation
         setIsSubmitting(true);
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1500));
         setIsSubmitting(false);
         setIsTeacherCardActive(true);
         localStorage.setItem(`teacher_status_${user.uid}`, 'active');
@@ -177,13 +148,11 @@ export default function ClassesPage() {
     
     const handleDeleteClass = async () => {
         if (!showDeleteConfirm) return;
-        // In a real app, delete from Firestore
         console.log(`[Mock] Deleting class ${showDeleteConfirm}`);
         setClasses(prev => prev.filter(c => c.id !== showDeleteConfirm));
         toast({ title: 'Class Deleted', description: 'The class has been removed.' });
         setShowDeleteConfirm(null);
     };
-
 
     if (authLoading || isLoadingClasses) {
         return (
@@ -218,41 +187,37 @@ export default function ClassesPage() {
     
     if (error) {
         return (
-            <Card className="max-w-2xl mx-auto my-12 text-center rounded-xl shadow-xl border-destructive/50">
-                <CardHeader>
-                    <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
-                    <CardTitle className="text-2xl text-destructive">Action Required: Fix Firebase Project Setup</CardTitle>
+            <Card className="max-w-3xl mx-auto my-12 text-center rounded-xl shadow-2xl border-2 border-destructive/50 bg-destructive/5">
+                <CardHeader className="p-6">
+                    <AlertTriangle className="mx-auto h-16 w-16 text-destructive" />
+                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Action Required: Fix Firebase Project Setup</CardTitle>
+                    <CardDescription className="text-lg text-foreground/90 mt-2">
+                        The app cannot connect to Firestore. This is a project configuration problem, not an app code problem.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <p className="text-foreground">
-                        The app can't connect to Firestore due to a permissions issue. This is almost always a project configuration problem, not an issue with the application's code.
+                <CardContent className="space-y-6 text-left p-6">
+                    <p className="text-base text-foreground mb-4">
+                        You've done the right thing by creating the database. The most likely remaining issue is that the **Cloud Firestore API** is not enabled for your project. Please complete this checklist:
                     </p>
-                    <div className="text-left bg-muted p-4 rounded-lg prose prose-sm dark:prose-invert">
-                        <p>Please complete this checklist in your Firebase project:</p>
-                        <ol className="list-decimal list-inside space-y-2">
-                            <li>
-                                <strong>Firestore Database is CREATED:</strong> Go to the Firestore Database page in your Firebase Console. If you see a "Create database" button, click it. This is the most common cause of the error.
-                                <a href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'link'}), "p-1 h-auto")}>
-                                  Go to Firestore
-                                </a>
-                            </li>
-                             <li>
-                                <strong>Cloud Firestore API is ENABLED:</strong> Make sure the API is enabled for your project in the Google Cloud Console.
-                                <a href={`https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'link'}), "p-1 h-auto")}>
-                                  Enable API
-                                </a>
-                            </li>
-                            <li>
-                                <strong>Correct Project ID in .env:</strong> Your <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code> in the <code>.env</code> file must exactly match your Firebase project ID.
-                            </li>
-                        </ol>
-                         <p className="mt-4">
-                            After checking these steps, please restart the development server. If the problem persists, review the error messages in the browser console for more clues.
-                        </p>
+                    <div className="space-y-4">
+                        <div className="p-4 border rounded-lg bg-background shadow-sm">
+                            <h3 className="font-bold text-lg">1. Enable Cloud Firestore API</h3>
+                            <p className="text-muted-foreground mt-1 mb-3">This is the most common cause of this error after creating the database. The API must be enabled for your project to allow connections.</p>
+                            <a href={`https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'default', size: 'lg'}), "w-full btn-gel rounded-lg")}>
+                              Enable Firestore API Now
+                            </a>
+                        </div>
+                        <div className="p-4 border rounded-lg bg-background shadow-sm">
+                            <h3 className="font-bold text-lg">2. Verify Project ID</h3>
+                            <p className="text-muted-foreground mt-1">Ensure the project ID in your <code>.env</code> file is correct. It should be: <strong>{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'Not Found'}</strong></p>
+                        </div>
                     </div>
+                     <p className="mt-6 text-center text-muted-foreground">
+                        After enabling the API, please <strong>restart the development server</strong> and then click the button below.
+                    </p>
                 </CardContent>
-                <CardFooter>
-                     <Button onClick={() => window.location.reload()} className="w-full rounded-lg">
+                <CardFooter className="p-6">
+                     <Button onClick={() => window.location.reload()} className="w-full rounded-lg" size="lg">
                         Retry Connection
                     </Button>
                 </CardFooter>
@@ -410,7 +375,6 @@ export default function ClassesPage() {
                 </div>
             )}
             
-            {/* Delete Confirmation Dialog */}
             <AlertDialog open={!!showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(null)}>
                 <AlertDialogContent className="rounded-xl">
                     <AlertDialogHeader>

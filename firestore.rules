@@ -1,12 +1,13 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // This rule allows anyone with your project's credentials to read, write,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire in 30 days.
+    // For development, allow read/write access to all authenticated users.
+    // In production, you MUST secure your data properly.
+    // Example: allow read, write: if request.auth.uid == resource.data.authorId;
     match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2024, 7, 28);
+      allow read, write: if true;
     }
   }
 }
