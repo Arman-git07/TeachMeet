@@ -22,15 +22,17 @@ if (
   !firebaseConfig.authDomain ||
   !firebaseConfig.projectId
 ) {
-  console.error(
+  // Use console.warn to avoid Next.js error overlay for a config issue
+  console.warn(
     `\n\n============================================================\n` +
-    `  ⛔️ CRITICAL ERROR: MISSING FIREBASE CONFIGURATION ⛔️\n` +
+    `  ⚠️  WARNING: INCOMPLETE FIREBASE CONFIGURATION ⚠️\n` +
     `------------------------------------------------------------\n` +
     `  Your .env file is missing required Firebase variables.\n` +
-    `  Firebase services will NOT work. Please ensure you have:\n` +
+    `  Firebase services will NOT work until you provide:\n` +
     `    - NEXT_PUBLIC_FIREBASE_API_KEY\n` +
     `    - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\n` +
-    `    - NEXT_PUBLIC_FIREBASE_PROJECT_ID\n` +
+    `    - NEXT_PUBLIC_FIREBASE_PROJECT_ID\n\n` +
+    `  You can find these in your Firebase project settings.\n` +
     `============================================================\n\n`
   );
 } else {
