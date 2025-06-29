@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
@@ -68,7 +69,7 @@ interface Participant {
   photoURL?: string | null;
 }
 
-const ParticipantView = React.memo(function ParticipantView({
+function ParticipantView({
   name,
   isMe = false,
   isMicMuted = false,
@@ -163,8 +164,7 @@ const ParticipantView = React.memo(function ParticipantView({
       </div>
     </Card>
   );
-});
-ParticipantView.displayName = 'ParticipantView';
+}
 
 
 export default function MeetingPage() {
