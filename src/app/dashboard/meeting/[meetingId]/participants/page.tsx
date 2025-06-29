@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import React, { use, useState, useEffect } from "react"; // Added React import
+import React, { use, useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +46,7 @@ interface Participant {
   // isHost property will be determined by comparing id with meetingCreatorId
 }
 
-const ParticipantItem = React.memo(function ParticipantItem({ // Wrapped with React.memo
+const ParticipantItem = React.memo(function ParticipantItem({
   participant, 
   isCurrentUserHost, 
   isThisParticipantTheHost 
@@ -131,7 +131,7 @@ const ParticipantItem = React.memo(function ParticipantItem({ // Wrapped with Re
     </div>
   );
 });
-ParticipantItem.displayName = 'ParticipantItem'; // Added display name for memoized component
+ParticipantItem.displayName = 'ParticipantItem';
 
 
 export default function MeetingParticipantsPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
@@ -139,8 +139,8 @@ export default function MeetingParticipantsPage({ params: paramsPromise }: { par
   const { meetingId } = resolvedParams;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const topicFromParams = searchParams.get('topic'); // Renamed to avoid conflict
-  const displayTopic = topicFromParams || `Meeting Participants`; // Use a different variable for display
+  const topicFromParams = searchParams.get('topic');
+  const displayTopic = topicFromParams || `Meeting Participants`;
   const { toast } = useToast();
 
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
