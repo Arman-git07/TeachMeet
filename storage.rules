@@ -1,12 +1,11 @@
-
 rules_version = '2';
 
-// For development, allow read/write to all paths
-// In production, you MUST replace this with secure rules
 service firebase.storage {
   match /b/{bucket}/o {
+    // This rule allows anyone to read and write to your Firebase Storage.
+    // It is useful for getting started, but it is configured to expire in 30 days.
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if request.time < timestamp.date(2024, 7, 28);
     }
   }
 }

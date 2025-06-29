@@ -137,7 +137,7 @@ export default function ClassesPage() {
                 console.log("[ClassesPage] Successfully fetched classes: ", fetchedClasses);
             } catch (err: any) {
                 console.error("[ClassesPage] Firestore Error fetching classes:", err);
-                if (err.code === 'permission-denied' || err.code === 'unauthenticated') {
+                if (err.code === 'permission-denied' || err.code === 'unauthenticated' || err.code === 'failed-precondition') {
                      setError("You don't have permission to view classes. This might be a project setup issue. See console for details.");
                      toast({
                         variant: "destructive",
@@ -315,10 +315,10 @@ export default function ClassesPage() {
                             <DialogContent className="sm:max-w-md rounded-xl">
                                 <Card className="border-0 shadow-none">
                                     <CardHeader className="text-center">
-                                         <CardTitle>Confirm Activation</CardTitle>
-                                         <CardDescription>
+                                         <DialogTitle>Confirm Activation</DialogTitle>
+                                         <DialogDescription>
                                             You are about to activate your teacher profile.
-                                         </CardDescription>
+                                         </DialogDescription>
                                     </CardHeader>
                                     <CardContent className="text-center">
                                          <p className="text-4xl font-bold">$49.99</p>
