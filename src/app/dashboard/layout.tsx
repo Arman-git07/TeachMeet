@@ -2,9 +2,10 @@
 'use client'; 
 
 import { useSidebar, SidebarTrigger } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/useAuth';
-import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+// import { useAuth } from '@/hooks/useAuth';
+// import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+// import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PanelLeftOpen } from 'lucide-react';
 import { DynamicHeaderProvider, useDynamicHeader } from '@/contexts/DynamicHeaderContext';
@@ -65,37 +66,41 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, loading } = useAuth();
-  const router = useRouter();
+  // --- AUTHENTICATION BYPASSED FOR DEVELOPMENT ---
+  // const { isAuthenticated, loading } = useAuth();
+  // const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.replace('/auth/signin');
-    }
-  }, [isAuthenticated, loading, router]);
+  // useEffect(() => {
+  //   if (!loading && !isAuthenticated) {
+  //     router.replace('/auth/signin');
+  //   }
+  // }, [isAuthenticated, loading, router]);
+  // --- END AUTH BYPASS ---
 
   // Check if the current page is a meeting page to apply different styles
   const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
 
-  // Simplified loading condition
-  if (loading || !isAuthenticated) {
-    return (
-      <div className="flex h-screen bg-background">
-        <div className="flex flex-1 flex-col">
-          <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
-            <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
-              <Skeleton className="h-8 w-8 rounded-md" /> {/* Sidebar trigger skeleton */}
-            </div>
-          </header>
-          <main className="flex-1 p-4 md:p-8 bg-background">
-            <Skeleton className="h-32 w-full mb-4 rounded-lg" />
-            <Skeleton className="h-64 w-full rounded-lg" />
-          </main>
-        </div>
-      </div>
-    );
-  }
+  // --- LOADING SKELETON BYPASSED FOR DEVELOPMENT ---
+  // The loading skeleton is also part of the auth check, so it's bypassed.
+  // if (loading || !isAuthenticated) {
+  //   return (
+  //     <div className="flex h-screen bg-background">
+  //       <div className="flex flex-1 flex-col">
+  //         <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
+  //           <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
+  //             <Skeleton className="h-8 w-8 rounded-md" /> {/* Sidebar trigger skeleton */}
+  //           </div>
+  //         </header>
+  //         <main className="flex-1 p-4 md:p-8 bg-background">
+  //           <Skeleton className="h-32 w-full mb-4 rounded-lg" />
+  //           <Skeleton className="h-64 w-full rounded-lg" />
+  //         </main>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+  // --- END BYPASS ---
 
   return (
     <DynamicHeaderProvider>
