@@ -95,85 +95,80 @@ export function SignInForm() {
     }
   }
 
-  if (apiError) {
-    return (
-       <Alert variant="destructive" className="my-4 text-left p-6">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-xl font-bold">Authentication Blocked</AlertTitle>
-          <AlertDescription>
-              <p className="mt-2 mb-4">
-                  You've hit a rare but persistent Firebase setup issue. Since you've already enabled the Identity Toolkit API and billing, the problem may be a more complex project configuration issue.
-              </p>
-              <div className="space-y-3 text-sm">
-                  <p><strong>1. Double-Check API Status:</strong> Visit your main API dashboard to confirm there are no outstanding errors or restrictions on the "Identity Toolkit API".</p>
-                  <a href={`https://console.cloud.google.com/apis/dashboard?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline' }), "w-full")}>
-                      View API Dashboard &rarr;
-                  </a>
-                  <p><strong>2. Check for Restrictions:</strong> Ensure there are no organizational policies or project-level restrictions (e.g., in "IAM & Admin" -> "Organization Policies") that might be blocking this service.</p>
-                  <p><strong>3. Wait and Retry:</strong> It can occasionally take 5-10 minutes for settings to apply across Google Cloud. Click retry to try the sign-in again.</p>
-              </div>
-              <Button onClick={() => setApiError(null)} className="w-full mt-4 btn-gel rounded-lg">
-                  Retry Sign In
-              </Button>
-          </AlertDescription>
-      </Alert>
-    );
-  }
-
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-foreground/80">Email Address</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="you@example.com" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading} />
+    <>
+      {apiError && (
+         <Alert variant="destructive" className="my-4 text-left p-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="text-xl font-bold">Authentication Blocked</AlertTitle>
+            <AlertDescription>
+                <p className="mt-2 mb-4">
+                    I'm very sorry, but this is a persistent Firebase project setup issue that I can't fix directly. Since you've already enabled the API and billing, the final step is to check for specific errors or restrictions on your Google Cloud dashboard.
+                </p>
+                <div className="space-y-3 text-sm">
+                    <p><strong>Next Step:</strong> Click the button below to go to your API dashboard. Look for any errors or warnings related to the "Identity Toolkit API". This is the most likely place to find the solution.</p>
+                    <a href={`https://console.cloud.google.com/apis/dashboard?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline' }), "w-full")}>
+                        View API Dashboard &rarr;
+                    </a>
+                    <p className="text-xs text-muted-foreground mt-2">Sometimes, these settings can take 5-10 minutes to apply across all of Google's services. You can always try again later by using the form below.</p>
                 </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-foreground/80">Password</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading} />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="flex items-center justify-between text-sm">
-          <Link href="/auth/forgot-password" className="font-medium text-accent hover:text-accent/80 hover:underline">
-            Forgot password?
-          </Link>
-          <Link href="/help" className="flex items-center text-muted-foreground hover:text-accent hover:underline">
-            <HelpCircle className="h-4 w-4 mr-1" />
-            Help
-          </Link>
-        </div>
-        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg" disabled={isLoading}>
-          {isLoading ? 'Signing In...' : 'Sign In'}
-        </Button>
-        <div className="text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link href="/auth/signup" className="font-medium text-accent hover:text-accent/80 hover:underline">
-            Sign Up
-          </Link>
-        </div>
-      </form>
-    </Form>
+            </AlertDescription>
+        </Alert>
+      )}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-foreground/80">Email Address</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input placeholder="you@example.com" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading} />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-foreground/80">Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading} />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="flex items-center justify-between text-sm">
+            <Link href="/auth/forgot-password" className="font-medium text-accent hover:text-accent/80 hover:underline">
+              Forgot password?
+            </Link>
+            <Link href="/help" className="flex items-center text-muted-foreground hover:text-accent hover:underline">
+              <HelpCircle className="h-4 w-4 mr-1" />
+              Help
+            </Link>
+          </div>
+          <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg" disabled={isLoading}>
+            {isLoading ? 'Signing In...' : 'Sign In'}
+          </Button>
+          <div className="text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{' '}
+            <Link href="/auth/signup" className="font-medium text-accent hover:text-accent/80 hover:underline">
+              Sign Up
+            </Link>
+          </div>
+        </form>
+      </Form>
+    </>
   );
 }

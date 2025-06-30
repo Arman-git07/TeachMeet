@@ -114,162 +114,157 @@ export function SignUpForm() {
     }
   }
 
-  if (apiError) {
-    return (
-      <Alert variant="destructive" className="my-4 text-left p-6">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-xl font-bold">Authentication Blocked</AlertTitle>
-          <AlertDescription>
-              <p className="mt-2 mb-4">
-                  You've hit a rare but persistent Firebase setup issue. Since you've already enabled the Identity Toolkit API and billing, the problem may be a more complex project configuration issue.
-              </p>
-              <div className="space-y-3 text-sm">
-                  <p><strong>1. Double-Check API Status:</strong> Visit your main API dashboard to confirm there are no outstanding errors or restrictions on the "Identity Toolkit API".</p>
-                  <a href={`https://console.cloud.google.com/apis/dashboard?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline' }), "w-full")}>
-                      View API Dashboard &rarr;
-                  </a>
-                  <p><strong>2. Check for Restrictions:</strong> Ensure there are no organizational policies or project-level restrictions (e.g., in "IAM & Admin" -> "Organization Policies") that might be blocking this service.</p>
-                  <p><strong>3. Wait and Retry:</strong> It can occasionally take 5-10 minutes for settings to apply across Google Cloud. Click retry to try the sign-up again.</p>
-              </div>
-              <Button onClick={() => setApiError(null)} className="w-full mt-4 btn-gel rounded-lg">
-                  Retry Sign Up
-              </Button>
-          </AlertDescription>
-      </Alert>
-    );
-  }
-
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="profileName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-foreground/80">Profile Name</FormLabel>
-              <FormControl>
-                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="Your Name" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
+    <>
+      {apiError && (
+         <Alert variant="destructive" className="my-4 text-left p-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="text-xl font-bold">Authentication Blocked</AlertTitle>
+            <AlertDescription>
+                <p className="mt-2 mb-4">
+                    I'm very sorry, but this is a persistent Firebase project setup issue that I can't fix directly. Since you've already enabled the API and billing, the final step is to check for specific errors or restrictions on your Google Cloud dashboard.
+                </p>
+                <div className="space-y-3 text-sm">
+                    <p><strong>Next Step:</strong> Click the button below to go to your API dashboard. Look for any errors or warnings related to the "Identity Toolkit API". This is the most likely place to find the solution.</p>
+                    <a href={`https://console.cloud.google.com/apis/dashboard?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline' }), "w-full")}>
+                        View API Dashboard &rarr;
+                    </a>
+                    <p className="text-xs text-muted-foreground mt-2">Sometimes, these settings can take 5-10 minutes to apply across all of Google's services. You can always try again later by using the form below.</p>
                 </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-foreground/80">Email Address</FormLabel>
-              <FormControl>
-                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="you@example.com" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-         <FormField
-          control={form.control}
-          name="dateOfBirth"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-foreground/80">Date of Birth</FormLabel>
-              <FormControl>
-                 <div className="relative">
-                  <CalendarIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input 
-                    type="date" 
-                    placeholder="YYYY-MM-DD" 
-                    {...field} 
-                    className="pl-10 rounded-lg text-base" 
-                    disabled={isLoading}
-                    // To prevent future dates, you could add max={new Date().toISOString().split("T")[0]}
-                  />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-foreground/80">Password</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="confirmPassword"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-foreground/80">Confirm Password</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="agreeToTerms"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 shadow-sm bg-background/50">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  disabled={isLoading}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel className="text-sm text-muted-foreground">
-                  I agree to the TeachMeet{' '}
-                  <Link href="/terms-of-service" target="_blank" className="text-accent hover:underline">
-                    Terms of Service
-                  </Link>{' '}
-                  and{' '}
-                  <Link href="/privacy-policy" target="_blank" className="text-accent hover:underline">
-                    Privacy Policy
-                  </Link>
-                  .
-                </FormLabel>
+            </AlertDescription>
+        </Alert>
+      )}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="profileName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-foreground/80">Profile Name</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input placeholder="Your Name" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
+                  </div>
+                </FormControl>
                 <FormMessage />
-              </div>
-            </FormItem>
-          )}
-        />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-foreground/80">Email Address</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input placeholder="you@example.com" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="dateOfBirth"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-foreground/80">Date of Birth</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <CalendarIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input 
+                      type="date" 
+                      placeholder="YYYY-MM-DD" 
+                      {...field} 
+                      className="pl-10 rounded-lg text-base" 
+                      disabled={isLoading}
+                      // To prevent future dates, you could add max={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-foreground/80">Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-foreground/80">Confirm Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input type="password" placeholder="••••••••" {...field} className="pl-10 rounded-lg text-base" disabled={isLoading}/>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg mt-6" disabled={isLoading}>
-          {isLoading ? 'Creating Account...' : 'Create Account'}
-        </Button>
-        <div className="text-center text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link href="/auth/signin" className="font-medium text-accent hover:text-accent/80 hover:underline">
-            Sign In
-          </Link>
-        </div>
-      </form>
-    </Form>
+          <FormField
+            control={form.control}
+            name="agreeToTerms"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 shadow-sm bg-background/50">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="text-sm text-muted-foreground">
+                    I agree to the TeachMeet{' '}
+                    <Link href="/terms-of-service" target="_blank" className="text-accent hover:underline">
+                      Terms of Service
+                    </Link>{' '}
+                    and{' '}
+                    <Link href="/privacy-policy" target="_blank" className="text-accent hover:underline">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </FormLabel>
+                  <FormMessage />
+                </div>
+              </FormItem>
+            )}
+          />
+
+          <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg mt-6" disabled={isLoading}>
+            {isLoading ? 'Creating Account...' : 'Create Account'}
+          </Button>
+          <div className="text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link href="/auth/signin" className="font-medium text-accent hover:text-accent/80 hover:underline">
+              Sign In
+            </Link>
+          </div>
+        </form>
+      </Form>
+    </>
   );
 }
