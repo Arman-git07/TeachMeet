@@ -100,10 +100,14 @@ export function SignInForm() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle className="text-xl font-bold">Project Setup Required</AlertTitle>
           <AlertDescription>
-              <p className="mt-2 mb-4">You've enabled the Identity Toolkit API, which is great! The final step for many Google Cloud services is to link a billing account. <strong>This is for verification and does not mean you will be charged.</strong></p>
-              <p className="font-semibold text-foreground">Firebase Authentication has a generous free tier. You will not pay unless your app has thousands of users.</p>
+              <p className="mt-2 mb-4">
+                  To prevent abuse, Google requires a billing account to be linked to your project to use this authentication service.
+              </p>
+              <p className="font-semibold text-foreground mb-4">
+                  This is for verification only. You will NOT be charged. Firebase Authentication has a generous free tier.
+              </p>
               <a href={`https://console.cloud.google.com/billing?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block w-full text-center px-4 py-2 bg-background text-destructive-foreground rounded-lg font-semibold hover:bg-background/80 transition-colors border border-background/50">
-                  Enable Billing Here
+                  Enable Billing Here (Free Tier Applies)
               </a>
               <p className="text-xs text-center mt-2">After enabling, please refresh this page.</p>
           </AlertDescription>
