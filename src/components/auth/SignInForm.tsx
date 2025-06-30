@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -21,6 +21,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -96,20 +97,24 @@ export function SignInForm() {
 
   if (apiError) {
     return (
-      <Alert variant="destructive" className="my-4 text-left p-6">
+       <Alert variant="destructive" className="my-4 text-left p-6">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-xl font-bold">Project Setup Required</AlertTitle>
+          <AlertTitle className="text-xl font-bold">Authentication Blocked</AlertTitle>
           <AlertDescription>
               <p className="mt-2 mb-4">
-                  To prevent abuse, Google requires a billing account to be linked to your project to use this authentication service.
+                  You've hit a rare but persistent Firebase setup issue. Since you've already enabled the Identity Toolkit API and billing, the problem may be a more complex project configuration issue.
               </p>
-              <p className="font-semibold text-foreground mb-4">
-                  This is for verification only. You will NOT be charged. Firebase Authentication has a generous free tier.
-              </p>
-              <a href={`https://console.cloud.google.com/billing?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block w-full text-center px-4 py-2 bg-background text-destructive-foreground rounded-lg font-semibold hover:bg-background/80 transition-colors border border-background/50">
-                  Enable Billing Here (Free Tier Applies)
-              </a>
-              <p className="text-xs text-center mt-2">After enabling, please refresh this page.</p>
+              <div className="space-y-3 text-sm">
+                  <p><strong>1. Double-Check API Status:</strong> Visit your main API dashboard to confirm there are no outstanding errors or restrictions on the "Identity Toolkit API".</p>
+                  <a href={`https://console.cloud.google.com/apis/dashboard?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline' }), "w-full")}>
+                      View API Dashboard &rarr;
+                  </a>
+                  <p><strong>2. Check for Restrictions:</strong> Ensure there are no organizational policies or project-level restrictions (e.g., in "IAM & Admin" -> "Organization Policies") that might be blocking this service.</p>
+                  <p><strong>3. Wait and Retry:</strong> It can occasionally take 5-10 minutes for settings to apply across Google Cloud. Click retry to try the sign-in again.</p>
+              </div>
+              <Button onClick={() => setApiError(null)} className="w-full mt-4 btn-gel rounded-lg">
+                  Retry Sign In
+              </Button>
           </AlertDescription>
       </Alert>
     );
