@@ -45,21 +45,27 @@ if (appInitialized) {
     `\n\n=====================================================================================\n` +
     `  🚨 READ THIS IF YOU SEE "Missing or insufficient permissions" 🚨\n` +
     `-------------------------------------------------------------------------------------\n` +
-    `  The app's security rules are wide open for development. If you see this\n` +
-    `  error, the cause is your Firebase project's setup, not the code.\n\n` +
-    `  👉 PLEASE VERIFY THE FOLLOWING IN YOUR GOOGLE CLOUD/FIREBASE CONSOLE:\n\n` +
-    `  1. Firestore Database is CREATED:\n` +
-    `     - Go to your Firebase Console -> Firestore Database.\n` +
-    `     - If you see a "Create database" button, CLICK IT and create the database.\n` +
-    `     - This is the MOST COMMON cause of the error.\n\n` +
+    `  The app's security rules are wide open for development. This error is almost always\n` +
+    `  caused by your Firebase project's setup, not the code.\n\n` +
+    `  👉 PLEASE VERIFY THE FOLLOWING IN YOUR FIREBASE/GOOGLE CLOUD CONSOLE:\n\n` +
+    `  1. SECURITY RULES ARE PUBLISHED (Most likely fix):\n` +
+    `     - Go to the Firestore Rules tab in your Firebase console:\n` +
+    `       https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules\n` +
+    `     - Replace the existing rules with:\n` +
+    `         rules_version = '2';\n` +
+    `         service cloud.firestore {\n` +
+    `           match /databases/{database}/documents {\n` +
+    `             match /{document=**} { allow read, write: if true; }\n` +
+    `           }\n` +
+    `         }\n` +
+    `     - Click "Publish".\n\n` +
     `  2. Cloud Firestore API is ENABLED:\n` +
-    `     - Go to this link and ensure the API is enabled for your project:\n` +
+    `     - The API must be enabled for your project. Check here:\n` +
     `       https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${firebaseConfig.projectId}\n\n` +
-    `  3. Correct Project ID in .env:\n` +
-    `     - Your NEXT_PUBLIC_FIREBASE_PROJECT_ID MUST be exactly:\n` +
-    `       '${firebaseConfig.projectId}'\n\n` +
-    `  This check runs every time you start the server. If the error persists,\n` +
-    `  one of these three steps has been missed.\n` +
+    `  3. Firestore Database is CREATED:\n` +
+    `     - In the Firebase Console, go to Firestore Database. If you see a "Create database"\n` +
+    `       button, you must click it and complete the setup.\n\n` +
+    `  After making changes, restart the development server.\n` +
     `=====================================================================================\n\n`
   );
 }

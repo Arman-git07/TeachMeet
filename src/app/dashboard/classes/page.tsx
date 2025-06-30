@@ -192,33 +192,52 @@ export default function ClassesPage() {
                     <AlertTriangle className="mx-auto h-16 w-16 text-destructive" />
                     <CardTitle className="text-3xl text-destructive font-bold mt-4">Action Required: Fix Firebase Project Setup</CardTitle>
                     <CardDescription className="text-lg text-foreground/90 mt-2">
-                        The app cannot connect to Firestore. This is a project configuration problem, not an app code problem.
+                        The app cannot connect to Firestore. This is a project configuration problem, not an app code problem. Please complete this definitive checklist.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 text-left p-6">
-                    <p className="text-base text-foreground mb-4">
-                        You've done the right thing by creating the database. The most likely remaining issue is that the **Cloud Firestore API** is not enabled for your project. Please complete this checklist:
-                    </p>
-                    <div className="space-y-4">
+                     <div className="space-y-4">
+                        {/* Step 1: Security Rules */}
+                        <div className="p-4 border-2 border-primary/50 rounded-lg bg-background shadow-sm">
+                            <h3 className="font-bold text-lg">1. Set Firestore Security Rules (Most Likely Fix)</h3>
+                            <p className="text-muted-foreground mt-1 mb-3">
+                                Your project's security rules are likely in a locked state. You must update them in the Firebase Console to allow access for development.
+                            </p>
+                            <ol className="list-decimal list-inside text-sm space-y-2 mb-3">
+                                <li>Go to the <a href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore/rules`} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">Firestore Rules Tab</a> for your project.</li>
+                                <li>Replace the entire content of the rules editor with the code below.</li>
+                                <li>Click <strong>Publish</strong>.</li>
+                            </ol>
+                            <pre className="p-3 bg-muted rounded-md text-xs overflow-x-auto"><code>{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}`}</code></pre>
+                        </div>
+                        {/* Step 2: Enable API */}
                         <div className="p-4 border rounded-lg bg-background shadow-sm">
-                            <h3 className="font-bold text-lg">1. Enable Cloud Firestore API</h3>
-                            <p className="text-muted-foreground mt-1 mb-3">This is the most common cause of this error after creating the database. The API must be enabled for your project to allow connections.</p>
+                            <h3 className="font-bold text-lg">2. Enable Cloud Firestore API</h3>
+                            <p className="text-muted-foreground mt-1 mb-3">If the rules didn't fix it, ensure the API is enabled for your project. It's a separate step from creating the database.</p>
                             <a href={`https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'default', size: 'lg'}), "w-full btn-gel rounded-lg")}>
                               Enable Firestore API Now
                             </a>
                         </div>
+                        {/* Step 3: Verify Project ID */}
                         <div className="p-4 border rounded-lg bg-background shadow-sm">
-                            <h3 className="font-bold text-lg">2. Verify Project ID</h3>
-                            <p className="text-muted-foreground mt-1">Ensure the project ID in your <code>.env</code> file is correct. It should be: <strong>{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'Not Found'}</strong></p>
+                            <h3 className="font-bold text-lg">3. Verify Project ID in .env</h3>
+                            <p className="text-muted-foreground mt-1">Ensure the project ID in your <code>.env</code> file is correct. It must be: <strong>{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'Not Found'}</strong></p>
                         </div>
                     </div>
                      <p className="mt-6 text-center text-muted-foreground">
-                        After enabling the API, please <strong>restart the development server</strong> and then click the button below.
+                        After making changes, please <strong>restart the development server</strong> and then click the button below.
                     </p>
                 </CardContent>
                 <CardFooter className="p-6">
                      <Button onClick={() => window.location.reload()} className="w-full rounded-lg" size="lg">
-                        Retry Connection
+                        Retry Connection and Refresh Page
                     </Button>
                 </CardFooter>
             </Card>
