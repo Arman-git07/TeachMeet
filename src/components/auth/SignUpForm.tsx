@@ -113,30 +113,26 @@ export function SignUpForm() {
     }
   }
 
+  if (apiError) {
+    return (
+      <Alert variant="destructive" className="my-4 text-left p-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="text-xl font-bold">Project Setup Required</AlertTitle>
+          <AlertDescription>
+              <p className="mt-2 mb-4">You've enabled the Identity Toolkit API, which is great! The final step for many Google Cloud services is to link a billing account. <strong>This is for verification and does not mean you will be charged.</strong></p>
+              <p className="font-semibold text-foreground">Firebase Authentication has a generous free tier. You will not pay unless your app has thousands of users.</p>
+              <a href={`https://console.cloud.google.com/billing?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block w-full text-center px-4 py-2 bg-background text-destructive-foreground rounded-lg font-semibold hover:bg-background/80 transition-colors border border-background/50">
+                  Enable Billing Here
+              </a>
+              <p className="text-xs text-center mt-2">After enabling, please refresh this page.</p>
+          </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {apiError && (
-            <Alert variant="destructive" className="my-4 text-left">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Authentication Setup Required</AlertTitle>
-                <AlertDescription>
-                    <p className="mb-3">You've enabled the API, which is great! This error means there's another project setting that needs attention. Please check the following:</p>
-                    <ul className="list-decimal list-inside space-y-2">
-                        <li>
-                            <strong>Billing Enabled:</strong> Is billing enabled for your Google Cloud project? Some APIs require a billing account to be linked, even if their usage falls within the free tier.
-                            <a href={`https://console.cloud.google.com/billing?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="font-bold underline ml-1">Check Billing Here</a>
-                        </li>
-                        <li>
-                            <strong>Browser Extensions:</strong> Try signing up using an Incognito or Private window. This disables most browser extensions, which can sometimes interfere with authentication.
-                        </li>
-                         <li>
-                            <strong>Wait and Refresh:</strong> If you just enabled billing or the API, it can sometimes take 5-10 minutes to take effect.
-                        </li>
-                    </ul>
-                </AlertDescription>
-            </Alert>
-        )}
         <FormField
           control={form.control}
           name="profileName"
