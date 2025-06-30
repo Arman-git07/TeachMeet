@@ -77,8 +77,8 @@ export function SignUpForm() {
       });
       router.push('/auth/signin');
     } catch (error: any) {
-      if (error.code && error.code.startsWith('auth/requests-to-this-api-identitytoolkit')) {
-        setApiError("Identity Toolkit API not enabled.");
+      if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
+        setApiError("Identity Toolkit API setup issue.");
         setIsLoading(false);
         return; 
       }
@@ -117,20 +117,23 @@ export function SignUpForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {apiError && (
-            <Alert variant="destructive" className="my-4">
+            <Alert variant="destructive" className="my-4 text-left">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Project Setup Required</AlertTitle>
+                <AlertTitle>Authentication Setup Required</AlertTitle>
                 <AlertDescription>
-                    Email/Password sign-up is not enabled for this project. Please enable the Identity Toolkit API.
-                    <a
-                        href={`https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-bold underline mt-2 block"
-                    >
-                        Click here to enable the API
-                    </a>
-                    <p className="mt-2 text-xs">After enabling, you may need to wait a minute and then refresh this page before trying again.</p>
+                    <p className="mb-3">You've enabled the API, which is great! This error means there's another project setting that needs attention. Please check the following:</p>
+                    <ul className="list-decimal list-inside space-y-2">
+                        <li>
+                            <strong>Billing Enabled:</strong> Is billing enabled for your Google Cloud project? Some APIs require a billing account to be linked, even if their usage falls within the free tier.
+                            <a href={`https://console.cloud.google.com/billing?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="font-bold underline ml-1">Check Billing Here</a>
+                        </li>
+                        <li>
+                            <strong>Browser Extensions:</strong> Try signing up using an Incognito or Private window. This disables most browser extensions, which can sometimes interfere with authentication.
+                        </li>
+                         <li>
+                            <strong>Wait and Refresh:</strong> If you just enabled billing or the API, it can sometimes take 5-10 minutes to take effect.
+                        </li>
+                    </ul>
                 </AlertDescription>
             </Alert>
         )}

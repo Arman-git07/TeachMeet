@@ -52,8 +52,8 @@ export function SignInForm() {
       });
       router.push('/');
     } catch (error: any) {
-      if (error.code && error.code.startsWith('auth/requests-to-this-api-identitytoolkit')) {
-        setApiError("Identity Toolkit API not enabled.");
+      if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
+        setApiError("Identity Toolkit API setup issue.");
         setIsLoading(false);
         return; 
       }
@@ -64,7 +64,7 @@ export function SignInForm() {
         'auth/invalid-credential', 
         'auth/invalid-email', 
         'auth/too-many-requests',
-        'auth/visibility-check-was-unavailable.-please-retry-the-request-and-contact-support-if-the-problem-persists'
+        'auth/visibility-check-was-unavailable'
       ];
 
       if (!knownErrorCodes.includes(error.code)) {
@@ -80,8 +80,8 @@ export function SignInForm() {
         errorMessage = "The email address is not valid.";
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
-      } else if (error.code === 'auth/visibility-check-was-unavailable.-please-retry-the-request-and-contact-support-if-the-problem-persists') {
-        errorMessage = "There was a temporary issue with the authentication service. Please try signing in again in a moment. If the problem continues, check your network connection or browser settings.";
+      } else if (error.code === 'auth/visibility-check-was-unavailable') {
+        errorMessage = "There was a temporary issue with the authentication service. This can sometimes be caused by network issues or ad-blocking browser extensions. Please try signing in again in a moment.";
       }
       
       toast({
@@ -98,20 +98,23 @@ export function SignInForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {apiError && (
-            <Alert variant="destructive" className="my-4">
+            <Alert variant="destructive" className="my-4 text-left">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Project Setup Required</AlertTitle>
+                <AlertTitle>Authentication Setup Required</AlertTitle>
                 <AlertDescription>
-                    Email/Password sign-in is not enabled for this project. Please enable the Identity Toolkit API.
-                    <a
-                        href={`https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-bold underline mt-2 block"
-                    >
-                        Click here to enable the API
-                    </a>
-                    <p className="mt-2 text-xs">After enabling, you may need to wait a minute and then refresh this page before trying again.</p>
+                    <p className="mb-3">You've enabled the API, which is great! This error means there's another project setting that needs attention. Please check the following:</p>
+                    <ul className="list-decimal list-inside space-y-2">
+                        <li>
+                            <strong>Billing Enabled:</strong> Is billing enabled for your Google Cloud project? Some APIs require a billing account to be linked, even if their usage falls within the free tier.
+                            <a href={`https://console.cloud.google.com/billing?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="font-bold underline ml-1">Check Billing Here</a>
+                        </li>
+                        <li>
+                            <strong>Browser Extensions:</strong> Try signing in using an Incognito or Private window. This disables most browser extensions, which can sometimes interfere with authentication.
+                        </li>
+                         <li>
+                            <strong>Wait and Refresh:</strong> If you just enabled billing or the API, it can sometimes take 5-10 minutes to take effect.
+                        </li>
+                    </ul>
                 </AlertDescription>
             </Alert>
         )}
