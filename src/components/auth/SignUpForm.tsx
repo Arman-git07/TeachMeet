@@ -79,9 +79,9 @@ export function SignUpForm() {
       router.push('/auth/signin');
     } catch (error: any) {
       if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-        setApiError("Identity Toolkit API setup issue.");
+        setApiError("Identity Toolkit API setup issue. Please check your Google Cloud project settings.");
         setIsLoading(false);
-        return; 
+        return;
       }
 
       const knownErrorCodes = [
@@ -117,20 +117,14 @@ export function SignUpForm() {
   return (
     <>
       {apiError && (
-         <Alert variant="destructive" className="my-4 text-left p-6">
+         <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle className="text-xl font-bold">Authentication Blocked</AlertTitle>
+            <AlertTitle>Project Setup Required</AlertTitle>
             <AlertDescription>
-                <p className="mt-2 mb-4">
-                    I'm very sorry, but this is a persistent Firebase project setup issue that I can't fix directly. Since you've already enabled the API and billing, the final step is to check for specific errors or restrictions on your Google Cloud dashboard.
-                </p>
-                <div className="space-y-3 text-sm">
-                    <p><strong>Next Step:</strong> Click the button below to go to your API dashboard. Look for any errors or warnings related to the "Identity Toolkit API". This is the most likely place to find the solution.</p>
-                    <a href={`https://console.cloud.google.com/apis/dashboard?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline' }), "w-full")}>
-                        View API Dashboard &rarr;
-                    </a>
-                    <p className="text-xs text-muted-foreground mt-2">Sometimes, these settings can take 5-10 minutes to apply across all of Google's services. You can always try again later by using the form below.</p>
-                </div>
+                <p>Authentication is currently blocked by your Google Cloud project settings. Please ensure the <strong>Identity Toolkit API</strong> is enabled and has no restrictions.</p>
+                <a href={`https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2")}>
+                    Check API Status &rarr;
+                </a>
             </AlertDescription>
         </Alert>
       )}
