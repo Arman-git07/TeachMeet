@@ -19,6 +19,7 @@ import {
   GraduationCap,
   ShieldAlert,
   ClipboardCheck,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -109,22 +110,13 @@ export default function ClassesPage() {
                 setClasses(fetchedClasses);
             } catch (err: any) {
                 console.error("[ClassesPage] Firestore Error fetching classes:", err);
-                if (err.code === 'permission-denied' || err.code === 'unauthenticated' || err.code === 'failed-precondition') {
-                     setError("You don't have permission to view classes. This might be a project setup issue. See console for details.");
-                     toast({
-                        variant: "destructive",
-                        title: "Permissions Error",
-                        description: "Could not fetch classes due to a permissions issue. Ensure your Firestore security rules are correctly configured and your project setup is complete.",
-                        duration: 10000,
-                     });
-                } else {
-                    setError('Failed to load classes. Please try again later.');
-                     toast({
-                        variant: "destructive",
-                        title: "Error Loading Classes",
-                        description: `An unexpected error occurred: ${err.message}`,
-                     });
-                }
+                setError("You don't have permission to view classes. This is usually due to your Firebase project setup, not a bug in the app. Please see the checklist below.");
+                toast({
+                    variant: "destructive",
+                    title: "Permissions Error",
+                    description: "Could not fetch classes due to a permissions issue. Ensure your Firestore security rules are correctly configured.",
+                    duration: 10000,
+                });
             } finally {
                 setIsLoadingClasses(false);
             }
@@ -190,54 +182,39 @@ export default function ClassesPage() {
             <Card className="max-w-3xl mx-auto my-12 text-center rounded-xl shadow-2xl border-2 border-destructive/50 bg-destructive/5">
                 <CardHeader className="p-6">
                     <AlertTriangle className="mx-auto h-16 w-16 text-destructive" />
-                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Action Required: Fix Firebase Project Setup</CardTitle>
+                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Could Not Load Classes</CardTitle>
                     <CardDescription className="text-lg text-foreground/90 mt-2">
-                        The app cannot connect to Firestore. This is a project configuration problem, not an app code problem. Please complete this definitive checklist.
+                        {error}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 text-left p-6">
                      <div className="space-y-4">
-                        {/* Step 1: Security Rules */}
-                        <div className="p-4 border-2 border-primary/50 rounded-lg bg-background shadow-sm">
-                            <h3 className="font-bold text-lg">1. Set Firestore Security Rules (Most Likely Fix)</h3>
-                            <p className="text-muted-foreground mt-1 mb-3">
-                                Your project's security rules are likely in a locked state. You must update them in the Firebase Console to allow access for development.
-                            </p>
-                            <ol className="list-decimal list-inside text-sm space-y-2 mb-3">
-                                <li>Go to the <a href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore/rules`} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">Firestore Rules Tab</a> for your project.</li>
-                                <li>Replace the entire content of the rules editor with the code below.</li>
-                                <li>Click <strong>Publish</strong>.</li>
-                            </ol>
-                            <pre className="p-3 bg-muted rounded-md text-xs overflow-x-auto"><code>{`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}`}</code></pre>
-                        </div>
-                        {/* Step 2: Enable API */}
+                        <h3 className="font-bold text-xl text-center">Project Setup Checklist</h3>
                         <div className="p-4 border rounded-lg bg-background shadow-sm">
-                            <h3 className="font-bold text-lg">2. Enable Cloud Firestore API</h3>
-                            <p className="text-muted-foreground mt-1 mb-3">If the rules didn't fix it, ensure the API is enabled for your project. It's a separate step from creating the database.</p>
-                            <a href={`https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'default', size: 'lg'}), "w-full btn-gel rounded-lg")}>
-                              Enable Firestore API Now
+                            <h4 className="font-semibold text-lg">1. Set Firestore Security Rules (Most Likely Fix)</h4>
+                            <p className="text-muted-foreground mt-1 mb-3 text-sm">Your project's security rules are likely locked. You must update them in the Firebase Console to allow access for development.</p>
+                            <a href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore/rules`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'outline', size: 'sm'}), "w-full rounded-lg")}>
+                              Go to Firestore Rules Tab &rarr;
+                            </a>
+                            <p className="text-xs text-muted-foreground mt-2">Replace the rules with: <code>{`rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { match /{document=**} { allow read, write: if true; } } }`}</code> and click "Publish".</p>
+                        </div>
+                        <div className="p-4 border rounded-lg bg-background shadow-sm">
+                            <h4 className="font-semibold text-lg">2. Enable Cloud Firestore API</h4>
+                            <p className="text-muted-foreground mt-1 mb-3 text-sm">If rules don't fix it, ensure the API is enabled for your project.</p>
+                            <a href={`https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'outline', size: 'sm'}), "w-full rounded-lg")}>
+                              Enable Firestore API Here &rarr;
                             </a>
                         </div>
-                        {/* Step 3: Verify Project ID */}
-                        <div className="p-4 border rounded-lg bg-background shadow-sm">
-                            <h3 className="font-bold text-lg">3. Verify Project ID in .env</h3>
-                            <p className="text-muted-foreground mt-1">Ensure the project ID in your <code>.env</code> file is correct. It must be: <strong>{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'Not Found'}</strong></p>
+                         <div className="p-4 border rounded-lg bg-background shadow-sm">
+                            <h4 className="font-semibold text-lg">3. Create Firestore Database</h4>
+                            <p className="text-muted-foreground mt-1 mb-3 text-sm">Ensure you have actually created a Firestore database instance within your Firebase project.</p>
                         </div>
                     </div>
-                     <p className="mt-6 text-center text-muted-foreground">
-                        After making changes, please <strong>restart the development server</strong> and then click the button below.
-                    </p>
                 </CardContent>
-                <CardFooter className="p-6">
-                     <Button onClick={() => window.location.reload()} className="w-full rounded-lg" size="lg">
-                        Retry Connection and Refresh Page
+                <CardFooter className="p-6 border-t">
+                     <Button onClick={() => window.location.reload()} className="w-full btn-gel rounded-lg" size="lg">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        I've fixed it, Retry Connection
                     </Button>
                 </CardFooter>
             </Card>
