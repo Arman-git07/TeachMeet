@@ -15,12 +15,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Mail, Lock, User, CalendarIcon } from 'lucide-react';
+import { Mail, Lock, User, CalendarIcon, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const formSchema = z.object({
   profileName: z.string().min(1, { message: 'Profile name is required.' }),
@@ -45,6 +46,8 @@ export function SignUpForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -59,6 +62,7 @@ export function SignUpForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    setApiError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       // Update Firebase profile with displayName
@@ -73,16 +77,10 @@ export function SignUpForm() {
       });
       router.push('/auth/signin');
     } catch (error: any) {
-      // New specific check for the blocked API error
       if (error.code && error.code.startsWith('auth/requests-to-this-api-identitytoolkit')) {
-        toast({
-          variant: "destructive",
-          title: "Project Setup Required",
-          description: "Email/Password sign-up is not enabled. Please enable the 'Identity Toolkit API' in your Google Cloud Console.",
-          duration: 10000,
-        });
+        setApiError("Identity Toolkit API not enabled.");
         setIsLoading(false);
-        return; // Exit early
+        return; 
       }
 
       const knownErrorCodes = [
@@ -117,7 +115,25 @@ export function SignUpForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4"> {/* Reduced space-y for compactness */}
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {apiError && (
+            <Alert variant="destructive" className="my-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Project Setup Required</AlertTitle>
+                <AlertDescription>
+                    Email/Password sign-up is not enabled for this project. Please enable the Identity Toolkit API.
+                    <a
+                        href={`https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold underline mt-2 block"
+                    >
+                        Click here to enable the API
+                    </a>
+                    <p className="mt-2 text-xs">After enabling, you may need to wait a minute and then refresh this page before trying again.</p>
+                </AlertDescription>
+            </Alert>
+        )}
         <FormField
           control={form.control}
           name="profileName"
