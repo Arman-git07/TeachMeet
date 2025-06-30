@@ -32,7 +32,7 @@ export function SignInForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [showSetupError, setShowSetupError] = useState<boolean>(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -44,7 +44,7 @@ export function SignInForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    setApiError(null);
+    setShowSetupError(false);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({
@@ -54,7 +54,7 @@ export function SignInForm() {
       router.push('/');
     } catch (error: any) {
       if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-        setApiError("Identity Toolkit API setup issue. Please check your Google Cloud project settings.");
+        setShowSetupError(true);
         setIsLoading(false);
         return;
       }
@@ -97,15 +97,23 @@ export function SignInForm() {
 
   return (
     <>
-      {apiError && (
+      {showSetupError && (
          <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Project Setup Required</AlertTitle>
+            <AlertTitle>Authentication Blocked: Check API Key</AlertTitle>
             <AlertDescription>
-                <p>Authentication is currently blocked by your Google Cloud project settings. Please ensure the <strong>Identity Toolkit API</strong> is enabled and has no restrictions.</p>
-                <a href={`https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2")}>
-                    Check API Status &rarr;
-                </a>
+                <div className="space-y-2">
+                    <p>You've enabled the API, which is great! The final step is to ensure your API key is not restricted.</p>
+                    <ol className="list-decimal list-inside text-xs space-y-1">
+                        <li>Find the API key in your project's <code>.env</code> file.</li>
+                        <li>Go to your project's API Credentials page.</li>
+                        <li>Click on the key name to edit it.</li>
+                        <li>Under <strong>API restrictions</strong>, ensure that <strong>Identity Toolkit API</strong> is on the list of allowed APIs. If "Don't restrict key" is selected, this check is passed.</li>
+                    </ol>
+                    <a href={`https://console.cloud.google.com/apis/credentials?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2")}>
+                        Go to API Credentials &rarr;
+                    </a>
+                </div>
             </AlertDescription>
         </Alert>
       )}
