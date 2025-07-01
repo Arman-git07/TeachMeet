@@ -192,14 +192,14 @@ service cloud.firestore {
             <Card className="max-w-3xl mx-auto my-12 text-center rounded-xl shadow-2xl border-2 border-destructive/50 bg-destructive/5">
                 <CardHeader className="p-6">
                     <ClipboardCheck className="mx-auto h-16 w-16 text-primary" />
-                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Permissions Error Detected</CardTitle>
+                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Action Required: Set Firestore Rules</CardTitle>
                     <CardDescription className="text-lg text-foreground/90 mt-2 max-w-xl mx-auto">
-                        The app can't access your database because of Firestore's security rules. This is a standard part of Firebase setup.
+                        For your security, Firebase requires you to manually set database rules in their console. The app cannot do this for you. This is a required one-time setup step.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 text-left p-6">
                     <div className="space-y-2">
-                        <p className="font-semibold text-lg">1. Go to your Firestore Rules</p>
+                        <p className="font-semibold text-lg">1. Open the Firestore Rules editor</p>
                         <a
                             href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore/rules`}
                             target="_blank"
@@ -210,10 +210,7 @@ service cloud.firestore {
                         </a>
                     </div>
                     <div className="space-y-2">
-                        <p className="font-semibold text-lg">2. Paste these development rules and "Publish"</p>
-                        <p className="text-muted-foreground text-sm">
-                            I have also added this rule to a new `firestore.rules` file in your project for reference.
-                        </p>
+                        <p className="font-semibold text-lg">2. Paste these development rules and click "Publish"</p>
                         <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold block whitespace-pre-wrap">
                             {firestoreRules}
                         </code>
@@ -222,7 +219,7 @@ service cloud.firestore {
                 <CardFooter className="p-6 border-t">
                     <Button onClick={() => window.location.reload()} className="w-full btn-gel rounded-lg" size="lg">
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        I've published the new rules, Retry Connection
+                        I've published the rules, Retry Connection
                     </Button>
                 </CardFooter>
             </Card>
@@ -348,6 +345,7 @@ service cloud.firestore {
                             <CardContent className="pt-4 flex-grow">
                                 <h3 className="text-xl font-semibold text-foreground truncate" title={cls.name}>{cls.name}</h3>
                                 <p className="text-sm text-muted-foreground">{cls.subject}</p>
+
                                 <div className="mt-2 flex items-center text-sm text-muted-foreground">
                                     <Users className="mr-2 h-4 w-4" />
                                     <span>{cls.studentCount} Student{cls.studentCount !== 1 && 's'}</span>
@@ -401,5 +399,3 @@ service cloud.firestore {
         </div>
     );
 }
-
-    
