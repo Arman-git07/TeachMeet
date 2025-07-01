@@ -178,43 +178,51 @@ export default function ClassesPage() {
     }
     
     if (error) {
+        const firestoreRules = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      // This rule allows anyone to read and write.
+      // NOT FOR PRODUCTION. For development only.
+      allow read, write: if true;
+    }
+  }
+}`;
         return (
             <Card className="max-w-3xl mx-auto my-12 text-center rounded-xl shadow-2xl border-2 border-destructive/50 bg-destructive/5">
                 <CardHeader className="p-6">
-                    <AlertTriangle className="mx-auto h-16 w-16 text-destructive" />
-                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Still Having Trouble Connecting?</CardTitle>
+                    <ClipboardCheck className="mx-auto h-16 w-16 text-primary" />
+                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Permissions Error Detected</CardTitle>
                     <CardDescription className="text-lg text-foreground/90 mt-2 max-w-xl mx-auto">
-                        I am very sorry you&apos;re still stuck. Since you&apos;ve already set the rules and enabled the API, let&apos;s check these more advanced settings. This is almost certainly a one-time project setup issue.
+                        The app can't access your database because of Firestore's security rules. This is a standard part of Firebase setup.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 text-left p-6">
-                     <div className="space-y-4">
-                        <h3 className="font-bold text-xl text-center">Final Setup Checklist</h3>
-                        <div className="p-4 border rounded-lg bg-background shadow-sm">
-                            <h4 className="font-semibold text-lg">1. Verify Project ID</h4>
-                            <p className="text-muted-foreground mt-1 mb-3 text-sm">
-                                The app is configured to use project ID: <br />
-                                <code className="text-sm font-semibold bg-muted px-2 py-1 rounded-md my-1 inline-block">{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "Not Found in .env file"}</code>
-                                <br/>Please ensure this exactly matches the project ID in your Firebase Console URL.
-                            </p>
-                        </div>
-                        <div className="p-4 border rounded-lg bg-background shadow-sm">
-                            <h4 className="font-semibold text-lg">2. Check API Key Restrictions</h4>
-                            <p className="text-muted-foreground mt-1 mb-3 text-sm">Your API key might be restricted. Ensure the <strong>Cloud Firestore API</strong> is allowed for the key used by this web app.</p>
-                            <a href={`https://console.cloud.google.com/apis/credentials?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({variant: 'outline', size: 'sm'}), "w-full rounded-lg")}>
-                              Go to API Credentials &rarr;
-                            </a>
-                        </div>
-                         <div className="p-4 border rounded-lg bg-background shadow-sm">
-                            <h4 className="font-semibold text-lg">3. Firestore Location</h4>
-                            <p className="text-muted-foreground mt-1 mb-3 text-sm">Ensure your Firestore database has been created in a specific location (e.g., us-central). An un-located database can sometimes cause permission issues.</p>
-                        </div>
+                    <div className="space-y-2">
+                        <p className="font-semibold text-lg">1. Go to your Firestore Rules</p>
+                        <a
+                            href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore/rules`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(buttonVariants({ variant: 'outline' }), "w-full rounded-lg")}
+                        >
+                            Open Firestore Rules Tab &rarr;
+                        </a>
+                    </div>
+                    <div className="space-y-2">
+                        <p className="font-semibold text-lg">2. Paste these development rules and "Publish"</p>
+                        <p className="text-muted-foreground text-sm">
+                            I have also added this rule to a new `firestore.rules` file in your project for reference.
+                        </p>
+                        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold block whitespace-pre-wrap">
+                            {firestoreRules}
+                        </code>
                     </div>
                 </CardContent>
                 <CardFooter className="p-6 border-t">
-                     <Button onClick={() => window.location.reload()} className="w-full btn-gel rounded-lg" size="lg">
+                    <Button onClick={() => window.location.reload()} className="w-full btn-gel rounded-lg" size="lg">
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        I've checked these, Retry Connection
+                        I've published the new rules, Retry Connection
                     </Button>
                 </CardFooter>
             </Card>
@@ -393,3 +401,5 @@ export default function ClassesPage() {
         </div>
     );
 }
+
+    
