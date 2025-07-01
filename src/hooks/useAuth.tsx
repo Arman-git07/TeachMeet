@@ -2,7 +2,7 @@
 'use client';
 
 import type { User as FirebaseUser } from 'firebase/auth';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -26,11 +26,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    // Explicitly set persistence to 'local' to ensure session survives browser closure.
+    // This is generally the default, but setting it explicitly can resolve some edge cases.
+    const unsubscribePromise = setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        // After persistence is set, listen for auth state changes.
+        return onAuthStateChanged(auth, (currentUser) => {
+          setUser(currentUser);
+          setLoading(false);
+        });
+      })
+      .catch((error) => {
+        console.error("Auth Persistence Error:", error);
+        // Fallback to just listening for auth changes if persistence fails.
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+          setUser(currentUser);
+          setLoading(false);
+        });
+        return unsubscribe;
+      });
+
+    // Return a cleanup function that unsubscribes from onAuthStateChanged.
+    return () => {
+      unsubscribePromise.then(unsubscribe => unsubscribe && unsubscribe());
+    };
   }, []);
 
   const signOut = async () => {
