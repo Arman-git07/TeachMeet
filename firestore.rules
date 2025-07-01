@@ -1,11 +1,109 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // This rule allows anyone to read and write to the database.
-    // THIS IS NOT SECURE FOR PRODUCTION.
-    // For development purposes only.
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ===== HELPER FUNCTIONS =====
+    function isUserAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isUserAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getDoc(path) {
+      return get(/databases/$(database)/documents/$(path));
+    }
+
+    function isClassTeacher(classId, userId) {
+      // Uses `creatorId` to match the application's code.
+      return getDoc('classes/' + classId).data.creatorId == userId;
+    }
+
+    function isClassMember(classId, userId) {
+      return exists(/databases/$(database)/documents/classes/$(classId)/members/$(userId));
+    }
+
+    function isMeetingCreator(meetingId, userId) {
+      return getDoc('meetings/' + meetingId).data.creatorId == userId;
+    }
+
+    function isMeetingParticipant(meetingId, userId) {
+      return exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(userId));
+    }
+
+    function isExamTeacher(examId, userId) {
+      return getDoc('exams/' + examId).data.teacherId == userId;
+    }
+
+
+    // ===== MEETINGS =====
+    match /meetings/{meetingId} {
+      allow read: if isUserAuthenticated();
+      allow create: if isOwner(request.resource.data.creatorId);
+      allow update, delete: if isUserAuthenticated() && isMeetingCreator(meetingId, request.auth.uid);
+
+      match /participants/{participantId} {
+        allow list, read: if isUserAuthenticated() && isMeetingParticipant(meetingId, request.auth.uid);
+        allow create, update: if isOwner(participantId);
+        allow delete: if isOwner(participantId) || isMeetingCreator(meetingId, request.auth.uid);
+      }
+    }
+
+
+    // ===== CLASSES (collection was 'classrooms' in provided rules) =====
+    match /classes/{classId} {
+      // 'list' permission is critical for the "My Classes" page to work.
+      allow list, read: if isUserAuthenticated();
+      allow create: if isOwner(request.resource.data.creatorId); // Changed from teacherId to match app code
+      allow update, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+
+      // --- Members Subcollection ---
+      match /members/{userId} {
+        allow list: if isUserAuthenticated() && (isClassTeacher(classId, request.auth.uid) || isClassMember(classId, request.auth.uid));
+        allow read, write, delete: if isUserAuthenticated() && (isClassTeacher(classId, request.auth.uid) || isOwner(userId));
+      }
+
+      // --- Join Requests Subcollection ---
+      match /joinRequests/{userId} {
+        allow list: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+        allow read, create, delete: if isUserAuthenticated() && (isClassTeacher(classId, request.auth.uid) || isOwner(userId));
+      }
+
+      // --- Other Class Subcollections ---
+      match /announcements/{docId} {
+        allow list, read: if isUserAuthenticated();
+        allow write, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+      }
+      match /materials/{docId} {
+        allow list, read: if isUserAuthenticated();
+        allow write, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+      }
+      match /assignments/{docId} {
+        allow list, read: if isUserAuthenticated();
+        allow write, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+
+        match /submissions/{submissionUserId} {
+          allow read: if isUserAuthenticated() && (isOwner(submissionUserId) || isClassTeacher(classId, request.auth.uid));
+          allow create, update: if isOwner(submissionUserId);
+          allow delete: if isUserAuthenticated() && (isOwner(submissionUserId) || isClassTeacher(classId, request.auth.uid));
+        }
+      }
+    }
+
+
+    // ===== EXAMS =====
+    match /exams/{examId} {
+      allow list, read: if isUserAuthenticated();
+      allow create: if isOwner(request.resource.data.teacherId);
+      allow update, delete: if isUserAuthenticated() && isExamTeacher(examId, request.auth.uid);
+
+      match /submissions/{submissionUserId} {
+        allow read: if isUserAuthenticated() && (isOwner(submissionUserId) || isExamTeacher(examId, request.auth.uid));
+        allow create, update, delete: if isOwner(submissionUserId);
+      }
     }
   }
 }
