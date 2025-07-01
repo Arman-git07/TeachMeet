@@ -33,6 +33,7 @@ export function SignInForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showSetupError, setShowSetupError] = useState<boolean>(false);
+  const [showNetworkError, setShowNetworkError] = useState<boolean>(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -45,6 +46,7 @@ export function SignInForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setShowSetupError(false);
+    setShowNetworkError(false);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({
@@ -53,6 +55,11 @@ export function SignInForm() {
       });
       router.push('/');
     } catch (error: any) {
+      if (error.code === 'auth/network-request-failed') {
+        setShowNetworkError(true);
+        setIsLoading(false);
+        return;
+      }
       if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
         setShowSetupError(true);
         setIsLoading(false);
@@ -97,6 +104,21 @@ export function SignInForm() {
 
   return (
     <>
+      {showNetworkError && (
+         <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Action Required: Enable Authentication API</AlertTitle>
+            <AlertDescription>
+                <div className="space-y-2">
+                    <p>Authentication is blocked due to a network error, which usually means the <strong>Identity Toolkit API</strong> is not enabled in your Google Cloud project. This is a required step for Firebase Authentication to work.</p>
+                    <a href={`https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2")}>
+                        Enable Identity Toolkit API &rarr;
+                    </a>
+                    <p className="text-xs text-muted-foreground">After enabling, please wait a minute and try signing in again.</p>
+                </div>
+            </AlertDescription>
+        </Alert>
+      )}
       {showSetupError && (
          <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
