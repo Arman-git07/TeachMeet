@@ -606,27 +606,73 @@ export default function MeetingPage() {
   return (
     <div className="h-full flex flex-col bg-background/95 relative overflow-hidden">
       <main className="flex-1 p-2 sm:p-4">
-        {remoteParticipants.length === 0 ? (
-          <div className="h-full w-full">
-            {selfView ? (
-              <ParticipantView {...selfView} />
-            ) : (
-              <div className="h-full w-full flex flex-col items-center justify-center text-center bg-muted rounded-xl">
-                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <p className="text-muted-foreground">Connecting your video...</p>
-                <p className="text-xs text-muted-foreground mt-2">Make sure you've granted camera permissions.</p>
+        {(() => {
+          // No remote participants, just show self view
+          if (remoteParticipants.length === 0) {
+            return (
+              <div className="h-full w-full">
+                {selfView ? (
+                  <ParticipantView {...selfView} />
+                ) : (
+                  <div className="h-full w-full flex flex-col items-center justify-center text-center bg-muted rounded-xl">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                    <p className="text-muted-foreground">Connecting your video...</p>
+                    <p className="text-xs text-muted-foreground mt-2">Make sure you've granted camera permissions.</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
+            );
+          }
+          // 1 remote participant: Full screen
+          if (remoteParticipants.length === 1) {
+            return (
+              <div className="h-full w-full">
+                <ParticipantView {...remoteParticipants[0]} />
+              </div>
+            );
+          }
+          // 2 remote participants: Vertical split
+          if (remoteParticipants.length === 2) {
+            return (
+              <div className="h-full w-full flex flex-col gap-2 sm:gap-4">
+                {remoteParticipants.map(participant => (
+                  <div key={participant.id} className="flex-1 min-h-0">
+                    <ParticipantView {...participant} />
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          // 3 remote participants: 1 on top, two below
+          if (remoteParticipants.length === 3) {
+            const topParticipant = host || remoteParticipants[0];
+            const bottomParticipants = remoteParticipants.filter(p => p.id !== topParticipant.id);
+            return (
+              <div className="h-full w-full flex flex-col gap-2 sm:gap-4">
+                <div className="flex-1 min-h-0">
+                  <ParticipantView {...topParticipant} />
+                </div>
+                <div className="flex-1 min-h-0 flex gap-2 sm:gap-4">
+                  {bottomParticipants.map(participant => (
+                    <div key={participant.id} className="flex-1 min-h-0">
+                      <ParticipantView {...participant} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          // 4 or more participants: 2x2 grid (host prioritized)
+          return (
+            <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
               {mainGridParticipants.map(participant => (
                 <div key={participant.id} className="min-h-0">
                   <ParticipantView {...participant} />
                 </div>
               ))}
-          </div>
-        )}
+            </div>
+          );
+        })()}
       </main>
       
       {remoteParticipants.length > 0 && selfView && (
