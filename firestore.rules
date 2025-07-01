@@ -17,8 +17,7 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/$(path));
     }
 
-    function isClassTeacher(classId, userId) {
-      // Uses `creatorId` to match the application's code.
+    function isClassCreator(classId, userId) {
       return getDoc('classes/' + classId).data.creatorId == userId;
     }
 
@@ -35,7 +34,8 @@ service cloud.firestore {
     }
 
     function isExamTeacher(examId, userId) {
-      return getDoc('exams/' + examId).data.teacherId == userId;
+      // This assumes an exam document has a `creatorId` field.
+      return getDoc('exams/' + examId).data.creatorId == userId;
     }
 
 
@@ -53,51 +53,40 @@ service cloud.firestore {
     }
 
 
-    // ===== CLASSES (collection was 'classrooms' in provided rules) =====
+    // ===== CLASSES =====
     match /classes/{classId} {
-      // 'list' permission is critical for the "My Classes" page to work.
+      // Allow any authenticated user to list and read classes.
+      // The query on the "My Classes" page (`where('creatorId', '==', user.uid)`) secures the list operation.
       allow list, read: if isUserAuthenticated();
-      allow create: if isOwner(request.resource.data.creatorId); // Changed from teacherId to match app code
-      allow update, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+      
+      // Allow creation only if the user making the request is the creator listed in the new document.
+      allow create: if isOwner(request.resource.data.creatorId);
+      
+      // Allow updates and deletes only for the user who created the class.
+      allow update, delete: if isUserAuthenticated() && isClassCreator(classId, request.auth.uid);
 
-      // --- Members Subcollection ---
+      // --- Members Subcollection (Placeholder) ---
       match /members/{userId} {
-        allow list: if isUserAuthenticated() && (isClassTeacher(classId, request.auth.uid) || isClassMember(classId, request.auth.uid));
-        allow read, write, delete: if isUserAuthenticated() && (isClassTeacher(classId, request.auth.uid) || isOwner(userId));
+        allow list: if isUserAuthenticated() && (isClassCreator(classId, request.auth.uid) || isClassMember(classId, request.auth.uid));
+        allow read, write, delete: if isUserAuthenticated() && (isClassCreator(classId, request.auth.uid) || isOwner(userId));
       }
 
-      // --- Join Requests Subcollection ---
-      match /joinRequests/{userId} {
-        allow list: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
-        allow read, create, delete: if isUserAuthenticated() && (isClassTeacher(classId, request.auth.uid) || isOwner(userId));
-      }
-
-      // --- Other Class Subcollections ---
-      match /announcements/{docId} {
+      // --- Other Classroom Subcollections (Placeholders) ---
+      match /assignments/{docId} {
         allow list, read: if isUserAuthenticated();
-        allow write, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+        allow write, delete: if isUserAuthenticated() && isClassCreator(classId, request.auth.uid);
       }
       match /materials/{docId} {
         allow list, read: if isUserAuthenticated();
-        allow write, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
-      }
-      match /assignments/{docId} {
-        allow list, read: if isUserAuthenticated();
-        allow write, delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
-
-        match /submissions/{submissionUserId} {
-          allow read: if isUserAuthenticated() && (isOwner(submissionUserId) || isClassTeacher(classId, request.auth.uid));
-          allow create, update: if isOwner(submissionUserId);
-          allow delete: if isUserAuthenticated() && (isOwner(submissionUserId) || isClassTeacher(classId, request.auth.uid));
-        }
+        allow write, delete: if isUserAuthenticated() && isClassCreator(classId, request.auth.uid);
       }
     }
 
 
-    // ===== EXAMS =====
+    // ===== EXAMS (Placeholder) =====
     match /exams/{examId} {
       allow list, read: if isUserAuthenticated();
-      allow create: if isOwner(request.resource.data.teacherId);
+      allow create: if isOwner(request.resource.data.creatorId);
       allow update, delete: if isUserAuthenticated() && isExamTeacher(examId, request.auth.uid);
 
       match /submissions/{submissionUserId} {
