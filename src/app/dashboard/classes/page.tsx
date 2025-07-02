@@ -182,44 +182,68 @@ export default function ClassesPage() {
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
-      // This rule allows anyone to read and write.
-      // NOT FOR PRODUCTION. For development only.
+      // Allow read/write access for development.
+      // NOT FOR PRODUCTION.
       allow read, write: if true;
     }
   }
 }`;
+        const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
         return (
-            <Card className="max-w-3xl mx-auto my-12 text-center rounded-xl shadow-2xl border-2 border-destructive/50 bg-destructive/5">
+            <Card className="max-w-3xl mx-auto my-8 text-center rounded-xl shadow-2xl border-2 border-destructive/50 bg-destructive/5">
                 <CardHeader className="p-6">
-                    <ClipboardCheck className="mx-auto h-16 w-16 text-primary" />
-                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Action Required: Set Firestore Rules</CardTitle>
+                    <AlertTriangle className="mx-auto h-16 w-16 text-destructive" />
+                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Connection Error: Action Required</CardTitle>
                     <CardDescription className="text-lg text-foreground/90 mt-2 max-w-xl mx-auto">
-                        For your security, Firebase requires you to manually set database rules in their console. The app cannot do this for you. This is a required one-time setup step.
+                        The app couldn't connect to your database. You've likely done everything right, but there may be a small configuration mismatch. Let's fix it for good.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 text-left p-6">
+                    
+                    <div className="p-4 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700">
+                        <h3 className="font-bold text-yellow-900 dark:text-yellow-200">1. Confirm Project ID</h3>
+                        <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                            The app is trying to connect to project:
+                        </p>
+                        <code className="block w-full text-center font-mono bg-yellow-200 dark:bg-yellow-800/50 p-2 my-2 rounded-md text-yellow-900 dark:text-yellow-100">
+                            {projectId || "NOT SET in .env file"}
+                        </code>
+                        <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                            Please ensure this ID is correct and that your <code>.env</code> file contains the line: <br/><code>NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-actual-project-id</code>
+                        </p>
+                    </div>
+
                     <div className="space-y-2">
-                        <p className="font-semibold text-lg">1. Open the Firestore Rules editor</p>
+                        <p className="font-semibold text-lg">2. Set Firestore Rules</p>
+                        <p className="text-sm text-muted-foreground">This is the most common fix. Even if you've done this before, please re-apply it to the correct project.</p>
                         <a
-                            href={`https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/firestore/rules`}
+                            href={projectId ? `https://console.firebase.google.com/project/${projectId}/firestore/rules` : '#'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={cn(buttonVariants({ variant: 'outline' }), "w-full rounded-lg")}
+                            className={cn(buttonVariants({ variant: 'outline' }), "w-full rounded-lg", !projectId && 'opacity-50 cursor-not-allowed')}
+                            aria-disabled={!projectId}
                         >
                             Open Firestore Rules Tab &rarr;
                         </a>
-                    </div>
-                    <div className="space-y-2">
-                        <p className="font-semibold text-lg">2. Paste these development rules and click "Publish"</p>
                         <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold block whitespace-pre-wrap">
                             {firestoreRules}
                         </code>
                     </div>
+
+                    <div className="space-y-2">
+                        <p className="font-semibold text-lg">3. Enable Authentication API</p>
+                        <p className="text-sm text-muted-foreground">The app also needs the "Identity Toolkit API" to handle user sign-ins.</p>
+                         <a href={projectId ? `https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${projectId}` : '#'} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2", !projectId && 'opacity-50 cursor-not-allowed')} aria-disabled={!projectId}>
+                            Enable Identity Toolkit API &rarr;
+                        </a>
+                    </div>
+
                 </CardContent>
                 <CardFooter className="p-6 border-t">
                     <Button onClick={() => window.location.reload()} className="w-full btn-gel rounded-lg" size="lg">
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        I've published the rules, Retry Connection
+                        I've checked everything, Retry Connection
                     </Button>
                 </CardFooter>
             </Card>
