@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -26,31 +25,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Explicitly set persistence to 'local' to ensure session survives browser closure.
-    // This is generally the default, but setting it explicitly can resolve some edge cases.
-    const unsubscribePromise = setPersistence(auth, browserLocalPersistence)
-      .then(() => {
-        // After persistence is set, listen for auth state changes.
-        return onAuthStateChanged(auth, (currentUser) => {
-          setUser(currentUser);
-          setLoading(false);
+    // This function sets up persistence and then subscribes to auth changes.
+    // It returns the unsubscribe function for cleanup.
+    const subscribeToAuth = async () => {
+      try {
+        // This is the key change: we set persistence first.
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (error) {
+        // Log an error if persistence fails, but continue without it.
+        // This would result in session-only login.
+        console.error("Firebase Auth: Could not set persistence.", error);
+        toast({
+          variant: "destructive",
+          title: "Login Not Persisted",
+          description: "Your login will not be remembered after you close the browser. This may be due to your browser's privacy settings.",
+          duration: 10000,
         });
-      })
-      .catch((error) => {
-        console.error("Auth Persistence Error:", error);
-        // Fallback to just listening for auth changes if persistence fails.
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-          setUser(currentUser);
-          setLoading(false);
-        });
-        return unsubscribe;
+      }
+
+      // onAuthStateChanged returns the unsubscribe function.
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        setLoading(false);
       });
 
-    // Return a cleanup function that unsubscribes from onAuthStateChanged.
-    return () => {
-      unsubscribePromise.then(unsubscribe => unsubscribe && unsubscribe());
+      return unsubscribe;
     };
-  }, []);
+
+    // We call the async function and store the promise for the unsubscribe function.
+    const unsubscribePromise = subscribeToAuth();
+
+    // The cleanup function for useEffect will wait for the promise to resolve
+    // and then call the returned unsubscribe function.
+    return () => {
+      unsubscribePromise.then((unsubscribe) => {
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      });
+    };
+  }, [toast]);
 
   const signOut = async () => {
     try {
