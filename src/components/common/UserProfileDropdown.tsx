@@ -64,7 +64,7 @@ export function UserProfileDropdown() {
 
   if (!isAuthenticated || !user) {
     return (
-      <Link href="/auth/signin" passHref legacyBehavior>
+      <Link href="/auth/signin">
         <Button variant="ghost" className="rounded-full">
           <UserIconFallback className="mr-2 h-5 w-5" />
           Sign In
