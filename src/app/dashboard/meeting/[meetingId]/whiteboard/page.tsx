@@ -663,6 +663,17 @@ export default function WhiteboardPage() {
     setIsPagesPopoverOpen(false);
   };
 
+  const handleCreateNewPage = () => {
+    const newPageIndex = pages.length;
+    const newPage: ElementState = { elements: [], selectedElementIds: new Set() };
+    setPages(currentPages => [...currentPages, newPage]);
+    pagesHistoryRef.current.push([]);
+    pagesHistoryStepRef.current.push(-1);
+    setCurrentPageIndex(newPageIndex); 
+    pushToHistory(newPageIndex, newPage);
+    setIsPagesPopoverOpen(false);
+  };
+  
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
     setPages([newInitialPage]);
@@ -731,11 +742,14 @@ export default function WhiteboardPage() {
              
              <Popover open={isPagesPopoverOpen} onOpenChange={setIsPagesPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <ToolButton icon={Files} label={`Pages (${currentPageIndex + 1}/${pages.length})`} />
+                  <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label={`Pages (${currentPageIndex + 1}/${pages.length})`}>
+                    <Files className="h-5 w-5 mb-0.5" />
+                    <span className="text-[10px] leading-tight">Pages ({currentPageIndex + 1}/{pages.length})</span>
+                  </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-64 p-2 rounded-xl" side="bottom">
                     <div className="space-y-2">
-                        <Button onClick={handleAddPage} className="w-full rounded-lg btn-gel" size="lg">
+                      <Button onClick={handleCreateNewPage} className="w-full rounded-lg btn-gel" size="lg">
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Page
                         </Button>
                         <div className="relative py-2">
@@ -788,7 +802,7 @@ export default function WhiteboardPage() {
 
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
-            <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
+            <CardContent className="flex-grow bg-white flex items-center justify-center relative p-0">
                 <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
                 <canvas 
                     ref={tempCanvasRef} 
@@ -809,7 +823,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
-    
-
-    
