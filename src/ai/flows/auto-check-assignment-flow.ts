@@ -40,6 +40,7 @@ const autoCheckAssignmentPrompt = ai.definePrompt({
   name: 'autoCheckAssignmentPrompt',
   input: { schema: AutoCheckAssignmentInputSchema },
   output: { schema: AutoCheckAssignmentOutputSchema },
+  model: 'googleai/gemini-2.0-flash',
   prompt: `You are an AI Teaching Assistant. Your task is to evaluate a student's assignment based on the provided teacher's rubric and assignment title. Optional keywords may also be provided for context.
 
 Assignment Title: {{{assignmentTitle}}}
