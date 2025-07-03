@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // --- Type Definitions ---
 interface Point { x: number; y: number; }
@@ -140,7 +141,11 @@ export default function WhiteboardPage() {
   const tempCanvasRef = useRef<HTMLCanvasElement>(null);
   const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const [whiteboardState, setWhiteboardState] = useState<ElementState>({ elements: [], selectedElementIds: new Set() });
+  const [pages, setPages] = useState<ElementState[]>([{ elements: [], selectedElementIds: new Set() }]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const pagesHistoryRef = useRef<ElementState[][]>([[]]);
+  const pagesHistoryStepRef = useRef<number[]>([-1]);
+
   const [activeTool, setActiveTool] = useState<'draw' | 'shape' | 'text' | 'erase' | 'lasso' | 'select'>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
@@ -152,22 +157,24 @@ export default function WhiteboardPage() {
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
   
-  const historyRef = useRef<ElementState[]>([]);
-  const historyStepRef = useRef(-1);
-
   const getFontSize = () => 16;
   const getFontString = () => `${getFontSize()}px sans-serif`;
 
-  const pushToHistory = useCallback((state: ElementState) => {
-    if (historyStepRef.current < historyRef.current.length - 1) {
-        historyRef.current.splice(historyStepRef.current + 1);
+  const pushToHistory = useCallback((pageIndex: number, state: ElementState) => {
+    const history = pagesHistoryRef.current[pageIndex] || [];
+    let step = pagesHistoryStepRef.current[pageIndex] ?? -1;
+    
+    if (step < history.length - 1) {
+        history.splice(step + 1);
     }
-    historyRef.current.push(state);
-    if (historyRef.current.length > MAX_HISTORY_STEPS) {
-      historyRef.current.shift();
+    history.push(state);
+    if (history.length > MAX_HISTORY_STEPS) {
+      history.shift();
     } else {
-      historyStepRef.current++;
+      step++;
     }
+    pagesHistoryRef.current[pageIndex] = history;
+    pagesHistoryStepRef.current[pageIndex] = step;
   }, []);
 
   const drawElement = useCallback((ctx: CanvasRenderingContext2D, element: WhiteboardElement) => {
@@ -220,9 +227,12 @@ export default function WhiteboardPage() {
     const mainCtx = mainCanvasRef.current?.getContext('2d');
     if (!mainCtx) return;
     clearCanvas(mainCtx);
-    whiteboardState.elements.forEach(element => drawElement(mainCtx, element));
+    const currentPage = pages[currentPageIndex];
+    if (!currentPage) return;
+    
+    currentPage.elements.forEach(element => drawElement(mainCtx, element));
 
-    const selectionBox = getSelectionBoundingBox(whiteboardState.elements, whiteboardState.selectedElementIds);
+    const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
     if (selectionBox) {
       mainCtx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
       mainCtx.lineWidth = 1;
@@ -235,7 +245,7 @@ export default function WhiteboardPage() {
       );
       mainCtx.setLineDash([]);
     }
-  }, [whiteboardState, drawElement]);
+  }, [pages, currentPageIndex, drawElement]);
   
   const redrawTempCanvas = useCallback(() => {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
@@ -284,27 +294,41 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawMainCanvas();
-  }, [whiteboardState, redrawMainCanvas]);
+  }, [pages, currentPageIndex, redrawMainCanvas]);
   
   useEffect(() => {
     redrawTempCanvas();
   }, [tempDragPreview, redrawTempCanvas]);
 
   const handleUndo = useCallback(() => {
-    if (historyStepRef.current > 0) {
-      historyStepRef.current--;
-      const prevState = historyRef.current[historyStepRef.current];
-      setWhiteboardState(prevState);
+    const currentHistory = pagesHistoryRef.current[currentPageIndex];
+    let currentStep = pagesHistoryStepRef.current[currentPageIndex];
+    if (currentStep > 0) {
+      currentStep--;
+      pagesHistoryStepRef.current[currentPageIndex] = currentStep;
+      const prevState = currentHistory[currentStep];
+      setPages(currentPages => {
+          const newPages = [...currentPages];
+          newPages[currentPageIndex] = prevState;
+          return newPages;
+      });
     }
-  }, []);
+  }, [currentPageIndex]);
 
   const handleRedo = useCallback(() => {
-    if (historyStepRef.current < historyRef.current.length - 1) {
-      historyStepRef.current++;
-      const nextState = historyRef.current[historyStepRef.current];
-      setWhiteboardState(nextState);
+    const currentHistory = pagesHistoryRef.current[currentPageIndex];
+    let currentStep = pagesHistoryStepRef.current[currentPageIndex];
+    if (currentStep < currentHistory.length - 1) {
+      currentStep++;
+      pagesHistoryStepRef.current[currentPageIndex] = currentStep;
+      const nextState = currentHistory[currentStep];
+      setPages(currentPages => {
+          const newPages = [...currentPages];
+          newPages[currentPageIndex] = nextState;
+          return newPages;
+      });
     }
-  }, []);
+  }, [currentPageIndex]);
   
   const getPointerPosition = useCallback((event: React.PointerEvent): Point => {
       const rect = tempCanvasRef.current!.getBoundingClientRect();
@@ -333,29 +357,35 @@ export default function WhiteboardPage() {
     
     const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
     
-    setWhiteboardState(prevState => {
-       const newState = { ...prevState, elements: [...prevState.elements, newTextElement], selectedElementIds: new Set() };
-       pushToHistory(newState);
-       return newState;
+    setPages(currentPages => {
+        const newPages = [...currentPages];
+        const currentPage = newPages[currentPageIndex];
+        const newElements = [...currentPage.elements, newTextElement];
+        const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+        newPages[currentPageIndex] = updatedPage;
+        pushToHistory(currentPageIndex, updatedPage);
+        return newPages;
     });
 
     textInput.value = '';
     textInput.style.display = 'none';
     operationStateRef.current = { type: 'idle' };
-  }, [selectedColor, pushToHistory, getFontString]);
+  }, [selectedColor, pushToHistory, getFontString, currentPageIndex]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
     if (event.button !== 0) return;
     const pos = getPointerPosition(event);
     
     finalizeLiveText();
+
+    const currentPage = pages[currentPageIndex];
     
     if (activeTool === 'select') {
-        const selectionBox = getSelectionBoundingBox(whiteboardState.elements, whiteboardState.selectedElementIds);
+        const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
         if (selectionBox && isPointInRect(pos, selectionBox)) {
             const originalElements = new Map<string, WhiteboardElement>();
-            whiteboardState.elements.forEach(el => {
-                if (whiteboardState.selectedElementIds.has(el.id)) {
+            currentPage.elements.forEach(el => {
+                if (currentPage.selectedElementIds.has(el.id)) {
                     originalElements.set(el.id, JSON.parse(JSON.stringify(el)));
                 }
             });
@@ -364,8 +394,12 @@ export default function WhiteboardPage() {
         }
     }
 
-    if (whiteboardState.selectedElementIds.size > 0) {
-      setWhiteboardState(s => ({ ...s, selectedElementIds: new Set() }));
+    if (currentPage.selectedElementIds.size > 0) {
+      setPages(currentPages => {
+        const newPages = [...currentPages];
+        newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: new Set() };
+        return newPages;
+      });
     }
     
     switch(activeTool) {
@@ -393,7 +427,7 @@ export default function WhiteboardPage() {
             operationStateRef.current = { type: 'lassoing', lassoPath: [pos] };
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, whiteboardState, finalizeLiveText, getFontString]);
+  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     const pos = getPointerPosition(event);
@@ -432,20 +466,28 @@ export default function WhiteboardPage() {
     if (opState.type === 'drawing') {
         if (opState.currentPath.length > 1) {
             const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
-            setWhiteboardState(prevState => {
-                const newState = { ...prevState, elements: [...prevState.elements, newPath], selectedElementIds: new Set() };
-                pushToHistory(newState);
-                return newState;
+            setPages(currentPages => {
+                const newPages = [...currentPages];
+                const currentPage = newPages[currentPageIndex];
+                const newElements = [...currentPage.elements, newPath];
+                const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+                newPages[currentPageIndex] = updatedPage;
+                pushToHistory(currentPageIndex, updatedPage);
+                return newPages;
             });
         }
     } else if (opState.type === 'shaping') {
         const { startPoint, currentPoint } = opState;
         if (Math.hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y) > 2) {
              const newShape: ShapeElement = { type: 'shape', id: `shape_${Date.now()}`, shapeType: selectedShape, x1: startPoint.x, y1: startPoint.y, x2: currentPoint.x, y2: currentPoint.y, color: selectedColor, lineWidth };
-             setWhiteboardState(prevState => {
-                 const newState = { ...prevState, elements: [...prevState.elements, newShape], selectedElementIds: new Set() };
-                 pushToHistory(newState);
-                 return newState;
+             setPages(currentPages => {
+                 const newPages = [...currentPages];
+                 const currentPage = newPages[currentPageIndex];
+                 const newElements = [...currentPage.elements, newShape];
+                 const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+                 newPages[currentPageIndex] = updatedPage;
+                 pushToHistory(currentPageIndex, updatedPage);
+                 return newPages;
              });
         }
     } else if (opState.type === 'lassoing') {
@@ -453,8 +495,8 @@ export default function WhiteboardPage() {
             const newSelectedIds = new Set<string>();
             const lassoPolygon = opState.lassoPath;
             const lassoBox = getElementBoundingBox({type:'path', id:'', points:lassoPolygon, color:'', lineWidth:1});
-
-            whiteboardState.elements.forEach(element => {
+            
+            pages[currentPageIndex].elements.forEach(element => {
                 const elementBox = getElementBoundingBox(element);
                 if(!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
                 
@@ -464,7 +506,11 @@ export default function WhiteboardPage() {
             });
 
             if (newSelectedIds.size > 0) {
-                setWhiteboardState(prevState => ({...prevState, selectedElementIds: newSelectedIds}));
+                 setPages(currentPages => {
+                    const newPages = [...currentPages];
+                    newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: newSelectedIds };
+                    return newPages;
+                });
                 setActiveTool('select');
             }
         }
@@ -475,9 +521,11 @@ export default function WhiteboardPage() {
         const dy = pos.y - startPos.y;
 
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-            setWhiteboardState(prevState => {
-                const newElements = prevState.elements.map(el => {
-                    if (prevState.selectedElementIds.has(el.id)) {
+            setPages(currentPages => {
+                const newPages = [...currentPages];
+                const currentPage = newPages[currentPageIndex];
+                const newElements = currentPage.elements.map(el => {
+                    if (currentPage.selectedElementIds.has(el.id)) {
                         const originalElement = originalElements.get(el.id);
                         if (!originalElement) return el;
                         if (originalElement.type === 'path') {
@@ -490,20 +538,21 @@ export default function WhiteboardPage() {
                     }
                     return el;
                 });
-                const newState = { ...prevState, elements: newElements };
-                pushToHistory(newState);
-                return newState;
+                const updatedPage = { ...currentPage, elements: newElements };
+                newPages[currentPageIndex] = updatedPage;
+                pushToHistory(currentPageIndex, updatedPage);
+                return newPages;
             });
         }
         setTempDragPreview([]);
     }
     
-    // Eraser Click Logic
     if (activeTool === 'erase' && opState.type === 'idle') {
          let elementToDeleteId: string | null = null;
          const pos = getPointerPosition(event);
-         for (let i = whiteboardState.elements.length - 1; i >= 0; i--) {
-            const element = whiteboardState.elements[i];
+         const currentPageElements = pages[currentPageIndex].elements;
+         for (let i = currentPageElements.length - 1; i >= 0; i--) {
+            const element = currentPageElements[i];
             if (element.type === 'path') {
                 for (let j = 0; j < element.points.length - 1; j++) {
                     if (distToSegment(pos, element.points[j], element.points[j + 1]) < ERASER_THRESHOLD + element.lineWidth / 2) {
@@ -523,11 +572,14 @@ export default function WhiteboardPage() {
         }
         if (elementToDeleteId) {
             const idToDelete = elementToDeleteId;
-            setWhiteboardState(prevState => {
-                const newElements = prevState.elements.filter(el => el.id !== idToDelete);
-                const newState = { ...prevState, elements: newElements, selectedElementIds: new Set() };
-                pushToHistory(newState);
-                return newState;
+            setPages(currentPages => {
+                const newPages = [...currentPages];
+                const currentPage = newPages[currentPageIndex];
+                const newElements = currentPage.elements.filter(el => el.id !== idToDelete);
+                const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+                newPages[currentPageIndex] = updatedPage;
+                pushToHistory(currentPageIndex, updatedPage);
+                return newPages;
             });
         }
     }
@@ -536,35 +588,82 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (tempCtx) clearCanvas(tempCtx);
 
-  }, [getPointerPosition, selectedColor, lineWidth, whiteboardState, activeTool, pushToHistory, selectedShape]);
+  }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
 
-  const handleClearWhiteboard = () => { 
-    setWhiteboardState({ elements: [], selectedElementIds: new Set() });
-    pushToHistory({ elements: [], selectedElementIds: new Set() });
+  const handleClearPage = () => { 
+    const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
+    setPages(currentPages => {
+        const newPages = [...currentPages];
+        newPages[currentPageIndex] = clearedPage;
+        return newPages;
+    });
+    pushToHistory(currentPageIndex, clearedPage);
   };
   
   const handleDrawPopoverOpenChange = useCallback((open: boolean) => {
     setIsDrawPopoverOpen(open);
-    // When the popover is being opened, if we are not on a drawing tool,
-    // switch to the last used drawing tool.
-    if (open && activeTool !== 'draw' && activeTool !== 'shape') {
-      setActiveTool(lastDrawToolRef.current);
+    if (open) {
+      if (activeTool !== 'draw' && activeTool !== 'shape') {
+        setActiveTool(lastDrawToolRef.current);
+      }
     }
   }, [activeTool]);
 
   const handleToolSelect = (tool: 'draw' | 'shape') => {
     setActiveTool(tool);
     lastDrawToolRef.current = tool;
-    setIsDrawPopoverOpen(false); // Close popover when a tool is selected from it
+    setIsDrawPopoverOpen(false);
   };
   
   const handleNonDrawingToolSelect = (tool: 'text' | 'erase' | 'lasso' | 'select') => {
       setActiveTool(tool);
-      setIsDrawPopoverOpen(false); // Ensure the drawing popover is closed
+      setIsDrawPopoverOpen(false);
+  };
+
+  const handleAddPage = () => {
+    const newPageIndex = pages.length;
+    const newPage: ElementState = { elements: [], selectedElementIds: new Set() };
+    setPages(currentPages => [...currentPages, newPage]);
+    pagesHistoryRef.current.push([]);
+    pagesHistoryStepRef.current.push(-1);
+    setCurrentPageIndex(newPageIndex); 
+    pushToHistory(newPageIndex, newPage);
+  };
+
+  const handleSwitchPage = (index: number) => {
+    if (index !== currentPageIndex) {
+        finalizeLiveText();
+        setPages(currentPages => {
+            const newPages = [...currentPages];
+            newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: new Set() };
+            return newPages;
+        });
+        setCurrentPageIndex(index);
+    }
+  };
+
+  const handleDeletePage = (indexToDelete: number) => {
+    if (pages.length <= 1) {
+        handleClearPage();
+        return;
+    }
+    setPages(currentPages => currentPages.filter((_, i) => i !== indexToDelete));
+    pagesHistoryRef.current.splice(indexToDelete, 1);
+    pagesHistoryStepRef.current.splice(indexToDelete, 1);
+    
+    if (currentPageIndex === indexToDelete) {
+        setCurrentPageIndex(Math.max(0, indexToDelete - 1));
+    } else if (currentPageIndex > indexToDelete) {
+        setCurrentPageIndex(currentPageIndex - 1);
+    }
   };
 
   useEffect(() => {
-    pushToHistory({ elements: [], selectedElementIds: new Set() });
+    const newInitialPage = { elements: [], selectedElementIds: new Set() };
+    setPages([newInitialPage]);
+    pagesHistoryRef.current = [[newInitialPage]];
+    pagesHistoryStepRef.current = [0];
+
     setHeaderContent(
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3"><Brush className="h-7 w-7 text-primary" /><h1 className="text-xl font-semibold truncate">Whiteboard</h1></div>
@@ -572,7 +671,7 @@ export default function WhiteboardPage() {
       </div>
     );
     return () => setHeaderContent(null);
-  }, [setHeaderContent, meetingId, pushToHistory]);
+  }, [setHeaderContent, meetingId]);
 
 
   return (
@@ -624,14 +723,52 @@ export default function WhiteboardPage() {
              <ToolButton icon={Eraser} label="Erase" onClick={() => handleNonDrawingToolSelect("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
+             
+             <Popover>
+                <PopoverTrigger asChild>
+                    <ToolButton icon={Files} label={`Page ${currentPageIndex + 1}/${pages.length}`} />
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2 rounded-xl" side="bottom">
+                    <div className="space-y-2">
+                        <Label className="px-2 text-xs font-semibold">Pages</Label>
+                        <ScrollArea className="h-40 border rounded-lg">
+                            <div className="p-1 space-y-1">
+                                {pages.map((page, index) => (
+                                    <div 
+                                        key={index}
+                                        onClick={() => handleSwitchPage(index)}
+                                        className={cn(
+                                            "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted",
+                                            currentPageIndex === index && "bg-primary/10 text-primary-foreground"
+                                        )}
+                                    >
+                                        <span className="text-sm font-medium">Page {index + 1}</span>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                          onClick={(e) => { e.stopPropagation(); handleDeletePage(index); }}
+                                          disabled={pages.length <= 1}
+                                        >
+                                            <Trash2 className="h-4 w-4"/>
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                        <Button onClick={handleAddPage} className="w-full rounded-lg" size="sm">Add Page</Button>
+                    </div>
+                </PopoverContent>
+             </Popover>
+
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear">
+                    <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear Page">
                         <Trash2 className="h-5 w-5 mb-0.5" />
                         <span className="text-[10px] leading-tight">Clear</span>
                     </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will clear the entire whiteboard. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearWhiteboard} className="rounded-lg">Clear Whiteboard</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Clear this page?</AlertDialogTitle><AlertDialogDescription>This will clear the current page. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearPage} className="rounded-lg">Clear Page</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
              </AlertDialog>
           </div>
         </div>
@@ -659,3 +796,5 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
+    
