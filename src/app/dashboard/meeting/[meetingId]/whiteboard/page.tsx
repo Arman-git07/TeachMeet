@@ -648,6 +648,7 @@ export default function WhiteboardPage() {
   const handleDeletePage = (indexToDelete: number) => {
     if (pages.length <= 1) {
         handleClearPage();
+        setIsPagesPopoverOpen(false);
         return;
     }
     setPages(currentPages => currentPages.filter((_, i) => i !== indexToDelete));
@@ -659,6 +660,7 @@ export default function WhiteboardPage() {
     } else if (currentPageIndex > indexToDelete) {
         setCurrentPageIndex(currentPageIndex - 1);
     }
+    setIsPagesPopoverOpen(false);
   };
 
   useEffect(() => {
@@ -787,7 +789,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow bg-card flex items-center justify-center relative p-0">
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0 bg-white" style={{ zIndex: 1 }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
                 <canvas 
                     ref={tempCanvasRef} 
                     onPointerDown={handlePointerDown} 
