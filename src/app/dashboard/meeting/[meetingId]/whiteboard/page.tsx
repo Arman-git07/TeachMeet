@@ -141,11 +141,13 @@ export default function WhiteboardPage() {
   const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
 
   const [whiteboardState, setWhiteboardState] = useState<ElementState>({ elements: [], selectedElementIds: new Set() });
-  const [activeTool, setActiveTool] = useState<string>("draw");
+  const [activeTool, setActiveTool] = useState<'draw' | 'shape' | 'text' | 'erase' | 'lasso' | 'select'>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
+  
   const [isDrawPopoverOpen, setIsDrawPopoverOpen] = useState(false);
+  const lastDrawToolRef = useRef<'draw' | 'shape'>('draw');
 
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
@@ -541,6 +543,24 @@ export default function WhiteboardPage() {
     pushToHistory({ elements: [], selectedElementIds: new Set() });
   };
   
+  const handleDrawPopoverChange = useCallback((open: boolean) => {
+    setIsDrawPopoverOpen(open);
+    // When the popover is triggered to open, ensure a drawing tool is active.
+    if (open && activeTool !== 'draw' && activeTool !== 'shape') {
+      setActiveTool(lastDrawToolRef.current);
+    }
+  }, [activeTool]);
+
+  const handleToolSelect = (tool: 'draw' | 'shape' | 'text' | 'erase' | 'lasso' | 'select') => {
+    setActiveTool(tool);
+    // If a drawing tool is selected, update the last used ref.
+    if (tool === 'draw' || tool === 'shape') {
+      lastDrawToolRef.current = tool;
+    }
+    // Close the popover if it's open
+    setIsDrawPopoverOpen(false);
+  };
+  
   useEffect(() => {
     pushToHistory({ elements: [], selectedElementIds: new Set() });
     setHeaderContent(
@@ -559,7 +579,7 @@ export default function WhiteboardPage() {
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-            <Popover open={isDrawPopoverOpen} onOpenChange={setIsDrawPopoverOpen}>
+            <Popover open={isDrawPopoverOpen} onOpenChange={handleDrawPopoverChange}>
               <PopoverTrigger asChild>
                  <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'}/>
               </PopoverTrigger>
@@ -589,17 +609,17 @@ export default function WhiteboardPage() {
                 <div className="space-y-2">
                     <Label className="text-xs font-semibold text-muted-foreground">TOOLS</Label>
                     <div className="flex gap-2">
-                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => { setActiveTool('draw'); setIsDrawPopoverOpen(false); }}><Brush className="h-5 w-5" /></Button>
-                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('rectangle'); setIsDrawPopoverOpen(false);}}><RectangleHorizontal className="h-5 w-5" /></Button>
-                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('circle'); setIsDrawPopoverOpen(false);}}><Circle className="h-5 w-5" /></Button>
-                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('line'); setIsDrawPopoverOpen(false);}}><Minus className="h-5 w-5" /></Button>
+                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => { handleToolSelect('draw') }}><Brush className="h-5 w-5" /></Button>
+                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('rectangle'); handleToolSelect('shape');}}><RectangleHorizontal className="h-5 w-5" /></Button>
+                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('circle'); handleToolSelect('shape');}}><Circle className="h-5 w-5" /></Button>
+                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('line'); handleToolSelect('shape');}}><Minus className="h-5 w-5" /></Button>
                     </div>
                 </div>
               </PopoverContent>
             </Popover>
-             <ToolButton icon={Lasso} label="Select" onClick={() => {setActiveTool("lasso"); setIsDrawPopoverOpen(false);}} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <ToolButton icon={Type} label="Text" onClick={() => {setActiveTool("text"); setIsDrawPopoverOpen(false);}} isActive={activeTool === "text"}/>
-             <ToolButton icon={Eraser} label="Erase" onClick={() => {setActiveTool("erase"); setIsDrawPopoverOpen(false);}} isActive={activeTool === "erase"}/>
+             <ToolButton icon={Lasso} label="Select" onClick={() => handleToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
+             <ToolButton icon={Type} label="Text" onClick={() => handleToolSelect("text")} isActive={activeTool === "text"}/>
+             <ToolButton icon={Eraser} label="Erase" onClick={() => handleToolSelect("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
              <AlertDialog>
