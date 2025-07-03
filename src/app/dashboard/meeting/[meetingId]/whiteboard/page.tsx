@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -726,11 +726,17 @@ export default function WhiteboardPage() {
              
              <Popover>
                 <PopoverTrigger asChild>
-                    <ToolButton icon={Files} label={`Page ${currentPageIndex + 1}/${pages.length}`} />
+                    <ToolButton icon={Files} label={`Pages (${currentPageIndex + 1}/${pages.length})`} />
                 </PopoverTrigger>
                 <PopoverContent className="w-64 p-2 rounded-xl" side="bottom">
                     <div className="space-y-2">
-                        <Label className="px-2 text-xs font-semibold">Pages</Label>
+                        <Button onClick={handleAddPage} className="w-full rounded-lg btn-gel" size="lg">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add New Page
+                        </Button>
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-popover px-2 text-muted-foreground">Or Manage Pages</span></div>
+                        </div>
                         <ScrollArea className="h-40 border rounded-lg">
                             <div className="p-1 space-y-1">
                                 {pages.map((page, index) => (
@@ -739,14 +745,17 @@ export default function WhiteboardPage() {
                                         onClick={() => handleSwitchPage(index)}
                                         className={cn(
                                             "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted",
-                                            currentPageIndex === index && "bg-primary/10 text-primary-foreground"
+                                            currentPageIndex === index && "bg-primary text-primary-foreground"
                                         )}
                                     >
                                         <span className="text-sm font-medium">Page {index + 1}</span>
                                         <Button 
                                           variant="ghost" 
                                           size="icon" 
-                                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                          className={cn(
+                                            "h-6 w-6 text-muted-foreground hover:text-destructive",
+                                            currentPageIndex === index && "text-primary-foreground/70 hover:text-primary-foreground hover:bg-white/20"
+                                          )}
                                           onClick={(e) => { e.stopPropagation(); handleDeletePage(index); }}
                                           disabled={pages.length <= 1}
                                         >
@@ -756,7 +765,6 @@ export default function WhiteboardPage() {
                                 ))}
                             </div>
                         </ScrollArea>
-                        <Button onClick={handleAddPage} className="w-full rounded-lg" size="sm">Add Page</Button>
                     </div>
                 </PopoverContent>
              </Popover>
