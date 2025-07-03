@@ -142,7 +142,6 @@ export default function WhiteboardPage() {
 
   const [whiteboardState, setWhiteboardState] = useState<ElementState>({ elements: [], selectedElementIds: new Set() });
   const [activeTool, setActiveTool] = useState<string>("draw");
-  const [lastDrawTool, setLastDrawTool] = useState<'draw' | 'shape'>('draw');
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
@@ -542,10 +541,6 @@ export default function WhiteboardPage() {
     pushToHistory({ elements: [], selectedElementIds: new Set() });
   };
   
-  const handleDrawButtonClick = () => {
-    setActiveTool(lastDrawTool);
-    setIsDrawPopoverOpen(true);
-  };
 
   useEffect(() => {
     pushToHistory({ elements: [], selectedElementIds: new Set() });
@@ -567,7 +562,7 @@ export default function WhiteboardPage() {
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <Popover open={isDrawPopoverOpen} onOpenChange={setIsDrawPopoverOpen}>
               <PopoverTrigger asChild>
-                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'} onClick={handleDrawButtonClick}/>
+                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'} onClick={() => setIsDrawPopoverOpen(true)}/>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
                 <div className="space-y-2">
@@ -595,10 +590,10 @@ export default function WhiteboardPage() {
                 <div className="space-y-2">
                     <Label className="text-xs font-semibold text-muted-foreground">TOOLS</Label>
                     <div className="flex gap-2">
-                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => { setActiveTool('draw'); setLastDrawTool('draw'); setIsDrawPopoverOpen(false); }}><Brush className="h-5 w-5" /></Button>
-                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('rectangle'); setLastDrawTool('shape'); setIsDrawPopoverOpen(false);}}><RectangleHorizontal className="h-5 w-5" /></Button>
-                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('circle'); setLastDrawTool('shape'); setIsDrawPopoverOpen(false);}}><Circle className="h-5 w-5" /></Button>
-                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('line'); setLastDrawTool('shape'); setIsDrawPopoverOpen(false);}}><Minus className="h-5 w-5" /></Button>
+                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => { setActiveTool('draw'); setIsDrawPopoverOpen(false); }}><Brush className="h-5 w-5" /></Button>
+                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('rectangle'); setIsDrawPopoverOpen(false);}}><RectangleHorizontal className="h-5 w-5" /></Button>
+                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('circle'); setIsDrawPopoverOpen(false);}}><Circle className="h-5 w-5" /></Button>
+                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('line'); setIsDrawPopoverOpen(false);}}><Minus className="h-5 w-5" /></Button>
                     </div>
                 </div>
               </PopoverContent>
