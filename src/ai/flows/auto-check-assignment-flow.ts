@@ -71,7 +71,7 @@ Be fair and objective.
 Ensure your output matches the specified JSON schema.
 `,
   config: {
-    model: googleAI.model('gemini-1.5-flash-latest'),
+    model: googleAI.model('gemini-pro'),
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
