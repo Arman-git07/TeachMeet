@@ -79,6 +79,7 @@ const aiHelpAssistantPrompt = ai.definePrompt({
   Question: {{{question}}}
   Answer:`, 
   config: {
+    model: googleAI.model('gemini-1.5-flash-latest'),
     safetySettings: [
       {
         category: 'HARM_CATEGORY_HATE_SPEECH',
