@@ -1,4 +1,3 @@
-
 'use client';
 import { Button } from '@/components/ui/button';
 import { Video, PlusCircle, Code } from 'lucide-react';
@@ -100,34 +99,36 @@ export function SlideUpPanel() {
               </DialogContent>
             </Dialog>
           ) : (
-            <Link href={startMeetingHref} passHref legacyBehavior>
-              <Button
-                size="lg"
-                className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
-                aria-label="Start New Meeting"
-                disabled={authLoading}
-              >
+            <Button
+              asChild
+              size="lg"
+              className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+              aria-label="Start New Meeting"
+              disabled={authLoading}
+            >
+              <Link href={startMeetingHref}>
                 <PlusCircle className="mr-2 h-6 w-6" />
                 Start New Meeting
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )}
         </div>
 
         {/* Join Meeting Section */}
         <div className="w-full sm:flex-1 flex flex-col items-center">
           <div className="relative w-full max-w-xs">
-            <Link href={joinMeetingHref} passHref legacyBehavior className="block">
-              <Button
-                size="lg"
-                className="w-full btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
-                aria-label="Join Existing Meeting"
-                disabled={authLoading}
-              >
+            <Button
+              asChild
+              size="lg"
+              className="w-full btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+              aria-label="Join Existing Meeting"
+              disabled={authLoading}
+            >
+              <Link href={joinMeetingHref}>
                 <Video className="mr-2 h-6 w-6" />
                 Join Meeting
-              </Button>
-            </Link>
+              </Link>
+            </Button>
 
             <Dialog>
               <DialogTrigger asChild>
