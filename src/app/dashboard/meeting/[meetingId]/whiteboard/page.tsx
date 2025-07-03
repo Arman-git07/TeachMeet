@@ -541,7 +541,6 @@ export default function WhiteboardPage() {
     pushToHistory({ elements: [], selectedElementIds: new Set() });
   };
   
-
   useEffect(() => {
     pushToHistory({ elements: [], selectedElementIds: new Set() });
     setHeaderContent(
@@ -562,7 +561,7 @@ export default function WhiteboardPage() {
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <Popover open={isDrawPopoverOpen} onOpenChange={setIsDrawPopoverOpen}>
               <PopoverTrigger asChild>
-                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'} onClick={() => setIsDrawPopoverOpen(true)}/>
+                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'}/>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
                 <div className="space-y-2">
@@ -598,9 +597,9 @@ export default function WhiteboardPage() {
                 </div>
               </PopoverContent>
             </Popover>
-             <ToolButton icon={Lasso} label="Select" onClick={() => setActiveTool("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <ToolButton icon={Type} label="Text" onClick={() => setActiveTool("text")} isActive={activeTool === "text"}/>
-             <ToolButton icon={Eraser} label="Erase" onClick={() => setActiveTool("erase")} isActive={activeTool === "erase"}/>
+             <ToolButton icon={Lasso} label="Select" onClick={() => {setActiveTool("lasso"); setIsDrawPopoverOpen(false);}} isActive={activeTool === "lasso" || activeTool === "select"}/>
+             <ToolButton icon={Type} label="Text" onClick={() => {setActiveTool("text"); setIsDrawPopoverOpen(false);}} isActive={activeTool === "text"}/>
+             <ToolButton icon={Eraser} label="Erase" onClick={() => {setActiveTool("erase"); setIsDrawPopoverOpen(false);}} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
              <AlertDialog>
