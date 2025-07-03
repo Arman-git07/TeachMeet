@@ -152,6 +152,7 @@ export default function WhiteboardPage() {
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
   
   const [isDrawPopoverOpen, setIsDrawPopoverOpen] = useState(false);
+  const [isPagesPopoverOpen, setIsPagesPopoverOpen] = useState(false);
   const lastDrawToolRef = useRef<'draw' | 'shape'>('draw');
 
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
@@ -628,6 +629,7 @@ export default function WhiteboardPage() {
     pagesHistoryStepRef.current.push(-1);
     setCurrentPageIndex(newPageIndex); 
     pushToHistory(newPageIndex, newPage);
+    setIsPagesPopoverOpen(false);
   };
 
   const handleSwitchPage = (index: number) => {
@@ -640,6 +642,7 @@ export default function WhiteboardPage() {
         });
         setCurrentPageIndex(index);
     }
+    setIsPagesPopoverOpen(false);
   };
 
   const handleDeletePage = (indexToDelete: number) => {
@@ -724,7 +727,7 @@ export default function WhiteboardPage() {
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
              
-             <Popover>
+             <Popover open={isPagesPopoverOpen} onOpenChange={setIsPagesPopoverOpen}>
                 <PopoverTrigger asChild>
                     <ToolButton icon={Files} label={`Pages (${currentPageIndex + 1}/${pages.length})`} />
                 </PopoverTrigger>
@@ -804,5 +807,7 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
+    
 
     
