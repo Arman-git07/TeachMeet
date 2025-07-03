@@ -2,7 +2,7 @@
 
 'use server';
 
-import {ai} from '@/ai/genkit';
+import {ai, googleAI} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const AiHelpAssistantInputSchema = z.object({
@@ -70,7 +70,7 @@ const aiHelpAssistantPrompt = ai.definePrompt({
   name: 'aiHelpAssistantPrompt',
   input: {schema: AiHelpAssistantInputSchema},
   output: {schema: AiHelpAssistantOutputSchema},
-  model: 'googleai/gemini-2.0-flash',
+  model: googleAI.model('gemini-2.0-flash'),
   prompt: `You are a chat assistant for TeachMeet, a 3D meeting app, and your goal is to answer user questions accurately.
 
   Here are some frequently asked questions and answers. Use these as a reference, and be concise.

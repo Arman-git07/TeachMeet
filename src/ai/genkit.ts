@@ -1,6 +1,6 @@
 
 import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
+import {googleAI as genkitGoogleAI} from '@genkit-ai/googleai';
 
 let apiKeyFound = false;
 if (process.env.GOOGLE_API_KEY) {
@@ -37,7 +37,10 @@ if (!apiKeyFound) {
     );
 }
 
+// Create an instance of the Google AI plugin.
+export const googleAI = genkitGoogleAI();
 
+// Configure Genkit with the Google AI plugin.
 export const ai = genkit({
-  plugins: [googleAI()],
+  plugins: [googleAI],
 });
