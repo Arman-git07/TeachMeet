@@ -146,6 +146,7 @@ export default function WhiteboardPage() {
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
+  const [isDrawPopoverOpen, setIsDrawPopoverOpen] = useState(false);
 
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
@@ -254,7 +255,7 @@ export default function WhiteboardPage() {
         tempCtx.moveTo(opState.lassoPath[0].x, opState.lassoPath[0].y);
         opState.lassoPath.forEach(p => tempCtx.lineTo(p.x, p.y));
       }
-      ctx.stroke();
+      tempCtx.stroke();
       tempCtx.setLineDash([]);
     } else if (opState.type === 'dragging') {
         tempDragPreview.forEach(el => drawElement(tempCtx, el));
@@ -315,6 +316,7 @@ export default function WhiteboardPage() {
     const textInput = liveTextInputRef.current;
     if (!textInput || !textInput.value.trim()) {
       if (textInput) textInput.style.display = 'none';
+      operationStateRef.current = { type: 'idle' };
       return;
     }
     
@@ -379,6 +381,7 @@ export default function WhiteboardPage() {
                 liveTextInputRef.current.style.left = `${pos.x}px`;
                 liveTextInputRef.current.style.display = 'block';
                 liveTextInputRef.current.style.color = selectedColor;
+                liveTextInputRef.current.style.font = getFontString();
                 liveTextInputRef.current.focus();
             }
             break;
@@ -389,7 +392,7 @@ export default function WhiteboardPage() {
             operationStateRef.current = { type: 'lassoing', lassoPath: [pos] };
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, whiteboardState, finalizeLiveText]);
+  }, [getPointerPosition, activeTool, selectedColor, whiteboardState, finalizeLiveText, getFontString]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     const pos = getPointerPosition(event);
@@ -540,9 +543,8 @@ export default function WhiteboardPage() {
   };
   
   const handleDrawButtonClick = () => {
-    if (activeTool !== 'draw' && activeTool !== 'shape') {
-        setActiveTool(lastDrawTool);
-    }
+    setActiveTool(lastDrawTool);
+    setIsDrawPopoverOpen(true);
   };
 
   useEffect(() => {
@@ -563,7 +565,7 @@ export default function WhiteboardPage() {
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-            <Popover>
+            <Popover open={isDrawPopoverOpen} onOpenChange={setIsDrawPopoverOpen}>
               <PopoverTrigger asChild>
                  <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'} onClick={handleDrawButtonClick}/>
               </PopoverTrigger>
@@ -593,10 +595,10 @@ export default function WhiteboardPage() {
                 <div className="space-y-2">
                     <Label className="text-xs font-semibold text-muted-foreground">TOOLS</Label>
                     <div className="flex gap-2">
-                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => { setActiveTool('draw'); setLastDrawTool('draw'); }}><Brush className="h-5 w-5" /></Button>
-                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('rectangle'); setLastDrawTool('shape');}}><RectangleHorizontal className="h-5 w-5" /></Button>
-                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('circle'); setLastDrawTool('shape');}}><Circle className="h-5 w-5" /></Button>
-                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('line'); setLastDrawTool('shape');}}><Minus className="h-5 w-5" /></Button>
+                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => { setActiveTool('draw'); setLastDrawTool('draw'); setIsDrawPopoverOpen(false); }}><Brush className="h-5 w-5" /></Button>
+                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('rectangle'); setLastDrawTool('shape'); setIsDrawPopoverOpen(false);}}><RectangleHorizontal className="h-5 w-5" /></Button>
+                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('circle'); setLastDrawTool('shape'); setIsDrawPopoverOpen(false);}}><Circle className="h-5 w-5" /></Button>
+                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setActiveTool('shape'); setSelectedShape('line'); setLastDrawTool('shape'); setIsDrawPopoverOpen(false);}}><Minus className="h-5 w-5" /></Button>
                     </div>
                 </div>
               </PopoverContent>
@@ -641,5 +643,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
-    
