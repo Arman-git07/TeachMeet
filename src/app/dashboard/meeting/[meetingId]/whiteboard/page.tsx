@@ -543,7 +543,7 @@ export default function WhiteboardPage() {
     setHeaderContent(
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3"><Brush className="h-7 w-7 text-primary" /><h1 className="text-xl font-semibold truncate">Whiteboard</h1></div>
-        {meetingId && <Link href={`/dashboard/meeting/${meetingId}`} passHref legacyBehavior><Button variant="outline" size="sm" className="rounded-lg"><ArrowLeft className="mr-2 h-4 w-4" />Back</Button></Link>}
+        {meetingId && <Button asChild variant="outline" size="sm" className="rounded-lg"><Link href={`/dashboard/meeting/${meetingId}`}><ArrowLeft className="mr-2 h-4 w-4" />Back</Link></Button>}
       </div>
     );
     return () => setHeaderContent(null);
@@ -558,7 +558,7 @@ export default function WhiteboardPage() {
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <Popover>
               <PopoverTrigger asChild>
-                <ToolButton icon={Brush} label="Draw" onClick={() => {}} isActive={activeTool === 'draw' || activeTool === 'shape'}/>
+                 <ToolButton icon={Brush} label="Draw" onClick={() => {}} isActive={activeTool === 'draw' || activeTool === 'shape'}/>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
                 <div className="space-y-2">

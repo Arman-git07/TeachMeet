@@ -331,21 +331,21 @@ export default function SettingsPage() {
             <Button variant="link" className="text-accent">Enable</Button>
           </div>
           <div className="mt-4 space-y-2">
-             <Link href="/privacy-policy" passHref legacyBehavior>
-                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
-                    <a><ShieldQuestion className="mr-2 h-4 w-4"/> View Privacy Policy</a>
-                </Button>
-             </Link>
-             <Link href="/terms-of-service" passHref legacyBehavior>
-                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
-                    <a><BookOpen className="mr-2 h-4 w-4"/> View Terms of Service</a>
-                </Button>
-             </Link>
-             <Link href="/community-guidelines" passHref legacyBehavior>
-                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
-                    <a><UsersIconLucide className="mr-2 h-4 w-4"/> View Community Guidelines</a>
-                </Button>
-             </Link>
+            <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
+              <Link href="/privacy-policy" target="_blank">
+                <ShieldQuestion className="mr-2 h-4 w-4"/> View Privacy Policy
+              </Link>
+            </Button>
+            <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
+              <Link href="/terms-of-service" target="_blank">
+                <BookOpen className="mr-2 h-4 w-4"/> View Terms of Service
+              </Link>
+            </Button>
+            <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-accent justify-start">
+              <Link href="/community-guidelines" target="_blank">
+                <UsersIconLucide className="mr-2 h-4 w-4"/> View Community Guidelines
+              </Link>
+            </Button>
           </div>
            <p className="text-xs text-muted-foreground mt-2">
               Communications are secured using HTTPS. Data stored with Firebase is encrypted at rest.
