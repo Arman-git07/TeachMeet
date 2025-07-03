@@ -254,7 +254,7 @@ export default function WhiteboardPage() {
         tempCtx.moveTo(opState.lassoPath[0].x, opState.lassoPath[0].y);
         opState.lassoPath.forEach(p => tempCtx.lineTo(p.x, p.y));
       }
-      tempCtx.stroke();
+      ctx.stroke();
       tempCtx.setLineDash([]);
     } else if (opState.type === 'dragging') {
         tempDragPreview.forEach(el => drawElement(tempCtx, el));
@@ -538,6 +538,12 @@ export default function WhiteboardPage() {
     setWhiteboardState({ elements: [], selectedElementIds: new Set() });
     pushToHistory({ elements: [], selectedElementIds: new Set() });
   };
+  
+  const handleDrawButtonClick = () => {
+    if (activeTool !== 'draw' && activeTool !== 'shape') {
+        setActiveTool(lastDrawTool);
+    }
+  };
 
   useEffect(() => {
     pushToHistory({ elements: [], selectedElementIds: new Set() });
@@ -559,7 +565,7 @@ export default function WhiteboardPage() {
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <Popover>
               <PopoverTrigger asChild>
-                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'}/>
+                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'} onClick={handleDrawButtonClick}/>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
                 <div className="space-y-2">
