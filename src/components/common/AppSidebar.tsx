@@ -150,19 +150,16 @@ const NavItem = ({
             {dropdownItems.map(item => {
               const isSubItemActive = currentPath.startsWith(item.href);
               return (
-                <Link key={item.label} href={item.href} passHref legacyBehavior={item.target ? undefined : true} target={item.target}>
+                <Link key={item.label} href={item.href} target={item.target}>
                   <DropdownMenuItem
-                    asChild
                     className={cn(
                       "cursor-pointer p-3 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md",
                       isSubItemActive && "bg-sidebar-primary text-sidebar-primary-foreground"
                     )}
                     onSelect={() => { if (isMobile) setOpenMobile(false); }}
                   >
-                    <a target={item.target}>
                       <item.icon className="mr-2 h-4 w-4" />
                       {item.label}
-                    </a>
                   </DropdownMenuItem>
                 </Link>
               );
@@ -176,17 +173,16 @@ const NavItem = ({
   if (href) {
     return (
       <SidebarMenuItem>
-        <Link href={href} passHref legacyBehavior={target ? undefined : true} target={target}>
-          <SidebarMenuButton
-            as="a"
-            onClick={handleClick}
-            isActive={isActive}
-            className={buttonClassName}
-            target={target}
-          >
+        <SidebarMenuButton
+          asChild
+          onClick={handleClick}
+          isActive={isActive}
+          className={buttonClassName}
+        >
+          <Link href={href} target={target}>
             {buttonContent}
-          </SidebarMenuButton>
-        </Link>
+          </Link>
+        </SidebarMenuButton>
       </SidebarMenuItem>
     );
   }
@@ -229,10 +225,8 @@ export function AppSidebar() {
     <>
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-6 border-b border-sidebar-border">
-        <Link href="/" legacyBehavior>
-          <a>
-            <Logo size="small" />
-          </a>
+        <Link href="/">
+          <Logo size="small" />
         </Link>
       </SidebarHeader>
       <SidebarContent className="flex-grow p-4">

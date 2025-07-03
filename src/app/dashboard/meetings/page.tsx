@@ -29,11 +29,11 @@ export default function MyMeetingsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">My Meetings</h1>
           <p className="text-muted-foreground">View and manage your scheduled and past meetings.</p>
         </div>
-        <Link href="/dashboard/start-meeting" passHref legacyBehavior>
-          <Button className="btn-gel rounded-lg">
+        <Button asChild className="btn-gel rounded-lg">
+          <Link href="/dashboard/start-meeting">
             <PlusCircle className="mr-2 h-5 w-5" /> Schedule New Meeting
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       {meetings.length === 0 ? (
@@ -44,7 +44,7 @@ export default function MyMeetingsPage() {
             <CardDescription>You haven&apos;t scheduled or joined any meetings.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/dashboard/start-meeting" passHref legacyBehavior>
+            <Link href="/dashboard/start-meeting" passHref>
               <Button size="lg" className="btn-gel rounded-lg">
                 Schedule Your First Meeting
               </Button>

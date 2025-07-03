@@ -262,12 +262,12 @@ export default function JoinMeetingPage() {
           </Button>
         </CardContent>
          <CardFooter className="flex justify-between border-t pt-4">
-            <Link href="/dashboard" passHref legacyBehavior>
-                <Button variant="ghost" className="text-muted-foreground hover:text-destructive rounded-lg">
+            <Button asChild variant="ghost" className="text-muted-foreground hover:text-destructive rounded-lg">
+                <Link href="/dashboard">
                     <XCircle className="mr-2 h-5 w-5" />
                     Cancel
-                </Button>
-            </Link>
+                </Link>
+            </Button>
         </CardFooter>
       </Card>
     </div>

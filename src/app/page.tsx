@@ -177,24 +177,19 @@ export default function HomePage() {
                   <li key={meeting.id} className="flex items-center gap-2">
                     <Link
                       href={`/dashboard/meeting/${meeting.id}/wait?topic=${encodeURIComponent(meeting.title)}`}
-                      passHref
-                      legacyBehavior
+                      className={cn(
+                        "w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center",
+                        "border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow"
+                      )}
                     >
-                      <a
-                        className={cn(
-                          "w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center",
-                          "border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow"
-                        )}
-                      >
-                        <Video className="mr-3 h-5 w-5 text-primary/80" />
-                        <span className="truncate flex-grow text-foreground">{meeting.title}</span>
-                        {meeting.participants && (
-                          <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
-                            <UsersIcon className="h-3 w-3 mr-1" />
-                            {meeting.participants}
-                          </span>
-                        )}
-                      </a>
+                      <Video className="mr-3 h-5 w-5 text-primary/80" />
+                      <span className="truncate flex-grow text-foreground">{meeting.title}</span>
+                      {meeting.participants && (
+                        <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
+                          <UsersIcon className="h-3 w-3 mr-1" />
+                          {meeting.participants}
+                        </span>
+                      )}
                     </Link>
                     <Button
                       variant="ghost"
@@ -218,6 +213,4 @@ export default function HomePage() {
     </div>
   );
 }
-    
-
     

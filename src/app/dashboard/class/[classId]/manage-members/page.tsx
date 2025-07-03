@@ -70,12 +70,12 @@ export default function ManageMembersPage({ params: paramsPromise }: { params: P
                             <CardTitle className="text-2xl">Manage Class Members</CardTitle>
                             <CardDescription>Invite, remove, and manage roles for class members.</CardDescription>
                         </div>
-                         <Link href={`/dashboard/class/${classId}`} passHref legacyBehavior>
-                           <Button variant="outline" size="sm" className="rounded-lg">
+                         <Button asChild variant="outline" size="sm" className="rounded-lg">
+                           <Link href={`/dashboard/class/${classId}`}>
                                <ArrowLeft className="mr-2 h-4 w-4" />
                                Back to Class
-                           </Button>
-                        </Link>
+                           </Link>
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">

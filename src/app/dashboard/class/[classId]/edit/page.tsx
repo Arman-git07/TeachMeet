@@ -57,12 +57,12 @@ export default function EditClassPage({ params: paramsPromise }: { params: Promi
                             <CardTitle className="text-2xl">Edit Class Details</CardTitle>
                             <CardDescription>Update information for your class.</CardDescription>
                         </div>
-                         <Link href={`/dashboard/class/${classId}`} passHref legacyBehavior>
-                           <Button variant="outline" size="sm" className="rounded-lg">
+                         <Button asChild variant="outline" size="sm" className="rounded-lg">
+                           <Link href={`/dashboard/class/${classId}`}>
                                <ArrowLeft className="mr-2 h-4 w-4" />
                                Cancel
-                           </Button>
-                        </Link>
+                           </Link>
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">

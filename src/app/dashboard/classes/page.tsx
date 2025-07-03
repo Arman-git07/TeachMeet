@@ -353,7 +353,7 @@ service cloud.firestore {
                     {classes.map(cls => (
                         <Card key={cls.id} className="flex flex-col rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border-border/50">
                              <CardHeader className="p-0 overflow-hidden">
-                                <Link href={`/dashboard/class/${cls.id}`} passHref>
+                                <Link href={`/dashboard/class/${cls.id}`}>
                                     <div className="relative h-36 w-full cursor-pointer">
                                         <Image
                                             src={cls.bannerUrl || 'https://placehold.co/400x200.png'}
@@ -376,11 +376,9 @@ service cloud.firestore {
                                 </div>
                             </CardContent>
                             <CardFooter className="border-t pt-4 grid grid-cols-2 gap-2">
-                                <Link href={`/dashboard/class/${cls.id}`} passHref legacyBehavior>
-                                    <Button asChild className="w-full rounded-lg">
-                                       <a>View Class</a>
-                                    </Button>
-                                </Link>
+                                <Button asChild className="w-full rounded-lg">
+                                   <Link href={`/dashboard/class/${cls.id}`}>View Class</Link>
+                                </Button>
                                  <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" className="w-full rounded-lg">

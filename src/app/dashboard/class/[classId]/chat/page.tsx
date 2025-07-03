@@ -61,12 +61,12 @@ export default function ClassChatPage({ params: paramsPromise }: { params: Promi
             <header className="flex-none p-3 border-b bg-background shadow-sm">
                 <div className="container mx-auto flex items-center justify-between">
                     <h1 className="text-xl font-semibold text-foreground">Class Chat (ID: {classId})</h1>
-                    <Link href={`/dashboard/class/${classId}`} passHref legacyBehavior>
-                        <Button variant="outline" className="rounded-lg">
+                    <Button asChild variant="outline" className="rounded-lg">
+                        <Link href={`/dashboard/class/${classId}`}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Class Home
-                        </Button>
-                    </Link>
+                        </Link>
+                    </Button>
                 </div>
             </header>
             <main className="flex-grow flex flex-col overflow-hidden">

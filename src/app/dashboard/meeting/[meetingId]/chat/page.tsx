@@ -95,12 +95,12 @@ export default function MeetingChatPage({ params: paramsPromise }: { params: Pro
             </h1>
             <span className="text-sm text-muted-foreground"> (Meeting ID: {meetingId})</span>
           </div>
-          <Link href={backToMeetingLink} passHref legacyBehavior>
-            <Button variant="outline" className="rounded-lg">
+          <Button asChild variant="outline" className="rounded-lg">
+            <Link href={backToMeetingLink}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Meeting
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </header>
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -268,14 +269,12 @@ export default function WaitingAreaPage(props: { params: Promise<{ meetingId: st
             </div>
           </div>
 
-          <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`} passHref legacyBehavior>
-            <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
-              <a>
+          <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
+              <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`}>
                 <Settings2 className="h-5 w-5" />
                 Advanced Settings
-              </a>
+              </Link>
             </Button>
-          </Link>
           
           <div className="flex items-center space-x-2 p-3 border rounded-lg shadow-sm">
             <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />

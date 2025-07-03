@@ -79,11 +79,9 @@ export default function MyExamsPage() {
               </CardContent>
               <CardFooter className="border-t pt-4">
                 {exam.status === "Upcoming" ? (
-                   <Link href={`/dashboard/exam/${exam.id}`} passHref legacyBehavior>
-                    <Button asChild className="w-full btn-gel rounded-lg">
-                        <a>Begin Exam</a>
-                    </Button>
-                  </Link>
+                  <Button asChild className="w-full btn-gel rounded-lg">
+                    <Link href={`/dashboard/exam/${exam.id}`}>Begin Exam</Link>
+                  </Button>
                 ) : (
                   <Button variant="outline" className="w-full rounded-lg">
                     <CheckCircle className="mr-2 h-4 w-4" /> View Results
