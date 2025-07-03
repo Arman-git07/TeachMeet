@@ -125,8 +125,8 @@ export default function ClassAssignmentsPage({ params: paramsPromise }: { params
                              <Button 
                                key={sub.id} 
                                variant={selectedSubmission?.id === sub.id ? 'default' : 'outline'}
-                                className="w-full justify-start rounded-lg"
-                                onClick={() => { setSelectedSubmission(sub); setAiFeedback(null); }}
+                               className="w-full justify-start rounded-lg"
+                               onClick={() => { setSelectedSubmission(sub); setAiFeedback(null); }}
                              >
                                {sub.studentName}
                              </Button>
@@ -186,7 +186,7 @@ export default function ClassAssignmentsPage({ params: paramsPromise }: { params
                                                 {aiFeedback.isPlagiarized !== undefined && (
                                                    <p className={`mt-2 font-semibold ${aiFeedback.isPlagiarized ? 'text-destructive' : 'text-green-600'}`}>
                                                       {aiFeedback.isPlagiarized ? <AlertTriangle className="inline h-4 w-4 mr-1"/> : <CheckCircle className="inline h-4 w-4 mr-1"/>}
-                                                      {ai_feedback_is_plagiarized ? "Potential plagiarism detected." : "No obvious plagiarism detected."}
+                                                      {aiFeedback.isPlagiarized ? "Potential plagiarism detected." : "No obvious plagiarism detected."}
                                                    </p>
                                                 )}
                                             </div>
