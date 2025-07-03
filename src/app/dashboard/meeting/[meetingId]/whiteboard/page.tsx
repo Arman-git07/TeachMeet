@@ -123,7 +123,7 @@ function getSelectionBoundingBox(elements: WhiteboardElement[], selectedIds: Set
 const isPointInRect = (point: Point, rect: BoundingBox) => (point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY);
 
 // --- UI Components ---
-const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType; label: string; onClick: () => void; isActive?: boolean; }) => (
+const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType; label: string; onClick?: () => void; isActive?: boolean; }) => (
   <Button variant={isActive ? "default" : "outline"} size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" onClick={onClick} aria-label={label}>
     <Icon className="h-5 w-5 mb-0.5" />
     <span className="text-[10px] leading-tight">{label}</span>
@@ -559,7 +559,7 @@ export default function WhiteboardPage() {
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <Popover>
               <PopoverTrigger asChild>
-                 <ToolButton icon={Brush} label="Draw" onClick={() => setActiveTool(lastDrawTool)} isActive={activeTool === 'draw' || activeTool === 'shape'}/>
+                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'}/>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
                 <div className="space-y-2">
