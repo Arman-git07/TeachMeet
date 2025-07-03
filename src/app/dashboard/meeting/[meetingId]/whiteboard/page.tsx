@@ -558,10 +558,7 @@ export default function WhiteboardPage() {
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant={activeTool === 'draw' || activeTool === 'shape' ? "default" : "outline"} size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Drawing Tools">
-                  <Brush className="h-5 w-5 mb-0.5" />
-                  <span className="text-[10px] leading-tight">Draw</span>
-                </Button>
+                <ToolButton icon={Brush} label="Draw" onClick={() => {}} isActive={activeTool === 'draw' || activeTool === 'shape'}/>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
                 <div className="space-y-2">
