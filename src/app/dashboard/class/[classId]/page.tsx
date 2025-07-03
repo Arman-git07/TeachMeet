@@ -1,7 +1,7 @@
 
 'use client';
 
-import { use, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, MessageSquare, Users, BookOpen, BarChart3, Edit, Settings } from "lucide-react";
@@ -31,8 +31,8 @@ const featureCards = [
 ];
 
 
-export default function ClassHomePage({ params: paramsPromise }: { params: Promise<{ classId: string }> }) {
-    const { classId } = use(paramsPromise);
+export default function ClassHomePage({ params }: { params: { classId: string } }) {
+    const { classId } = params;
     const { setHeaderContent } = useDynamicHeader();
 
     // Set the header content when the component mounts

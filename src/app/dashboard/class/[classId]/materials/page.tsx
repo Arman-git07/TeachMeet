@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { PlusCircle, FileText, ArrowLeft, UploadCloud, Link as LinkIcon, Download, Trash2, FolderOpen } from "lucide-react";
 import Link from 'next/link';
-import { use } from "react";
 
 interface Material {
   id: string;
@@ -26,8 +25,8 @@ const mockMaterials: Material[] = [
 ];
 
 
-export default function ClassMaterialsPage({ params: paramsPromise }: { params: Promise<{ classId: string }> }) {
-    const { classId } = use(paramsPromise);
+export default function ClassMaterialsPage({ params }: { params: { classId: string } }) {
+    const { classId } = params;
 
     return (
         <div className="space-y-8">

@@ -7,8 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, Users, MessageSquare, UserCheck } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, use, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -25,9 +25,8 @@ interface ChatMessage {
 
 // Mock participants removed
 
-export default function MeetingChatPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
-  const resolvedParams = use(paramsPromise);
-  const { meetingId } = resolvedParams;
+export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
+  const { meetingId } = params;
   const router = useRouter();
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic') || "Meeting Chat";

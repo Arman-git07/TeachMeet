@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { PlusCircle, FileText, ArrowLeft, Loader2, AlertTriangle, CheckCircle, Send, Sparkles, BookOpen } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useState, use } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -45,8 +45,8 @@ const mockSubmissions: { [assignmentId: string]: StudentSubmission[] } = {
 };
 
 
-export default function ClassAssignmentsPage({ params: paramsPromise }: { params: Promise<{ classId: string }> }) {
-    const { classId } = use(paramsPromise);
+export default function ClassAssignmentsPage({ params }: { params: { classId: string } }) {
+    const { classId } = params;
     const router = useRouter();
     const { toast } = useToast();
     

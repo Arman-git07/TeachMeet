@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, useEffect, useRef, use } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,8 +29,8 @@ const mockMessages: ChatMessage[] = [
 ];
 
 
-export default function ClassChatPage({ params: paramsPromise }: { params: Promise<{ classId: string }> }) {
-    const { classId } = use(paramsPromise);
+export default function ClassChatPage({ params }: { params: { classId: string } }) {
+    const { classId } = params;
     const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
     const [inputValue, setInputValue] = useState("");
     const scrollAreaRef = useRef<HTMLDivElement>(null);

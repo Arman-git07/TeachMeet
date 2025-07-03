@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import React, { useState, useEffect, useRef, use } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth"; 
@@ -17,9 +17,8 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export default function WaitingAreaPage(props: { params: Promise<{ meetingId: string }> }) {
-  const resolvedParams = use(props.params);
-  const { meetingId } = resolvedParams;
+export default function WaitingAreaPage({ params }: { params: { meetingId: string } }) {
+  const { meetingId } = params;
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic");
   const router = useRouter();

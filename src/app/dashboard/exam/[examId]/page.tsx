@@ -1,7 +1,7 @@
 
 'use client';
 
-import { use, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, HelpCircle, ArrowLeft, ArrowRight, Flag, FileText } from "lucide-react";
@@ -39,8 +39,8 @@ const mockExam = {
 };
 
 
-export default function TakeExamPage({ params: paramsPromise }: { params: Promise<{ examId: string }> }) {
-    const { examId } = use(paramsPromise);
+export default function TakeExamPage({ params }: { params: { examId: string } }) {
+    const { examId } = params;
     const { setHeaderContent } = useDynamicHeader();
     
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +23,8 @@ const mockClassDetails = {
 };
 
 
-export default function EditClassPage({ params: paramsPromise }: { params: Promise<{ classId: string }> }) {
-    const { classId } = use(paramsPromise);
+export default function EditClassPage({ params }: { params: { classId: string } }) {
+    const { classId } = params;
     const [className, setClassName] = useState(mockClassDetails.name);
     const [subject, setSubject] = useState(mockClassDetails.subject);
     const [description, setDescription] = useState(mockClassDetails.description);

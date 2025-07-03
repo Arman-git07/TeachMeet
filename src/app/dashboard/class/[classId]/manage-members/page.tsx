@@ -1,7 +1,7 @@
 
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,8 +28,8 @@ const mockMembers: Member[] = [
     { id: 'usr4', name: 'John Hammond', email: 'john.h@teachmeet.com', role: 'Student', avatarUrl: 'https://placehold.co/40x40/F1C40F/FFFFFF.png?text=JH' },
 ];
 
-export default function ManageMembersPage({ params: paramsPromise }: { params: Promise<{ classId: string }> }) {
-    const { classId } = use(paramsPromise);
+export default function ManageMembersPage({ params }: { params: { classId: string } }) {
+    const { classId } = params;
     const [members, setMembers] = useState<Member[]>(mockMembers);
     const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();

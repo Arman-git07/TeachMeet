@@ -24,8 +24,8 @@ import {
   Loader2,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import React, { use, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,9 +134,8 @@ const ParticipantItem = React.memo(function ParticipantItem({
 ParticipantItem.displayName = 'ParticipantItem';
 
 
-export default function MeetingParticipantsPage({ params: paramsPromise }: { params: Promise<{ meetingId: string }> }) {
-  const resolvedParams = use(paramsPromise);
-  const { meetingId } = resolvedParams;
+export default function MeetingParticipantsPage({ params }: { params: { meetingId: string } }) {
+  const { meetingId } = params;
   const router = useRouter();
   const searchParams = useSearchParams();
   const topicFromParams = searchParams.get('topic');
