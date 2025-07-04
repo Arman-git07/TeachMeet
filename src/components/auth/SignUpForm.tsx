@@ -15,13 +15,12 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Mail, Lock, User, CalendarIcon, AlertTriangle } from 'lucide-react';
+import { Mail, Lock, User, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
@@ -47,8 +46,6 @@ export function SignUpForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [showSetupError, setShowSetupError] = useState<boolean>(false);
-  const [showNetworkError, setShowNetworkError] = useState<boolean>(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -64,8 +61,6 @@ export function SignUpForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    setShowSetupError(false);
-    setShowNetworkError(false);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       // Update Firebase profile with displayName
@@ -81,12 +76,22 @@ export function SignUpForm() {
       router.push('/auth/signin');
     } catch (error: any) {
       if (error.code === 'auth/network-request-failed') {
-        setShowNetworkError(true);
+        toast({
+          variant: "destructive",
+          title: "Network Error",
+          description: "Could not connect to authentication services. This might be a network issue or a missing API configuration. Please check the developer console for details.",
+          duration: 7000,
+        });
         setIsLoading(false);
         return;
       }
       if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-        setShowSetupError(true);
+         toast({
+          variant: "destructive",
+          title: "API Key Error",
+          description: "Authentication is blocked by your API key settings. Ensure the 'Identity Toolkit API' is enabled and allowed by your key.",
+          duration: 7000,
+        });
         setIsLoading(false);
         return;
       }
@@ -123,41 +128,6 @@ export function SignUpForm() {
 
   return (
     <>
-      {showNetworkError && (
-         <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Action Required: Enable Authentication API</AlertTitle>
-            <AlertDescription>
-                <div className="space-y-2">
-                    <p>Authentication is blocked due to a network error, which usually means the <strong>Identity Toolkit API</strong> is not enabled in your Google Cloud project. This is a required step for Firebase Authentication to work.</p>
-                    <a href={`https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2")}>
-                        Enable Identity Toolkit API &rarr;
-                    </a>
-                    <p className="text-xs text-muted-foreground">After enabling, please wait a minute and try signing up again.</p>
-                </div>
-            </AlertDescription>
-        </Alert>
-      )}
-      {showSetupError && (
-         <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Authentication Blocked: Check API Key</AlertTitle>
-            <AlertDescription>
-                <div className="space-y-2">
-                    <p>You've enabled the API, which is great! The final step is to ensure your API key is not restricted.</p>
-                    <ol className="list-decimal list-inside text-xs space-y-1">
-                        <li>Find the API key in your project's <code>.env</code> file.</li>
-                        <li>Go to your project's API Credentials page.</li>
-                        <li>Click on the key name to edit it.</li>
-                        <li>Under <strong>API restrictions</strong>, ensure that <strong>Identity Toolkit API</strong> is on the list of allowed APIs. If "Don't restrict key" is selected, this check is passed.</li>
-                    </ol>
-                    <a href={`https://console.cloud.google.com/apis/credentials?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2")}>
-                        Go to API Credentials &rarr;
-                    </a>
-                </div>
-            </AlertDescription>
-        </Alert>
-      )}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
