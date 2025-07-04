@@ -503,6 +503,7 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
+    if (event.buttons !== 1) return;
     const pos = getPointerPosition(event);
     const opState = operationStateRef.current;
 
