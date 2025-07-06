@@ -160,6 +160,14 @@ export default function WhiteboardPage() {
 
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
+  const [bgColor, setBgColor] = useState('#FFFFFF');
+
+  useEffect(() => {
+    const storedColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
+    if (storedColor) {
+      setBgColor(storedColor);
+    }
+  }, []);
   
   const getFontString = useCallback(() => `${fontSize}px sans-serif`, [fontSize]);
 
@@ -263,10 +271,10 @@ export default function WhiteboardPage() {
     }
   }, []);
   
-  const clearCanvas = (ctx: CanvasRenderingContext2D) => {
-    ctx.fillStyle = 'white';
+  const clearCanvas = useCallback((ctx: CanvasRenderingContext2D) => {
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  };
+  }, [bgColor]);
   
 
   const redrawMainCanvas = useCallback(() => {
@@ -291,7 +299,7 @@ export default function WhiteboardPage() {
       );
       mainCtx.setLineDash([]);
     }
-  }, [pages, currentPageIndex, drawElement]);
+  }, [pages, currentPageIndex, drawElement, clearCanvas]);
   
   const redrawTempCanvas = useCallback(() => {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
@@ -967,7 +975,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow flex items-center justify-center relative p-0">
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0 bg-white" style={{ zIndex: 1 }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
                 <canvas 
                     ref={tempCanvasRef} 
                     onPointerDown={handlePointerDown} 
