@@ -1,6 +1,6 @@
 
 'use client';
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
 interface DynamicHeaderContextType {
   headerContent: ReactNode | null;
@@ -16,8 +16,12 @@ export const DynamicHeaderProvider = ({ children }: { children: ReactNode }) => 
   const [headerContent, setHeaderContent] = useState<ReactNode | null>(null);
   // const [headerActions, setHeaderActions] = useState<ReactNode | null>(null);
 
+  const setHeaderContentCallback = useCallback((content: ReactNode | null) => {
+    setHeaderContent(content);
+  }, []);
+
   return (
-    <DynamicHeaderContext.Provider value={{ headerContent, setHeaderContent /*, headerActions, setHeaderActions */ }}>
+    <DynamicHeaderContext.Provider value={{ headerContent, setHeaderContent: setHeaderContentCallback /*, headerActions, setHeaderActions */ }}>
       {children}
     </DynamicHeaderContext.Provider>
   );

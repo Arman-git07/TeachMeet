@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, HelpCircle, ArrowLeft, ArrowRight, Flag, FileText } from "lucide-react";
@@ -38,35 +38,56 @@ const mockExam = {
   ],
 };
 
+function ExamTimer({ durationMinutes }: { durationMinutes: number }) {
+  const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTimeLeft((prevTime) => {
+        if (prevTime <= 1) {
+          clearInterval(timerId);
+          // Here you might add a callback to auto-submit the exam
+          return 0;
+        }
+        return prevTime - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  return (
+    <div className="flex items-center gap-2 text-lg font-mono bg-destructive text-destructive-foreground px-3 py-1 rounded-lg">
+      <Clock className="h-5 w-5" />
+      <span>{Math.floor(timeLeft / 60).toString().padStart(2, '0')}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+    </div>
+  );
+}
+
 
 export default function TakeExamPage({ params }: { params: { examId: string } }) {
     const { examId } = params;
     const { setHeaderContent } = useDynamicHeader();
     
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [timeLeft, setTimeLeft] = useState(mockExam.durationMinutes * 60);
     const currentQuestion = mockExam.questions[currentQuestionIndex];
 
-    useEffect(() => {
-        setHeaderContent(
-             <div className="flex items-baseline gap-2 w-full justify-between">
-                <h2 className="text-lg font-semibold text-foreground truncate">{mockExam.title}</h2>
-                <div className="flex items-center gap-2 text-lg font-mono bg-destructive text-destructive-foreground px-3 py-1 rounded-lg">
-                    <Clock className="h-5 w-5" />
-                    <span>{Math.floor(timeLeft / 60).toString().padStart(2, '0')}:{ (timeLeft % 60).toString().padStart(2, '0') }</span>
-                </div>
-            </div>
-        );
-         // Timer logic
-        const timer = setInterval(() => {
-            setTimeLeft(prevTime => (prevTime > 0 ? prevTime - 1 : 0));
-        }, 1000);
+    // Memoize the header content to prevent it from being recreated on every render.
+    // The ExamTimer component now manages its own state, preventing the entire page from re-rendering every second.
+    const headerContent = useMemo(() => (
+      <div className="flex items-baseline gap-2 w-full justify-between">
+        <h2 className="text-lg font-semibold text-foreground truncate">{mockExam.title}</h2>
+        <ExamTimer durationMinutes={mockExam.durationMinutes} />
+      </div>
+    ), [mockExam.title, mockExam.durationMinutes]);
 
+    useEffect(() => {
+        // This effect now only runs when headerContent itself changes.
+        setHeaderContent(headerContent);
         return () => {
-          clearInterval(timer);
           setHeaderContent(null);
         };
-    }, [setHeaderContent, examId, timeLeft]);
+    }, [setHeaderContent, headerContent]);
 
     const handleNextQuestion = () => {
         if (currentQuestionIndex < mockExam.questions.length - 1) {
