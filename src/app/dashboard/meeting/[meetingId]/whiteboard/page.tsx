@@ -519,6 +519,8 @@ export default function WhiteboardPage() {
                 liveTextInputRef.current.style.display = 'block';
                 liveTextInputRef.current.style.color = selectedColor;
                 liveTextInputRef.current.style.font = getFontString();
+                liveTextInputRef.current.style.height = 'auto';
+                liveTextInputRef.current.style.width = 'auto';
                 liveTextInputRef.current.focus();
             }
             break;
@@ -779,7 +781,30 @@ export default function WhiteboardPage() {
 
   return (
     <>
-      <textarea ref={liveTextInputRef} onBlur={finalizeLiveText} style={{ position: 'absolute', display: 'none', border: '1px dashed hsl(var(--primary))', outline: 'none', background: 'transparent', font: getFontString(), lineHeight: `${getFontSize() * 1.2}px`, zIndex: 10, resize: 'none', overflow: 'hidden', whiteSpace: 'pre', padding: '4px' }} tabIndex={-1} />
+      <textarea
+        ref={liveTextInputRef}
+        onBlur={finalizeLiveText}
+        onInput={(e) => {
+            const textarea = e.currentTarget;
+            textarea.style.height = 'auto';
+            textarea.style.height = `${textarea.scrollHeight}px`;
+        }}
+        style={{
+          position: 'absolute',
+          display: 'none',
+          border: '1px dashed hsl(var(--primary))',
+          outline: 'none',
+          background: 'transparent',
+          font: getFontString(),
+          lineHeight: `${getFontSize() * 1.2}px`,
+          zIndex: 10,
+          resize: 'none',
+          overflow: 'hidden',
+          whiteSpace: 'pre',
+          padding: '4px',
+        }}
+        tabIndex={-1}
+      />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2 relative">
