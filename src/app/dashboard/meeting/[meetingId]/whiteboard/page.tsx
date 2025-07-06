@@ -150,17 +150,18 @@ export default function WhiteboardPage() {
   const [activeTool, setActiveTool] = useState<'draw' | 'shape' | 'text' | 'erase' | 'lasso' | 'select'>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
+  const [fontSize, setFontSize] = useState<number>(16);
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line' | 'triangle' | 'arrow' | 'diamond'>('rectangle');
   
   const [isDrawPanelVisible, setIsDrawPanelVisible] = useState(false);
+  const [isTextPanelVisible, setIsTextPanelVisible] = useState(false);
   const [isPagesPopoverOpen, setIsPagesPopoverOpen] = useState(false);
   const lastDrawToolRef = useRef<'draw' | 'shape'>('draw');
 
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
   
-  const getFontSize = () => 16;
-  const getFontString = () => `${getFontSize()}px sans-serif`;
+  const getFontString = useCallback(() => `${fontSize}px sans-serif`, [fontSize]);
 
   const pushToHistory = useCallback((pageIndex: number, state: ElementState) => {
     const history = pagesHistoryRef.current[pageIndex] || [];
@@ -212,7 +213,8 @@ export default function WhiteboardPage() {
       ctx.font = element.font;
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      element.text.split('\n').forEach((line, index) => ctx.fillText(line, element.x, element.y + (index * (getFontSize() * 1.2))));
+      const parsedFontSize = parseInt(element.font.match(/(\d+)px/)?.[1] || '16', 10);
+      element.text.split('\n').forEach((line, index) => ctx.fillText(line, element.x, element.y + (index * (parsedFontSize * 1.2))));
     } else if (element.type === 'shape') {
       ctx.strokeStyle = element.color;
       ctx.lineWidth = element.lineWidth;
@@ -397,7 +399,7 @@ export default function WhiteboardPage() {
     const lines = textInput.value.split('\n');
     const textMetrics = lines.map(line => tempCtx.measureText(line));
     const maxWidth = Math.max(...textMetrics.map(m => m.width));
-    const totalHeight = lines.length * (getFontSize() * 1.2);
+    const totalHeight = lines.length * (fontSize * 1.2);
     
     const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
     
@@ -414,7 +416,7 @@ export default function WhiteboardPage() {
     textInput.value = '';
     textInput.style.display = 'none';
     operationStateRef.current = { type: 'idle' };
-  }, [selectedColor, pushToHistory, getFontString, currentPageIndex]);
+  }, [selectedColor, pushToHistory, getFontString, currentPageIndex, fontSize]);
   
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -443,6 +445,7 @@ export default function WhiteboardPage() {
 
     finalizeLiveText();
     setIsDrawPanelVisible(false);
+    setIsTextPanelVisible(false);
 
     const currentPage = pages[currentPageIndex];
 
@@ -520,6 +523,7 @@ export default function WhiteboardPage() {
                 liveTextInputRef.current.style.display = 'block';
                 liveTextInputRef.current.style.color = selectedColor;
                 liveTextInputRef.current.style.font = getFontString();
+                liveTextInputRef.current.style.lineHeight = `${fontSize * 1.2}px`;
                 liveTextInputRef.current.style.height = 'auto';
                 liveTextInputRef.current.style.width = 'auto';
                 liveTextInputRef.current.focus();
@@ -528,7 +532,7 @@ export default function WhiteboardPage() {
         case 'erase':
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString]);
+  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
@@ -708,7 +712,19 @@ export default function WhiteboardPage() {
       setIsDrawPanelVisible(prev => !prev);
     } else {
       setActiveTool(lastDrawToolRef.current);
+      setIsTextPanelVisible(false);
+      setIsDrawPanelVisible(true);
+    }
+  };
+
+  const handleTextButtonClick = () => {
+    const isTextToolActive = activeTool === 'text';
+    if (isTextToolActive) {
+      setIsTextPanelVisible(prev => !prev);
+    } else {
+      setActiveTool('text');
       setIsDrawPanelVisible(false);
+      setIsTextPanelVisible(true);
     }
   };
 
@@ -717,9 +733,10 @@ export default function WhiteboardPage() {
     lastDrawToolRef.current = tool;
   };
   
-  const handleNonDrawingToolSelect = (tool: 'text' | 'erase' | 'lasso' | 'select') => {
+  const handleNonDrawingToolSelect = (tool: 'erase' | 'lasso' | 'select') => {
       setActiveTool(tool);
       setIsDrawPanelVisible(false);
+      setIsTextPanelVisible(false);
   };
 
   const handleAddPage = () => {
@@ -789,6 +806,12 @@ export default function WhiteboardPage() {
             const textarea = e.currentTarget;
             textarea.style.height = 'auto';
             textarea.style.height = `${textarea.scrollHeight}px`;
+            const tempCtx = tempCanvasRef.current?.getContext('2d');
+            if (tempCtx) {
+              tempCtx.font = getFontString();
+              const textMetrics = tempCtx.measureText(textarea.value);
+              textarea.style.width = `${Math.max(50, textMetrics.width + 10)}px`;
+            }
         }}
         style={{
           position: 'absolute',
@@ -796,8 +819,6 @@ export default function WhiteboardPage() {
           border: '1px dashed hsl(var(--primary))',
           outline: 'none',
           background: 'transparent',
-          font: getFontString(),
-          lineHeight: `${getFontSize() * 1.2}px`,
           zIndex: 10,
           resize: 'none',
           overflow: 'hidden',
@@ -851,7 +872,35 @@ export default function WhiteboardPage() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <ToolButton icon={Type} label="Text" onClick={() => handleNonDrawingToolSelect("text")} isActive={activeTool === "text"}/>
+             <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
+             {isTextPanelVisible && (
+                <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-muted-foreground">COLOR</Label>
+                            <div className="flex flex-wrap gap-2 items-center">
+                                {['#000000', '#ef4444', '#3b82f6', '#22c55e', '#facc15', '#f97316'].map(color => (
+                                    <button key={color} style={{ backgroundColor: color }} className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', selectedColor === color ? 'border-primary ring-2 ring-offset-2 ring-offset-background ring-primary' : 'border-background')} onClick={() => setSelectedColor(color)} />
+                                ))}
+                                <div className="w-8 h-8 rounded-full border-2 border-border overflow-hidden inline-flex items-center justify-center">
+                                    <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-muted-foreground">FONT SIZE</Label>
+                            <div className="flex items-center gap-2">
+                                <Slider
+                                  value={[fontSize]}
+                                  onValueChange={(value) => setFontSize(value[0])}
+                                  min={8} max={128} step={1}
+                                />
+                                <span className="text-sm font-mono w-10 text-center">{fontSize}px</span>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+             )}
              <ToolButton icon={Eraser} label="Erase" onClick={() => handleNonDrawingToolSelect("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
