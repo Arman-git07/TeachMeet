@@ -14,9 +14,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -134,6 +134,7 @@ ToolButton.displayName = "ToolButton";
 
 export default function WhiteboardPage() {
   const params = useParams();
+  const router = useRouter();
   const meetingId = params.meetingId as string;
   const { setHeaderContent } = useDynamicHeader();
 
@@ -912,6 +913,7 @@ export default function WhiteboardPage() {
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Clear this page?</AlertDialogTitle><AlertDialogDescription>This will clear the current page. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearPage} className="rounded-lg">Clear Page</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
              </AlertDialog>
+             <ToolButton icon={Settings} label="Settings" onClick={() => router.push('/dashboard/settings')} />
           </div>
         </div>
 
