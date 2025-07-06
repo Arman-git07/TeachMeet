@@ -151,7 +151,7 @@ export default function WhiteboardPage() {
   const [lineWidth, setLineWidth] = useState<number>(5);
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
   
-  const [isDrawPopoverOpen, setIsDrawPopoverOpen] = useState(false);
+  const [isDrawPanelVisible, setIsDrawPanelVisible] = useState(false);
   const [isPagesPopoverOpen, setIsPagesPopoverOpen] = useState(false);
   const lastDrawToolRef = useRef<'draw' | 'shape'>('draw');
 
@@ -413,10 +413,11 @@ export default function WhiteboardPage() {
   }, [handleDeleteSelected, pages, currentPageIndex]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
-    if (event.button !== 0) return;
+    if (event.buttons !== 1) return;
     const pos = getPointerPosition(event);
 
     finalizeLiveText();
+    setIsDrawPanelVisible(false);
 
     const currentPage = pages[currentPageIndex];
 
@@ -674,24 +675,24 @@ export default function WhiteboardPage() {
     pushToHistory(currentPageIndex, clearedPage);
   };
   
-  const handleDrawPopoverOpenChange = useCallback((open: boolean) => {
-    setIsDrawPopoverOpen(open);
-    if (open) {
-      if (activeTool !== 'draw' && activeTool !== 'shape') {
-        setActiveTool(lastDrawToolRef.current);
-      }
+  const handleDrawButtonClick = () => {
+    const isDrawingToolActive = activeTool === 'draw' || activeTool === 'shape';
+    if (isDrawingToolActive) {
+      setIsDrawPanelVisible(prev => !prev);
+    } else {
+      setActiveTool(lastDrawToolRef.current);
+      setIsDrawPanelVisible(false);
     }
-  }, [activeTool]);
+  };
 
-  const handleToolSelect = (tool: 'draw' | 'shape') => {
+  const handleToolSelectFromPanel = (tool: 'draw' | 'shape') => {
     setActiveTool(tool);
     lastDrawToolRef.current = tool;
-    setIsDrawPopoverOpen(false);
   };
   
   const handleNonDrawingToolSelect = (tool: 'text' | 'erase' | 'lasso' | 'select') => {
       setActiveTool(tool);
-      setIsDrawPopoverOpen(false);
+      setIsDrawPanelVisible(false);
   };
 
   const handleAddPage = () => {
@@ -757,45 +758,45 @@ export default function WhiteboardPage() {
       <textarea ref={liveTextInputRef} onBlur={finalizeLiveText} style={{ position: 'absolute', display: 'none', border: '1px dashed hsl(var(--primary))', outline: 'none', background: 'transparent', font: getFontString(), lineHeight: `${getFontSize() * 1.2}px`, zIndex: 10, resize: 'none', overflow: 'hidden', whiteSpace: 'pre', padding: '4px' }} tabIndex={-1} />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
-          <div className="container mx-auto flex flex-wrap items-center justify-center gap-2">
-            <Popover open={isDrawPopoverOpen} onOpenChange={handleDrawPopoverOpenChange}>
-              <PopoverTrigger asChild>
-                 <ToolButton icon={Brush} label="Draw" isActive={activeTool === 'draw' || activeTool === 'shape'}/>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-4 rounded-xl space-y-4" side="bottom" align="start">
-                <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">COLOR</Label>
-                    <div className="flex flex-wrap gap-2 items-center">
-                        {['#000000', '#ef4444', '#3b82f6', '#22c55e', '#facc15', '#f97316'].map(color => (
-                            <button key={color} style={{ backgroundColor: color }} className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', selectedColor === color ? 'border-primary ring-2 ring-offset-2 ring-offset-background ring-primary' : 'border-background')} onClick={() => setSelectedColor(color)} />
-                        ))}
-                        <div className="w-8 h-8 rounded-full border-2 border-border overflow-hidden inline-flex items-center justify-center">
-                            <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
-                        </div>
-                    </div>
+          <div className="container mx-auto flex flex-wrap items-center justify-center gap-2 relative">
+            <ToolButton icon={Brush} label="Draw" onClick={handleDrawButtonClick} isActive={activeTool === 'draw' || activeTool === 'shape'}/>
+            {isDrawPanelVisible && (
+              <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">COLOR</Label>
+                      <div className="flex flex-wrap gap-2 items-center">
+                          {['#000000', '#ef4444', '#3b82f6', '#22c55e', '#facc15', '#f97316'].map(color => (
+                              <button key={color} style={{ backgroundColor: color }} className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', selectedColor === color ? 'border-primary ring-2 ring-offset-2 ring-offset-background ring-primary' : 'border-background')} onClick={() => setSelectedColor(color)} />
+                          ))}
+                          <div className="w-8 h-8 rounded-full border-2 border-border overflow-hidden inline-flex items-center justify-center">
+                              <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">LINE WIDTH</Label>
+                      <div className="flex items-center gap-2">
+                          <Slider
+                            value={[lineWidth]}
+                            onValueChange={(value) => setLineWidth(value[0])}
+                            min={1} max={50} step={1}
+                          />
+                          <span className="text-sm font-mono w-8 text-center">{lineWidth}</span>
+                      </div>
+                  </div>
+                  <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">TOOLS</Label>
+                      <div className="flex gap-2">
+                          <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => handleToolSelectFromPanel('draw')}><Brush className="h-5 w-5" /></Button>
+                          <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('rectangle'); handleToolSelectFromPanel('shape');}}><RectangleHorizontal className="h-5 w-5" /></Button>
+                          <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('circle'); handleToolSelectFromPanel('shape');}}><Circle className="h-5 w-5" /></Button>
+                          <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('line'); handleToolSelectFromPanel('shape');}}><Minus className="h-5 w-5" /></Button>
+                      </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">LINE WIDTH</Label>
-                    <div className="flex items-center gap-2">
-                        <Slider
-                          value={[lineWidth]}
-                          onValueChange={(value) => setLineWidth(value[0])}
-                          min={1} max={50} step={1}
-                        />
-                        <span className="text-sm font-mono w-8 text-center">{lineWidth}</span>
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">TOOLS</Label>
-                    <div className="flex gap-2">
-                        <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => handleToolSelect('draw')}><Brush className="h-5 w-5" /></Button>
-                        <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('rectangle'); handleToolSelect('shape');}}><RectangleHorizontal className="h-5 w-5" /></Button>
-                        <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('circle'); handleToolSelect('shape');}}><Circle className="h-5 w-5" /></Button>
-                        <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('line'); handleToolSelect('shape');}}><Minus className="h-5 w-5" /></Button>
-                    </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+              </Card>
+            )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
              <ToolButton icon={Type} label="Text" onClick={() => handleNonDrawingToolSelect("text")} isActive={activeTool === "text"}/>
              <ToolButton icon={Eraser} label="Erase" onClick={() => handleNonDrawingToolSelect("erase")} isActive={activeTool === "erase"}/>
