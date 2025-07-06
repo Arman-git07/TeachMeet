@@ -47,6 +47,7 @@ export default function SettingsPage() {
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
   const recordingSettingsRef = useRef<HTMLDivElement>(null); 
+  const whiteboardSettingsRef = useRef<HTMLDivElement>(null);
 
   const [selectedFilter, setSelectedFilter] = useState<string>("none");
   const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#000000");
@@ -152,6 +153,7 @@ export default function SettingsPage() {
       const sectionRefMap: { [key: string]: React.RefObject<HTMLDivElement> } = {
         advancedMeetingSettings: advancedMeetingSettingsRef,
         recordingSettings: recordingSettingsRef,
+        whiteboardSettings: whiteboardSettingsRef,
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -197,6 +199,14 @@ export default function SettingsPage() {
           >
             <Clapperboard className="mr-2 h-5 w-5" />
             Recording Settings
+          </Button>
+          <Button 
+            variant="outline" 
+            className="rounded-lg justify-start text-left py-3" 
+            onClick={() => handleNavigateToSection('whiteboardSettings')}
+          >
+            <Palette className="mr-2 h-5 w-5" />
+            Whiteboard Settings
           </Button>
         </div>
       </SettingsSection>
@@ -300,7 +310,14 @@ export default function SettingsPage() {
          <Button className="mt-6 btn-gel rounded-lg">Save Notification Settings</Button>
       </SettingsSection>
 
-      <SettingsSection title="Whiteboard Customization" description="Personalize your whiteboard appearance." icon={Palette}>
+      <SettingsSection 
+        id="whiteboardSettings"
+        ref={whiteboardSettingsRef}
+        title="Whiteboard Customization" 
+        description="Personalize your whiteboard appearance." 
+        icon={Palette}
+        className={highlightedSectionId === 'whiteboardSettings' ? 'highlight-blink' : ''}
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="defaultPenColor">Default Pen Color</Label>

@@ -569,19 +569,17 @@ export default function WhiteboardPage() {
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
     
-    if (opState.type === 'drawing') {
-        if (opState.currentPath.length > 1) {
-            const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
-            setPages(currentPages => {
-                const newPages = [...currentPages];
-                const currentPage = newPages[currentPageIndex];
-                const newElements = [...currentPage.elements, newPath];
-                const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
-                newPages[currentPageIndex] = updatedPage;
-                pushToHistory(currentPageIndex, updatedPage);
-                return newPages;
-            });
-        }
+    if (opState.type === 'drawing' && opState.currentPath.length > 1) {
+        const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
+        setPages(currentPages => {
+            const newPages = [...currentPages];
+            const currentPage = newPages[currentPageIndex];
+            const newElements = [...currentPage.elements, newPath];
+            const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+            newPages[currentPageIndex] = updatedPage;
+            pushToHistory(currentPageIndex, updatedPage);
+            return newPages;
+        });
     } else if (opState.type === 'shaping') {
         const { startPoint, currentPoint } = opState;
         if (Math.hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y) > 2) {
@@ -962,7 +960,7 @@ export default function WhiteboardPage() {
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Clear this page?</AlertDialogTitle><AlertDialogDescription>This will clear the current page. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearPage} className="rounded-lg">Clear Page</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
              </AlertDialog>
-             <ToolButton icon={Settings} label="Settings" onClick={() => router.push('/dashboard/settings')} />
+             <ToolButton icon={Settings} label="Settings" onClick={() => router.push('/dashboard/settings?highlight=whiteboardSettings')} />
           </div>
         </div>
 
