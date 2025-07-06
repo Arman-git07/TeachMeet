@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -64,34 +65,48 @@ export default function SettingsPage() {
   const [showTextTool, setShowTextTool] = useState<boolean>(true);
   const [showEraseTool, setShowEraseTool] = useState<boolean>(true);
   
+  const [initialWhiteboardSettings, setInitialWhiteboardSettings] = useState({
+    backgroundColor: "#FFFFFF",
+    shapeRecognition: true,
+    showDrawTool: true,
+    showSelectTool: true,
+    showTextTool: true,
+    showEraseTool: true,
+  });
+
+  const isWhiteboardDirty =
+    whiteboardBackgroundColor !== initialWhiteboardSettings.backgroundColor ||
+    enableShapeRecognition !== initialWhiteboardSettings.shapeRecognition ||
+    showDrawTool !== initialWhiteboardSettings.showDrawTool ||
+    showSelectTool !== initialWhiteboardSettings.showSelectTool ||
+    showTextTool !== initialWhiteboardSettings.showTextTool ||
+    showEraseTool !== initialWhiteboardSettings.showEraseTool;
+
   useEffect(() => {
     if (user && !authLoading) {
       setDisplayNameInput(user.displayName || '');
     }
     // Camera filter
-    const storedFilter = localStorage.getItem("teachmeet-camera-filter");
-    if (storedFilter) setSelectedFilter(storedFilter);
+    const storedFilter = localStorage.getItem("teachmeet-camera-filter") || "none";
+    setSelectedFilter(storedFilter);
     
     // Whiteboard settings
-    const storedShowDraw = localStorage.getItem("teachmeet-whiteboard-showDrawTool");
-    setShowDrawTool(storedShowDraw ? storedShowDraw === 'true' : true);
-
-    const storedShowSelect = localStorage.getItem("teachmeet-whiteboard-showSelectTool");
-    setShowSelectTool(storedShowSelect ? storedShowSelect === 'true' : true);
-
-    const storedShowText = localStorage.getItem("teachmeet-whiteboard-showTextTool");
-    setShowTextTool(storedShowText ? storedShowText === 'true' : true);
-
-    const storedShowErase = localStorage.getItem("teachmeet-whiteboard-showEraseTool");
-    setShowEraseTool(storedShowErase ? storedShowErase === 'true' : true);
+    const loadedSettings = {
+      backgroundColor: localStorage.getItem("teachmeet-whiteboard-bg-color") || "#FFFFFF",
+      shapeRecognition: localStorage.getItem("teachmeet-whiteboard-shape-recognition") !== 'false',
+      showDrawTool: localStorage.getItem("teachmeet-whiteboard-showDrawTool") !== 'false',
+      showSelectTool: localStorage.getItem("teachmeet-whiteboard-showSelectTool") !== 'false',
+      showTextTool: localStorage.getItem("teachmeet-whiteboard-showTextTool") !== 'false',
+      showEraseTool: localStorage.getItem("teachmeet-whiteboard-showEraseTool") !== 'false',
+    };
     
-    const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
-    if (storedBgColor) setWhiteboardBackgroundColor(storedBgColor);
-    else localStorage.setItem("teachmeet-whiteboard-bg-color", "#FFFFFF");
-
-    const storedShapeRecognition = localStorage.getItem("teachmeet-whiteboard-shape-recognition");
-    if (storedShapeRecognition) setEnableShapeRecognition(storedShapeRecognition === 'true');
-    else localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(true));
+    setWhiteboardBackgroundColor(loadedSettings.backgroundColor);
+    setEnableShapeRecognition(loadedSettings.shapeRecognition);
+    setShowDrawTool(loadedSettings.showDrawTool);
+    setShowSelectTool(loadedSettings.showSelectTool);
+    setShowTextTool(loadedSettings.showTextTool);
+    setShowEraseTool(loadedSettings.showEraseTool);
+    setInitialWhiteboardSettings(loadedSettings);
 
   }, [user, authLoading]);
 
@@ -116,6 +131,13 @@ export default function SettingsPage() {
       setIsSavingGeneralSettings(false);
     }
   };
+  
+  const handleGenericSave = (sectionName: string) => {
+    toast({
+        title: `${sectionName} Settings Saved`,
+        description: `Your preferences for ${sectionName.toLowerCase()} have been updated (Mock).`,
+    });
+  };
 
   const handleFilterChange = (value: string) => {
     setSelectedFilter(value);
@@ -128,46 +150,46 @@ export default function SettingsPage() {
   };
 
   const handleWhiteboardBackgroundColorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newColor = event.target.value;
-    setWhiteboardBackgroundColor(newColor);
-    localStorage.setItem("teachmeet-whiteboard-bg-color", newColor);
-     toast({
-      title: "Whiteboard Background Changed",
-      description: `Background color set to ${newColor}. This will apply when you next open or clear a whiteboard.`,
-    });
+    setWhiteboardBackgroundColor(event.target.value);
   };
   
   const handleShapeRecognitionToggle = (checked: boolean) => {
     setEnableShapeRecognition(checked);
-    localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(checked));
-     toast({
-      title: "Shape Recognition Setting Changed",
-      description: `Shape recognition is now ${checked ? 'enabled' : 'disabled'}.`,
-    });
   };
 
   const handleToggleToolVisibility = (tool: 'draw' | 'select' | 'text' | 'erase', checked: boolean) => {
-    const keyMap = {
-      draw: 'teachmeet-whiteboard-showDrawTool',
-      select: 'teachmeet-whiteboard-showSelectTool',
-      text: 'teachmeet-whiteboard-showTextTool',
-      erase: 'teachmeet-whiteboard-showEraseTool',
-    };
     const stateSetterMap = {
       draw: setShowDrawTool,
       select: setShowSelectTool,
       text: setShowTextTool,
       erase: setShowEraseTool,
     };
-
     stateSetterMap[tool](checked);
-    localStorage.setItem(keyMap[tool], String(checked));
-    toast({
-      title: "Toolbar Setting Changed",
-      description: `${tool.charAt(0).toUpperCase() + tool.slice(1)} tool is now ${checked ? 'visible' : 'hidden'}.`,
-    });
   };
   
+  const handleSaveWhiteboardSettings = () => {
+    localStorage.setItem("teachmeet-whiteboard-bg-color", whiteboardBackgroundColor);
+    localStorage.setItem("teachmeet-whiteboard-shape-recognition", String(enableShapeRecognition));
+    localStorage.setItem("teachmeet-whiteboard-showDrawTool", String(showDrawTool));
+    localStorage.setItem("teachmeet-whiteboard-showSelectTool", String(showSelectTool));
+    localStorage.setItem("teachmeet-whiteboard-showTextTool", String(showTextTool));
+    localStorage.setItem("teachmeet-whiteboard-showEraseTool", String(showEraseTool));
+    
+    setInitialWhiteboardSettings({
+        backgroundColor: whiteboardBackgroundColor,
+        shapeRecognition: enableShapeRecognition,
+        showDrawTool: showDrawTool,
+        showSelectTool: showSelectTool,
+        showTextTool: showTextTool,
+        showEraseTool: showEraseTool,
+    });
+
+    toast({
+        title: "Settings Saved",
+        description: "Your whiteboard settings have been updated.",
+    });
+  };
+
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
     if (highlightParam) {
@@ -290,7 +312,7 @@ export default function SettingsPage() {
             </Select>
           </div>
         </div>
-        <Button className="mt-6 btn-gel rounded-lg">Save Meeting Visuals</Button>
+        <Button className="mt-6 btn-gel rounded-lg" onClick={() => handleGenericSave('Meeting Visuals')}>Save Meeting Visuals</Button>
       </SettingsSection>
 
       <SettingsSection 
@@ -311,7 +333,7 @@ export default function SettingsPage() {
             <Switch id="autoRecord" />
           </div>
         </div>
-        <Button className="mt-6 btn-gel rounded-lg">Save Recording Settings</Button>
+        <Button className="mt-6 btn-gel rounded-lg" onClick={() => handleGenericSave('Recording')}>Save Recording Settings</Button>
       </SettingsSection>
       
 
@@ -330,7 +352,7 @@ export default function SettingsPage() {
             <Switch id="emailSummaries" />
           </div>
         </div>
-         <Button className="mt-6 btn-gel rounded-lg">Save Notification Settings</Button>
+         <Button className="mt-6 btn-gel rounded-lg" onClick={() => handleGenericSave('Notification')}>Save Notification Settings</Button>
       </SettingsSection>
 
       <SettingsSection 
@@ -344,7 +366,7 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <div className="space-y-2">
             <Label>Toolbar Buttons</Label>
-            <p className="text-sm text-muted-foreground">Choose which tools appear on the whiteboard toolbar. Changes are saved automatically.</p>
+            <p className="text-sm text-muted-foreground">Choose which tools appear on the whiteboard toolbar.</p>
             <div className="pl-2 space-y-3 pt-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="showDrawTool" className="flex-grow">Show Draw/Shapes Tool</Label>
@@ -371,6 +393,29 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <Label htmlFor="shapeRecognition" className="flex-grow">Enable Shape Recognition (Experimental)</Label>
             <Switch id="shapeRecognition" checked={enableShapeRecognition} onCheckedChange={handleShapeRecognitionToggle} />
+          </div>
+          <div className="mt-6 flex justify-end">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button className="btn-gel rounded-lg" disabled={!isWhiteboardDirty}>
+                  Save Whiteboard Settings
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Save Your Changes?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will save your current whiteboard customization settings. Are you sure you want to continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleSaveWhiteboardSettings} className="rounded-lg">
+                    Save Changes
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </SettingsSection>
