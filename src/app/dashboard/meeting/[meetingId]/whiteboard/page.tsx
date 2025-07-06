@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -29,7 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 interface Point { x: number; y: number; }
 type PathElement = { type: 'path'; id: string; points: Point[]; color: string; lineWidth: number; };
 type TextElement = { type: 'text'; id: string; text: string; x: number; y: number; color: string; font: string; width: number; height: number; };
-type ShapeElement = { type: 'shape'; id: string; shapeType: 'rectangle' | 'circle' | 'line'; x1: number; y1: number; x2: number; y2: number; color: string; lineWidth: number; };
+type ShapeElement = { type: 'shape'; id: string; shapeType: 'rectangle' | 'circle' | 'line' | 'triangle' | 'arrow' | 'diamond'; x1: number; y1: number; x2: number; y2: number; color: string; lineWidth: number; };
 type WhiteboardElement = PathElement | TextElement | ShapeElement;
 
 interface ElementState {
@@ -149,7 +149,7 @@ export default function WhiteboardPage() {
   const [activeTool, setActiveTool] = useState<'draw' | 'shape' | 'text' | 'erase' | 'lasso' | 'select'>("draw");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
-  const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
+  const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line' | 'triangle' | 'arrow' | 'diamond'>('rectangle');
   
   const [isDrawPanelVisible, setIsDrawPanelVisible] = useState(false);
   const [isPagesPopoverOpen, setIsPagesPopoverOpen] = useState(false);
@@ -231,6 +231,30 @@ export default function WhiteboardPage() {
         const centerX = x1 + (x2 - x1) / 2;
         const centerY = y1 + (y2 - y1) / 2;
         ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+        ctx.stroke();
+      } else if (shapeType === 'triangle') {
+        ctx.moveTo(x1 + (x2 - x1) / 2, y1); // Top point
+        ctx.lineTo(x2, y2); // Bottom right
+        ctx.lineTo(x1, y2); // Bottom left
+        ctx.closePath();
+        ctx.stroke();
+      } else if (shapeType === 'diamond') {
+        const midX = x1 + (x2 - x1) / 2;
+        const midY = y1 + (y2 - y1) / 2;
+        ctx.moveTo(midX, y1); // Top
+        ctx.lineTo(x2, midY); // Right
+        ctx.lineTo(midX, y2); // Bottom
+        ctx.lineTo(x1, midY); // Left
+        ctx.closePath();
+        ctx.stroke();
+      } else if (shapeType === 'arrow') {
+        const headlen = Math.max(10, element.lineWidth * 3); // Arrow head size
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
         ctx.stroke();
       }
     }
@@ -787,11 +811,14 @@ export default function WhiteboardPage() {
                   </div>
                   <div className="space-y-2">
                       <Label className="text-xs font-semibold text-muted-foreground">TOOLS</Label>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                           <Button title="Pen" size="icon" variant={activeTool === 'draw' ? 'secondary' : 'ghost'} onClick={() => handleToolSelectFromPanel('draw')}><Brush className="h-5 w-5" /></Button>
                           <Button title="Rectangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'rectangle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('rectangle'); handleToolSelectFromPanel('shape');}}><RectangleHorizontal className="h-5 w-5" /></Button>
                           <Button title="Circle" size="icon" variant={activeTool === 'shape' && selectedShape === 'circle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('circle'); handleToolSelectFromPanel('shape');}}><Circle className="h-5 w-5" /></Button>
                           <Button title="Line" size="icon" variant={activeTool === 'shape' && selectedShape === 'line' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('line'); handleToolSelectFromPanel('shape');}}><Minus className="h-5 w-5" /></Button>
+                          <Button title="Triangle" size="icon" variant={activeTool === 'shape' && selectedShape === 'triangle' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('triangle'); handleToolSelectFromPanel('shape');}}><Triangle className="h-5 w-5" /></Button>
+                          <Button title="Arrow" size="icon" variant={activeTool === 'shape' && selectedShape === 'arrow' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('arrow'); handleToolSelectFromPanel('shape');}}><MoveRight className="h-5 w-5" /></Button>
+                          <Button title="Diamond" size="icon" variant={activeTool === 'shape' && selectedShape === 'diamond' ? 'secondary' : 'ghost'} onClick={() => {setSelectedShape('diamond'); handleToolSelectFromPanel('shape');}}><Diamond className="h-5 w-5" /></Button>
                       </div>
                   </div>
                 </div>
@@ -866,7 +893,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow flex items-center justify-center relative p-0">
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0 bg-white" style={{ zIndex: 1 }} />
                 <canvas 
                     ref={tempCanvasRef} 
                     onPointerDown={handlePointerDown} 
