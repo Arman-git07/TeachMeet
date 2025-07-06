@@ -44,20 +44,26 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
 
-  const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
   const recordingSettingsRef = useRef<HTMLDivElement>(null); 
   const whiteboardSettingsRef = useRef<HTMLDivElement>(null);
+  const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
 
-  const [selectedFilter, setSelectedFilter] = useState<string>("none");
-  const [whiteboardPenColor, setWhiteboardPenColor] = useState<string>("#000000");
-  const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
-  const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
-  
+  // General Settings State
   const [displayNameInput, setDisplayNameInput] = useState<string>('');
   const [isSavingGeneralSettings, setIsSavingGeneralSettings] = useState<boolean>(false);
 
+  // Meeting Settings State
+  const [selectedFilter, setSelectedFilter] = useState<string>("none");
 
+  // Whiteboard Settings State
+  const [whiteboardBackgroundColor, setWhiteboardBackgroundColor] = useState<string>("#FFFFFF");
+  const [enableShapeRecognition, setEnableShapeRecognition] = useState<boolean>(true);
+  const [showDrawTool, setShowDrawTool] = useState<boolean>(true);
+  const [showSelectTool, setShowSelectTool] = useState<boolean>(true);
+  const [showTextTool, setShowTextTool] = useState<boolean>(true);
+  const [showEraseTool, setShowEraseTool] = useState<boolean>(true);
+  
   useEffect(() => {
     if (user && !authLoading) {
       setDisplayNameInput(user.displayName || '');
@@ -66,10 +72,18 @@ export default function SettingsPage() {
     const storedFilter = localStorage.getItem("teachmeet-camera-filter");
     if (storedFilter) setSelectedFilter(storedFilter);
     
-    // Whiteboard
-    const storedPenColor = localStorage.getItem("teachmeet-whiteboard-pen-color");
-    if (storedPenColor) setWhiteboardPenColor(storedPenColor);
-    else localStorage.setItem("teachmeet-whiteboard-pen-color", "#000000");
+    // Whiteboard settings
+    const storedShowDraw = localStorage.getItem("teachmeet-whiteboard-showDrawTool");
+    setShowDrawTool(storedShowDraw ? storedShowDraw === 'true' : true);
+
+    const storedShowSelect = localStorage.getItem("teachmeet-whiteboard-showSelectTool");
+    setShowSelectTool(storedShowSelect ? storedShowSelect === 'true' : true);
+
+    const storedShowText = localStorage.getItem("teachmeet-whiteboard-showTextTool");
+    setShowTextTool(storedShowText ? storedShowText === 'true' : true);
+
+    const storedShowErase = localStorage.getItem("teachmeet-whiteboard-showEraseTool");
+    setShowEraseTool(storedShowErase ? storedShowErase === 'true' : true);
     
     const storedBgColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
     if (storedBgColor) setWhiteboardBackgroundColor(storedBgColor);
@@ -113,12 +127,6 @@ export default function SettingsPage() {
     });
   };
 
-  const handleWhiteboardPenColorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newColor = event.target.value;
-    setWhiteboardPenColor(newColor);
-    localStorage.setItem("teachmeet-whiteboard-pen-color", newColor);
-  };
-
   const handleWhiteboardBackgroundColorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newColor = event.target.value;
     setWhiteboardBackgroundColor(newColor);
@@ -137,11 +145,26 @@ export default function SettingsPage() {
       description: `Shape recognition is now ${checked ? 'enabled' : 'disabled'}.`,
     });
   };
-  
-  const handleSaveWhiteboardSettings = () => {
+
+  const handleToggleToolVisibility = (tool: 'draw' | 'select' | 'text' | 'erase', checked: boolean) => {
+    const keyMap = {
+      draw: 'teachmeet-whiteboard-showDrawTool',
+      select: 'teachmeet-whiteboard-showSelectTool',
+      text: 'teachmeet-whiteboard-showTextTool',
+      erase: 'teachmeet-whiteboard-showEraseTool',
+    };
+    const stateSetterMap = {
+      draw: setShowDrawTool,
+      select: setShowSelectTool,
+      text: setShowTextTool,
+      erase: setShowEraseTool,
+    };
+
+    stateSetterMap[tool](checked);
+    localStorage.setItem(keyMap[tool], String(checked));
     toast({
-      title: "Whiteboard Settings Confirmed",
-      description: "Your whiteboard preferences are up-to-date and saved in your browser's local storage.",
+      title: "Toolbar Setting Changed",
+      description: `${tool.charAt(0).toUpperCase() + tool.slice(1)} tool is now ${checked ? 'visible' : 'hidden'}.`,
     });
   };
   
@@ -314,14 +337,32 @@ export default function SettingsPage() {
         id="whiteboardSettings"
         ref={whiteboardSettingsRef}
         title="Whiteboard Customization" 
-        description="Personalize your whiteboard appearance." 
+        description="Personalize your whiteboard appearance and tools." 
         icon={Palette}
         className={highlightedSectionId === 'whiteboardSettings' ? 'highlight-blink' : ''}
       >
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="defaultPenColor">Default Pen Color</Label>
-            <Input id="defaultPenColor" type="color" value={whiteboardPenColor} onChange={handleWhiteboardPenColorChange} className="mt-1 w-full h-10 rounded-lg" />
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label>Toolbar Buttons</Label>
+            <p className="text-sm text-muted-foreground">Choose which tools appear on the whiteboard toolbar. Changes are saved automatically.</p>
+            <div className="pl-2 space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="showDrawTool" className="flex-grow">Show Draw/Shapes Tool</Label>
+                <Switch id="showDrawTool" checked={showDrawTool} onCheckedChange={(checked) => handleToggleToolVisibility('draw', checked)} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="showSelectTool" className="flex-grow">Show Select Tool</Label>
+                <Switch id="showSelectTool" checked={showSelectTool} onCheckedChange={(checked) => handleToggleToolVisibility('select', checked)} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="showTextTool" className="flex-grow">Show Text Tool</Label>
+                <Switch id="showTextTool" checked={showTextTool} onCheckedChange={(checked) => handleToggleToolVisibility('text', checked)} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="showEraseTool" className="flex-grow">Show Erase Tool</Label>
+                <Switch id="showEraseTool" checked={showEraseTool} onCheckedChange={(checked) => handleToggleToolVisibility('erase', checked)} />
+              </div>
+            </div>
           </div>
           <div>
             <Label htmlFor="backgroundColor">Background Color</Label>
@@ -332,7 +373,6 @@ export default function SettingsPage() {
             <Switch id="shapeRecognition" checked={enableShapeRecognition} onCheckedChange={handleShapeRecognitionToggle} />
           </div>
         </div>
-        <Button className="mt-6 btn-gel rounded-lg" onClick={handleSaveWhiteboardSettings}>Save Whiteboard Settings</Button>
       </SettingsSection>
       
       <SettingsSection title="Privacy & Security" description="Manage your account security and data." icon={ShieldCheck}>
