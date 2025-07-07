@@ -45,6 +45,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface ClassData {
     id: string;
@@ -110,12 +111,34 @@ export default function ClassesPage() {
                 setClasses(fetchedClasses);
             } catch (err: any) {
                 console.error("[ClassesPage] Firestore Error fetching classes:", err);
-                setError("You don't have permission to view classes. This is usually due to your Firebase project setup, not a bug in the app. Please see the checklist below.");
+                
+                let detailedError = "An unknown error occurred. Please check the browser's developer console for more details.";
+                
+                if (err.code) {
+                    switch (err.code) {
+                        case 'permission-denied':
+                            detailedError = "Firestore permission denied. Please ensure your security rules allow reads on the 'classes' collection for authenticated users.";
+                            break;
+                        case 'failed-precondition':
+                            detailedError = "A required database index is missing. The original error in the developer console should contain a direct link to create it in the Firebase Console. This is a common and easily fixable issue when adding new queries.";
+                            break;
+                        case 'unauthenticated':
+                            detailedError = "You are not authenticated. Please sign in again.";
+                            break;
+                        default:
+                            detailedError = `An error occurred with code: ${err.code}. Message: ${err.message}`;
+                            break;
+                    }
+                } else if (err.message) {
+                    detailedError = err.message;
+                }
+
+                setError(detailedError);
                 toast({
                     variant: "destructive",
-                    title: "Permissions Error",
-                    description: "Could not fetch classes due to a permissions issue. Ensure your Firestore security rules are correctly configured.",
-                    duration: 10000,
+                    title: "Database Connection Error",
+                    description: "Could not fetch classes. See details on the page.",
+                    duration: 15000,
                 });
             } finally {
                 setIsLoadingClasses(false);
@@ -178,72 +201,31 @@ export default function ClassesPage() {
     }
     
     if (error) {
-        const firestoreRules = `rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      // Allow read/write access for development.
-      // NOT FOR PRODUCTION.
-      allow read, write: if true;
-    }
-  }
-}`;
-        const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-
         return (
             <Card className="max-w-3xl mx-auto my-8 text-center rounded-xl shadow-2xl border-2 border-destructive/50 bg-destructive/5">
                 <CardHeader className="p-6">
                     <AlertTriangle className="mx-auto h-16 w-16 text-destructive" />
-                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Connection Error: Action Required</CardTitle>
-                    <CardDescription className="text-lg text-foreground/90 mt-2 max-w-xl mx-auto">
-                        The app couldn't connect to your database. You've likely done everything right, but there may be a small configuration mismatch. Let's fix it for good.
-                    </CardDescription>
+                    <CardTitle className="text-3xl text-destructive font-bold mt-4">Database Connection Error</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6 text-left p-6">
-                    
-                    <div className="p-4 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700">
-                        <h3 className="font-bold text-yellow-900 dark:text-yellow-200">1. Confirm Project ID</h3>
-                        <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                            The app is trying to connect to project:
-                        </p>
-                        <code className="block w-full text-center font-mono bg-yellow-200 dark:bg-yellow-800/50 p-2 my-2 rounded-md text-yellow-900 dark:text-yellow-100">
-                            {projectId || "NOT SET in .env file"}
-                        </code>
-                        <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                            Please ensure this ID is correct and that your <code>.env</code> file contains the line: <br/><code>NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-actual-project-id</code>
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <p className="font-semibold text-lg">2. Set Firestore Rules</p>
-                        <p className="text-sm text-muted-foreground">This is the most common fix. Even if you've done this before, please re-apply it to the correct project.</p>
-                        <a
-                            href={projectId ? `https://console.firebase.google.com/project/${projectId}/firestore/rules` : '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={cn(buttonVariants({ variant: 'outline' }), "w-full rounded-lg", !projectId && 'opacity-50 cursor-not-allowed')}
-                            aria-disabled={!projectId}
-                        >
-                            Open Firestore Rules Tab &rarr;
-                        </a>
-                        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold block whitespace-pre-wrap">
-                            {firestoreRules}
-                        </code>
-                    </div>
-
-                    <div className="space-y-2">
-                        <p className="font-semibold text-lg">3. Enable Authentication API</p>
-                        <p className="text-sm text-muted-foreground">The app also needs the "Identity Toolkit API" to handle user sign-ins.</p>
-                         <a href={projectId ? `https://console.cloud.google.com/apis/library/identitytoolkit.googleapis.com?project=${projectId}` : '#'} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full mt-2", !projectId && 'opacity-50 cursor-not-allowed')} aria-disabled={!projectId}>
-                            Enable Identity Toolkit API &rarr;
-                        </a>
-                    </div>
-
+                <CardContent className="space-y-6 text-left p-6 bg-background/50">
+                    <p className="text-lg text-foreground/90 max-w-xl mx-auto text-center">
+                        The application could not retrieve data from the database. This is often due to a configuration issue with your Firebase project.
+                    </p>
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Error Details</AlertTitle>
+                        <AlertDescription>
+                            <p className="font-mono whitespace-pre-wrap">{error}</p>
+                        </AlertDescription>
+                    </Alert>
+                    <p className="text-sm text-muted-foreground">
+                        <strong>Common Solutions:</strong> If the error message mentions a &quot;missing index&quot;, please check the browser&apos;s developer console (usually by pressing F12) for a direct link to create the required database index in your Firebase console. Otherwise, please double-check your Firestore security rules and ensure the correct Firebase project is configured in your <code>.env</code> file.
+                    </p>
                 </CardContent>
                 <CardFooter className="p-6 border-t">
                     <Button onClick={() => window.location.reload()} className="w-full btn-gel rounded-lg" size="lg">
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        I've checked everything, Retry Connection
+                        I've made changes, Retry Connection
                     </Button>
                 </CardFooter>
             </Card>
