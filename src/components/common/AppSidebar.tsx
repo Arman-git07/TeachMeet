@@ -19,8 +19,6 @@ import {
   BookOpen,
   ShieldQuestion,
   Users,
-  ShieldAlert,
-  ClipboardCheck,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -216,11 +214,6 @@ export function AppSidebar() {
     { href: "/community-guidelines", label: "Community Guidelines", icon: Users, target: "_blank" },
   ];
 
-  const classesAndExamsItems = [
-    { href: "/dashboard/classes", label: "My Classes", icon: Users },
-    { href: "/dashboard/exams", label: "My Exams", icon: ShieldAlert },
-  ];
-
   return (
     <>
     <Sidebar side="left" variant="sidebar" collapsible="icon">
@@ -249,14 +242,6 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
-              <NavItem 
-                icon={ClipboardCheck} 
-                currentPath={pathname} 
-                isDropdown 
-                dropdownItems={classesAndExamsItems}
-              >
-                Classes
-              </NavItem>
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
@@ -279,7 +264,7 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
-          <NavItem icon={ShieldAlert} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal &amp; Info</NavItem>
+          <NavItem icon={ShieldQuestion} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal &amp; Info</NavItem>
           {isAuthenticated && (
             <NavItem 
               icon={LogOut} 
