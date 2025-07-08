@@ -10,6 +10,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
+import { useAuth } from "@/hooks/useAuth";
 
 
 const mockMembers = [
@@ -21,11 +22,18 @@ const mockMembers = [
 // Mock class name for the share panel. In a real app, this would be fetched.
 const mockClassName = "Algebra 101";
 
+// In a real app, this ID would come from the class data.
+const mockTeacherId = "teacher-evelyn-reed-uid";
+
 export default function ManageMembersPage() {
     const params = useParams();
     const classId = params.classId as string;
     const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
     const { toast } = useToast();
+    const { user: currentUser } = useAuth();
+
+    // Check if the current user is the host/teacher.
+    const isHost = currentUser?.uid === mockTeacherId;
     
     // Construct a mock invite link. In a real app, this might be a specific invite route.
     const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/class/${classId}/join` : '';
@@ -102,9 +110,11 @@ export default function ManageMembersPage() {
                                             <p className="text-sm text-muted-foreground">{member.email}</p>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="text-destructive rounded-lg">
-                                        <Trash2 className="h-4 w-4"/>
-                                    </Button>
+                                    {isHost && (
+                                        <Button variant="ghost" size="icon" className="text-destructive rounded-lg">
+                                            <Trash2 className="h-4 w-4"/>
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
