@@ -14,7 +14,8 @@ import {
   Settings,
   Users,
   Edit,
-  FileText
+  FileText,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
@@ -50,6 +51,7 @@ const navigationItems = [
   { href: 'test-and-exams', icon: FileText, label: 'Test & Exams' },
   { href: 'chat', icon: MessageSquare, label: 'Class Chat' },
   { href: 'manage-members', icon: Users, label: 'Members' },
+  { href: 'fees', icon: CreditCard, label: 'Class Fees' },
 ];
 
 export default function ClassHomePage() {
