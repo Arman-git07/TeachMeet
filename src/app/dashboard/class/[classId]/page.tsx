@@ -38,6 +38,7 @@ const mockClassData = {
 const navigationItems = [
   { href: 'materials', icon: BookOpen, label: 'Materials' },
   { href: 'assignments', icon: ClipboardList, label: 'Assignments' },
+  { href: 'test-and-exams', icon: FileText, label: 'Test & Exams' },
   { href: 'chat', icon: MessageSquare, label: 'Class Chat' },
   { href: 'manage-members', icon: Users, label: 'Members' },
 ];
