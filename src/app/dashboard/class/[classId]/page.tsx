@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -23,11 +24,20 @@ import { useAuth } from "@/hooks/useAuth";
 const mockClassData = {
   name: "Algebra 101",
   description: "Fundamentals of algebra and problem solving.",
-  teacher: {
-    id: "teacher-evelyn-reed-uid", // Mock ID for the host/teacher
-    name: "Dr. Evelyn Reed",
-    avatar: "https://placehold.co/100x100/223D4A/FFFFFF.png?text=ER",
-  },
+  instructors: [
+    {
+      id: "teacher-evelyn-reed-uid",
+      name: "Dr. Evelyn Reed",
+      avatar: "https://placehold.co/100x100/223D4A/FFFFFF.png?text=ER",
+      subject: "Lead Instructor"
+    },
+    {
+      id: "teacher-ben-carter-uid",
+      name: "Mr. Ben Carter",
+      avatar: "https://placehold.co/100x100/00FFFF/223D4A.png?text=BC",
+      subject: "Geometry Specialist"
+    },
+  ],
   announcements: [
     { id: 1, title: "Welcome to Algebra 101!", content: "Welcome everyone! Please review the syllabus in the materials section. Our first class is this Wednesday.", date: "2 days ago" },
     { id: 2, title: "Homework 1 Posted", content: "The first homework assignment is now available under 'Assignments'. It is due next Monday.", date: "1 day ago" },
@@ -49,9 +59,9 @@ export default function ClassHomePage() {
   const { user: currentUser } = useAuth();
   
   // In a real app, you would fetch class data using the classId
-  const { name, description, teacher, announcements } = mockClassData;
+  const { name, description, instructors, announcements } = mockClassData;
 
-  const isHost = currentUser?.uid === teacher.id;
+  const isHost = currentUser ? instructors.some(inst => inst.id === currentUser.uid) : false;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -111,17 +121,24 @@ export default function ClassHomePage() {
         {/* Teacher Info */}
         <Card className="rounded-xl shadow-lg border-border/50">
           <CardHeader>
-            <CardTitle className="text-lg">Instructor</CardTitle>
+            <CardTitle className="text-lg">Instructors</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={teacher.avatar} alt={teacher.name} data-ai-hint="teacher avatar"/>
-              <AvatarFallback>{teacher.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-semibold">{teacher.name}</p>
-              <p className="text-sm text-muted-foreground">Lead Instructor</p>
-            </div>
+          <CardContent className="space-y-4">
+            {instructors.map((instructor, index) => (
+              <React.Fragment key={instructor.id}>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={instructor.avatar} alt={instructor.name} data-ai-hint="teacher avatar"/>
+                    <AvatarFallback>{instructor.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-semibold">{instructor.name}</p>
+                    <p className="text-sm text-muted-foreground">{instructor.subject}</p>
+                  </div>
+                </div>
+                {index < instructors.length - 1 && <Separator />}
+              </React.Fragment>
+            ))}
           </CardContent>
         </Card>
         
