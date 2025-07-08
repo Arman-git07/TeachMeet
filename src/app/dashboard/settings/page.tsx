@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Mic, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Mic, Save, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -21,22 +21,32 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
   { title: string, description: string, icon: React.ElementType, children: React.ReactNode, className?: string, id?: string }
->(({ title, description, icon: Icon, children, className, id }, ref) => (
-  <Card id={id} ref={ref} className={cn("shadow-lg rounded-xl border-border/50", className)}>
-    <CardHeader>
-      <div className="flex items-center gap-3">
-        <Icon className="h-7 w-7 text-primary" />
-        <div>
-          <CardTitle className="text-xl">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+>(({ title, description, icon: Icon, children, className, id }, ref) => {
+  const router = useRouter();
+
+  return (
+    <Card id={id} ref={ref} className={cn("shadow-lg rounded-xl border-border/50", className)}>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Icon className="h-7 w-7 text-primary" />
+            <div>
+              <CardTitle className="text-xl">{title}</CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" className="rounded-lg flex-shrink-0" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
         </div>
-      </div>
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {children}
-    </CardContent>
-  </Card>
-));
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {children}
+      </CardContent>
+    </Card>
+  );
+});
 SettingsSection.displayName = "SettingsSection";
 
 export default function SettingsPage() {
@@ -469,3 +479,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
