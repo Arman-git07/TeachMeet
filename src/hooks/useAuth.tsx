@@ -25,55 +25,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // This function sets up auth persistence and then subscribes to auth state changes.
-    // It returns the unsubscribe function for cleanup.
-    const subscribeToAuthChanges = async () => {
+    let unsubscribe: (() => void) | undefined;
+
+    const initializeAuth = async () => {
       try {
-        // Explicitly setting persistence to 'local'.
-        // This ensures the user remains signed in even after closing the browser.
-        // This is the default for web, but being explicit helps avoid issues.
+        // Ensure persistence is set to 'local' before subscribing to auth state changes.
+        // This is crucial for remembering the user across browser sessions.
         await setPersistence(auth, browserLocalPersistence);
+        console.log("[AuthProvider] Firebase persistence has been set to 'local'.");
       } catch (error) {
-        // This can happen if the browser has privacy settings that block local storage.
-        console.error("Firebase Auth: Could not set persistence.", error);
+        console.error("[AuthProvider] Failed to set Firebase persistence:", error);
         toast({
-          variant: "destructive",
-          title: "Login Not Remembered",
-          description: "Your login will not be saved for the next session. This might be due to your browser's privacy settings.",
-          duration: 10000,
+            variant: "destructive",
+            title: "Could Not Save Session",
+            description: "Your login will not be remembered for the next session. This may be due to your browser's privacy settings.",
+            duration: 10000,
         });
       }
 
-      // onAuthStateChanged returns an unsubscribe function. We attach the listener
-      // after attempting to set persistence.
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      // Now, subscribe to auth state changes.
+      // onAuthStateChanged returns the unsubscribe function.
+      unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        console.log("[AuthProvider] Auth state changed. User:", currentUser ? currentUser.uid : 'null');
         setUser(currentUser);
         setLoading(false);
       });
-      
-      return unsubscribe;
     };
 
-    // Call the setup function and store the returned unsubscribe promise.
-    const unsubscribePromise = subscribeToAuthChanges();
+    initializeAuth();
 
-    // The cleanup function for this effect will run when the component unmounts.
-    // We wait for the promise to resolve and then call the actual unsubscribe function.
+    // The cleanup function for the effect.
     return () => {
-      unsubscribePromise.then((unsubscribe) => {
-        if (unsubscribe) {
-          unsubscribe();
-        }
-      });
+      if (unsubscribe) {
+        console.log("[AuthProvider] Cleaning up auth state listener.");
+        unsubscribe();
+      }
     };
-  // The dependency array is empty, so this effect runs only once when the provider mounts.
-  }, []);
+  // Adding toast to dependency array as a best practice, though it's stable.
+  }, [toast]);
 
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
-      // After a successful sign out, the onAuthStateChanged listener will automatically
-      // update the user state to null, triggering the necessary UI updates.
+      // The onAuthStateChanged listener will handle setting user to null.
       toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
       // Redirect to home or sign-in page after sign out
       if (pathname.startsWith('/dashboard')) {
