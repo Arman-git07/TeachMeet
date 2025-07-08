@@ -78,7 +78,7 @@ export default function ManageMembersPage() {
                             </Button>
                         </div>
                         <Button onClick={() => setIsSharePanelOpen(true)} className="w-full btn-gel rounded-lg">
-                            <Share2 className="mr-2 h-4 w-4" /> Share Invite Options
+                            <Share2 className="mr-2 h-4 w-4" /> Share Invite
                         </Button>
                     </CardContent>
                 </Card>
