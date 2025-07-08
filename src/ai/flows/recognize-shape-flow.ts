@@ -41,7 +41,7 @@ const recognizeShapeFlow = ai.defineFlow(
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
       prompt: [
         { media: { url: input.drawingDataUri } },
-        { text: `The output MUST be a PNG image with a fully transparent background. Generate a clean, simple, black line drawing of the object from the user's provided image. Do not add color, shading, or any background fill. The style should be minimalist, like an icon. ${input.prompt || ''}` },
+        { text: `The output MUST be a PNG image with a fully transparent background. Transform the user's rough drawing into a professional, high-quality, black line graphic. The final image should look like a polished vector icon with smooth, clean lines. Do not add color, shading, or background fill. Accurately interpret the object, letter, or word from the user's drawing, using their optional hint to improve accuracy. User hint: "${input.prompt || 'No hint provided.'}"` },
       ],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
