@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const RecognizeShapeInputSchema = z.object({
+const RecognizeShapeInputSchema = z.object({
   drawingDataUri: z
     .string()
     .describe(
@@ -21,7 +21,7 @@ export const RecognizeShapeInputSchema = z.object({
 });
 export type RecognizeShapeInput = z.infer<typeof RecognizeShapeInputSchema>;
 
-export const RecognizeShapeOutputSchema = z.object({
+const RecognizeShapeOutputSchema = z.object({
   refinedImageUri: z.string().describe("The data URI of the refined, generated image with a transparent background."),
 });
 export type RecognizeShapeOutput = z.infer<typeof RecognizeShapeOutputSchema>;
