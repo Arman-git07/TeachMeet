@@ -816,7 +816,7 @@ export default function WhiteboardPage() {
     const currentPage = pages[currentPageIndex];
     if (currentPage.selectedElementIds.size === 0) {
       toast({
-        title: "Nothing to Recognize",
+        title: "Nothing to Refine",
         description: "Please select a drawing first using the select tool.",
       });
       return;
@@ -831,7 +831,7 @@ export default function WhiteboardPage() {
     const recognitionToastId = `recognize-${Date.now()}`;
     toast({
       id: recognitionToastId,
-      title: "Recognizing Shape...",
+      title: "Refining Shape...",
       description: "The AI is analyzing your drawing. This might take a moment.",
       duration: Infinity,
     });
@@ -849,7 +849,6 @@ export default function WhiteboardPage() {
       return;
     }
   
-    // FIX: Add a solid white background for better AI analysis
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, width, height);
   
@@ -867,7 +866,6 @@ export default function WhiteboardPage() {
   
       const newImg = new Image();
       newImg.onload = () => {
-        // FIX: Scale and center the new image within the original selection box
         const originalWidth = selectionBox.maxX - selectionBox.minX;
         const originalHeight = selectionBox.maxY - selectionBox.minY;
         const aspectRatio = newImg.width / newImg.height;
@@ -909,7 +907,7 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        toast({ id: recognitionToastId, title: "Shape Recognized!", description: "Your drawing has been transformed." });
+        toast({ id: recognitionToastId, title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
         toast({ id: recognitionToastId, variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
@@ -920,7 +918,7 @@ export default function WhiteboardPage() {
       toast({
         id: recognitionToastId,
         variant: "destructive",
-        title: "Recognition Failed",
+        title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
       });
     }
@@ -1017,7 +1015,7 @@ export default function WhiteboardPage() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <ToolButton icon={Sparkles} label="Recognize" onClick={handleRecognizeShape} disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
+             <ToolButton icon={Sparkles} label="Refine" onClick={handleRecognizeShape} disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
