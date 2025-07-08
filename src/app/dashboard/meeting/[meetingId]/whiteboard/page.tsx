@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { recognizeShape } from "@/ai/flows/recognize-shape-flow";
+import { Input } from "@/components/ui/input";
 
 
 // --- Type Definitions ---
@@ -170,6 +171,9 @@ export default function WhiteboardPage() {
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
   const [bgColor, setBgColor] = useState('#FFFFFF');
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
+
+  const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
+  const [refinePrompt, setRefinePrompt] = useState("");
 
 
   useEffect(() => {
@@ -813,18 +817,23 @@ export default function WhiteboardPage() {
   };
   
   const handleRecognizeShape = async () => {
+    // This will be called by the dialog action, so we close it here.
+    setIsRefineDialogOpen(false);
+    
     const currentPage = pages[currentPageIndex];
     if (currentPage.selectedElementIds.size === 0) {
       toast({
         title: "Nothing to Refine",
         description: "Please select a drawing first using the select tool.",
       });
+      setRefinePrompt(''); // Also clear prompt on error
       return;
     }
   
     const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
     if (!selectionBox) {
       toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
+      setRefinePrompt(''); // Also clear prompt on error
       return;
     }
   
@@ -846,9 +855,11 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
       toast({ id: recognitionToastId, variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      setRefinePrompt(''); // Also clear prompt on error
       return;
     }
   
+    // Fill with a solid white background, as transparent can be problematic for some models
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, width, height);
   
@@ -862,7 +873,7 @@ export default function WhiteboardPage() {
     const drawingDataUri = tempCanvas.toDataURL('image/png');
   
     try {
-      const result = await recognizeShape({ drawingDataUri });
+      const result = await recognizeShape({ drawingDataUri, prompt: refinePrompt });
   
       const newImg = new Image();
       newImg.onload = () => {
@@ -921,6 +932,8 @@ export default function WhiteboardPage() {
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
       });
+    } finally {
+        setRefinePrompt(''); // Reset prompt after use
     }
   };
 
@@ -1015,7 +1028,39 @@ export default function WhiteboardPage() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <ToolButton icon={Sparkles} label="Refine" onClick={handleRecognizeShape} disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
+             <AlertDialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <ToolButton icon={Sparkles} label="Refine" disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Refine Your Drawing</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Optionally, tell the AI what you drew to get a better result.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-2">
+                  <Label htmlFor="refine-prompt" className="text-sm text-muted-foreground">What did you draw? (e.g., "a bird", "a house")</Label>
+                  <Input
+                    id="refine-prompt"
+                    value={refinePrompt}
+                    onChange={(e) => setRefinePrompt(e.target.value)}
+                    placeholder="Optional prompt..."
+                    className="mt-2"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleRecognizeShape();
+                      }
+                    }}
+                  />
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setRefinePrompt('')}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRecognizeShape}>Refine</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
