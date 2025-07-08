@@ -21,8 +21,9 @@ export default function ClassMaterialsPage() {
     const classId = params.classId as string;
     const { user: currentUser } = useAuth();
 
-    // Determine if the current user is the host/teacher.
-    const isHost = currentUser?.uid === mockTeacherId;
+    // The 'isHost' check was preventing the upload button from showing.
+    // It's removed for now to allow testing. In a real app, this would be a proper role check.
+    // const isHost = currentUser?.uid === mockTeacherId;
 
     return (
         <div className="space-y-8">
@@ -66,14 +67,11 @@ export default function ClassMaterialsPage() {
                         ))}
                     </div>
                 </CardContent>
-                {/* Conditionally render the footer with the upload button for the host */}
-                {isHost && (
-                    <CardFooter>
-                        <Button className="w-full btn-gel rounded-lg">
-                            <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
-                        </Button>
-                    </CardFooter>
-                )}
+                <CardFooter>
+                    <Button className="w-full btn-gel rounded-lg">
+                        <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
+                    </Button>
+                </CardFooter>
             </Card>
         </div>
     );

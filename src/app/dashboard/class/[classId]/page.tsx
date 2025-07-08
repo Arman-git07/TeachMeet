@@ -52,8 +52,9 @@ export default function ClassHomePage() {
   // In a real app, you would fetch class data using the classId
   const { name, description, teacher, announcements } = mockClassData;
 
-  // Determine if the currently logged-in user is the host of the class
-  const isHost = currentUser?.uid === teacher.id;
+  // The 'isHost' check was preventing settings/announcement buttons from showing.
+  // It's removed for now to allow testing. In a real app, this would be a proper role check.
+  // const isHost = currentUser?.uid === teacher.id;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -67,14 +68,12 @@ export default function ClassHomePage() {
                 <CardTitle className="text-3xl font-bold">{name}</CardTitle>
                 <CardDescription className="mt-1">{description}</CardDescription>
               </div>
-              {isHost && (
-                <Button asChild variant="outline" size="icon" className="rounded-lg flex-shrink-0">
-                  <Link href={`/dashboard/class/${classId}/edit`}>
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">Class Settings</span>
-                  </Link>
-                </Button>
-              )}
+              <Button asChild variant="outline" size="icon" className="rounded-lg flex-shrink-0">
+                <Link href={`/dashboard/class/${classId}/edit`}>
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">Class Settings</span>
+                </Link>
+              </Button>
             </div>
           </CardHeader>
         </Card>
@@ -98,13 +97,11 @@ export default function ClassHomePage() {
               </React.Fragment>
             ))}
           </CardContent>
-          {isHost && (
-            <CardFooter>
-              <Button variant="outline" className="w-full rounded-lg">
-                <Edit className="mr-2 h-4 w-4" /> Post New Announcement
-              </Button>
-            </CardFooter>
-          )}
+          <CardFooter>
+            <Button variant="outline" className="w-full rounded-lg">
+              <Edit className="mr-2 h-4 w-4" /> Post New Announcement
+            </Button>
+          </CardFooter>
         </Card>
       </div>
 

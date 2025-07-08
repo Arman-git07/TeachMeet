@@ -23,7 +23,9 @@ export default function ClassTestAndExamsPage() {
     const classId = params.classId as string;
     const { user: currentUser } = useAuth();
 
-    const isHost = currentUser?.uid === mockTeacherId;
+    // The 'isHost' check was preventing the create button from showing.
+    // It's removed for now to allow testing. In a real app, this would be a proper role check.
+    // const isHost = currentUser?.uid === mockTeacherId;
 
     return (
         <div className="space-y-8">
@@ -65,20 +67,18 @@ export default function ClassTestAndExamsPage() {
                         ))}
                     </div>
                 </CardContent>
-                 {isHost && (
-                    <CardFooter>
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button className="w-full btn-gel rounded-lg">
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Test / Exam
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-lg rounded-xl">
-                                <CreateExamDialogContent />
-                            </DialogContent>
-                        </Dialog>
-                    </CardFooter>
-                 )}
+                 <CardFooter>
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button className="w-full btn-gel rounded-lg">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Create New Test / Exam
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-lg rounded-xl">
+                            <CreateExamDialogContent />
+                        </DialogContent>
+                    </Dialog>
+                </CardFooter>
             </Card>
         </div>
     );
