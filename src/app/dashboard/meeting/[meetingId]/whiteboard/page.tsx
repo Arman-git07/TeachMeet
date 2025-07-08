@@ -821,25 +821,25 @@ export default function WhiteboardPage() {
       });
       return;
     }
-
+  
     const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
     if (!selectionBox) {
       toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
       return;
     }
-    
+  
     const recognitionToastId = `recognize-${Date.now()}`;
     toast({
-        id: recognitionToastId,
-        title: "Recognizing Shape...",
-        description: "The AI is analyzing your drawing. This might take a moment.",
-        duration: Infinity,
+      id: recognitionToastId,
+      title: "Recognizing Shape...",
+      description: "The AI is analyzing your drawing. This might take a moment.",
+      duration: Infinity,
     });
-    
+  
     const PADDING = 20;
     const width = selectionBox.maxX - selectionBox.minX + PADDING * 2;
     const height = selectionBox.maxY - selectionBox.minY + PADDING * 2;
-
+  
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
@@ -848,33 +848,53 @@ export default function WhiteboardPage() {
       toast({ id: recognitionToastId, variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
       return;
     }
-    
+  
+    // FIX: Add a solid white background for better AI analysis
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, width, height);
+  
     tempCtx.translate(-selectionBox.minX + PADDING, -selectionBox.minY + PADDING);
     currentPage.elements.forEach(element => {
       if (currentPage.selectedElementIds.has(element.id)) {
         drawElement(tempCtx, element);
       }
     });
-
+  
     const drawingDataUri = tempCanvas.toDataURL('image/png');
-
+  
     try {
       const result = await recognizeShape({ drawingDataUri });
-
+  
       const newImg = new Image();
       newImg.onload = () => {
+        // FIX: Scale and center the new image within the original selection box
+        const originalWidth = selectionBox.maxX - selectionBox.minX;
+        const originalHeight = selectionBox.maxY - selectionBox.minY;
+        const aspectRatio = newImg.width / newImg.height;
+  
+        let newWidth = originalWidth;
+        let newHeight = newWidth / aspectRatio;
+  
+        if (newHeight > originalHeight) {
+          newHeight = originalHeight;
+          newWidth = newHeight * aspectRatio;
+        }
+  
+        const newX = selectionBox.minX + (originalWidth - newWidth) / 2;
+        const newY = selectionBox.minY + (originalHeight - newHeight) / 2;
+  
         const newImageElement: ImageElement = {
           type: 'image',
           id: `image_${Date.now()}`,
           src: result.refinedImageUri,
-          x: selectionBox.minX,
-          y: selectionBox.minY,
-          width: newImg.width,
-          height: newImg.height,
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
         };
-        
+  
         setLoadedImages(prev => new Map(prev).set(newImageElement.id, newImg));
-
+  
         setPages(currentPages => {
           const newPages = [...currentPages];
           const pageToUpdate = { ...newPages[currentPageIndex] };
@@ -888,7 +908,7 @@ export default function WhiteboardPage() {
           pushToHistory(currentPageIndex, updatedPage);
           return newPages;
         });
-
+  
         toast({ id: recognitionToastId, title: "Shape Recognized!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
