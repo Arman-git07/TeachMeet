@@ -21,7 +21,8 @@ const mockLinks = [
 ];
 
 
-// Reusing the mock teacher ID from the class home page for consistency.
+// In a real app, this ID would come from the class data.
+// We use a mock ID here to simulate role-based access.
 const mockTeacherId = "teacher-evelyn-reed-uid";
 
 export default function ClassMaterialsPage() {
@@ -29,9 +30,8 @@ export default function ClassMaterialsPage() {
     const classId = params.classId as string;
     const { user: currentUser } = useAuth();
 
-    // The 'isHost' check was preventing the upload button from showing.
-    // It's removed for now to allow testing. In a real app, this would be a proper role check.
-    // const isHost = currentUser?.uid === mockTeacherId;
+    // Check if the current user is the host/teacher.
+    const isHost = currentUser?.uid === mockTeacherId;
 
     return (
         <div className="space-y-8">
@@ -85,11 +85,13 @@ export default function ClassMaterialsPage() {
                                 ))}
                             </div>
                         </CardContent>
-                        <CardFooter>
-                            <Button className="w-full btn-gel rounded-lg">
-                                <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
-                            </Button>
-                        </CardFooter>
+                        {isHost && (
+                            <CardFooter>
+                                <Button className="w-full btn-gel rounded-lg">
+                                    <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
+                                </Button>
+                            </CardFooter>
+                        )}
                     </TabsContent>
 
                     <TabsContent value="links">
@@ -120,11 +122,13 @@ export default function ClassMaterialsPage() {
                                 </div>
                              )}
                         </CardContent>
-                        <CardFooter>
-                            <Button className="w-full btn-gel rounded-lg">
-                                <PlusCircle className="mr-2 h-4 w-4" /> Add New Link
-                            </Button>
-                        </CardFooter>
+                        {isHost && (
+                            <CardFooter>
+                                <Button className="w-full btn-gel rounded-lg">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Link
+                                </Button>
+                            </CardFooter>
+                        )}
                     </TabsContent>
                 </Card>
             </Tabs>
