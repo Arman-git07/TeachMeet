@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export function CreateExamDialogContent() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState<"Quiz" | "Test" | "Exam">("Quiz");
+  const [type, setType] = useState<"Quiz" | "Test" | "Exam" | "Multiple Choice Questions">("Quiz");
   const [dueDate, setDueDate] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
@@ -77,7 +77,7 @@ export function CreateExamDialogContent() {
 
         <div>
             <Label htmlFor="examType">Type</Label>
-            <Select onValueChange={(value) => setType(value as "Quiz" | "Test" | "Exam")} defaultValue={type} disabled={isCreating}>
+            <Select onValueChange={(value) => setType(value as "Quiz" | "Test" | "Exam" | "Multiple Choice Questions")} defaultValue={type} disabled={isCreating}>
                 <SelectTrigger className="w-full mt-1 rounded-lg">
                     <SelectValue placeholder="Select an assessment type" />
                 </SelectTrigger>
@@ -85,6 +85,7 @@ export function CreateExamDialogContent() {
                     <SelectItem value="Quiz" className="rounded-md">Quiz</SelectItem>
                     <SelectItem value="Test" className="rounded-md">Test</SelectItem>
                     <SelectItem value="Exam" className="rounded-md">Exam</SelectItem>
+                    <SelectItem value="Multiple Choice Questions" className="rounded-md">Multiple Choice Questions</SelectItem>
                 </SelectContent>
             </Select>
         </div>
