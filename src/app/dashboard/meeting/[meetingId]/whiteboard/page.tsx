@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -27,6 +27,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { recognizeShape } from "@/ai/flows/recognize-shape-flow";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 // --- Type Definitions ---
@@ -945,12 +951,40 @@ export default function WhiteboardPage() {
 
     setHeaderContent(
       <div className="flex items-center justify-between w-full">
-        <div className="flex items-center gap-3"><Brush className="h-7 w-7 text-primary" /><h1 className="text-xl font-semibold truncate">Whiteboard</h1></div>
-        {meetingId && <Button asChild variant="outline" size="sm" className="rounded-lg"><Link href={`/dashboard/meeting/${meetingId}`}><ArrowLeft className="mr-2 h-4 w-4" />Back</Link></Button>}
+        <div className="flex items-center gap-3">
+          <Brush className="h-7 w-7 text-primary" />
+          <h1 className="text-xl font-semibold truncate">Whiteboard</h1>
+        </div>
+        <div className="flex items-center gap-2">
+            {meetingId && (
+              <Button asChild variant="outline" size="sm" className="rounded-lg">
+                <Link href={`/dashboard/meeting/${meetingId}`}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Link>
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="rounded-xl">
+                <DropdownMenuItem
+                  onSelect={() => router.push('/dashboard/settings?highlight=whiteboardSettings')}
+                  className="cursor-pointer"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Whiteboard Settings</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
       </div>
     );
     return () => setHeaderContent(null);
-  }, [setHeaderContent, meetingId]);
+  }, [setHeaderContent, meetingId, router]);
 
 
   return (
@@ -1151,7 +1185,6 @@ export default function WhiteboardPage() {
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Clear this page?</AlertDialogTitle><AlertDialogDescription>This will clear the current page. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearPage} className="rounded-lg">Clear Page</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
              </AlertDialog>
-             <ToolButton icon={Settings} label="Settings" onClick={() => router.push('/dashboard/settings?highlight=whiteboardSettings')} />
           </div>
         </div>
 
