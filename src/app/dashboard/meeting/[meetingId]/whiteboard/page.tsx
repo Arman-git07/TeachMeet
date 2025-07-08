@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -24,13 +24,18 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { recognizeShape } from "@/ai/flows/recognize-shape-flow";
+
 
 // --- Type Definitions ---
 interface Point { x: number; y: number; }
 type PathElement = { type: 'path'; id: string; points: Point[]; color: string; lineWidth: number; };
 type TextElement = { type: 'text'; id: string; text: string; x: number; y: number; color: string; font: string; width: number; height: number; };
 type ShapeElement = { type: 'shape'; id: string; shapeType: 'rectangle' | 'circle' | 'line' | 'triangle' | 'arrow' | 'diamond'; x1: number; y1: number; x2: number; y2: number; color: string; lineWidth: number; };
-type WhiteboardElement = PathElement | TextElement | ShapeElement;
+type ImageElement = { type: 'image'; id: string; src: string; x: number; y: number; width: number; height: number; };
+type WhiteboardElement = PathElement | TextElement | ShapeElement | ImageElement;
+
 
 interface ElementState {
   elements: WhiteboardElement[];
@@ -93,6 +98,8 @@ function getElementBoundingBox(element: WhiteboardElement): BoundingBox | null {
         const maxX = Math.max(element.x1, element.x2);
         const maxY = Math.max(element.y1, element.y2);
         return { minX, minY, maxX, maxY };
+    } else if (element.type === 'image') {
+        return { minX: element.x, minY: element.y, maxX: element.x + element.width, maxY: element.y + element.height };
     }
     return null;
 }
@@ -124,8 +131,8 @@ function getSelectionBoundingBox(elements: WhiteboardElement[], selectedIds: Set
 const isPointInRect = (point: Point, rect: BoundingBox) => (point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY);
 
 // --- UI Components ---
-const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false }: { icon: React.ElementType; label: string; onClick?: () => void; isActive?: boolean; }) => (
-  <Button variant={isActive ? "default" : "outline"} size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" onClick={onClick} aria-label={label}>
+const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false, disabled = false }: { icon: React.ElementType; label: string; onClick?: () => void; isActive?: boolean; disabled?: boolean; }) => (
+  <Button variant={isActive ? "default" : "outline"} size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" onClick={onClick} aria-label={label} disabled={disabled}>
     <Icon className="h-5 w-5 mb-0.5" />
     <span className="text-[10px] leading-tight">{label}</span>
   </Button>
@@ -137,6 +144,7 @@ export default function WhiteboardPage() {
   const router = useRouter();
   const meetingId = params.meetingId as string;
   const { setHeaderContent } = useDynamicHeader();
+  const { toast } = useToast();
 
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const tempCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -161,6 +169,8 @@ export default function WhiteboardPage() {
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
   const [bgColor, setBgColor] = useState('#FFFFFF');
+  const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
+
 
   useEffect(() => {
     const storedColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
@@ -268,8 +278,19 @@ export default function WhiteboardPage() {
         ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
         ctx.stroke();
       }
+    } else if (element.type === 'image') {
+      const cachedImg = loadedImages.get(element.id);
+      if (cachedImg) {
+        ctx.drawImage(cachedImg, element.x, element.y, element.width, element.height);
+      } else {
+        const img = new Image();
+        img.onload = () => {
+          setLoadedImages(prev => new Map(prev).set(element.id, img));
+        };
+        img.src = element.src;
+      }
     }
-  }, []);
+  }, [loadedImages]);
   
   const clearCanvas = useCallback((ctx: CanvasRenderingContext2D) => {
     ctx.fillStyle = bgColor;
@@ -348,7 +369,7 @@ export default function WhiteboardPage() {
   
   useEffect(() => {
     redrawMainCanvas();
-  }, [pages, currentPageIndex, redrawMainCanvas]);
+  }, [pages, currentPageIndex, redrawMainCanvas, loadedImages]);
   
   useEffect(() => {
     redrawTempCanvas();
@@ -568,6 +589,8 @@ export default function WhiteboardPage() {
                 draggedElements.push({ ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy });
             } else if (originalElement.type === 'shape') {
                 draggedElements.push({ ...originalElement, x1: originalElement.x1 + dx, y1: originalElement.y1 + dy, x2: originalElement.x2 + dx, y2: originalElement.y2 + dy });
+            } else if (originalElement.type === 'image') {
+              draggedElements.push({ ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy });
             }
         }
         setTempDragPreview(draggedElements);
@@ -646,6 +669,8 @@ export default function WhiteboardPage() {
                             return { ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy };
                         } else if (originalElement.type === 'shape') {
                             return { ...originalElement, x1: originalElement.x1 + dx, y1: originalElement.y1 + dy, x2: originalElement.x2 + dx, y2: originalElement.y2 + dy };
+                        } else if (originalElement.type === 'image') {
+                          return { ...originalElement, x: originalElement.x + dx, y: originalElement.y + dy };
                         }
                     }
                     return el;
@@ -671,7 +696,7 @@ export default function WhiteboardPage() {
                         elementToDeleteId = element.id; break;
                     }
                 }
-            } else if (element.type === 'text' || element.type === 'shape') {
+            } else if (element.type === 'text' || element.type === 'shape' || element.type === 'image') {
                 const box = getElementBoundingBox(element);
                 if(box) {
                     const inflatedBox = { minX: box.minX - ERASER_THRESHOLD, minY: box.minY - ERASER_THRESHOLD, maxX: box.maxX + ERASER_THRESHOLD, maxY: box.maxY + ERASER_THRESHOLD };
@@ -787,6 +812,100 @@ export default function WhiteboardPage() {
     setIsPagesPopoverOpen(false);
   };
   
+  const handleRecognizeShape = async () => {
+    const currentPage = pages[currentPageIndex];
+    if (currentPage.selectedElementIds.size === 0) {
+      toast({
+        title: "Nothing to Recognize",
+        description: "Please select a drawing first using the select tool.",
+      });
+      return;
+    }
+
+    const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
+    if (!selectionBox) {
+      toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
+      return;
+    }
+    
+    const recognitionToastId = `recognize-${Date.now()}`;
+    toast({
+        id: recognitionToastId,
+        title: "Recognizing Shape...",
+        description: "The AI is analyzing your drawing. This might take a moment.",
+        duration: Infinity,
+    });
+    
+    const PADDING = 20;
+    const width = selectionBox.maxX - selectionBox.minX + PADDING * 2;
+    const height = selectionBox.maxY - selectionBox.minY + PADDING * 2;
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) {
+      toast({ id: recognitionToastId, variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      return;
+    }
+    
+    tempCtx.translate(-selectionBox.minX + PADDING, -selectionBox.minY + PADDING);
+    currentPage.elements.forEach(element => {
+      if (currentPage.selectedElementIds.has(element.id)) {
+        drawElement(tempCtx, element);
+      }
+    });
+
+    const drawingDataUri = tempCanvas.toDataURL('image/png');
+
+    try {
+      const result = await recognizeShape({ drawingDataUri });
+
+      const newImg = new Image();
+      newImg.onload = () => {
+        const newImageElement: ImageElement = {
+          type: 'image',
+          id: `image_${Date.now()}`,
+          src: result.refinedImageUri,
+          x: selectionBox.minX,
+          y: selectionBox.minY,
+          width: newImg.width,
+          height: newImg.height,
+        };
+        
+        setLoadedImages(prev => new Map(prev).set(newImageElement.id, newImg));
+
+        setPages(currentPages => {
+          const newPages = [...currentPages];
+          const pageToUpdate = { ...newPages[currentPageIndex] };
+          const elementsWithoutOld = pageToUpdate.elements.filter(el => !pageToUpdate.selectedElementIds.has(el.id));
+          const finalElements = [...elementsWithoutOld, newImageElement];
+          const updatedPage: ElementState = {
+            elements: finalElements,
+            selectedElementIds: new Set([newImageElement.id])
+          };
+          newPages[currentPageIndex] = updatedPage;
+          pushToHistory(currentPageIndex, updatedPage);
+          return newPages;
+        });
+
+        toast({ id: recognitionToastId, title: "Shape Recognized!", description: "Your drawing has been transformed." });
+      };
+      newImg.onerror = () => {
+        toast({ id: recognitionToastId, variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+      };
+      newImg.src = result.refinedImageUri;
+    } catch (error) {
+      console.error("Shape recognition failed:", error);
+      toast({
+        id: recognitionToastId,
+        variant: "destructive",
+        title: "Recognition Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+      });
+    }
+  };
+
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
     setPages([newInitialPage]);
@@ -878,6 +997,7 @@ export default function WhiteboardPage() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
+             <ToolButton icon={Sparkles} label="Recognize" onClick={handleRecognizeShape} disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
