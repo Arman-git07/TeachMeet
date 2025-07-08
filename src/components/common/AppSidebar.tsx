@@ -244,6 +244,7 @@ export function AppSidebar() {
               )}
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
+              <NavItem href="/dashboard/classes" icon={Users} currentPath={pathname}>Classes</NavItem>
             </>
           ) : (
             <>
