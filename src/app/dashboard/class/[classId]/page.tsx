@@ -18,12 +18,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/hooks/useAuth";
 
 // Mock data, in a real app this would be fetched based on classId
 const mockClassData = {
   name: "Algebra 101",
   description: "Fundamentals of algebra and problem solving.",
   teacher: {
+    id: "teacher-evelyn-reed-uid", // Mock ID for the host/teacher
     name: "Dr. Evelyn Reed",
     avatar: "https://placehold.co/100x100/223D4A/FFFFFF.png?text=ER",
   },
@@ -44,9 +46,13 @@ export default function ClassHomePage() {
   const params = useParams();
   const classId = params.classId as string;
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   
   // In a real app, you would fetch class data using the classId
   const { name, description, teacher, announcements } = mockClassData;
+
+  // Determine if the currently logged-in user is the host of the class
+  const isHost = currentUser?.uid === teacher.id;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -60,12 +66,14 @@ export default function ClassHomePage() {
                 <CardTitle className="text-3xl font-bold">{name}</CardTitle>
                 <CardDescription className="mt-1">{description}</CardDescription>
               </div>
-              <Button asChild variant="outline" size="icon" className="rounded-lg flex-shrink-0">
-                <Link href={`/dashboard/class/${classId}/edit`}>
-                  <Settings className="h-5 w-5" />
-                  <span className="sr-only">Class Settings</span>
-                </Link>
-              </Button>
+              {isHost && (
+                <Button asChild variant="outline" size="icon" className="rounded-lg flex-shrink-0">
+                  <Link href={`/dashboard/class/${classId}/edit`}>
+                    <Settings className="h-5 w-5" />
+                    <span className="sr-only">Class Settings</span>
+                  </Link>
+                </Button>
+              )}
             </div>
           </CardHeader>
         </Card>
@@ -89,11 +97,13 @@ export default function ClassHomePage() {
               </React.Fragment>
             ))}
           </CardContent>
-          <CardFooter>
-             <Button variant="outline" className="w-full rounded-lg">
-              <Edit className="mr-2 h-4 w-4" /> Post New Announcement
-            </Button>
-          </CardFooter>
+          {isHost && (
+            <CardFooter>
+              <Button variant="outline" className="w-full rounded-lg">
+                <Edit className="mr-2 h-4 w-4" /> Post New Announcement
+              </Button>
+            </CardFooter>
+          )}
         </Card>
       </div>
 
