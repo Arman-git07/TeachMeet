@@ -7,6 +7,8 @@ import { FileText, PlusCircle, ArrowLeft, CheckCircle, Clock } from "lucide-reac
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { CreateExamDialogContent } from "@/components/exam/CreateExamDialog";
 
 const mockTests = [
     { id: 'midterm', title: 'Midterm Exam', dueDate: '2024-10-10', status: 'Upcoming', type: 'Exam' },
@@ -65,9 +67,16 @@ export default function ClassTestAndExamsPage() {
                 </CardContent>
                  {isHost && (
                     <CardFooter>
-                        <Button className="w-full btn-gel rounded-lg">
-                            <PlusCircle className="mr-2 h-4 w-4" /> Create New Test / Exam
-                        </Button>
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button className="w-full btn-gel rounded-lg">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Test / Exam
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-lg rounded-xl">
+                                <CreateExamDialogContent />
+                            </DialogContent>
+                        </Dialog>
                     </CardFooter>
                  )}
             </Card>
