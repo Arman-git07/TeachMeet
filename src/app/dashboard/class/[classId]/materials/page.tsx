@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, UploadCloud, ArrowLeft, Download, Eye } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 
 const mockMaterials = [
     { id: 'syllabus', name: 'Course Syllabus.pdf', size: '1.2MB', uploadDate: '2024-08-20' },
@@ -12,9 +13,16 @@ const mockMaterials = [
     { id: 'reading1', name: 'Required Reading Ch 1-3.pdf', size: '3.4MB', uploadDate: '2024-08-22' },
 ];
 
+// Reusing the mock teacher ID from the class home page for consistency.
+const mockTeacherId = "teacher-evelyn-reed-uid";
+
 export default function ClassMaterialsPage() {
     const params = useParams();
     const classId = params.classId as string;
+    const { user: currentUser } = useAuth();
+
+    // Determine if the current user is the host/teacher.
+    const isHost = currentUser?.uid === mockTeacherId;
 
     return (
         <div className="space-y-8">
@@ -58,11 +66,14 @@ export default function ClassMaterialsPage() {
                         ))}
                     </div>
                 </CardContent>
-                <CardFooter>
-                    <Button className="w-full btn-gel rounded-lg">
-                        <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
-                    </Button>
-                </CardFooter>
+                {/* Conditionally render the footer with the upload button for the host */}
+                {isHost && (
+                    <CardFooter>
+                        <Button className="w-full btn-gel rounded-lg">
+                            <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
+                        </Button>
+                    </CardFooter>
+                )}
             </Card>
         </div>
     );
