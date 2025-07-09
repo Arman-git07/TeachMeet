@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, BadgeCheck, CircleAlert, Edit, Save, X, QrCode, Landmark, WalletCards } from "lucide-react";
+import { ArrowLeft, CreditCard, BadgeCheck, CircleAlert, Edit, Save, X, QrCode, Landmark, WalletCards, Info } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // In a real app, this ID would come from the class data.
 const mockTeacherId = "teacher-evelyn-reed-uid";
@@ -76,6 +77,14 @@ export default function ClassFeesPage() {
                     </Link>
                 </Button>
             </div>
+
+            <Alert className="bg-primary/5 border-primary/20">
+                <Info className="h-4 w-4" />
+                <AlertTitle className="text-primary font-semibold">Platform Fee Notice</AlertTitle>
+                <AlertDescription>
+                    Please be aware that a 2% platform fee is applied to all class fee transactions to support the development and maintenance of TeachMeet. This fee is automatically calculated during payment. Developer UPI for contributions: <strong>07arman2004-1@oksbi</strong>.
+                </AlertDescription>
+            </Alert>
 
             <Card className="rounded-xl shadow-lg border-border/50">
                 <CardHeader className="flex flex-row items-start justify-between">
