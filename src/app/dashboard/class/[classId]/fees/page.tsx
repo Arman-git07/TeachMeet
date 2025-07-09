@@ -4,28 +4,62 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, BadgeCheck, CircleAlert } from "lucide-react";
+import { ArrowLeft, CreditCard, BadgeCheck, CircleAlert, Edit, Save, X } from "lucide-react"; // Added Edit, Save, X
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react"; // Added useState
+import { useAuth } from "@/hooks/useAuth"; // Added useAuth
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Added Select
+
+// In a real app, this ID would come from the class data.
+const mockTeacherId = "teacher-evelyn-reed-uid";
 
 export default function ClassFeesPage() {
     const params = useParams();
     const classId = params.classId as string;
     const { toast } = useToast();
+    const { user: currentUser } = useAuth();
 
-    // Mock fee status. In a real app, this would be fetched.
-    const feeStatus = "Due"; // Can be 'Paid' or 'Due'
-    const feeAmount = "150.00";
+    // Check if the current user is the host/teacher.
+    const isHost = currentUser?.uid === mockTeacherId;
+
+    // Mock fee status and details, now using state for dynamic updates.
+    const [feeStatus, setFeeStatus] = useState<'Paid' | 'Due'>("Due");
+    const [feeAmount, setFeeAmount] = useState<string>("150.00");
+    const [currency, setCurrency] = useState<string>("$");
+
+    // State for editing fee details
+    const [isEditing, setIsEditing] = useState(false);
+    const [editAmount, setEditAmount] = useState(feeAmount);
+    const [editCurrency, setEditCurrency] = useState(currency);
 
     const handlePayment = () => {
         // Mock payment processing
         toast({
             title: "Payment Submitted",
-            description: `Your payment of $${feeAmount} has been processed successfully.`,
+            description: `Your payment of ${currency}${feeAmount} has been processed successfully.`,
         });
         // In a real app, you would update the fee status here.
+        setFeeStatus("Paid");
+    };
+
+    const handleSaveFeeDetails = () => {
+        if (!editAmount || isNaN(Number(editAmount)) || Number(editAmount) < 0) {
+            toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid, non-negative number for the fee." });
+            return;
+        }
+        setFeeAmount(Number(editAmount).toFixed(2));
+        setCurrency(editCurrency);
+        setIsEditing(false);
+        toast({ title: "Fee Details Updated", description: "The class fee has been successfully updated." });
+    };
+
+    const handleCancelEdit = () => {
+        setEditAmount(feeAmount);
+        setEditCurrency(currency);
+        setIsEditing(false);
     };
 
     return (
@@ -43,29 +77,77 @@ export default function ClassFeesPage() {
             </div>
 
             <Card className="rounded-xl shadow-lg border-border/50">
-                <CardHeader>
-                    <CardTitle>Fee Status</CardTitle>
-                    <CardDescription>Your current fee status for this class.</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                        <CardTitle>Fee Status</CardTitle>
+                        <CardDescription>Your current fee status for this class.</CardDescription>
+                    </div>
+                    {isHost && !isEditing && (
+                        <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setIsEditing(true)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit Fee
+                        </Button>
+                    )}
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                        <div className="font-semibold text-lg">
-                            Total Due: ${feeAmount}
+                    {isEditing ? (
+                        <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                             <h3 className="text-lg font-semibold">Edit Fee Details</h3>
+                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="sm:col-span-2">
+                                    <Label htmlFor="feeAmount">Amount</Label>
+                                    <Input 
+                                        id="feeAmount"
+                                        type="number"
+                                        value={editAmount}
+                                        onChange={(e) => setEditAmount(e.target.value)}
+                                        placeholder="e.g., 150.00"
+                                        className="mt-1 rounded-lg"
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="feeCurrency">Currency</Label>
+                                    <Select value={editCurrency} onValueChange={setEditCurrency}>
+                                        <SelectTrigger id="feeCurrency" className="mt-1 rounded-lg">
+                                            <SelectValue placeholder="Select Currency" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-lg">
+                                            <SelectItem value="$" className="rounded-md">USD ($)</SelectItem>
+                                            <SelectItem value="₹" className="rounded-md">INR (₹)</SelectItem>
+                                            <SelectItem value="£" className="rounded-md">GBP (£)</SelectItem>
+                                            <SelectItem value="€" className="rounded-md">EUR (€)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                             </div>
+                             <div className="flex justify-end gap-2 mt-2">
+                                <Button variant="ghost" size="sm" className="rounded-lg" onClick={handleCancelEdit}>
+                                    <X className="mr-2 h-4 w-4" /> Cancel
+                                </Button>
+                                <Button size="sm" className="rounded-lg btn-gel" onClick={handleSaveFeeDetails}>
+                                    <Save className="mr-2 h-4 w-4" /> Save
+                                </Button>
+                             </div>
                         </div>
-                        {feeStatus === "Paid" ? (
-                            <Badge variant="default" className="text-base py-1 px-3 bg-green-600">
-                                <BadgeCheck className="mr-2 h-5 w-5"/> Paid
-                            </Badge>
-                        ) : (
-                            <Badge variant="destructive" className="text-base py-1 px-3">
-                                <CircleAlert className="mr-2 h-5 w-5"/> Due
-                            </Badge>
-                        )}
-                    </div>
+                    ) : (
+                        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                            <div className="font-semibold text-lg">
+                                Total Due: {currency}{feeAmount}
+                            </div>
+                            {feeStatus === "Paid" ? (
+                                <Badge variant="default" className="text-base py-1 px-3 bg-green-600">
+                                    <BadgeCheck className="mr-2 h-5 w-5"/> Paid
+                                </Badge>
+                            ) : (
+                                <Badge variant="destructive" className="text-base py-1 px-3">
+                                    <CircleAlert className="mr-2 h-5 w-5"/> Due
+                                </Badge>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
-            {feeStatus === "Due" && (
+            {!isHost && feeStatus === "Due" && (
                 <Card className="rounded-xl shadow-lg border-border/50">
                     <CardHeader>
                         <CardTitle>Payment Details</CardTitle>
@@ -96,7 +178,7 @@ export default function ClassFeesPage() {
                     </CardContent>
                     <CardFooter>
                         <Button onClick={handlePayment} className="w-full btn-gel rounded-lg">
-                            Pay ${feeAmount} Now
+                            Pay {currency}{feeAmount} Now
                         </Button>
                     </CardFooter>
                 </Card>
