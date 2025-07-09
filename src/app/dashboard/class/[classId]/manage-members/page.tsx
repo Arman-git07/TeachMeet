@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Trash2, Copy, Share2, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Trash2, Copy, Share2, Link as LinkIcon, Check, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -19,6 +19,11 @@ const mockMembers = [
     { id: 'user3', name: 'Carlos Gomez', email: 'carlos@example.com', role: 'Student' },
 ];
 
+const initialMockJoinRequests = [
+    { id: 'user4', name: 'Diana Prince', email: 'diana@example.com' },
+    { id: 'user5', name: 'Bruce Wayne', email: 'bruce@example.com' },
+];
+
 // Mock class name for the share panel. In a real app, this would be fetched.
 const mockClassName = "Algebra 101";
 
@@ -29,6 +34,7 @@ export default function ManageMembersPage() {
     const params = useParams();
     const classId = params.classId as string;
     const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+    const [joinRequests, setJoinRequests] = useState(initialMockJoinRequests);
     const { toast } = useToast();
     const { user: currentUser } = useAuth();
 
@@ -46,6 +52,15 @@ export default function ManageMembersPage() {
             console.error('Failed to copy link: ', err);
             toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy the link." });
         });
+    };
+
+    const handleRequestAction = (requestId: string, approved: boolean, studentName: string) => {
+        setJoinRequests(currentRequests => currentRequests.filter(req => req.id !== requestId));
+        toast({
+            title: `Request ${approved ? 'Approved' : 'Denied'}`,
+            description: `${studentName} has been ${approved ? 'added to' : 'denied access to'} the class.`,
+        });
+        // In a real app, you would also update the members list if approved.
     };
 
     return (
@@ -90,6 +105,41 @@ export default function ManageMembersPage() {
                         </Button>
                     </CardContent>
                 </Card>
+
+                {isHost && joinRequests.length > 0 && (
+                    <Card className="rounded-xl shadow-lg border-primary/30">
+                        <CardHeader>
+                            <CardTitle>Pending Join Requests ({joinRequests.length})</CardTitle>
+                            <CardDescription>Approve or deny requests from students to join this class.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {joinRequests.map(request => (
+                                    <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-10 w-10">
+                                                <AvatarImage src={`https://placehold.co/40x40.png?text=${request.name.charAt(0)}`} alt={request.name} data-ai-hint="avatar student"/>
+                                                <AvatarFallback>{request.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <p className="font-semibold">{request.name}</p>
+                                                <p className="text-sm text-muted-foreground">{request.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" size="sm" className="rounded-lg border-green-500/50 text-green-600 hover:bg-green-500/10 hover:text-green-700" onClick={() => handleRequestAction(request.id, true, request.name)}>
+                                                <Check className="mr-2 h-4 w-4" /> Approve
+                                            </Button>
+                                            <Button variant="destructive" size="sm" className="rounded-lg" onClick={() => handleRequestAction(request.id, false, request.name)}>
+                                                <X className="mr-2 h-4 w-4" /> Deny
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card className="rounded-xl shadow-lg border-border/50">
                     <CardHeader>

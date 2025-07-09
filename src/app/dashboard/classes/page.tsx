@@ -3,19 +3,45 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, PlusCircle, ArrowRight, BookOpen, User } from "lucide-react";
+import { Users, PlusCircle, ArrowRight, BookOpen, User, Send, Check } from "lucide-react";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { CreateClassDialogContent } from "@/components/class/CreateClassDialog";
 import Image from "next/image";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
-const mockClasses = [
-  { id: "math101", name: "Algebra 101", description: "Fundamentals of algebra and problem solving.", members: 25, subject: "Mathematics" },
-  { id: "hist202", name: "World History: 1500-Present", description: "A survey of major global events.", members: 32, subject: "History" },
-  { id: "lit301", name: "American Literature", description: "Exploring classic and contemporary American authors.", members: 18, subject: "Literature" },
+interface MockClass {
+  id: string;
+  name: string;
+  description: string;
+  members: number;
+  subject: string;
+  joinStatus: 'joined' | 'not-joined' | 'requested';
+}
+
+const initialMockClasses: MockClass[] = [
+  { id: "math101", name: "Algebra 101", description: "Fundamentals of algebra and problem solving.", members: 25, subject: "Mathematics", joinStatus: 'joined' },
+  { id: "hist202", name: "World History: 1500-Present", description: "A survey of major global events.", members: 32, subject: "History", joinStatus: 'not-joined' },
+  { id: "lit301", name: "American Literature", description: "Exploring classic and contemporary American authors.", members: 18, subject: "Literature", joinStatus: 'requested' },
 ];
 
 export default function ClassesPage() {
+  const [mockClasses, setMockClasses] = useState<MockClass[]>(initialMockClasses);
+  const { toast } = useToast();
+
+  const handleRequestToJoin = (classId: string) => {
+    setMockClasses(currentClasses =>
+      currentClasses.map(cls =>
+        cls.id === classId ? { ...cls, joinStatus: 'requested' } : cls
+      )
+    );
+    toast({
+      title: "Request Sent",
+      description: "Your request to join the class has been sent to the instructor for approval.",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -82,11 +108,23 @@ export default function ClassesPage() {
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4">
-                 <Button asChild variant="default" className="w-full btn-gel rounded-lg">
-                    <Link href={`/dashboard/class/${cls.id}`}>
-                      Enter Class <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
+                {cls.joinStatus === 'joined' && (
+                   <Button asChild variant="default" className="w-full btn-gel rounded-lg">
+                      <Link href={`/dashboard/class/${cls.id}`}>
+                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                )}
+                {cls.joinStatus === 'not-joined' && (
+                  <Button variant="outline" className="w-full rounded-lg" onClick={() => handleRequestToJoin(cls.id)}>
+                      <Send className="mr-2 h-4 w-4" /> Request to Join
+                    </Button>
+                )}
+                {cls.joinStatus === 'requested' && (
+                  <Button variant="secondary" className="w-full rounded-lg" disabled>
+                      <Check className="mr-2 h-4 w-4" /> Request Sent
+                    </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
