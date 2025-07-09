@@ -13,13 +13,97 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-// Define question structure
+// Define question structure outside the component
 interface MCQuestion {
   id: string;
   text: string;
   options: { id: string; text: string }[];
   correctAnswerId: string;
 }
+
+// Moved the question editor to a stable, separate component to prevent re-renders from causing focus loss.
+const OnlineQuestionEditor = ({
+  questions,
+  type,
+  onAddQuestion,
+  onRemoveQuestion,
+  onQuestionTextChange,
+  onOptionTextChange,
+  onCorrectAnswerChange,
+}: {
+  questions: MCQuestion[];
+  type: string;
+  onAddQuestion: () => void;
+  onRemoveQuestion: (questionId: string) => void;
+  onQuestionTextChange: (questionId: string, text: string) => void;
+  onOptionTextChange: (questionId: string, optionId: string, text: string) => void;
+  onCorrectAnswerChange: (questionId: string, optionId: string) => void;
+}) => (
+  <div className="space-y-4">
+      <Label>Online Questions</Label>
+      <div className="border rounded-lg p-2 space-y-4 max-h-[300px]">
+          <ScrollArea className="h-full pr-4">
+              <div className="p-2 space-y-4">
+                {questions.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-4">
+                        <p>No questions yet. Click "Add Question" to start.</p>
+                    </div>
+                ) : (
+                    questions.map((q, qIndex) => (
+                        <div key={q.id} className="p-4 border rounded-lg bg-muted/50 relative">
+                            <div className="flex justify-between items-center mb-2">
+                              <Label htmlFor={`q-text-${q.id}`} className="font-semibold">Question {qIndex + 1}</Label>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => onRemoveQuestion(q.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Textarea
+                                id={`q-text-${q.id}`}
+                                placeholder="Type your question here..."
+                                value={q.text}
+                                onChange={(e) => onQuestionTextChange(q.id, e.target.value)}
+                                className="mt-1"
+                                rows={2}
+                            />
+                            {type === "Multiple Choice (Online)" && (
+                                <div className="mt-4 space-y-2">
+                                    <Label className="text-xs text-muted-foreground">Options (select the correct answer)</Label>
+                                    <RadioGroup value={q.correctAnswerId} onValueChange={(value) => onCorrectAnswerChange(q.id, value)}>
+                                        {q.options.map((opt, optIndex) => (
+                                            <div key={opt.id} className="flex items-center gap-2">
+                                                <RadioGroupItem value={opt.id} id={opt.id} />
+                                                <Input
+                                                    placeholder={`Option ${optIndex + 1}`}
+                                                    value={opt.text}
+                                                    onChange={(e) => onOptionTextChange(q.id, opt.id, e.target.value)}
+                                                />
+                                            </div>
+                                        ))}
+                                    </RadioGroup>
+                                </div>
+                            )}
+                            {type === "Written Answer (Online)" && (
+                              <div className="mt-2 p-3 text-center text-xs text-muted-foreground bg-background rounded-md border">
+                                  Student will provide a written answer for this question.
+                              </div>
+                            )}
+                        </div>
+                    ))
+                )}
+              </div>
+          </ScrollArea>
+      </div>
+      <Button variant="outline" className="w-full" onClick={onAddQuestion}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Question
+      </Button>
+  </div>
+);
+
 
 export function CreateExamDialogContent() {
   const [title, setTitle] = useState("");
@@ -30,7 +114,6 @@ export function CreateExamDialogContent() {
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
   
-  // New state for online questions
   const [questions, setQuestions] = useState<MCQuestion[]>([]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,73 +195,6 @@ export function CreateExamDialogContent() {
     setSelectedFile(null);
     setQuestions([]);
   };
-
-  // The online question editor component
-  const OnlineQuestionEditor = () => (
-    <div className="space-y-4">
-        <Label>Online Questions</Label>
-        <div className="border rounded-lg p-2 space-y-4 max-h-[300px]">
-            <ScrollArea className="h-full pr-4">
-                <div className="p-2 space-y-4">
-                  {questions.length === 0 ? (
-                      <div className="text-center text-muted-foreground py-4">
-                          <p>No questions yet. Click "Add Question" to start.</p>
-                      </div>
-                  ) : (
-                      questions.map((q, qIndex) => (
-                          <div key={q.id} className="p-4 border rounded-lg bg-muted/50 relative">
-                              <div className="flex justify-between items-center mb-2">
-                                <Label htmlFor={`q-text-${q.id}`} className="font-semibold">Question {qIndex + 1}</Label>
-                                <Button
-                                  variant="destructive"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => handleRemoveQuestion(q.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <Textarea
-                                  id={`q-text-${q.id}`}
-                                  placeholder="Type your question here..."
-                                  value={q.text}
-                                  onChange={(e) => handleQuestionTextChange(q.id, e.target.value)}
-                                  className="mt-1"
-                                  rows={2}
-                              />
-                              {type === "Multiple Choice (Online)" && (
-                                  <div className="mt-4 space-y-2">
-                                      <Label className="text-xs text-muted-foreground">Options (select the correct answer)</Label>
-                                      <RadioGroup value={q.correctAnswerId} onValueChange={(value) => handleCorrectAnswerChange(q.id, value)}>
-                                          {q.options.map((opt, optIndex) => (
-                                              <div key={opt.id} className="flex items-center gap-2">
-                                                  <RadioGroupItem value={opt.id} id={opt.id} />
-                                                  <Input
-                                                      placeholder={`Option ${optIndex + 1}`}
-                                                      value={opt.text}
-                                                      onChange={(e) => handleOptionTextChange(q.id, opt.id, e.target.value)}
-                                                  />
-                                              </div>
-                                          ))}
-                                      </RadioGroup>
-                                  </div>
-                              )}
-                              {type === "Written Answer (Online)" && (
-                                <div className="mt-2 p-3 text-center text-xs text-muted-foreground bg-background rounded-md border">
-                                    Student will provide a written answer for this question.
-                                </div>
-                              )}
-                          </div>
-                      ))
-                  )}
-                </div>
-            </ScrollArea>
-        </div>
-        <Button variant="outline" className="w-full" onClick={handleAddQuestion}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Question
-        </Button>
-    </div>
-  );
 
   return (
     <>
@@ -269,7 +285,15 @@ export function CreateExamDialogContent() {
                 </div>
             </div>
         ) : (
-            <OnlineQuestionEditor />
+            <OnlineQuestionEditor
+              questions={questions}
+              type={type}
+              onAddQuestion={handleAddQuestion}
+              onRemoveQuestion={handleRemoveQuestion}
+              onQuestionTextChange={handleQuestionTextChange}
+              onOptionTextChange={handleOptionTextChange}
+              onCorrectAnswerChange={handleCorrectAnswerChange}
+            />
         )}
 
       </div>
