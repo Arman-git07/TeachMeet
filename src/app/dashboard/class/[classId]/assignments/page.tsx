@@ -3,10 +3,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, PlusCircle, ArrowLeft, CheckCircle, Clock, Sparkles, Loader2, UploadCloud, Download } from "lucide-react";
+import { FileText, PlusCircle, ArrowLeft, CheckCircle, Clock, Sparkles, Loader2, UploadCloud, Download, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle as ShadDialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,43 +14,40 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { autoCheckAssignment, type AutoCheckAssignmentOutput } from "@/ai/flows/auto-check-assignment-flow";
-
-const mockTeacherId = "teacher-evelyn-reed-uid";
+import { db } from "@/lib/firebase";
+import { collection, doc, onSnapshot, addDoc, serverTimestamp, updateDoc, setDoc, query, orderBy, getDoc } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Assignment {
   id: string;
   title: string;
   dueDate: string;
-  status: 'Upcoming' | 'Submitted' | 'Graded';
-  score?: string;
   question: string;
   rubric?: string;
   assignmentFile?: string;
   assignmentDataUri?: string;
+  // Student-specific properties
+  status: 'Upcoming' | 'Submitted' | 'Graded';
+  score?: string;
   submission?: string;
   feedback?: AutoCheckAssignmentOutput;
 }
 
-const initialAssignments: Assignment[] = [
-    { id: 'hw1', title: 'Homework 1: Solving Linear Equations', dueDate: '2024-09-15', status: 'Graded', score: '95/100', question: "Solve for x in the equation: 3x - 7 = 14. See attached worksheet for all problems.", rubric: "Correctly isolate x and find its value. Show your work.", assignmentFile: "linear_equations_worksheet.pdf", assignmentDataUri: "data:text/plain;base64,U29sdmUgZm9yIHggaW4gdGhlIGZvbGxvd2luZyBlcXVhdGlvbnM6CjEuIDN4IC0gNyA9IDE0CjIuIDV4ICsgMyA9IDIzCjMuIDJ4IC0gOSA9IDAK" },
-    { id: 'hw2', title: 'Homework 2: Graphing Functions', dueDate: '2024-09-22', status: 'Submitted', question: "Graph the function y = 2x + 1 for x values from -2 to 2.", rubric: "The graph should be a straight line with the correct slope and y-intercept. All points must be accurate." },
-    { id: 'project1', title: 'Project 1: Real-world Applications', dueDate: '2024-10-01', status: 'Upcoming', question: "Describe a real-world scenario that can be modeled by a linear equation. Provide the equation and explain how it works.", rubric: "Scenario must be plausible. Equation must accurately model the scenario. Explanation must be clear." },
-];
-
-function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { onAssignmentCreated: (newAssignment: Omit<Assignment, 'id' | 'status'>) => void; open: boolean; onOpenChange: (open: boolean) => void; }) {
+function CreateAssignmentDialog({ classId, open, onOpenChange }: { classId: string; open: boolean; onOpenChange: (open: boolean) => void; }) {
     const [title, setTitle] = useState("");
     const [question, setQuestion] = useState("");
     const [rubric, setRubric] = useState("");
+    const [dueDate, setDueDate] = useState("");
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const { toast } = useToast();
     const [isCreating, setIsCreating] = useState(false);
 
     useEffect(() => {
-        // Reset form when dialog is closed
         if (!open) {
             setTitle("");
             setQuestion("");
             setRubric("");
+            setDueDate("");
             setSelectedFile(null);
             setIsCreating(false);
         }
@@ -65,8 +62,8 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
     };
 
     const handleCreate = async () => {
-        if (!title.trim() || !question.trim()) {
-            toast({ variant: "destructive", title: "Missing Information", description: "Title and Question are required." });
+        if (!title.trim() || !question.trim() || !dueDate) {
+            toast({ variant: "destructive", title: "Missing Information", description: "Title, Question, and Due Date are required." });
             return;
         }
         setIsCreating(true);
@@ -80,18 +77,24 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
                     reader.onerror = (error) => reject(error);
                 });
             }
-            onAssignmentCreated({ 
-                title, 
-                question, 
-                rubric, 
-                dueDate: '2024-10-15', // Mock due date
-                assignmentFile: selectedFile?.name, 
+
+            const assignmentsColRef = collection(db, "classes", classId, "assignments");
+            await addDoc(assignmentsColRef, {
+                title,
+                question,
+                rubric,
+                dueDate,
+                assignmentFile: selectedFile?.name,
                 assignmentDataUri,
+                createdAt: serverTimestamp(),
             });
+
+            toast({ title: "Assignment Created", description: `"${title}" is now available for students.` });
             onOpenChange(false);
         } catch (error) {
-            console.error("File read error:", error);
-            toast({ variant: "destructive", title: "File Read Error", description: "Could not process the uploaded file." });
+            console.error("Assignment creation error:", error);
+            const errorMessage = error instanceof Error ? error.message : "Could not create the assignment.";
+            toast({ variant: "destructive", title: "Creation Error", description: errorMessage });
         } finally {
             setIsCreating(false);
         }
@@ -106,6 +109,7 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div><Label htmlFor="new-title">Title</Label><Input id="new-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g., Chapter 3 Problems" disabled={isCreating} /></div>
+                    <div><Label htmlFor="new-due-date">Due Date</Label><Input id="new-due-date" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} disabled={isCreating} /></div>
                     <div><Label htmlFor="new-question">Question/Prompt</Label><Textarea id="new-question" value={question} onChange={e => setQuestion(e.target.value)} placeholder="What is the main assignment prompt? This will be used for AI grading." disabled={isCreating} /></div>
                     <div>
                         <Label htmlFor="assignment-file-upload">Assignment Paper (Optional)</Label>
@@ -113,20 +117,13 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
                             <div className="text-center">
                                 <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                                 <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
-                                    <Label
-                                        htmlFor="assignment-file-upload"
-                                        className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
-                                    >
+                                    <Label htmlFor="assignment-file-upload" className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80">
                                         <span>{selectedFile ? 'Change file' : 'Upload a file'}</span>
                                         <Input id="assignment-file-upload" name="assignment-file-upload" type="file" className="sr-only" onChange={handleFileChange} disabled={isCreating} />
                                     </Label>
                                     {!selectedFile && <p className="pl-1">or drag and drop</p>}
                                 </div>
-                                {selectedFile ? (
-                                    <p className="text-sm mt-2 font-medium text-foreground">{selectedFile.name}</p>
-                                ) : (
-                                    <p className="text-xs leading-5">PDF, DOCX, etc. up to 10MB</p>
-                                )}
+                                {selectedFile ? <p className="text-sm mt-2 font-medium text-foreground">{selectedFile.name}</p> : <p className="text-xs leading-5">PDF, DOCX, etc. up to 10MB</p>}
                             </div>
                         </div>
                     </div>
@@ -144,23 +141,20 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
     );
 }
 
-function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssignment }: { assignment: Assignment | null; open: boolean; onOpenChange: (open: boolean) => void; onUpdateAssignment: (updatedAssignment: Assignment) => void; }) {
+function SubmitAssignmentDialog({ classId, assignment, open, onOpenChange, studentId }: { classId: string; assignment: Assignment | null; open: boolean; onOpenChange: (open: boolean) => void; studentId: string | undefined; }) {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<AutoCheckAssignmentOutput | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
-      setResult(assignment?.feedback || null);
-      setSelectedFile(null); // Reset file selection when dialog opens/changes
+        setResult(assignment?.feedback || null);
+        setSelectedFile(null);
     }, [assignment]);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files.length > 0) {
-            setSelectedFile(event.target.files[0]);
-        } else {
-            setSelectedFile(null);
-        }
+        if (event.target.files && event.target.files.length > 0) setSelectedFile(event.target.files[0]);
+        else setSelectedFile(null);
     };
 
     const handleDownloadAssignment = () => {
@@ -177,8 +171,8 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
     };
 
     const handleSubmit = async () => {
-        if (!selectedFile) {
-            toast({ variant: "destructive", title: "No file selected", description: "Please upload your assignment file." });
+        if (!selectedFile || !assignment || !studentId) {
+            toast({ variant: "destructive", title: "Submission Error", description: "Missing file, assignment details, or user ID." });
             return;
         }
         setIsLoading(true);
@@ -197,22 +191,26 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
 
             try {
                 const aiResult = await autoCheckAssignment({
-                    assignmentQuestion: assignment!.question,
+                    assignmentQuestion: assignment.question,
                     submissionDataUri,
-                    gradingRubric: assignment!.rubric,
-                    teacherAssignmentDataUri: assignment!.assignmentDataUri,
+                    gradingRubric: assignment.rubric,
+                    teacherAssignmentDataUri: assignment.assignmentDataUri,
                 });
                 setResult(aiResult);
-                onUpdateAssignment({
-                  ...assignment!,
-                  status: 'Graded',
-                  submission: selectedFile.name,
-                  feedback: aiResult,
-                  score: `${aiResult.suggestedScore}/100`
-                });
+
+                const submissionRef = doc(db, "classes", classId, "assignments", assignment.id, "submissions", studentId);
+                await setDoc(submissionRef, {
+                    studentId,
+                    submittedAt: serverTimestamp(),
+                    fileName: selectedFile.name,
+                    feedback: aiResult,
+                    score: aiResult.suggestedScore,
+                }, { merge: true });
+
             } catch (error) {
                 console.error("Auto-check failed:", error);
-                toast({ variant: "destructive", title: "Grading Failed", description: "Could not automatically grade the assignment." });
+                const errorMessage = error instanceof Error ? error.message : "Could not automatically grade the assignment.";
+                toast({ variant: "destructive", title: "Grading Failed", description: errorMessage });
             } finally {
                 setIsLoading(false);
             }
@@ -243,8 +241,7 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
                             {assignment.assignmentFile && (
                                 <div className="pt-2">
                                     <Button variant="outline" size="sm" className="rounded-lg" onClick={handleDownloadAssignment}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Assignment: {assignment.assignmentFile}
+                                        <Download className="mr-2 h-4 w-4" /> Download Assignment: {assignment.assignmentFile}
                                     </Button>
                                 </div>
                             )}
@@ -275,20 +272,13 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
                                     <div className="text-center">
                                         <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                                         <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
-                                            <Label
-                                                htmlFor="file-upload"
-                                                className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
-                                            >
+                                            <Label htmlFor="file-upload" className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80">
                                                 <span>{selectedFile ? 'Change file' : 'Upload a file'}</span>
                                                 <Input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.doc,.docx,.txt" />
                                             </Label>
                                             {!selectedFile && <p className="pl-1">or drag and drop</p>}
                                         </div>
-                                        {selectedFile ? (
-                                            <p className="text-sm mt-2 font-medium text-foreground">{selectedFile.name}</p>
-                                        ) : (
-                                            <p className="text-xs leading-5">PDF, DOC, DOCX, TXT up to 10MB</p>
-                                        )}
+                                        {selectedFile ? <p className="text-sm mt-2 font-medium text-foreground">{selectedFile.name}</p> : <p className="text-xs leading-5">PDF, DOC, DOCX, TXT up to 10MB</p>}
                                     </div>
                                 </div>
                             </div>
@@ -296,11 +286,7 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
 
                         <DialogFooter>
                             <DialogClose asChild><Button variant="outline" className="rounded-lg">Close</Button></DialogClose>
-                            {!result && !isLoading && 
-                                <Button onClick={handleSubmit} className="btn-gel rounded-lg" disabled={!selectedFile}>
-                                    <Sparkles className="mr-2 h-4 w-4" /> Submit for Auto-Grading
-                                </Button>
-                            }
+                            {!result && !isLoading && <Button onClick={handleSubmit} className="btn-gel rounded-lg" disabled={!selectedFile}><Sparkles className="mr-2 h-4 w-4" /> Submit for Auto-Grading</Button>}
                         </DialogFooter>
                     </>
                 )}
@@ -309,53 +295,91 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
     );
 }
 
-
 export default function ClassAssignmentsPage() {
     const params = useParams();
     const classId = params.classId as string;
     const { user: currentUser } = useAuth();
-    const isHost = currentUser?.uid === mockTeacherId;
-    const { toast } = useToast();
-
-    const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
+    
+    const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isHost, setIsHost] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleOpenSubmitDialog = (assignment: Assignment) => {
-        setSelectedAssignment(assignment);
-    };
-    
-    const handleCloseSubmitDialog = () => {
-        setSelectedAssignment(null);
-    };
+    useEffect(() => {
+        if (!classId) return;
+        const classDocRef = doc(db, "classes", classId);
+        const unsubscribeClass = onSnapshot(classDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const classData = docSnap.data();
+                setIsHost(classData.creatorId === currentUser?.uid);
+            }
+        });
+        return () => unsubscribeClass();
+    }, [classId, currentUser]);
 
-    const handleCreateAssignment = (newAssignmentData: Omit<Assignment, 'id' | 'status'>) => {
-        const newAssignment: Assignment = {
-            id: `hw-${Date.now()}`,
-            status: 'Upcoming',
-            ...newAssignmentData,
-        };
-        setAssignments(prev => [newAssignment, ...prev]);
-        toast({ title: "Assignment Created", description: `"${newAssignment.title}" is now available for students.` });
-    };
+    useEffect(() => {
+        if (!classId || !currentUser?.uid) {
+            setIsLoading(false);
+            return;
+        }
+        setIsLoading(true);
+        const assignmentsQuery = query(collection(db, "classes", classId, "assignments"), orderBy("createdAt", "desc"));
 
-    const handleUpdateAssignment = (updatedAssignment: Assignment) => {
-        setAssignments(prev => prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a));
-    };
+        const unsubscribeAssignments = onSnapshot(assignmentsQuery, async (querySnapshot) => {
+            const assignmentsData: Omit<Assignment, 'status' | 'score' | 'submission' | 'feedback'>[] = [];
+            querySnapshot.forEach((doc) => {
+                assignmentsData.push({ id: doc.id, ...doc.data() } as any);
+            });
+
+            // For each assignment, fetch the current user's submission status
+            const enrichedAssignments = await Promise.all(
+                assignmentsData.map(async (assignment) => {
+                    const submissionDocRef = doc(db, "classes", classId, "assignments", assignment.id, "submissions", currentUser.uid);
+                    const submissionSnap = await getDoc(submissionDocRef);
+                    
+                    let studentProps: Pick<Assignment, 'status' | 'score' | 'submission' | 'feedback'> = { status: 'Upcoming' };
+                    if (submissionSnap.exists()) {
+                        const submissionData = submissionSnap.data();
+                        studentProps = {
+                            status: submissionData.score ? 'Graded' : 'Submitted',
+                            score: submissionData.score ? `${submissionData.score}/100` : undefined,
+                            submission: submissionData.fileName,
+                            feedback: submissionData.feedback,
+                        };
+                    }
+                    return { ...assignment, ...studentProps };
+                })
+            );
+            
+            setAssignments(enrichedAssignments as Assignment[]);
+            setIsLoading(false);
+            setError(null);
+        }, (err) => {
+            console.error("Error fetching assignments:", err);
+            setError("Could not load assignments. Please try again later.");
+            setIsLoading(false);
+        });
+
+        return () => unsubscribeAssignments();
+    }, [classId, currentUser]);
+
+    const handleOpenSubmitDialog = (assignment: Assignment) => setSelectedAssignment(assignment);
+    const handleCloseSubmitDialog = () => setSelectedAssignment(null);
 
     return (
         <>
-            <CreateAssignmentDialog 
-                open={isCreateDialogOpen} 
-                onOpenChange={setIsCreateDialogOpen} 
-                onAssignmentCreated={handleCreateAssignment} 
-            />
-             <SubmitAssignmentDialog 
-                assignment={selectedAssignment}
-                open={!!selectedAssignment}
-                onOpenChange={(open) => !open && handleCloseSubmitDialog()}
-                onUpdateAssignment={handleUpdateAssignment}
-            />
+            {classId && <CreateAssignmentDialog classId={classId} open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />}
+            {classId && (
+                <SubmitAssignmentDialog 
+                    classId={classId}
+                    assignment={selectedAssignment}
+                    open={!!selectedAssignment}
+                    onOpenChange={(open) => !open && handleCloseSubmitDialog()}
+                    studentId={currentUser?.uid}
+                />
+            )}
 
             <div className="space-y-8">
                 <div className="flex items-center justify-between">
@@ -364,9 +388,7 @@ export default function ClassAssignmentsPage() {
                         <p className="text-muted-foreground">View and submit your homework and projects for this class.</p>
                     </div>
                     <Button asChild variant="outline" className="rounded-lg">
-                        <Link href={`/dashboard/class/${classId}`}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Class
-                        </Link>
+                        <Link href={`/dashboard/class/${classId}`}><ArrowLeft className="mr-2 h-4 w-4" /> Back to Class</Link>
                     </Button>
                 </div>
 
@@ -376,42 +398,50 @@ export default function ClassAssignmentsPage() {
                             <CardTitle>Assignment List</CardTitle>
                             <CardDescription>All homework and projects for this class are listed below.</CardDescription>
                         </div>
-                        {isHost && (
-                            <Button className="btn-gel rounded-lg" onClick={() => setIsCreateDialogOpen(true)}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Create New Assignment
-                            </Button>
-                        )}
+                        {isHost && <Button className="btn-gel rounded-lg" onClick={() => setIsCreateDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> Create New Assignment</Button>}
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-4">
-                            {assignments.map(assignment => (
-                                <div key={assignment.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
-                                    <div className="flex items-center gap-4">
-                                        <FileText className="h-6 w-6 text-primary" />
-                                        <div>
-                                            <p className="font-semibold">{assignment.title}</p>
-                                            <p className="text-sm text-muted-foreground">Due: {assignment.dueDate}</p>
+                        {isLoading ? (
+                            <div className="space-y-4">
+                                <Skeleton className="h-16 w-full rounded-lg" />
+                                <Skeleton className="h-16 w-full rounded-lg" />
+                                <Skeleton className="h-16 w-full rounded-lg" />
+                            </div>
+                        ) : error ? (
+                             <div className="text-center py-10 text-destructive bg-destructive/10 rounded-lg">
+                                <AlertTriangle className="mx-auto h-12 w-12 mb-2" />
+                                <p className="font-semibold">Error Loading Assignments</p>
+                                <p className="text-sm">{error}</p>
+                            </div>
+                        ) : assignments.length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground">
+                                <FileText className="mx-auto h-12 w-12 mb-2" />
+                                <p>No assignments have been created yet.</p>
+                                {isHost && <p className="text-sm mt-1">Click "Create New Assignment" to get started.</p>}
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {assignments.map(assignment => (
+                                    <div key={assignment.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                                        <div className="flex items-center gap-4">
+                                            <FileText className="h-6 w-6 text-primary" />
+                                            <div>
+                                                <p className="font-semibold">{assignment.title}</p>
+                                                <p className="text-sm text-muted-foreground">Due: {assignment.dueDate}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            {assignment.status === 'Graded' && <Badge variant="default">{assignment.score}</Badge>}
+                                            {assignment.status === 'Submitted' && <Badge variant="secondary"><CheckCircle className="h-3 w-3 mr-1" />{assignment.status}</Badge>}
+                                            {assignment.status === 'Upcoming' && <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />{assignment.status}</Badge>}
+                                            
+                                            {!isHost && <Button variant="outline" className="rounded-lg" size="sm" onClick={() => handleOpenSubmitDialog(assignment)}>{assignment.submission ? 'View Submission' : 'View & Submit'}</Button>}
+                                            {isHost && <Button variant="outline" className="rounded-lg" size="sm">View Submissions</Button>}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        {assignment.status === 'Graded' && <Badge variant="default">{assignment.score}</Badge>}
-                                        {assignment.status === 'Submitted' && <Badge variant="secondary"><CheckCircle className="h-3 w-3 mr-1" />{assignment.status}</Badge>}
-                                        {assignment.status === 'Upcoming' && <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />{assignment.status}</Badge>}
-                                        
-                                        {!isHost && (
-                                            <Button variant="outline" className="rounded-lg" size="sm" onClick={() => handleOpenSubmitDialog(assignment)}>
-                                                {assignment.submission ? 'View Submission' : 'View & Submit'}
-                                            </Button>
-                                        )}
-                                        {isHost && (
-                                            <Button variant="outline" className="rounded-lg" size="sm">
-                                                View Submissions
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>

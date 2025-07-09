@@ -3,35 +3,80 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, UploadCloud, ArrowLeft, Download, Eye, Link as LinkIcon, ExternalLink, PlusCircle } from "lucide-react";
+import { FileText, UploadCloud, ArrowLeft, Download, Eye, Link as LinkIcon, ExternalLink, PlusCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, doc, query, orderBy } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const mockMaterials = [
-    { id: 'syllabus', name: 'Course Syllabus.pdf', size: '1.2MB', uploadDate: '2024-08-20' },
-    { id: 'lecture1', name: 'Lecture 1 - Introduction.pptx', size: '5.8MB', uploadDate: '2024-08-22' },
-    { id: 'reading1', name: 'Required Reading Ch 1-3.pdf', size: '3.4MB', uploadDate: '2024-08-22' },
-];
+interface Material {
+    id: string;
+    name: string;
+    size: string;
+    uploadDate: string; // Should be Firestore Timestamp in a real app
+    url: string;
+}
 
-const mockLinks = [
-    { id: 'link1', title: 'Khan Academy - Algebra Basics', url: 'https://www.khanacademy.org/math/algebra-basics', description: 'Great for fundamentals.' },
-    { id: 'link2', title: '3Blue1Brown - Essence of Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab', description: 'Visual explanations of core concepts.' },
-    { id: 'link3', title: 'Paul\'s Online Math Notes', url: 'https://tutorial.math.lamar.edu/', description: 'Detailed notes and examples.' },
-];
-
-
-// In a real app, this ID would come from the class data.
-// We use a mock ID here to simulate role-based access.
-const mockTeacherId = "teacher-evelyn-reed-uid";
+interface ExternalLink {
+    id: string;
+    title: string;
+    url: string;
+    description: string;
+}
 
 export default function ClassMaterialsPage() {
     const params = useParams();
     const classId = params.classId as string;
     const { user: currentUser } = useAuth();
+    
+    const [materials, setMaterials] = useState<Material[]>([]);
+    const [links, setLinks] = useState<ExternalLink[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isHost, setIsHost] = useState(false);
 
-    // Check if the current user is the host/teacher.
-    const isHost = currentUser?.uid === mockTeacherId;
+    useEffect(() => {
+        if (!classId || !currentUser) return;
+        
+        const unsubs: (() => void)[] = [];
+
+        // Check if user is the host
+        unsubs.push(onSnapshot(doc(db, "classes", classId), (docSnap) => {
+            if (docSnap.exists()) {
+                setIsHost(docSnap.data().creatorId === currentUser.uid);
+            }
+        }));
+
+        // Fetch materials
+        const materialsQuery = query(collection(db, "classes", classId, "materials"), orderBy("uploadDate", "desc"));
+        unsubs.push(onSnapshot(materialsQuery, (snapshot) => {
+            const fetchedMaterials: Material[] = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                fetchedMaterials.push({ 
+                    id: doc.id, 
+                    ...data,
+                    uploadDate: data.uploadDate?.toDate().toLocaleDateString() || new Date().toLocaleDateString() 
+                } as Material);
+            });
+            setMaterials(fetchedMaterials);
+            setIsLoading(false);
+        }));
+
+        // Fetch links
+        const linksQuery = query(collection(db, "classes", classId, "links"), orderBy("createdAt", "desc"));
+        unsubs.push(onSnapshot(linksQuery, (snapshot) => {
+            const fetchedLinks: ExternalLink[] = [];
+            snapshot.forEach(doc => fetchedLinks.push({ id: doc.id, ...doc.data() } as ExternalLink));
+            setLinks(fetchedLinks);
+        }));
+
+        return () => unsubs.forEach(unsub => unsub());
+
+    }, [classId, currentUser]);
+
 
     return (
         <div className="space-y-8">
@@ -41,9 +86,7 @@ export default function ClassMaterialsPage() {
                     <p className="text-muted-foreground">Find all your course documents, links, and lecture notes here.</p>
                 </div>
                  <Button asChild variant="outline" className="rounded-lg">
-                    <Link href={`/dashboard/class/${classId}`}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Class
-                    </Link>
+                    <Link href={`/dashboard/class/${classId}`}><ArrowLeft className="mr-2 h-4 w-4" /> Back to Class</Link>
                 </Button>
             </div>
             <Tabs defaultValue="files" className="w-full">
@@ -63,32 +106,37 @@ export default function ClassMaterialsPage() {
 
                     <TabsContent value="files">
                         <CardContent>
-                            <div className="space-y-3">
-                                {mockMaterials.map(material => (
-                                    <div key={material.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
-                                        <div className="flex items-center gap-4">
-                                            <FileText className="h-6 w-6 text-primary" />
-                                            <div>
-                                                <p className="font-semibold">{material.name}</p>
-                                                <p className="text-sm text-muted-foreground">Uploaded: {material.uploadDate} | Size: {material.size}</p>
+                            {isLoading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-20 w-full" />
+                                    <Skeleton className="h-20 w-full" />
+                                </div>
+                            ) : materials.length > 0 ? (
+                                <div className="space-y-3">
+                                    {materials.map(material => (
+                                        <div key={material.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                                            <div className="flex items-center gap-4">
+                                                <FileText className="h-6 w-6 text-primary" />
+                                                <div>
+                                                    <p className="font-semibold">{material.name}</p>
+                                                    <p className="text-sm text-muted-foreground">Uploaded: {material.uploadDate} | Size: {material.size}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button asChild variant="outline" size="icon" className="rounded-lg"><a href={material.url} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4" /></a></Button>
+                                                <Button asChild variant="outline" size="icon" className="rounded-lg"><a href={material.url} download={material.name}><Download className="h-4 w-4" /></a></Button>
                                             </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" size="icon" className="rounded-lg">
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="outline" size="icon" className="rounded-lg">
-                                                <Download className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 text-muted-foreground"><FileText className="mx-auto h-12 w-12 mb-2" /><p>No files have been uploaded yet.</p></div>
+                            )}
                         </CardContent>
                         {isHost && (
                             <CardFooter>
-                                <Button className="w-full btn-gel rounded-lg">
-                                    <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material
+                                <Button className="w-full btn-gel rounded-lg" disabled>
+                                    <UploadCloud className="mr-2 h-4 w-4" /> Upload New Material (Coming Soon)
                                 </Button>
                             </CardFooter>
                         )}
@@ -96,9 +144,14 @@ export default function ClassMaterialsPage() {
 
                     <TabsContent value="links">
                         <CardContent>
-                             {mockLinks.length > 0 ? (
+                             {isLoading ? (
                                 <div className="space-y-3">
-                                    {mockLinks.map(link => (
+                                    <Skeleton className="h-20 w-full" />
+                                    <Skeleton className="h-20 w-full" />
+                                </div>
+                            ) : links.length > 0 ? (
+                                <div className="space-y-3">
+                                    {links.map(link => (
                                         <div key={link.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
                                             <div className="flex items-center gap-4 min-w-0">
                                                 <LinkIcon className="h-6 w-6 text-primary flex-shrink-0" />
@@ -108,24 +161,21 @@ export default function ClassMaterialsPage() {
                                                 </div>
                                             </div>
                                             <Button asChild variant="outline" size="icon" className="rounded-lg flex-shrink-0 ml-2">
-                                                <a href={link.url} target="_blank" rel="noopener noreferrer">
-                                                    <ExternalLink className="h-4 w-4" />
-                                                </a>
+                                                <a href={link.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
                                             </Button>
                                         </div>
                                     ))}
                                 </div>
                              ) : (
                                 <div className="text-center py-10 text-muted-foreground">
-                                    <LinkIcon className="mx-auto h-12 w-12 mb-2" />
-                                    <p>No links have been added yet.</p>
+                                    <LinkIcon className="mx-auto h-12 w-12 mb-2" /><p>No links have been added yet.</p>
                                 </div>
                              )}
                         </CardContent>
                         {isHost && (
                             <CardFooter>
-                                <Button className="w-full btn-gel rounded-lg">
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Link
+                                <Button className="w-full btn-gel rounded-lg" disabled>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Link (Coming Soon)
                                 </Button>
                             </CardFooter>
                         )}

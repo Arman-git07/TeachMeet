@@ -50,51 +50,27 @@ export function SignInForm() {
       });
       router.push('/');
     } catch (error: any) {
-      if (error.code === 'auth/network-request-failed') {
-        toast({
-          variant: "destructive",
-          title: "Network Error",
-          description: "Could not connect to authentication services. This might be a network issue or a missing API configuration. Please check the developer console for details.",
-          duration: 7000,
-        });
-        setIsLoading(false);
-        return;
-      }
-      if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-        toast({
-          variant: "destructive",
-          title: "API Key Error",
-          description: "Authentication is blocked by your API key settings. Ensure the 'Identity Toolkit API' is enabled and allowed by your key.",
-          duration: 7000,
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const knownErrorCodes = [
-        'auth/user-not-found',
-        'auth/wrong-password',
-        'auth/invalid-credential',
-        'auth/invalid-email',
-        'auth/too-many-requests',
-        'auth/visibility-check-was-unavailable'
-      ];
-
-      if (!knownErrorCodes.includes(error.code)) {
-        console.error("Unexpected Sign In Error:", error);
-      } else {
-        console.info(`Handled Sign In Error: ${error.code}`);
-      }
+      console.error("Sign In Error:", error);
 
       let errorMessage = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/user-not-found' || error.code === 'wrong-password' || error.code === 'invalid-credential') {
-        errorMessage = "Invalid email or password. Please try again.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "The email address is not valid.";
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
-      } else if (error.code === 'auth/visibility-check-was-unavailable') {
-        errorMessage = "There was a temporary issue with the authentication service. This can sometimes be caused by network issues or ad-blocking browser extensions. Please try signing in again in a moment.";
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          errorMessage = "Invalid email or password. Please try again.";
+          break;
+        case 'auth/invalid-email':
+          errorMessage = "The email address is not valid.";
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = "Network error. Please check your connection.";
+          break;
+        case String(error.code.match(/auth\/requests-to-this-api-.*/)):
+            errorMessage = "Authentication is temporarily unavailable. Please try again later.";
+            break;
       }
       
       toast({
