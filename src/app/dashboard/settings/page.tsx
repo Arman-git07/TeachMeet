@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Mic, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Bell, Palette, UserCircle, ShieldCheck, BarChart3, Video as VideoIcon, Clapperboard, Settings as SettingsIcon, ArrowRightCircle, BookOpen, ShieldQuestion, Users as UsersIconLucide, ImageIcon, Mic, Save, Loader2, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -58,6 +58,7 @@ export default function SettingsPage() {
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
   const recordingSettingsRef = useRef<HTMLDivElement>(null); 
   const whiteboardSettingsRef = useRef<HTMLDivElement>(null);
+  const paymentSettingsRef = useRef<HTMLDivElement>(null);
   const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null);
 
   // General Settings State
@@ -83,6 +84,11 @@ export default function SettingsPage() {
     showTextTool: true,
     showEraseTool: true,
   });
+
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [upiId, setUpiId] = useState('');
 
   const isWhiteboardDirty =
     whiteboardBackgroundColor !== initialWhiteboardSettings.backgroundColor ||
@@ -200,6 +206,21 @@ export default function SettingsPage() {
     });
   };
 
+  const handleSavePaymentSettings = () => {
+    // In a real app, this would securely save to a backend.
+    // For this prototype, we'll just show a confirmation.
+    console.log({
+      accountHolderName,
+      accountNumber,
+      ifscCode,
+      upiId
+    });
+    toast({
+      title: "Payment Settings Saved",
+      description: "Your payout information has been securely updated.",
+    });
+  };
+
   useEffect(() => {
     const highlightParam = searchParams.get('highlight');
     if (highlightParam) {
@@ -209,6 +230,7 @@ export default function SettingsPage() {
         advancedMeetingSettings: advancedMeetingSettingsRef,
         recordingSettings: recordingSettingsRef,
         whiteboardSettings: whiteboardSettingsRef,
+        paymentSettings: paymentSettingsRef,
       };
 
       const targetRef = sectionRefMap[highlightParam];
@@ -262,6 +284,14 @@ export default function SettingsPage() {
           >
             <Palette className="mr-2 h-5 w-5" />
             Whiteboard Settings
+          </Button>
+          <Button 
+            variant="outline" 
+            className="rounded-lg justify-start text-left py-3" 
+            onClick={() => handleNavigateToSection('paymentSettings')}
+          >
+            <Landmark className="mr-2 h-5 w-5" />
+            Payment & Payouts
           </Button>
         </div>
       </SettingsSection>
@@ -430,6 +460,52 @@ export default function SettingsPage() {
         </div>
       </SettingsSection>
       
+       <SettingsSection 
+        id="paymentSettings"
+        ref={paymentSettingsRef}
+        title="Payment & Payouts" 
+        description="Manage how you receive payments. This information is kept private and secure." 
+        icon={Landmark}
+        className={highlightedSectionId === 'paymentSettings' ? 'highlight-blink' : ''}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            This information is used to transfer student fees to you. It is not shared with students or other users.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="accountHolderName">Account Holder Name</Label>
+            <Input id="accountHolderName" placeholder="e.g., John Doe" className="rounded-lg" value={accountHolderName} onChange={(e) => setAccountHolderName(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="accountNumber">Bank Account Number</Label>
+              <Input id="accountNumber" placeholder="Your account number" className="rounded-lg" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ifscCode">IFSC Code</Label>
+              <Input id="ifscCode" placeholder="Your bank's IFSC code" className="rounded-lg" value={ifscCode} onChange={(e) => setIfscCode(e.target.value)} />
+            </div>
+          </div>
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">
+                Or
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="upiId">UPI ID</Label>
+            <Input id="upiId" placeholder="e.g., yourname@oksbi" className="rounded-lg" value={upiId} onChange={(e) => setUpiId(e.target.value)} />
+          </div>
+        </div>
+        <Button className="mt-6 btn-gel rounded-lg" onClick={handleSavePaymentSettings}>
+          <Save className="mr-2 h-4 w-4" /> Save Payment Settings
+        </Button>
+      </SettingsSection>
+
       <SettingsSection title="Privacy & Security" description="Manage your account security and data." icon={ShieldCheck}>
         <div className="space-y-4">
            <div>
