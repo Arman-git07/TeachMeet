@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Trash2, Copy, Share2, Link as LinkIcon, Check, X } from "lucide-react";
+import { ArrowLeft, Trash2, Copy, Share2, Link as LinkIcon, Check, X, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -106,37 +106,44 @@ export default function ManageMembersPage() {
                     </CardContent>
                 </Card>
 
-                {isHost && joinRequests.length > 0 && (
+                {isHost && (
                     <Card className="rounded-xl shadow-lg border-primary/30">
                         <CardHeader>
                             <CardTitle>Pending Join Requests ({joinRequests.length})</CardTitle>
                             <CardDescription>Approve or deny requests from students to join this class.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-4">
-                                {joinRequests.map(request => (
-                                    <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-10 w-10">
-                                                <AvatarImage src={`https://placehold.co/40x40.png?text=${request.name.charAt(0)}`} alt={request.name} data-ai-hint="avatar student"/>
-                                                <AvatarFallback>{request.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <p className="font-semibold">{request.name}</p>
-                                                <p className="text-sm text-muted-foreground">{request.email}</p>
+                            {joinRequests.length > 0 ? (
+                                <div className="space-y-4">
+                                    {joinRequests.map(request => (
+                                        <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-10 w-10">
+                                                    <AvatarImage src={`https://placehold.co/40x40.png?text=${request.name.charAt(0)}`} alt={request.name} data-ai-hint="avatar student"/>
+                                                    <AvatarFallback>{request.name.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                    <p className="font-semibold">{request.name}</p>
+                                                    <p className="text-sm text-muted-foreground">{request.email}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button variant="outline" size="sm" className="rounded-lg border-green-500/50 text-green-600 hover:bg-green-500/10 hover:text-green-700" onClick={() => handleRequestAction(request.id, true, request.name)}>
+                                                    <Check className="mr-2 h-4 w-4" /> Approve
+                                                </Button>
+                                                <Button variant="destructive" size="sm" className="rounded-lg" onClick={() => handleRequestAction(request.id, false, request.name)}>
+                                                    <X className="mr-2 h-4 w-4" /> Deny
+                                                </Button>
                                             </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" size="sm" className="rounded-lg border-green-500/50 text-green-600 hover:bg-green-500/10 hover:text-green-700" onClick={() => handleRequestAction(request.id, true, request.name)}>
-                                                <Check className="mr-2 h-4 w-4" /> Approve
-                                            </Button>
-                                            <Button variant="destructive" size="sm" className="rounded-lg" onClick={() => handleRequestAction(request.id, false, request.name)}>
-                                                <X className="mr-2 h-4 w-4" /> Deny
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-muted-foreground flex flex-col items-center gap-2">
+                                    <Users className="h-12 w-12" />
+                                    <p>There are no pending join requests.</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}
