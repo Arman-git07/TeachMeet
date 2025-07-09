@@ -10,8 +10,7 @@ import { useParams } from "next/navigation";
 const mockAssignments = [
     { id: 'hw1', title: 'Homework 1: Solving Linear Equations', dueDate: '2024-09-15', status: 'Graded', score: '95/100' },
     { id: 'hw2', title: 'Homework 2: Graphing Functions', dueDate: '2024-09-22', status: 'Submitted' },
-    { id: 'quiz1', title: 'Quiz 1: Chapter 1 & 2', dueDate: '2024-09-25', status: 'Upcoming' },
-    { id: 'midterm', title: 'Midterm Exam', dueDate: '2024-10-10', status: 'Upcoming' },
+    { id: 'project1', title: 'Project 1: Real-world Applications', dueDate: '2024-10-01', status: 'Upcoming' },
 ];
 
 export default function ClassAssignmentsPage() {
@@ -22,8 +21,8 @@ export default function ClassAssignmentsPage() {
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Assignments & Exams</h1>
-                    <p className="text-muted-foreground">View and submit your assignments for this class.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Assignments</h1>
+                    <p className="text-muted-foreground">View and submit your homework and projects for this class.</p>
                 </div>
                 <Button asChild variant="outline" className="rounded-lg">
                     <Link href={`/dashboard/class/${classId}`}>
@@ -35,7 +34,7 @@ export default function ClassAssignmentsPage() {
             <Card className="rounded-xl shadow-lg border-border/50">
                 <CardHeader>
                     <CardTitle>Assignment List</CardTitle>
-                    <CardDescription>All assignments and exams for this class are listed below.</CardDescription>
+                    <CardDescription>All homework and projects for this class are listed below.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
