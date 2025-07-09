@@ -82,7 +82,7 @@ export default function ClassFeesPage() {
                 <Info className="h-4 w-4" />
                 <AlertTitle className="text-primary font-semibold">Platform Fee Notice</AlertTitle>
                 <AlertDescription>
-                    Please be aware that a 2% platform fee is applied to all class fee transactions to support the development and maintenance of TeachMeet. This fee is automatically calculated during payment. Developer UPI for contributions: <strong>07arman2004-1@oksbi</strong>.
+                    Please be aware that a 2% platform fee is applied to all class fee transactions to support the development and maintenance of TeachMeet. This fee is automatically calculated during payment.
                 </AlertDescription>
             </Alert>
 
