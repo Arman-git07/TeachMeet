@@ -19,9 +19,9 @@ export const AutoCheckAssignmentInputSchema = z.object({
 export type AutoCheckAssignmentInput = z.infer<typeof AutoCheckAssignmentInputSchema>;
 
 export const AutoCheckAssignmentOutputSchema = z.object({
-  isCorrect: z.boolean().describe("Whether the student's submission is considered correct or satisfactory."),
-  feedback: z.string().describe("Constructive feedback for the student on their submission."),
-  suggestedScore: z.number().min(0).max(100).describe("A suggested score between 0 and 100."),
+  isCorrect: z.boolean().describe("Whether the student's submission is considered correct or satisfactory based on the rubric."),
+  feedback: z.string().describe("Constructive, helpful, and encouraging feedback for the student on their submission."),
+  suggestedScore: z.number().min(0).max(100).describe("A suggested score between 0 and 100, based on the rubric and correctness."),
 });
 export type AutoCheckAssignmentOutput = z.infer<typeof AutoCheckAssignmentOutputSchema>;
 
@@ -33,15 +33,17 @@ const prompt = ai.definePrompt({
   name: 'autoCheckAssignmentPrompt',
   input: {schema: AutoCheckAssignmentInputSchema},
   output: {schema: AutoCheckAssignmentOutputSchema},
-  prompt: `You are an AI teaching assistant. Your task is to evaluate a student's submission based on the assignment question and an optional grading rubric.
+  prompt: `You are an expert and friendly AI teaching assistant. Your task is to evaluate a student's submission based on the assignment question and an optional grading rubric.
 
-  Provide clear, constructive feedback. Determine if the answer is correct and suggest a score from 0 to 100.
+  Your feedback should be encouraging and constructive. Explain what the student did well and where they can improve.
+  
+  Based on the grading rubric (if provided) and the correctness of the answer, determine if the submission is satisfactory and provide a score from 0 to 100.
 
   ## Assignment Details
   - **Question**: {{{assignmentQuestion}}}
-  {{#if gradingRubric}}- **Rubric**: {{{gradingRubric}}}{{/if}}
+  {{#if gradingRubric}}- **Grading Rubric**: {{{gradingRubric}}}{{/if}}
 
-  ## Student Submission
+  ## Student's Submission
   {{{studentSubmission}}}
   `,
 });
