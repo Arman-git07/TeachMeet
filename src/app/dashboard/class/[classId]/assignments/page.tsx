@@ -26,12 +26,13 @@ interface Assignment {
   question: string;
   rubric?: string;
   assignmentFile?: string;
+  assignmentDataUri?: string;
   submission?: string;
   feedback?: AutoCheckAssignmentOutput;
 }
 
 const initialAssignments: Assignment[] = [
-    { id: 'hw1', title: 'Homework 1: Solving Linear Equations', dueDate: '2024-09-15', status: 'Graded', score: '95/100', question: "Solve for x in the equation: 3x - 7 = 14. See attached worksheet for all problems.", rubric: "Correctly isolate x and find its value. Show your work.", assignmentFile: "linear_equations_worksheet.pdf" },
+    { id: 'hw1', title: 'Homework 1: Solving Linear Equations', dueDate: '2024-09-15', status: 'Graded', score: '95/100', question: "Solve for x in the equation: 3x - 7 = 14. See attached worksheet for all problems.", rubric: "Correctly isolate x and find its value. Show your work.", assignmentFile: "linear_equations_worksheet.pdf", assignmentDataUri: "data:text/plain;base64,U29sdmUgZm9yIHggaW4gdGhlIGZvbGxvd2luZyBlcXVhdGlvbnM6CjEuIDN4IC0gNyA9IDE0CjIuIDV4ICsgMyA9IDIzCjMuIDJ4IC0gOSA9IDAK" },
     { id: 'hw2', title: 'Homework 2: Graphing Functions', dueDate: '2024-09-22', status: 'Submitted', question: "Graph the function y = 2x + 1 for x values from -2 to 2.", rubric: "The graph should be a straight line with the correct slope and y-intercept. All points must be accurate." },
     { id: 'project1', title: 'Project 1: Real-world Applications', dueDate: '2024-10-01', status: 'Upcoming', question: "Describe a real-world scenario that can be modeled by a linear equation. Provide the equation and explain how it works.", rubric: "Scenario must be plausible. Equation must accurately model the scenario. Explanation must be clear." },
 ];
@@ -42,6 +43,7 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
     const [rubric, setRubric] = useState("");
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const { toast } = useToast();
+    const [isCreating, setIsCreating] = useState(false);
 
     useEffect(() => {
         // Reset form when dialog is closed
@@ -50,6 +52,7 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
             setQuestion("");
             setRubric("");
             setSelectedFile(null);
+            setIsCreating(false);
         }
     }, [open]);
 
@@ -61,13 +64,37 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
         }
     };
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         if (!title.trim() || !question.trim()) {
             toast({ variant: "destructive", title: "Missing Information", description: "Title and Question are required." });
             return;
         }
-        onAssignmentCreated({ title, question, rubric, dueDate: '2024-10-15', assignmentFile: selectedFile?.name }); // Mock due date
-        onOpenChange(false);
+        setIsCreating(true);
+        let assignmentDataUri: string | undefined = undefined;
+        try {
+            if (selectedFile) {
+                assignmentDataUri = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(selectedFile);
+                    reader.onload = (event) => resolve(event.target?.result as string);
+                    reader.onerror = (error) => reject(error);
+                });
+            }
+            onAssignmentCreated({ 
+                title, 
+                question, 
+                rubric, 
+                dueDate: '2024-10-15', // Mock due date
+                assignmentFile: selectedFile?.name, 
+                assignmentDataUri,
+            });
+            onOpenChange(false);
+        } catch (error) {
+            console.error("File read error:", error);
+            toast({ variant: "destructive", title: "File Read Error", description: "Could not process the uploaded file." });
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     return (
@@ -78,8 +105,8 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
                     <DialogDescription>Define the assignment question and grading criteria for automated review.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                    <div><Label htmlFor="new-title">Title</Label><Input id="new-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g., Chapter 3 Problems" /></div>
-                    <div><Label htmlFor="new-question">Question/Prompt</Label><Textarea id="new-question" value={question} onChange={e => setQuestion(e.target.value)} placeholder="What is the main assignment prompt? This will be used for AI grading." /></div>
+                    <div><Label htmlFor="new-title">Title</Label><Input id="new-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g., Chapter 3 Problems" disabled={isCreating} /></div>
+                    <div><Label htmlFor="new-question">Question/Prompt</Label><Textarea id="new-question" value={question} onChange={e => setQuestion(e.target.value)} placeholder="What is the main assignment prompt? This will be used for AI grading." disabled={isCreating} /></div>
                     <div>
                         <Label htmlFor="assignment-file-upload">Assignment Paper (Optional)</Label>
                         <div className="mt-1 flex justify-center rounded-lg border border-dashed border-input px-6 py-10">
@@ -91,7 +118,7 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
                                         className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
                                     >
                                         <span>{selectedFile ? 'Change file' : 'Upload a file'}</span>
-                                        <Input id="assignment-file-upload" name="assignment-file-upload" type="file" className="sr-only" onChange={handleFileChange} />
+                                        <Input id="assignment-file-upload" name="assignment-file-upload" type="file" className="sr-only" onChange={handleFileChange} disabled={isCreating} />
                                     </Label>
                                     {!selectedFile && <p className="pl-1">or drag and drop</p>}
                                 </div>
@@ -103,11 +130,14 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
                             </div>
                         </div>
                     </div>
-                    <div><Label htmlFor="new-rubric">Grading Rubric (Optional)</Label><Textarea id="new-rubric" value={rubric} onChange={e => setRubric(e.target.value)} placeholder="Provide criteria for grading. e.g., 'Correct answer is worth 50 points...'" /></div>
+                    <div><Label htmlFor="new-rubric">Grading Rubric (Optional)</Label><Textarea id="new-rubric" value={rubric} onChange={e => setRubric(e.target.value)} placeholder="Provide criteria for grading. e.g., 'Correct answer is worth 50 points...'" disabled={isCreating} /></div>
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild><Button variant="outline" className="rounded-lg">Cancel</Button></DialogClose>
-                    <Button onClick={handleCreate} className="btn-gel rounded-lg">Create Assignment</Button>
+                    <DialogClose asChild><Button variant="outline" className="rounded-lg" disabled={isCreating}>Cancel</Button></DialogClose>
+                    <Button onClick={handleCreate} className="btn-gel rounded-lg" disabled={isCreating}>
+                        {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isCreating ? 'Creating...' : 'Create Assignment'}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -133,6 +163,19 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
         }
     };
 
+    const handleDownloadAssignment = () => {
+        if (!assignment?.assignmentDataUri) {
+            toast({ variant: 'destructive', title: 'Download Failed', description: 'No file is available for download for this assignment.' });
+            return;
+        }
+        const link = document.createElement('a');
+        link.href = assignment.assignmentDataUri;
+        link.download = assignment.assignmentFile || 'assignment';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleSubmit = async () => {
         if (!selectedFile) {
             toast({ variant: "destructive", title: "No file selected", description: "Please upload your assignment file." });
@@ -156,7 +199,8 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
                 const aiResult = await autoCheckAssignment({
                     assignmentQuestion: assignment!.question,
                     submissionDataUri,
-                    gradingRubric: assignment!.rubric
+                    gradingRubric: assignment!.rubric,
+                    teacherAssignmentDataUri: assignment!.assignmentDataUri,
                 });
                 setResult(aiResult);
                 onUpdateAssignment({
@@ -198,7 +242,7 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
                             <DialogDescription>{assignment.question}</DialogDescription>
                             {assignment.assignmentFile && (
                                 <div className="pt-2">
-                                    <Button variant="outline" size="sm" className="rounded-lg">
+                                    <Button variant="outline" size="sm" className="rounded-lg" onClick={handleDownloadAssignment}>
                                         <Download className="mr-2 h-4 w-4" />
                                         Download Assignment: {assignment.assignmentFile}
                                     </Button>
