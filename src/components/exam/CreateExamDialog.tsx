@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,8 +7,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Loader2, FileText, UploadCloud } from "lucide-react";
+import { Loader2, FileText, UploadCloud, PlusCircle, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+
+// Define question structure
+interface MCQuestion {
+  id: string;
+  text: string;
+  options: { id: string; text: string }[];
+  correctAnswerId: string;
+}
 
 export function CreateExamDialogContent() {
   const [title, setTitle] = useState("");
@@ -17,6 +29,9 @@ export function CreateExamDialogContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
+  
+  // New state for online questions
+  const [questions, setQuestions] = useState<MCQuestion[]>([]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -26,41 +41,67 @@ export function CreateExamDialogContent() {
     }
   };
 
+  const handleAddQuestion = () => {
+    const newQuestionId = `q-${Date.now()}`;
+    const newOptions = [
+        { id: `opt-1-${newQuestionId}`, text: "" },
+        { id: `opt-2-${newQuestionId}`, text: "" },
+        { id: `opt-3-${newQuestionId}`, text: "" },
+        { id: `opt-4-${newQuestionId}`, text: "" },
+    ];
+    const newQuestion: MCQuestion = {
+      id: newQuestionId,
+      text: "",
+      options: newOptions,
+      correctAnswerId: newOptions[0].id,
+    };
+    setQuestions([...questions, newQuestion]);
+  };
+
+  const handleRemoveQuestion = (questionId: string) => {
+    setQuestions(questions.filter(q => q.id !== questionId));
+  };
+
+  const handleQuestionTextChange = (questionId: string, text: string) => {
+    setQuestions(questions.map(q => q.id === questionId ? { ...q, text } : q));
+  };
+
+  const handleOptionTextChange = (questionId: string, optionId: string, text: string) => {
+    setQuestions(questions.map(q => 
+      q.id === questionId ? { ...q, options: q.options.map(opt => opt.id === optionId ? { ...opt, text } : opt) } : q
+    ));
+  };
+
+  const handleCorrectAnswerChange = (questionId: string, optionId: string) => {
+    setQuestions(questions.map(q => q.id === questionId ? { ...q, correctAnswerId: optionId } : q));
+  };
 
   const handleCreateExam = async () => {
     if (!title.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Title Required",
-        description: "Please enter a title for the assessment.",
-      });
+      toast({ variant: "destructive", title: "Title Required", description: "Please enter a title for the assessment." });
       return;
     }
     if (!dueDate) {
-        toast({
-          variant: "destructive",
-          title: "Due Date Required",
-          description: "Please select a due date.",
-        });
+        toast({ variant: "destructive", title: "Due Date Required", description: "Please select a due date." });
         return;
-      }
+    }
+    if (type.includes("Online") && questions.length === 0) {
+        toast({ variant: "destructive", title: "Questions Required", description: "Please add at least one question for an online assessment." });
+        return;
+    }
     if (type === "Uploaded Paper" && !selectedFile) {
-        toast({
-          variant: "destructive",
-          title: "File Required",
-          description: "Please upload a paper for this assessment type.",
-        });
+        toast({ variant: "destructive", title: "File Required", description: "Please upload a paper for this assessment type." });
         return;
     }
     setIsCreating(true);
     
     // Mock API call
-    console.log("Creating exam:", { title, type, dueDate, description, fileName: selectedFile?.name });
+    console.log("Creating exam:", { title, type, dueDate, description, questions, fileName: selectedFile?.name });
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     toast({
       title: "Assessment Created!",
-      description: `The assessment "${title}" has been created. ${selectedFile ? `File "${selectedFile.name}" was uploaded.` : ''}`,
+      description: `The assessment "${title}" has been created.`,
     });
     
     setIsCreating(false);
@@ -69,7 +110,75 @@ export function CreateExamDialogContent() {
     setType("Multiple Choice (Online)");
     setDueDate("");
     setSelectedFile(null);
+    setQuestions([]);
   };
+
+  // The online question editor component
+  const OnlineQuestionEditor = () => (
+    <div className="space-y-4">
+        <Label>Online Questions</Label>
+        <div className="border rounded-lg p-2 space-y-4 max-h-[300px]">
+            <ScrollArea className="h-full pr-4">
+                <div className="p-2 space-y-4">
+                  {questions.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-4">
+                          <p>No questions yet. Click "Add Question" to start.</p>
+                      </div>
+                  ) : (
+                      questions.map((q, qIndex) => (
+                          <div key={q.id} className="p-4 border rounded-lg bg-muted/50 relative">
+                              <div className="flex justify-between items-center mb-2">
+                                <Label htmlFor={`q-text-${q.id}`} className="font-semibold">Question {qIndex + 1}</Label>
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleRemoveQuestion(q.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                  id={`q-text-${q.id}`}
+                                  placeholder="Type your question here..."
+                                  value={q.text}
+                                  onChange={(e) => handleQuestionTextChange(q.id, e.target.value)}
+                                  className="mt-1"
+                                  rows={2}
+                              />
+                              {type === "Multiple Choice (Online)" && (
+                                  <div className="mt-4 space-y-2">
+                                      <Label className="text-xs text-muted-foreground">Options (select the correct answer)</Label>
+                                      <RadioGroup value={q.correctAnswerId} onValueChange={(value) => handleCorrectAnswerChange(q.id, value)}>
+                                          {q.options.map((opt, optIndex) => (
+                                              <div key={opt.id} className="flex items-center gap-2">
+                                                  <RadioGroupItem value={opt.id} id={opt.id} />
+                                                  <Input
+                                                      placeholder={`Option ${optIndex + 1}`}
+                                                      value={opt.text}
+                                                      onChange={(e) => handleOptionTextChange(q.id, opt.id, e.target.value)}
+                                                  />
+                                              </div>
+                                          ))}
+                                      </RadioGroup>
+                                  </div>
+                              )}
+                              {type === "Written Answer (Online)" && (
+                                <div className="mt-2 p-3 text-center text-xs text-muted-foreground bg-background rounded-md border">
+                                    Student will provide a written answer for this question.
+                                </div>
+                              )}
+                          </div>
+                      ))
+                  )}
+                </div>
+            </ScrollArea>
+        </div>
+        <Button variant="outline" className="w-full" onClick={handleAddQuestion}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Question
+        </Button>
+    </div>
+  );
 
   return (
     <>
@@ -160,12 +269,7 @@ export function CreateExamDialogContent() {
                 </div>
             </div>
         ) : (
-            <div>
-                 <Label>Online Questions</Label>
-                 <div className="mt-1 flex items-center justify-center rounded-lg border border-dashed border-border/70 px-6 py-10 text-center">
-                    <p className="text-sm text-muted-foreground">Online question creation tools will be available here.</p>
-                 </div>
-            </div>
+            <OnlineQuestionEditor />
         )}
 
       </div>
@@ -179,7 +283,7 @@ export function CreateExamDialogContent() {
           type="button" 
           onClick={handleCreateExam} 
           className="btn-gel rounded-lg" 
-          disabled={!title.trim() || !dueDate || isCreating || (type === "Uploaded Paper" && !selectedFile)}
+          disabled={!title.trim() || !dueDate || isCreating || (type === "Uploaded Paper" && !selectedFile) || (type.includes("Online") && questions.length === 0)}
         >
           {isCreating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
           {isCreating ? "Creating..." : "Create"}
