@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, PlusCircle, ArrowLeft, CheckCircle, Clock, Sparkles, Loader2, UploadCloud } from "lucide-react";
+import { FileText, PlusCircle, ArrowLeft, CheckCircle, Clock, Sparkles, Loader2, UploadCloud, Download } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useMemo, useEffect } from "react";
@@ -25,12 +25,13 @@ interface Assignment {
   score?: string;
   question: string;
   rubric?: string;
+  assignmentFile?: string;
   submission?: string;
   feedback?: AutoCheckAssignmentOutput;
 }
 
 const initialAssignments: Assignment[] = [
-    { id: 'hw1', title: 'Homework 1: Solving Linear Equations', dueDate: '2024-09-15', status: 'Graded', score: '95/100', question: "Solve for x in the equation: 3x - 7 = 14.", rubric: "Correctly isolate x and find its value. Show your work." },
+    { id: 'hw1', title: 'Homework 1: Solving Linear Equations', dueDate: '2024-09-15', status: 'Graded', score: '95/100', question: "Solve for x in the equation: 3x - 7 = 14. See attached worksheet for all problems.", rubric: "Correctly isolate x and find its value. Show your work.", assignmentFile: "linear_equations_worksheet.pdf" },
     { id: 'hw2', title: 'Homework 2: Graphing Functions', dueDate: '2024-09-22', status: 'Submitted', question: "Graph the function y = 2x + 1 for x values from -2 to 2.", rubric: "The graph should be a straight line with the correct slope and y-intercept. All points must be accurate." },
     { id: 'project1', title: 'Project 1: Real-world Applications', dueDate: '2024-10-01', status: 'Upcoming', question: "Describe a real-world scenario that can be modeled by a linear equation. Provide the equation and explain how it works.", rubric: "Scenario must be plausible. Equation must accurately model the scenario. Explanation must be clear." },
 ];
@@ -39,17 +40,33 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
     const [title, setTitle] = useState("");
     const [question, setQuestion] = useState("");
     const [rubric, setRubric] = useState("");
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const { toast } = useToast();
+
+    useEffect(() => {
+        // Reset form when dialog is closed
+        if (!open) {
+            setTitle("");
+            setQuestion("");
+            setRubric("");
+            setSelectedFile(null);
+        }
+    }, [open]);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files.length > 0) {
+            setSelectedFile(event.target.files[0]);
+        } else {
+            setSelectedFile(null);
+        }
+    };
 
     const handleCreate = () => {
         if (!title.trim() || !question.trim()) {
             toast({ variant: "destructive", title: "Missing Information", description: "Title and Question are required." });
             return;
         }
-        onAssignmentCreated({ title, question, rubric, dueDate: '2024-10-15' }); // Mock due date
-        setTitle("");
-        setQuestion("");
-        setRubric("");
+        onAssignmentCreated({ title, question, rubric, dueDate: '2024-10-15', assignmentFile: selectedFile?.name }); // Mock due date
         onOpenChange(false);
     };
 
@@ -62,7 +79,30 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div><Label htmlFor="new-title">Title</Label><Input id="new-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g., Chapter 3 Problems" /></div>
-                    <div><Label htmlFor="new-question">Question</Label><Textarea id="new-question" value={question} onChange={e => setQuestion(e.target.value)} placeholder="What is the assignment prompt?" /></div>
+                    <div><Label htmlFor="new-question">Question/Prompt</Label><Textarea id="new-question" value={question} onChange={e => setQuestion(e.target.value)} placeholder="What is the main assignment prompt? This will be used for AI grading." /></div>
+                    <div>
+                        <Label htmlFor="assignment-file-upload">Assignment Paper (Optional)</Label>
+                        <div className="mt-1 flex justify-center rounded-lg border border-dashed border-input px-6 py-10">
+                            <div className="text-center">
+                                <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
+                                    <Label
+                                        htmlFor="assignment-file-upload"
+                                        className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
+                                    >
+                                        <span>{selectedFile ? 'Change file' : 'Upload a file'}</span>
+                                        <Input id="assignment-file-upload" name="assignment-file-upload" type="file" className="sr-only" onChange={handleFileChange} />
+                                    </Label>
+                                    {!selectedFile && <p className="pl-1">or drag and drop</p>}
+                                </div>
+                                {selectedFile ? (
+                                    <p className="text-sm mt-2 font-medium text-foreground">{selectedFile.name}</p>
+                                ) : (
+                                    <p className="text-xs leading-5">PDF, DOCX, etc. up to 10MB</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                     <div><Label htmlFor="new-rubric">Grading Rubric (Optional)</Label><Textarea id="new-rubric" value={rubric} onChange={e => setRubric(e.target.value)} placeholder="Provide criteria for grading. e.g., 'Correct answer is worth 50 points...'" /></div>
                 </div>
                 <DialogFooter>
@@ -156,6 +196,14 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
                         <DialogHeader>
                             <ShadDialogTitle>{assignment.title}</ShadDialogTitle>
                             <DialogDescription>{assignment.question}</DialogDescription>
+                            {assignment.assignmentFile && (
+                                <div className="pt-2">
+                                    <Button variant="outline" size="sm" className="rounded-lg">
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Assignment: {assignment.assignmentFile}
+                                    </Button>
+                                </div>
+                            )}
                             {assignment.rubric && <p className="text-xs text-muted-foreground pt-2 italic">Rubric: {assignment.rubric}</p>}
                         </DialogHeader>
                         
