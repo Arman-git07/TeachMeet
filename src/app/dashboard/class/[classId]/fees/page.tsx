@@ -4,14 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, BadgeCheck, CircleAlert, Edit, Save, X } from "lucide-react"; // Added Edit, Save, X
+import { ArrowLeft, CreditCard, BadgeCheck, CircleAlert, Edit, Save, X, QrCode, Landmark, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react"; // Added useState
-import { useAuth } from "@/hooks/useAuth"; // Added useAuth
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Added Select
+import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // In a real app, this ID would come from the class data.
 const mockTeacherId = "teacher-evelyn-reed-uid";
@@ -150,36 +151,99 @@ export default function ClassFeesPage() {
             {!isHost && feeStatus === "Due" && (
                 <Card className="rounded-xl shadow-lg border-border/50">
                     <CardHeader>
-                        <CardTitle>Payment Details</CardTitle>
-                        <CardDescription>Enter your payment information below. This is a mock form.</CardDescription>
+                        <CardTitle>Make Payment</CardTitle>
+                        <CardDescription>Choose your preferred payment method. This is a mock form.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="cardName">Cardholder Name</Label>
-                            <Input id="cardName" placeholder="John M. Doe" className="rounded-lg" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="cardNumber">Card Number</Label>
-                            <div className="relative">
-                                <CreditCard className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                                <Input id="cardNumber" placeholder="**** **** **** 1234" className="rounded-lg pl-10" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="expiryDate">Expiry Date</Label>
-                                <Input id="expiryDate" placeholder="MM/YY" className="rounded-lg" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="cvc">CVC</Label>
-                                <Input id="cvc" placeholder="123" className="rounded-lg" />
-                            </div>
-                        </div>
+                    <CardContent>
+                        <Tabs defaultValue="card" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 rounded-lg">
+                                <TabsTrigger value="card" className="rounded-md"><CreditCard className="mr-2 h-4 w-4" /> Card</TabsTrigger>
+                                <TabsTrigger value="upi" className="rounded-md"><WalletCards className="mr-2 h-4 w-4" /> UPI</TabsTrigger>
+                                <TabsTrigger value="netbanking" className="rounded-md"><Landmark className="mr-2 h-4 w-4" /> Net Banking</TabsTrigger>
+                                <TabsTrigger value="qrcode" className="rounded-md"><QrCode className="mr-2 h-4 w-4" /> QR Code</TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="card" className="mt-6">
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cardName">Cardholder Name</Label>
+                                        <Input id="cardName" placeholder="John M. Doe" className="rounded-lg" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cardNumber">Card Number</Label>
+                                        <div className="relative">
+                                            <CreditCard className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                                            <Input id="cardNumber" placeholder="**** **** **** 1234" className="rounded-lg pl-10" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="expiryDate">Expiry Date</Label>
+                                            <Input id="expiryDate" placeholder="MM/YY" className="rounded-lg" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="cvc">CVC</Label>
+                                            <Input id="cvc" placeholder="123" className="rounded-lg" />
+                                        </div>
+                                    </div>
+                                     <Button onClick={handlePayment} className="w-full btn-gel rounded-lg pt-4">
+                                        Pay {currency}{feeAmount} Now
+                                    </Button>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="upi" className="mt-6">
+                                <div className="space-y-4">
+                                     <div className="space-y-2">
+                                        <Label htmlFor="upiId">UPI ID</Label>
+                                        <Input id="upiId" placeholder="yourname@bank" className="rounded-lg" />
+                                     </div>
+                                     <Button onClick={handlePayment} className="w-full btn-gel rounded-lg">
+                                        Pay {currency}{feeAmount} with UPI
+                                    </Button>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="netbanking" className="mt-6">
+                                <div className="space-y-4">
+                                     <div className="space-y-2">
+                                        <Label htmlFor="bankSelect">Select Bank</Label>
+                                        <Select>
+                                            <SelectTrigger id="bankSelect" className="rounded-lg">
+                                                <SelectValue placeholder="Choose your bank" />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-lg">
+                                                <SelectItem value="bank1" className="rounded-md">Bank of Example</SelectItem>
+                                                <SelectItem value="bank2" className="rounded-md">Global Trust Bank</SelectItem>
+                                                <SelectItem value="bank3" className="rounded-md">National Mock Bank</SelectItem>
+                                                <SelectItem value="bank4" className="rounded-md">Commerce Mock Bank</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                     </div>
+                                     <Button onClick={handlePayment} className="w-full btn-gel rounded-lg">
+                                        Proceed to Bank
+                                    </Button>
+                                </div>
+                            </TabsContent>
+                            
+                            <TabsContent value="qrcode" className="mt-6">
+                                <div className="flex flex-col items-center space-y-4">
+                                    <div className="p-4 bg-white rounded-lg border">
+                                       <img src="https://placehold.co/200x200.png" alt="QR Code" data-ai-hint="qr code" />
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">Scan the QR code with any UPI app.</p>
+                                     <Button onClick={handlePayment} className="w-full btn-gel rounded-lg">
+                                        I have paid
+                                    </Button>
+                                </div>
+                            </TabsContent>
+
+                        </Tabs>
                     </CardContent>
-                    <CardFooter>
-                        <Button onClick={handlePayment} className="w-full btn-gel rounded-lg">
-                            Pay {currency}{feeAmount} Now
-                        </Button>
+                     <CardFooter>
+                        <p className="text-xs text-muted-foreground text-center w-full">
+                            All transactions are placeholders and no real payment will be processed.
+                        </p>
                     </CardFooter>
                 </Card>
             )}
