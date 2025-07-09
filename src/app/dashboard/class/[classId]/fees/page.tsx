@@ -175,6 +175,10 @@ export default function ClassFeesPage() {
                             <TabsContent value="card" className="mt-6">
                                 <div className="space-y-4">
                                     <div className="space-y-2">
+                                        <Label htmlFor="paymentAmountCard">Amount to Pay</Label>
+                                        <Input id="paymentAmountCard" value={`${currency}${feeAmount}`} className="rounded-lg font-semibold bg-muted/80" readOnly />
+                                    </div>
+                                    <div className="space-y-2">
                                         <Label htmlFor="cardName">Cardholder Name</Label>
                                         <Input id="cardName" placeholder="John M. Doe" className="rounded-lg" />
                                     </div>
@@ -195,7 +199,7 @@ export default function ClassFeesPage() {
                                             <Input id="cvc" placeholder="123" className="rounded-lg" />
                                         </div>
                                     </div>
-                                     <Button onClick={handlePayment} className="w-full btn-gel rounded-lg pt-4">
+                                     <Button onClick={handlePayment} className="w-full btn-gel rounded-lg py-3">
                                         Pay {currency}{feeAmount} Now
                                     </Button>
                                 </div>
@@ -203,6 +207,10 @@ export default function ClassFeesPage() {
 
                             <TabsContent value="upi" className="mt-6">
                                 <div className="space-y-4">
+                                     <div className="space-y-2">
+                                        <Label htmlFor="paymentAmountUpi">Amount to Pay</Label>
+                                        <Input id="paymentAmountUpi" value={`${currency}${feeAmount}`} className="rounded-lg font-semibold bg-muted/80" readOnly />
+                                    </div>
                                      <div className="space-y-2">
                                         <Label htmlFor="upiId">UPI ID</Label>
                                         <Input id="upiId" placeholder="yourname@bank" className="rounded-lg" />
@@ -215,6 +223,10 @@ export default function ClassFeesPage() {
 
                             <TabsContent value="netbanking" className="mt-6">
                                 <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="paymentAmountNetBanking">Amount to Pay</Label>
+                                        <Input id="paymentAmountNetBanking" value={`${currency}${feeAmount}`} className="rounded-lg font-semibold bg-muted/80" readOnly />
+                                    </div>
                                      <div className="space-y-2">
                                         <Label htmlFor="bankSelect">Select Bank</Label>
                                         <Select>
@@ -237,6 +249,10 @@ export default function ClassFeesPage() {
                             
                             <TabsContent value="qrcode" className="mt-6">
                                 <div className="flex flex-col items-center space-y-4">
+                                    <div className="text-center">
+                                        <p className="text-sm text-muted-foreground">Amount to Pay</p>
+                                        <p className="text-2xl font-bold text-foreground">{currency}{feeAmount}</p>
+                                    </div>
                                     <div className="p-4 bg-white rounded-lg border">
                                        <img src="https://placehold.co/200x200.png" alt="QR Code" data-ai-hint="qr code" />
                                     </div>
