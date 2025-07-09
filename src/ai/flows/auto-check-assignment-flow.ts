@@ -13,7 +13,11 @@ import {z} from 'genkit';
 
 export const AutoCheckAssignmentInputSchema = z.object({
   assignmentQuestion: z.string().describe("The question or prompt for the assignment."),
-  studentSubmission: z.string().describe("The student's submitted text answer."),
+  submissionDataUri: z
+    .string()
+    .describe(
+      "The student's submission as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'. This can be a PDF, DOCX, or TXT file."
+    ),
   gradingRubric: z.string().optional().describe("An optional rubric or criteria for grading."),
 });
 export type AutoCheckAssignmentInput = z.infer<typeof AutoCheckAssignmentInputSchema>;
@@ -35,6 +39,8 @@ const prompt = ai.definePrompt({
   output: {schema: AutoCheckAssignmentOutputSchema},
   prompt: `You are an expert and friendly AI teaching assistant. Your task is to evaluate a student's submission based on the assignment question and an optional grading rubric.
 
+  The student's submission is provided as a document. First, extract all the text from this document. Then, evaluate the extracted text.
+
   Your feedback should be encouraging and constructive. Explain what the student did well and where they can improve.
   
   Based on the grading rubric (if provided) and the correctness of the answer, determine if the submission is satisfactory and provide a score from 0 to 100.
@@ -43,8 +49,8 @@ const prompt = ai.definePrompt({
   - **Question**: {{{assignmentQuestion}}}
   {{#if gradingRubric}}- **Grading Rubric**: {{{gradingRubric}}}{{/if}}
 
-  ## Student's Submission
-  {{{studentSubmission}}}
+  ## Student's Submission Document
+  {{media url=submissionDataUri}}
   `,
 });
 

@@ -3,10 +3,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, PlusCircle, ArrowLeft, CheckCircle, Clock, Sparkles, Loader2 } from "lucide-react";
+import { FileText, PlusCircle, ArrowLeft, CheckCircle, Clock, Sparkles, Loader2, UploadCloud } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle as ShadDialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -75,44 +75,70 @@ function CreateAssignmentDialog({ onAssignmentCreated, open, onOpenChange }: { o
 }
 
 function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssignment }: { assignment: Assignment | null; open: boolean; onOpenChange: (open: boolean) => void; onUpdateAssignment: (updatedAssignment: Assignment) => void; }) {
-    const [submission, setSubmission] = useState("");
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<AutoCheckAssignmentOutput | null>(null);
     const { toast } = useToast();
 
-    // Reset state when the dialog is closed or the assignment changes
-    useState(() => {
-      setSubmission(assignment?.submission || "");
+    useEffect(() => {
       setResult(assignment?.feedback || null);
-    });
+      setSelectedFile(null); // Reset file selection when dialog opens/changes
+    }, [assignment]);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files.length > 0) {
+            setSelectedFile(event.target.files[0]);
+        } else {
+            setSelectedFile(null);
+        }
+    };
 
     const handleSubmit = async () => {
-        if (!submission.trim()) {
-            toast({ variant: "destructive", title: "Submission is empty" });
+        if (!selectedFile) {
+            toast({ variant: "destructive", title: "No file selected", description: "Please upload your assignment file." });
             return;
         }
         setIsLoading(true);
         setResult(null);
-        try {
-            const aiResult = await autoCheckAssignment({
-                assignmentQuestion: assignment!.question,
-                studentSubmission: submission,
-                gradingRubric: assignment!.rubric
-            });
-            setResult(aiResult);
-            onUpdateAssignment({
-              ...assignment!,
-              status: 'Graded',
-              submission,
-              feedback: aiResult,
-              score: `${aiResult.suggestedScore}/100`
-            });
-        } catch (error) {
-            console.error("Auto-check failed:", error);
-            toast({ variant: "destructive", title: "Grading Failed", description: "Could not automatically grade the assignment." });
-        } finally {
+
+        const reader = new FileReader();
+        reader.readAsDataURL(selectedFile);
+
+        reader.onload = async (event) => {
+            const submissionDataUri = event.target?.result as string;
+            if (!submissionDataUri) {
+                toast({ variant: "destructive", title: "File Read Error", description: "Could not read the selected file." });
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const aiResult = await autoCheckAssignment({
+                    assignmentQuestion: assignment!.question,
+                    submissionDataUri,
+                    gradingRubric: assignment!.rubric
+                });
+                setResult(aiResult);
+                onUpdateAssignment({
+                  ...assignment!,
+                  status: 'Graded',
+                  submission: selectedFile.name,
+                  feedback: aiResult,
+                  score: `${aiResult.suggestedScore}/100`
+                });
+            } catch (error) {
+                console.error("Auto-check failed:", error);
+                toast({ variant: "destructive", title: "Grading Failed", description: "Could not automatically grade the assignment." });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        reader.onerror = (error) => {
+            console.error("FileReader error:", error);
+            toast({ variant: "destructive", title: "File Read Error", description: "There was a problem reading your file." });
             setIsLoading(false);
-        }
+        };
     };
 
     const scoreColorClass = useMemo(() => {
@@ -152,14 +178,37 @@ function SubmitAssignmentDialog({ assignment, open, onOpenChange, onUpdateAssign
                             </div>
                         ) : (
                             <div className="space-y-4 py-4">
-                                <Label htmlFor="submission-text">Your Submission</Label>
-                                <Textarea id="submission-text" value={submission} onChange={e => setSubmission(e.target.value)} rows={10} placeholder="Type your answer here..." />
+                                <Label>Your Submission</Label>
+                                <div className="mt-1 flex justify-center rounded-lg border border-dashed border-primary/50 bg-primary/5 px-6 py-10">
+                                    <div className="text-center">
+                                        <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                                        <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
+                                            <Label
+                                                htmlFor="file-upload"
+                                                className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
+                                            >
+                                                <span>{selectedFile ? 'Change file' : 'Upload a file'}</span>
+                                                <Input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.doc,.docx,.txt" />
+                                            </Label>
+                                            {!selectedFile && <p className="pl-1">or drag and drop</p>}
+                                        </div>
+                                        {selectedFile ? (
+                                            <p className="text-sm mt-2 font-medium text-foreground">{selectedFile.name}</p>
+                                        ) : (
+                                            <p className="text-xs leading-5">PDF, DOC, DOCX, TXT up to 10MB</p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
 
                         <DialogFooter>
                             <DialogClose asChild><Button variant="outline" className="rounded-lg">Close</Button></DialogClose>
-                            {!result && !isLoading && <Button onClick={handleSubmit} className="btn-gel rounded-lg"><Sparkles className="mr-2 h-4 w-4" /> Submit for Auto-Grading</Button>}
+                            {!result && !isLoading && 
+                                <Button onClick={handleSubmit} className="btn-gel rounded-lg" disabled={!selectedFile}>
+                                    <Sparkles className="mr-2 h-4 w-4" /> Submit for Auto-Grading
+                                </Button>
+                            }
                         </DialogFooter>
                     </>
                 )}
