@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Loader2, FileText } from "lucide-react";
+import { Loader2, FileText, UploadCloud } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function CreateExamDialogContent() {
@@ -15,8 +15,18 @@ export function CreateExamDialogContent() {
   const [description, setDescription] = useState("");
   const [type, setType] = useState<"Quiz" | "Test" | "Exam" | "Multiple Choice Questions">("Quiz");
   const [dueDate, setDueDate] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      setSelectedFile(event.target.files[0]);
+    } else {
+      setSelectedFile(null);
+    }
+  };
+
 
   const handleCreateExam = async () => {
     if (!title.trim()) {
@@ -38,17 +48,19 @@ export function CreateExamDialogContent() {
     setIsCreating(true);
     
     // Mock API call
+    console.log("Creating exam:", { title, type, dueDate, description, fileName: selectedFile?.name });
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     toast({
       title: "Test/Exam Created!",
-      description: `The ${type.toLowerCase()} "${title}" has been created.`,
+      description: `The ${type.toLowerCase()} "${title}" has been created. ${selectedFile ? `File "${selectedFile.name}" was uploaded.` : ''}`,
     });
     
     setIsCreating(false);
     setTitle("");
     setDescription("");
     setDueDate("");
+    setSelectedFile(null);
   };
 
   return (
@@ -114,6 +126,31 @@ export function CreateExamDialogContent() {
             disabled={isCreating}
           />
         </div>
+
+        <div>
+            <Label htmlFor="examFile">Upload Paper (Optional)</Label>
+            <div className="mt-1 flex justify-center rounded-lg border border-dashed border-border/70 px-6 py-10">
+                <div className="text-center">
+                    <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
+                        <Label
+                            htmlFor="examFile"
+                            className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80"
+                        >
+                            <span>{selectedFile ? 'Change file' : 'Upload a file'}</span>
+                            <Input id="examFile" name="examFile" type="file" className="sr-only" onChange={handleFileChange} disabled={isCreating} accept=".pdf,.doc,.docx,.txt" />
+                        </Label>
+                        {!selectedFile && <p className="pl-1">or drag and drop</p>}
+                    </div>
+                    {selectedFile ? (
+                        <p className="text-sm mt-2 font-medium text-foreground">{selectedFile.name}</p>
+                    ) : (
+                        <p className="text-xs leading-5">PDF, DOC, DOCX, TXT up to 10MB</p>
+                    )}
+                </div>
+            </div>
+        </div>
+
       </div>
       <DialogFooter className="gap-2 sm:gap-0">
         <DialogClose asChild>
