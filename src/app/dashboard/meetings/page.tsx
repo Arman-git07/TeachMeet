@@ -65,7 +65,7 @@ export default function MyMeetingsPage() {
                     data-ai-hint="meeting abstract"
                  />
                  <div className="absolute top-2 right-2">
-                    <Badge variant={meeting.status === "Upcoming" ? "default" : "secondary"} className="bg-primary/80 text-primary-foreground backdrop-blur-sm rounded-full"> {/* Ensure badge is also rounded */}
+                    <Badge variant={meeting.status === "Upcoming" ? "default" : "secondary"} className="bg-primary/80 text-primary-foreground backdrop-blur-sm rounded-full">
                         {meeting.status}
                     </Badge>
                  </div>
@@ -87,17 +87,17 @@ export default function MyMeetingsPage() {
               </CardContent>
               <CardFooter className="border-t pt-4 grid grid-cols-2 gap-2">
                 {meeting.status === "Upcoming" ? (
-                  <Button variant="default" className="w-full btn-gel rounded-lg"> {/* Changed to rounded-lg */}
+                  <Button variant="default" className="w-full btn-gel rounded-lg">
                     <Video className="mr-2 h-4 w-4" /> Join
                   </Button>
                 ) : (
-                  <Button variant="outline" className="w-full rounded-lg" disabled> {/* Changed to rounded-lg */}
+                  <Button variant="outline" className="w-full rounded-lg" disabled>
                     Completed
                   </Button>
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full rounded-lg">More Options</Button> {/* Changed to rounded-lg */}
+                    <Button variant="ghost" size="sm" className="w-full rounded-lg">More Options</Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="rounded-lg">
                     <DropdownMenuItem className="rounded-md"><Edit className="mr-2 h-4 w-4" /> Edit Details</DropdownMenuItem>
