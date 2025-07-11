@@ -143,7 +143,7 @@ export default function SettingsPage() {
     return () => {
         stream?.getTracks().forEach(track => track.stop());
     };
-  }, [selectedVideoDevice, hasAVPermissions]);
+  }, [selectedVideoDevice, hasAVPermissions, toast]);
 
   const handleSaveGeneral = async () => {
     if (!auth.currentUser || !isNameChanged) return;
@@ -185,6 +185,12 @@ export default function SettingsPage() {
       "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage",
       "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous",
       "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic",
+      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour",
+      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus",
+      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear",
+      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow",
+      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin",
+      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright",
     }
   );
 
@@ -273,6 +279,12 @@ export default function SettingsPage() {
                         <SelectItem value="vintage">Vintage</SelectItem>
                         <SelectItem value="luminous">Luminous</SelectItem>
                         <SelectItem value="dramatic">Dramatic</SelectItem>
+                        <SelectItem value="goldenhour">Golden Hour</SelectItem>
+                        <SelectItem value="softfocus">Soft Focus</SelectItem>
+                        <SelectItem value="brightclear">Bright & Clear</SelectItem>
+                        <SelectItem value="naturalglow">Natural Glow</SelectItem>
+                        <SelectItem value="radiantskin">Radiant Skin</SelectItem>
+                        <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -322,5 +334,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
