@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore'; // Import getFirestore
 
@@ -30,5 +30,12 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const storage = getStorage(app);
 const db = getFirestore(app); // Initialize Firestore
+
+// Set auth persistence to local storage to keep user signed in
+setPersistence(auth, browserLocalPersistence)
+  .catch((error) => {
+    console.error("Firebase Auth persistence error:", error);
+  });
+
 
 export { app, auth, storage, db };
