@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
-import React, { useState } from 'react';
+import React, from 'react';
 import {
   LogIn,
   UserPlus,
@@ -20,6 +20,7 @@ import {
   ShieldQuestion,
   Users,
   School,
+  Library,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -103,16 +104,17 @@ const NavItem = ({
   const buttonClassName = cn(
     commonClasses,
     isStrictlyHomeActive
-      ? "bg-secondary text-secondary-foreground" 
-      : isActive 
-      ? "bg-primary text-primary-foreground" 
-      : isGreenTheme 
+      ? "bg-secondary text-secondary-foreground"
+      : isActive
+      ? "bg-primary text-primary-foreground"
+      : isGreenTheme
       ? "text-primary hover:bg-primary hover:text-primary-foreground"
-      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" 
+      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
   );
 
 
   if (asDialogTrigger) {
+    // This case is specific for StartMeetingDialog
     return (
       <SidebarMenuItem>
         <Dialog>
@@ -131,7 +133,7 @@ const NavItem = ({
       </SidebarMenuItem>
     );
   }
-
+  
   if (isDropdown) {
     return (
       <SidebarMenuItem>
@@ -192,7 +194,7 @@ const NavItem = ({
          onClick={handleClick}
          className={cn(
              commonClasses,
-             "hover:bg-destructive hover:text-destructive-foreground" 
+             "hover:bg-destructive hover:text-destructive-foreground"
          )}
          >
          {buttonContent}
@@ -205,9 +207,9 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter(); 
+  const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
-  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = React.useState(false);
 
   const legalAndInfoItems = [
     { href: "/terms-of-service", label: "Terms of Service", icon: BookOpen, target: "_blank" },
@@ -226,7 +228,7 @@ export function AppSidebar() {
       <SidebarContent className="flex-grow p-4">
         {loading ? (
           <SidebarMenu className="space-y-2">
-            {[...Array(5)].map((_, i) => ( 
+            {[...Array(5)].map((_, i) => (
               <SidebarMenuItem key={i}>
                 <Skeleton className="h-10 w-full rounded-lg" />
               </SidebarMenuItem>
@@ -243,7 +245,6 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
-              <NavItem href="/dashboard/meetings" icon={Video} currentPath={pathname}>Meetings</NavItem>
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
@@ -266,11 +267,11 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
-          <NavItem icon={ShieldQuestion} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal &amp; Info</NavItem>
+          <NavItem icon={ShieldQuestion} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal & Info</NavItem>
           {isAuthenticated && (
-            <NavItem 
-              icon={LogOut} 
-              currentPath={pathname} 
+            <NavItem
+              icon={LogOut}
+              currentPath={pathname}
               onClick={() => setShowSignOutConfirm(true)}
             >
               Sign Out
@@ -290,17 +291,17 @@ export function AppSidebar() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel 
-            onClick={() => setShowSignOutConfirm(false)} 
+          <AlertDialogCancel
+            onClick={() => setShowSignOutConfirm(false)}
             className="rounded-lg"
           >
             Cancel
           </AlertDialogCancel>
-          <AlertDialogAction 
+          <AlertDialogAction
             onClick={() => {
               signOut();
               setShowSignOutConfirm(false);
-            }} 
+            }}
             className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))}
           >
             Sign Out
