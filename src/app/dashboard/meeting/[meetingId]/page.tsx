@@ -112,7 +112,7 @@ function ParticipantView({
     <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
       <video
         ref={videoRef}
-        muted={isMe}
+        muted={isMe || isMicMuted}
         autoPlay
         playsInline
         src={!isMe && showVideo ? "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" : undefined}
