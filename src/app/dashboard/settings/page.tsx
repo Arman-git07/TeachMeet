@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle } from "lucide-react";
+import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -70,6 +70,11 @@ export default function SettingsPage() {
 
   // Whiteboard Settings
   const [whiteboardBgColor, setWhiteboardBgColor] = useState('#FFFFFF');
+  
+  // Notification Settings
+  const [meetingReminders, setMeetingReminders] = useState(true);
+  const [chatMentions, setChatMentions] = useState(true);
+  const [handRaiseAlerts, setHandRaiseAlerts] = useState(true);
 
   // Highlight effect
   useEffect(() => {
@@ -94,6 +99,11 @@ export default function SettingsPage() {
     setDefaultCameraOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setDefaultMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
     setWhiteboardBgColor(localStorage.getItem('teachmeet-whiteboard-bg-color') || '#FFFFFF');
+    
+    // Notifications
+    setMeetingReminders(localStorage.getItem('teachmeet-notif-reminders') !== 'off');
+    setChatMentions(localStorage.getItem('teachmeet-notif-mentions') !== 'off');
+    setHandRaiseAlerts(localStorage.getItem('teachmeet-notif-handraise') !== 'off');
 
     const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
     setAppliedFilter(filter);
@@ -175,6 +185,13 @@ export default function SettingsPage() {
   const handleSaveWhiteboard = () => {
     localStorage.setItem('teachmeet-whiteboard-bg-color', whiteboardBgColor);
     toast({ title: "Whiteboard Settings Saved", description: "Your whiteboard preferences have been updated." });
+  };
+
+  const handleSaveNotifications = () => {
+    localStorage.setItem('teachmeet-notif-reminders', meetingReminders ? 'on' : 'off');
+    localStorage.setItem('teachmeet-notif-mentions', chatMentions ? 'on' : 'off');
+    localStorage.setItem('teachmeet-notif-handraise', handRaiseAlerts ? 'on' : 'off');
+    toast({ title: "Notification Settings Saved", description: "Your notification preferences have been updated." });
   };
   
   const videoClassNames = cn(
@@ -292,6 +309,28 @@ export default function SettingsPage() {
         <div className="flex justify-end pt-4 border-t">
           <Button onClick={handleSaveAdvancedMeeting} className="rounded-lg btn-gel">
             <Save className="mr-2 h-4 w-4" /> Save Meeting Defaults
+          </Button>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Notifications" description="Manage how you receive alerts." icon={Bell}>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+                <Label htmlFor="meeting-reminders" className="flex items-center gap-2"><Video className="h-4 w-4" /> Meeting Reminders</Label>
+                <Switch id="meeting-reminders" checked={meetingReminders} onCheckedChange={setMeetingReminders} />
+            </div>
+            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+                <Label htmlFor="chat-mentions" className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Chat Mentions</Label>
+                <Switch id="chat-mentions" checked={chatMentions} onCheckedChange={setChatMentions} />
+            </div>
+            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+                <Label htmlFor="hand-raise-alerts" className="flex items-center gap-2"><Hand className="h-4 w-4" /> Hand Raise Alerts</Label>
+                <Switch id="hand-raise-alerts" checked={handRaiseAlerts} onCheckedChange={setHandRaiseAlerts} />
+            </div>
+        </div>
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={handleSaveNotifications} className="rounded-lg btn-gel">
+            <Save className="mr-2 h-4 w-4" /> Save Notifications
           </Button>
         </div>
       </SettingsSection>
