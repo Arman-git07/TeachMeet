@@ -83,14 +83,14 @@ function ParticipantView({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current) {
+    if (isMe && videoRef.current) {
       videoRef.current.srcObject = stream || null;
     }
-  }, [stream]);
+  }, [stream, isMe]);
 
   const handleFullScreenClick = () => {
     const targetElement = videoRef.current;
-    if (targetElement && targetElement.srcObject) {
+    if (targetElement && (targetElement.srcObject || !isCameraOff)) {
       if (targetElement.requestFullscreen) {
         targetElement.requestFullscreen().catch((err) => {
           console.error("Error entering fullscreen:", err);
@@ -106,7 +106,7 @@ function ParticipantView({
 
   const avatarFallbackName = name ? name.charAt(0).toUpperCase() : 'U';
   const avatarSrc = photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`;
-  const showVideo = !!stream && !isCameraOff && !isScreenSharing;
+  const showVideo = !isCameraOff && !isScreenSharing;
 
   return (
     <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
@@ -115,6 +115,8 @@ function ParticipantView({
         muted={isMe}
         autoPlay
         playsInline
+        src={!isMe && showVideo ? "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" : undefined}
+        loop={!isMe}
         className={cn("w-full h-full object-cover bg-black", !showVideo && "hidden")}
       />
       
@@ -132,7 +134,7 @@ function ParticipantView({
                         <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
                     </Avatar>
                     <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
-                    {isCameraOff || !stream && (
+                    {isCameraOff && (
                       <VideoOff className="w-7 h-7 text-muted-foreground mt-1" title="Camera off"/>
                     )}
                 </>
@@ -716,7 +718,7 @@ export default function MeetingPage() {
             variant={localHandRaised ? "default" : "destructive"}
             className={cn(
               "rounded-full w-10 h-10 sm:w-12 sm:h-12",
-              localHandRaised && "ring-2 ring-offset-2 ring-offset-background ring-primary"
+              localHandRaised && "ring-2 ring-offset-2 ring-offset-background ring-offset-primary"
             )}
             onClick={toggleHandRaise}
             aria-label={localHandRaised ? "Lower Hand" : "Raise Hand"}
