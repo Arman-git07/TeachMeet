@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle, Bell } from 'lucide-react';
+import { Video, Users as UsersIcon, XCircle, History } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 
@@ -152,8 +152,8 @@ export default function HomePage() {
           />
           <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
-              <Bell className="mr-3 h-6 w-6" />
-              Ongoing Meetings
+              <History className="mr-3 h-6 w-6" />
+              Latest Activity
             </h2>
             {ongoingMeetings.length > 0 ? (
               <ul className="space-y-3 text-left">
