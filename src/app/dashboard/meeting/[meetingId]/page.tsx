@@ -312,6 +312,12 @@ export default function MeetingPage() {
 
     const joinMeetingRoom = async () => {
       setJoinStatus('joining');
+
+      const initialCameraOff = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') !== 'on' : true;
+      const initialMicMuted = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') !== 'on' : true;
+      setLocalCameraOff(initialCameraOff);
+      setLocalMicMuted(initialMicMuted);
+
       const meetingDocRef = doc(db, "meetings", meetingId);
       const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
 
@@ -331,8 +337,8 @@ export default function MeetingPage() {
           userId: currentUser.uid,
           name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
           photoURL: currentUser.photoURL,
-          isMicMuted: localMicMuted,
-          isCameraOff: localCameraOff,
+          isMicMuted: initialMicMuted,
+          isCameraOff: initialCameraOff,
           isHandRaised: false,
           isScreenSharing: false,
           joinedAt: serverTimestamp(),
@@ -356,7 +362,7 @@ export default function MeetingPage() {
     if (joinStatus === 'pending') {
       joinMeetingRoom();
     }
-  }, [currentUser, meetingId, db, toast, joinStatus, searchParamsHook, localMicMuted, localCameraOff]);
+  }, [currentUser, meetingId, db, toast, joinStatus, searchParamsHook]);
 
   useEffect(() => {
     if (joinStatus !== 'joined' || !meetingId || !db) return;
