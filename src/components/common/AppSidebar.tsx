@@ -21,6 +21,7 @@ import {
   Users,
   School,
   Library,
+  History,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -216,6 +217,13 @@ export function AppSidebar() {
     { href: "/privacy-policy", label: "Privacy Policy", icon: ShieldQuestion, target: "_blank" },
     { href: "/community-guidelines", label: "Community Guidelines", icon: Users, target: "_blank" },
   ];
+  
+  const libraryItems = [
+    { href: "/dashboard/documents", label: "Documents", icon: FileText },
+    { href: "/dashboard/recordings", label: "Recordings", icon: Clapperboard },
+    { href: "/dashboard/settings?highlight=historyAndData", label: "History & Data", icon: History },
+  ];
+
 
   return (
     <>
@@ -245,8 +253,7 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
-              <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
-              <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
+               <NavItem icon={Library} currentPath={pathname} isDropdown dropdownItems={libraryItems}>Library</NavItem>
             </>
           ) : (
             <>
