@@ -1,10 +1,59 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone to read and write.
-      // NOT FOR PRODUCTION. For development only.
-      allow read, write: if true;
+
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Rules for meetings collection
+    match /meetings/{meetingId} {
+      allow read: if isAuthenticated();
+      // Only authenticated users can create meetings.
+      // The creatorId must match the user's UID.
+      allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+      
+      // Allow host to update, but not change creatorId
+      allow update: if isAuthenticated() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid
+                    && request.resource.data.creatorId == resource.data.creatorId;
+
+      // Rules for participants subcollection
+      match /participants/{userId} {
+        allow read, delete: if isAuthenticated();
+        // Allow authenticated users to join (create) or update their own participant document.
+        allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // Rules for documents collection
+    match /documents/{documentId} {
+      // Anyone can read public documents
+      // Only the uploader can read their private documents
+      allow read: if resource.data.isPrivate == false || (isAuthenticated() && resource.data.uploaderId == request.auth.uid);
+      
+      // Only authenticated users can create documents.
+      // The uploaderId must match the user's UID.
+      allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
+      
+      // Only the uploader can delete their document
+      allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
+    }
+
+    // Rules for recordings collection
+    match /recordings/{recordingId} {
+      // Anyone can read public recordings
+      // Only the uploader can read their private recordings
+      allow read: if resource.data.isPrivate == false || (isAuthenticated() && resource.data.uploaderId == request.auth.uid);
+
+      // Only authenticated users can create recordings.
+      // The uploaderId must match the user's UID.
+      allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
+      
+      // Only the uploader can delete their recording
+      allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
     }
   }
 }

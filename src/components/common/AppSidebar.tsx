@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
-import React, { useState } from 'react'; // Added useState
+import React, { useState } from 'react';
 import {
   LogIn,
   UserPlus,
@@ -244,7 +244,6 @@ export function AppSidebar() {
               )}
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
-              <NavItem href="/dashboard/classes" icon={Users} currentPath={pathname}>Classes</NavItem>
             </>
           ) : (
             <>
