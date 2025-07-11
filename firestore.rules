@@ -4,56 +4,82 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
+    // Helper functions
+    function isUserAuthenticated() {
       return request.auth != null;
     }
 
-    // Rules for meetings collection
-    match /meetings/{meetingId} {
-      allow read: if isAuthenticated();
-      // Only authenticated users can create meetings.
-      // The creatorId must match the user's UID.
-      allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Classes collection rules
+    match /classes/{classId} {
+      // ANY authenticated user can read the list of classes.
+      // (This could be further restricted if needed, e.g., to class members only)
+      allow list; 
+      // ONLY authenticated users can create a new class document.
+      // The `hostId` of the new class MUST match the UID of the user creating it.
+      allow create: if isUserAuthenticated() && request.resource.data.hostId == request.auth.uid;
+      // Allow reading, updating, and deleting a specific class document
+      // only if the user is authenticated and is the owner (host) of the class.
+      allow read, update, delete: if isUserAuthenticated() && isOwner(resource.data.hostId);
+    }
+    
+    // Documents collection rules
+    match /documents/{documentId} {
+      // Allow creating documents for any authenticated user, ensuring they own the document.
+      allow create: if isUserAuthenticated() && isOwner(request.resource.data.uploaderId);
       
-      // Allow host to update, but not change creatorId
-      allow update: if isAuthenticated() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid
-                    && request.resource.data.creatorId == resource.data.creatorId;
+      // Public documents can be read by any authenticated user.
+      // Private documents can only be read by the owner.
+      allow read: if isUserAuthenticated() && (resource.data.isPrivate == false || isOwner(resource.data.uploaderId));
+      
+      // Documents can only be updated or deleted by the owner.
+      allow update, delete: if isUserAuthenticated() && isOwner(resource.data.uploaderId);
+    }
+    
+    // Recordings collection rules
+    match /recordings/{recordingId} {
+      // Allow creating recordings for any authenticated user, ensuring they own the recording.
+      allow create: if isUserAuthenticated() && isOwner(request.resource.data.uploaderId);
+      
+      // Public recordings can be read by any authenticated user.
+      // Private recordings can only be read by the owner.
+      allow read: if isUserAuthenticated() && (resource.data.isPrivate == false || isOwner(resource.data.uploaderId));
+      
+      // Recordings can only be updated or deleted by the owner.
+      allow update, delete: if isUserAuthenticated() && isOwner(resource.data.uploaderId);
+    }
+    
+    // Meeting rules
+    match /meetings/{meetingId} {
+      // Any authenticated user can create (implicitly start) a meeting document.
+      // The creator must set themselves as the creatorId.
+      allow create: if isUserAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+      
+      // Any authenticated user can read the main meeting document (to get topic, creatorId, etc.).
+      allow read: if isUserAuthenticated();
+      
+      // Only the creator of the meeting can update or delete the main meeting document.
+      allow update, delete: if isUserAuthenticated() && isOwner(resource.data.creatorId);
 
-      // Rules for participants subcollection
-      match /participants/{userId} {
-        allow read, delete: if isAuthenticated();
-        // Allow authenticated users to join (create) or update their own participant document.
-        allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Sub-collection for participants within a meeting
+      match /participants/{participantId} {
+        // A user can only create a participant document for themselves.
+        allow create: if isUserAuthenticated() && request.auth.uid == participantId;
+        
+        // Anyone in the meeting (authenticated user) can see who else is in the meeting.
+        allow list, read: if isUserAuthenticated();
+        
+        // A user can only update or delete their own participant document.
+        allow update, delete: if isUserAuthenticated() && request.auth.uid == participantId;
       }
     }
     
-    // Rules for documents collection
-    match /documents/{documentId} {
-      // Anyone can read public documents
-      // Only the uploader can read their private documents
-      allow read: if resource.data.isPrivate == false || (isAuthenticated() && resource.data.uploaderId == request.auth.uid);
-      
-      // Only authenticated users can create documents.
-      // The uploaderId must match the user's UID.
-      allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-      
-      // Only the uploader can delete their document
-      allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
-    }
-
-    // Rules for recordings collection
-    match /recordings/{recordingId} {
-      // Anyone can read public recordings
-      // Only the uploader can read their private recordings
-      allow read: if resource.data.isPrivate == false || (isAuthenticated() && resource.data.uploaderId == request.auth.uid);
-
-      // Only authenticated users can create recordings.
-      // The uploaderId must match the user's UID.
-      allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-      
-      // Only the uploader can delete their recording
-      allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
+    // Default deny all other reads/writes
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

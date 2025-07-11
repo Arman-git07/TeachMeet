@@ -19,6 +19,7 @@ import {
   BookOpen,
   ShieldQuestion,
   Users,
+  School,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -242,6 +243,8 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
+              <NavItem href="/dashboard/meetings" icon={Video} currentPath={pathname}>Meetings</NavItem>
+              <NavItem href="/dashboard/classes" icon={School} currentPath={pathname}>Classes</NavItem>
               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
