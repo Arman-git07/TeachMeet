@@ -972,7 +972,7 @@ export default function WhiteboardPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
                 <DropdownMenuItem
-                  onSelect={() => router.push('/dashboard/settings?highlight=whiteboardSettings')}
+                  onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}`)}
                   className="cursor-pointer"
                 >
                   <Settings className="mr-2 h-4 w-4" />

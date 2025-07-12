@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand } from "lucide-react";
+import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const meetingId = searchParams.get('meetingId');
 
   // Refs for scrolling to sections
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
@@ -340,7 +341,15 @@ export default function SettingsPage() {
           <Label htmlFor="whiteboard-bg">Background Color</Label>
           <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
         </div>
-        <div className="flex justify-end pt-4 border-t">
+        <div className="flex justify-end items-center pt-4 border-t gap-2">
+          {meetingId && (
+            <Button asChild variant="outline" className="rounded-lg">
+              <Link href={`/dashboard/meeting/${meetingId}/whiteboard`}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Whiteboard
+              </Link>
+            </Button>
+          )}
           <Button onClick={handleSaveWhiteboard} className="rounded-lg btn-gel">
             <Save className="mr-2 h-4 w-4" /> Save Whiteboard Settings
           </Button>
