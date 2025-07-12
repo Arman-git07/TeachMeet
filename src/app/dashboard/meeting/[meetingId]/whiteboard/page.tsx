@@ -183,10 +183,10 @@ export default function WhiteboardPage() {
 
 
   useEffect(() => {
-    const storedColor = localStorage.getItem("teachmeet-whiteboard-bg-color");
-    if (storedColor) {
-      setBgColor(storedColor);
-    }
+    setBgColor(localStorage.getItem('teachmeet-whiteboard-bg-color') || '#FFFFFF');
+    setSelectedColor(localStorage.getItem('teachmeet-whiteboard-color') || '#000000');
+    setLineWidth(parseInt(localStorage.getItem('teachmeet-whiteboard-linewidth') || '5', 10));
+    setFontSize(parseInt(localStorage.getItem('teachmeet-whiteboard-fontsize') || '16', 10));
   }, []);
   
   const getFontString = useCallback(() => `${fontSize}px sans-serif`, [fontSize]);

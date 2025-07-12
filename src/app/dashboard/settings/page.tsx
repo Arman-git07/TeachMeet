@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History } from "lucide-react";
+import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +17,7 @@ import { auth } from "@/lib/firebase";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -75,6 +76,9 @@ export default function SettingsPage() {
 
   // Whiteboard Settings
   const [whiteboardBgColor, setWhiteboardBgColor] = useState('#FFFFFF');
+  const [whiteboardDrawColor, setWhiteboardDrawColor] = useState('#000000');
+  const [whiteboardLineWidth, setWhiteboardLineWidth] = useState(5);
+  const [whiteboardFontSize, setWhiteboardFontSize] = useState(16);
   
   // Notification Settings
   const [meetingReminders, setMeetingReminders] = useState(true);
@@ -103,7 +107,11 @@ export default function SettingsPage() {
     }
     setDefaultCameraOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setDefaultMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
+
     setWhiteboardBgColor(localStorage.getItem('teachmeet-whiteboard-bg-color') || '#FFFFFF');
+    setWhiteboardDrawColor(localStorage.getItem('teachmeet-whiteboard-color') || '#000000');
+    setWhiteboardLineWidth(parseInt(localStorage.getItem('teachmeet-whiteboard-linewidth') || '5', 10));
+    setWhiteboardFontSize(parseInt(localStorage.getItem('teachmeet-whiteboard-fontsize') || '16', 10));
     
     // Notifications
     setMeetingReminders(localStorage.getItem('teachmeet-notif-reminders') !== 'off');
@@ -189,6 +197,9 @@ export default function SettingsPage() {
 
   const handleSaveWhiteboard = () => {
     localStorage.setItem('teachmeet-whiteboard-bg-color', whiteboardBgColor);
+    localStorage.setItem('teachmeet-whiteboard-color', whiteboardDrawColor);
+    localStorage.setItem('teachmeet-whiteboard-linewidth', String(whiteboardLineWidth));
+    localStorage.setItem('teachmeet-whiteboard-fontsize', String(whiteboardFontSize));
     toast({ title: "Whiteboard Settings Saved", description: "Your whiteboard preferences have been updated." });
   };
 
@@ -364,9 +375,43 @@ export default function SettingsPage() {
           )
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="whiteboard-bg">Background Color</Label>
-          <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
+        <div className="grid md:grid-cols-2 gap-6 items-start">
+            <div className="space-y-4">
+                 <div className="space-y-2">
+                    <Label htmlFor="whiteboard-bg">Background Color</Label>
+                    <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="whiteboard-draw-color">Default Drawing Color</Label>
+                    <Input id="whiteboard-draw-color" type="color" value={whiteboardDrawColor} onChange={(e) => setWhiteboardDrawColor(e.target.value)} className="w-full h-10 rounded-lg" />
+                </div>
+            </div>
+            <div className="space-y-6">
+                <div className="space-y-2">
+                    <Label htmlFor="whiteboard-linewidth" className="flex items-center gap-2"><Brush className="h-4 w-4"/> Default Line Width</Label>
+                     <div className="flex items-center gap-2">
+                        <Slider
+                            id="whiteboard-linewidth"
+                            value={[whiteboardLineWidth]}
+                            onValueChange={(value) => setWhiteboardLineWidth(value[0])}
+                            min={1} max={50} step={1}
+                        />
+                        <span className="text-sm font-mono w-8 text-center">{whiteboardLineWidth}</span>
+                    </div>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="whiteboard-fontsize" className="flex items-center gap-2"><TypeIcon className="h-4 w-4"/> Default Font Size</Label>
+                     <div className="flex items-center gap-2">
+                        <Slider
+                            id="whiteboard-fontsize"
+                            value={[whiteboardFontSize]}
+                            onValueChange={(value) => setWhiteboardFontSize(value[0])}
+                            min={8} max={128} step={1}
+                        />
+                        <span className="text-sm font-mono w-10 text-center">{whiteboardFontSize}px</span>
+                    </div>
+                </div>
+            </div>
         </div>
         <div className="flex justify-end items-center pt-4 border-t gap-2">
           <Button onClick={handleSaveWhiteboard} className="rounded-lg btn-gel">
