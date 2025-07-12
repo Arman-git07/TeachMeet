@@ -14,9 +14,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,6 +34,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import jsPDF from 'jspdf';
+import { auth, storage, db } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 
 // --- Type Definitions ---
@@ -150,6 +154,8 @@ ToolButton.displayName = "ToolButton";
 export default function WhiteboardPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const topic = searchParams.get('topic');
   const meetingId = params.meetingId as string;
   const { setHeaderContent } = useDynamicHeader();
   const { toast } = useToast();
@@ -179,6 +185,7 @@ export default function WhiteboardPage() {
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
   const [bgColor, setBgColor] = useState('#FFFFFF');
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
+  const [isExporting, setIsExporting] = useState(false);
 
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
@@ -946,6 +953,96 @@ export default function WhiteboardPage() {
     }
   };
 
+  const handleExportToPdf = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    setIsPagesPopoverOpen(false);
+
+    const exportToastId = `export-${Date.now()}`;
+    toast({
+        id: exportToastId,
+        title: "Exporting to PDF...",
+        description: "Please wait while your whiteboard is being converted.",
+        duration: Infinity
+    });
+
+    const offscreenCanvas = document.createElement('canvas');
+    const mainCanvas = mainCanvasRef.current;
+    if (!mainCanvas) {
+        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
+        setIsExporting(false);
+        return;
+    }
+
+    offscreenCanvas.width = mainCanvas.width;
+    offscreenCanvas.height = mainCanvas.height;
+    const offscreenCtx = offscreenCanvas.getContext('2d');
+    if (!offscreenCtx) {
+        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
+        setIsExporting(false);
+        return;
+    }
+
+    const doc = new jsPDF({
+        orientation: mainCanvas.width > mainCanvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [mainCanvas.width, mainCanvas.height]
+    });
+
+    try {
+        for (let i = 0; i < pages.length; i++) {
+            toast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            
+            // Draw the page content onto the offscreen canvas
+            offscreenCtx.fillStyle = bgColor;
+            offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+            for (const element of pages[i].elements) {
+                drawElement(offscreenCtx, element);
+            }
+
+            const imgData = offscreenCanvas.toDataURL('image/png');
+            if (i > 0) {
+                doc.addPage();
+            }
+            doc.addImage(imgData, 'PNG', 0, 0, mainCanvas.width, mainCanvas.height);
+        }
+
+        const pdfBlob = doc.getBlob();
+        
+        // Upload to Firebase Storage
+        if (!auth.currentUser) throw new Error("Authentication required.");
+        
+        const fileName = `Whiteboard - ${topic || meetingId} - ${new Date().toISOString()}.pdf`;
+        const userId = auth.currentUser.uid;
+        const storagePath = `documents/${userId}/public/${Date.now()}-${fileName}`;
+        const fileRef = storageRef(storage, storagePath);
+
+        await uploadBytes(fileRef, pdfBlob);
+        const downloadURL = await getDownloadURL(fileRef);
+
+        // Add to Firestore 'documents' collection
+        await addDoc(collection(db, "documents"), {
+            name: fileName,
+            lastModified: new Date().toISOString(),
+            size: `${(pdfBlob.size / (1024 * 1024)).toFixed(2)}MB`,
+            uploaderId: userId,
+            isPrivate: false, // Defaulting to public
+            downloadURL,
+            storagePath,
+            createdAt: serverTimestamp(),
+        });
+
+        toast({ id: exportToastId, title: "Export Successful!", description: "Your whiteboard has been saved to your documents." });
+        
+    } catch (error) {
+        console.error("PDF Export or Upload Failed:", error);
+        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+    } finally {
+        setIsExporting(false);
+    }
+};
+
+
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
     setPages([newInitialPage]);
@@ -961,7 +1058,7 @@ export default function WhiteboardPage() {
         <div className="flex items-center gap-2">
             {meetingId && (
               <Button asChild variant="outline" size="sm" className="rounded-lg">
-                <Link href={`/dashboard/meeting/${meetingId}`}>
+                <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back
                 </Link>
@@ -975,7 +1072,7 @@ export default function WhiteboardPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
                 <DropdownMenuItem
-                  onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}`)}
+                  onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)}
                   className="cursor-pointer"
                 >
                   <Settings className="mr-2 h-4 w-4" />
@@ -987,7 +1084,7 @@ export default function WhiteboardPage() {
       </div>
     );
     return () => setHeaderContent(null);
-  }, [setHeaderContent, meetingId, router]);
+  }, [setHeaderContent, meetingId, router, topic]);
 
 
   return (
@@ -1158,8 +1255,12 @@ export default function WhiteboardPage() {
                 </PopoverTrigger>
                 <PopoverContent className="w-64 p-2 rounded-xl" side="bottom">
                     <div className="space-y-2">
-                        <Button onClick={handleAddPage} className="w-full rounded-lg btn-gel" size="lg">
+                        <Button onClick={handleAddPage} className="w-full rounded-lg btn-gel" size="sm">
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Page
+                        </Button>
+                        <Button onClick={handleExportToPdf} className="w-full rounded-lg" size="sm" variant="outline" disabled={isExporting}>
+                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                            {isExporting ? 'Exporting...' : 'Export as PDF'}
                         </Button>
                         <div className="relative py-2">
                             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
