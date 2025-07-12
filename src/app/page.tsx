@@ -52,16 +52,26 @@ export default function HomePage() {
     }
 
     const now = Date.now();
+    let updatedDismissedIds = [...dismissedMeetingIds];
+    let didUpdateDismissedList = false;
+
     activeMeetings.forEach(meeting => {
+      // If a meeting is old and not already in the dismissed list, add it.
       if (meeting.startedAt && (now - meeting.startedAt > TWO_HOURS_IN_MS)) {
-        if (!dismissedMeetingIds.includes(meeting.id)) {
-          dismissedMeetingIds.push(meeting.id);
+        if (!updatedDismissedIds.includes(meeting.id)) {
+          updatedDismissedIds.push(meeting.id);
+          didUpdateDismissedList = true;
         }
       }
     });
 
+    // Persist the updated list of dismissed meetings if it changed.
+    if (didUpdateDismissedList) {
+      localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(updatedDismissedIds));
+    }
+
     const meetingsToDisplay = activeMeetings
-      .filter(meeting => !dismissedMeetingIds.includes(meeting.id))
+      .filter(meeting => !updatedDismissedIds.includes(meeting.id))
       .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
     
     setOngoingMeetings(meetingsToDisplay);
