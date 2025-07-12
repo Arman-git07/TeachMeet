@@ -79,6 +79,7 @@ export default function SettingsPage() {
   const [whiteboardDrawColor, setWhiteboardDrawColor] = useState('#000000');
   const [whiteboardLineWidth, setWhiteboardLineWidth] = useState(5);
   const [whiteboardFontSize, setWhiteboardFontSize] = useState(16);
+  const [whiteboardFontFamily, setWhiteboardFontFamily] = useState('sans-serif');
   
   // Notification Settings
   const [meetingReminders, setMeetingReminders] = useState(true);
@@ -112,6 +113,7 @@ export default function SettingsPage() {
     setWhiteboardDrawColor(localStorage.getItem('teachmeet-whiteboard-color') || '#000000');
     setWhiteboardLineWidth(parseInt(localStorage.getItem('teachmeet-whiteboard-linewidth') || '5', 10));
     setWhiteboardFontSize(parseInt(localStorage.getItem('teachmeet-whiteboard-fontsize') || '16', 10));
+    setWhiteboardFontFamily(localStorage.getItem('teachmeet-whiteboard-fontfamily') || 'sans-serif');
     
     // Notifications
     setMeetingReminders(localStorage.getItem('teachmeet-notif-reminders') !== 'off');
@@ -200,6 +202,7 @@ export default function SettingsPage() {
     localStorage.setItem('teachmeet-whiteboard-color', whiteboardDrawColor);
     localStorage.setItem('teachmeet-whiteboard-linewidth', String(whiteboardLineWidth));
     localStorage.setItem('teachmeet-whiteboard-fontsize', String(whiteboardFontSize));
+    localStorage.setItem('teachmeet-whiteboard-fontfamily', whiteboardFontFamily);
     toast({ title: "Whiteboard Settings Saved", description: "Your whiteboard preferences have been updated." });
   };
 
@@ -418,20 +421,36 @@ export default function SettingsPage() {
               </div>
             </div>
 
-             <div className="p-4 border rounded-lg">
+            <div className="p-4 border rounded-lg">
               <h4 className="font-medium text-foreground mb-3 flex items-center gap-2"><TypeIcon className="h-5 w-5"/> Text Tool</h4>
-                <div className="space-y-2">
-                    <Label htmlFor="whiteboard-fontsize">Default Font Size</Label>
-                    <div className="flex items-center gap-2">
-                        <Slider
-                            id="whiteboard-fontsize"
-                            value={[whiteboardFontSize]}
-                            onValueChange={(value) => setWhiteboardFontSize(value[0])}
-                            min={8} max={128} step={1}
-                        />
-                        <span className="text-sm font-mono w-10 text-center">{whiteboardFontSize}px</span>
-                    </div>
-                </div>
+              <div className="space-y-4">
+                  <div className="space-y-2">
+                      <Label htmlFor="whiteboard-fontfamily">Default Font</Label>
+                      <Select value={whiteboardFontFamily} onValueChange={setWhiteboardFontFamily}>
+                          <SelectTrigger id="whiteboard-fontfamily" className="rounded-lg">
+                              <SelectValue placeholder="Select a font..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg">
+                              <SelectItem value="sans-serif">Sans-Serif (Default)</SelectItem>
+                              <SelectItem value="serif">Serif</SelectItem>
+                              <SelectItem value="monospace">Monospace</SelectItem>
+                              <SelectItem value="cursive">Cursive</SelectItem>
+                          </SelectContent>
+                      </Select>
+                  </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="whiteboard-fontsize">Default Font Size</Label>
+                      <div className="flex items-center gap-2">
+                          <Slider
+                              id="whiteboard-fontsize"
+                              value={[whiteboardFontSize]}
+                              onValueChange={(value) => setWhiteboardFontSize(value[0])}
+                              min={8} max={128} step={1}
+                          />
+                          <span className="text-sm font-mono w-10 text-center">{whiteboardFontSize}px</span>
+                      </div>
+                  </div>
+              </div>
             </div>
         </div>
         <div className="flex justify-end items-center pt-4 border-t gap-2">

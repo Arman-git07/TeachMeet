@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -33,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 // --- Type Definitions ---
@@ -166,6 +167,7 @@ export default function WhiteboardPage() {
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [lineWidth, setLineWidth] = useState<number>(5);
   const [fontSize, setFontSize] = useState<number>(16);
+  const [fontFamily, setFontFamily] = useState<string>('sans-serif');
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle' | 'line' | 'triangle' | 'arrow' | 'diamond'>('rectangle');
   
   const [isDrawPanelVisible, setIsDrawPanelVisible] = useState(false);
@@ -187,9 +189,10 @@ export default function WhiteboardPage() {
     setSelectedColor(localStorage.getItem('teachmeet-whiteboard-color') || '#000000');
     setLineWidth(parseInt(localStorage.getItem('teachmeet-whiteboard-linewidth') || '5', 10));
     setFontSize(parseInt(localStorage.getItem('teachmeet-whiteboard-fontsize') || '16', 10));
+    setFontFamily(localStorage.getItem('teachmeet-whiteboard-fontfamily') || 'sans-serif');
   }, []);
   
-  const getFontString = useCallback(() => `${fontSize}px sans-serif`, [fontSize]);
+  const getFontString = useCallback(() => `${fontSize}px ${fontFamily}`, [fontSize, fontFamily]);
 
   const pushToHistory = useCallback((pageIndex: number, state: ElementState) => {
     const history = pagesHistoryRef.current[pageIndex] || [];
@@ -571,7 +574,7 @@ export default function WhiteboardPage() {
         case 'erase':
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize]);
+  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
@@ -1014,6 +1017,7 @@ export default function WhiteboardPage() {
           overflow: 'hidden',
           whiteSpace: 'pre',
           padding: '4px',
+          fontFamily: fontFamily,
         }}
         tabIndex={-1}
       />
@@ -1109,6 +1113,20 @@ export default function WhiteboardPage() {
                                     <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
                                 </div>
                             </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="font-family-select" className="text-xs font-semibold text-muted-foreground flex items-center gap-1"><Baseline className="h-4 w-4"/>FONT</Label>
+                            <Select value={fontFamily} onValueChange={setFontFamily}>
+                                <SelectTrigger id="font-family-select" className="rounded-lg">
+                                    <SelectValue placeholder="Select a font..." />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-lg">
+                                    <SelectItem value="sans-serif">Sans-Serif</SelectItem>
+                                    <SelectItem value="serif">Serif</SelectItem>
+                                    <SelectItem value="monospace">Monospace</SelectItem>
+                                    <SelectItem value="cursive">Cursive</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-semibold text-muted-foreground">FONT SIZE</Label>
