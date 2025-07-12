@@ -1,11 +1,43 @@
+
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // This rule allows anyone to read and write to the storage bucket.
-    // THIS IS NOT SECURE FOR PRODUCTION.
-    // For development purposes only.
+
+    // Helper function to check for authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Allow users to read/write their own avatars in a protected path
+    match /avatars/{userId}/{fileName} {
+      allow read; // Anyone can read avatars
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Rules for documents
+    match /documents/{userId}/{accessType}/{fileName} {
+      // User can write to their own private or public folders
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+
+      // Anyone can read from the public folder
+      // Users can read from their own private folder
+      allow read: if (accessType == 'public') || (isAuthenticated() && request.auth.uid == userId && accessType == 'private');
+    }
+
+    // Rules for recordings
+    match /recordings/{userId}/{accessType}/{fileName} {
+      // User can write to their own recording folders
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+
+      // Anyone can read from a public recording folder
+      // A user can read from their own private recording folder
+      allow read: if (accessType == 'public') || (isAuthenticated() && request.auth.uid == userId && accessType == 'private');
+    }
+
+    // Default deny all other paths
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

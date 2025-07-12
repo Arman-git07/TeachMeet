@@ -48,12 +48,14 @@ import {
   LayoutGrid,
   PanelRight,
   GalleryVertical,
+  Radio,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { auth, db } from '@/lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc } from 'firebase/firestore';
+import { auth, db, storage } from '@/lib/firebase';
+import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc, addDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 interface Participant {
@@ -193,6 +195,8 @@ export default function MeetingPage() {
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
@@ -204,6 +208,8 @@ export default function MeetingPage() {
   const otherParticipants = remoteParticipants.filter(p => p.id !== meetingCreatorId);
 
   const mainGridParticipants = (host ? [host] : []).concat(otherParticipants).slice(0, 4);
+
+  const isCurrentUserHost = currentUser?.uid === meetingCreatorId;
 
   const handleReportIssue = () => {
     toast({
@@ -246,18 +252,83 @@ export default function MeetingPage() {
     router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
   };
 
+  const handleToggleRecording = async () => {
+    if (!isCurrentUserHost || !currentUser) return;
+    
+    if (isRecording) {
+      // Stop recording
+      setIsRecording(false);
+      const endTime = Date.now();
+      const durationMs = recordingStartTime ? endTime - recordingStartTime : 0;
+      setRecordingStartTime(null);
+
+      const durationMinutes = Math.floor(durationMs / 60000);
+      const durationSeconds = Math.round((durationMs % 60000) / 1000);
+      const durationString = `${String(durationMinutes).padStart(2, '0')}:${String(durationSeconds).padStart(2, '0')}`;
+
+      toast({ title: "Recording Stopped", description: `Processing recording... Duration: ${durationString}` });
+      
+      const recordingName = `${topic || 'TeachMeet Recording'} - ${new Date().toLocaleDateString()}`;
+      const recordingSize = (Math.random() * 200 + 50).toFixed(2); // Mock size in MB
+      
+      // Simulate saving to storage and creating firestore entry
+      try {
+        const userId = currentUser.uid;
+        const storagePath = `recordings/${userId}/public/${Date.now()}-${recordingName.replace(/\s+/g, '_')}.mp4`;
+        
+        // This simulates uploading a tiny placeholder file. In a real app, you'd upload the actual video data.
+        const placeholderBlob = new Blob(["mock recording data"], { type: 'video/mp4' });
+        const fileRef = storageRef(storage, storagePath);
+        await uploadBytes(fileRef, placeholderBlob);
+        const downloadURL = `https://placehold.co/300x180.png?text=Recorded`;
+
+        await addDoc(collection(db, "recordings"), {
+          name: recordingName,
+          date: new Date().toLocaleDateString(),
+          duration: durationString,
+          size: `${recordingSize}MB`,
+          uploaderId: userId,
+          isPrivate: false, // Or make this a choice, for now public for demo
+          downloadURL,
+          storagePath,
+          createdAt: serverTimestamp(),
+          thumbnailUrl: `https://placehold.co/300x180.png?text=${encodeURIComponent(topic?.substring(0,10) || 'Rec')}`,
+        });
+        
+        toast({ title: "Recording Saved!", description: "The recording is now available in your library." });
+      } catch (error) {
+        console.error("Failed to save recording:", error);
+        toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the recording file.' });
+      }
+    } else {
+      // Start recording
+      setIsRecording(true);
+      setRecordingStartTime(Date.now());
+      toast({ title: "Recording Started", description: "The meeting is now being recorded." });
+    }
+  };
+
+
   useEffect(() => {
     const newHeaderContent = (
       <div className="flex items-center justify-between w-full gap-2 sm:gap-4">
-        <div className="flex-shrink min-w-0">
-          <h2 className="text-base sm:text-lg font-semibold text-foreground truncate" title={displayTitle}>
-            {displayTitle}
-          </h2>
-          {realtimeParticipants.length > 0 && (
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              {realtimeParticipants.length} Participant{realtimeParticipants.length === 1 ? '' : 's'}
-            </span>
+        <div className="flex-shrink min-w-0 flex items-center gap-2">
+           {isRecording && (
+            <div className="flex items-center gap-1.5 text-red-500 animate-pulse bg-red-500/10 px-2 py-1 rounded-md">
+              <Radio className="h-4 w-4" />
+              <span className="text-xs font-semibold">REC</span>
+            </div>
           )}
+          <div>
+            <h2 className="text-base sm:text-lg font-semibold text-foreground truncate" title={displayTitle}>
+              {displayTitle}
+            </h2>
+            {realtimeParticipants.length > 0 && (
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                {realtimeParticipants.length} Participant{realtimeParticipants.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -266,6 +337,12 @@ export default function MeetingPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 rounded-lg shadow-lg">
+             {isCurrentUserHost && (
+              <DropdownMenuItem onClick={handleToggleRecording} className="cursor-pointer">
+                {isRecording ? <StopCircle className="mr-2 h-4 w-4 text-destructive" /> : <Radio className="mr-2 h-4 w-4" />}
+                {isRecording ? "Stop Recording" : "Start Recording"}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={handleOpenSharePanel} className="cursor-pointer">
               <Share2 className="mr-2 h-4 w-4" /> Share Invite
             </DropdownMenuItem>
@@ -303,6 +380,8 @@ export default function MeetingPage() {
       realtimeParticipants.length, 
       isScreenSharingActive, 
       router, 
+      isCurrentUserHost,
+      isRecording
     ]);
 
 
@@ -332,8 +411,10 @@ export default function MeetingPage() {
             topic: meetingTopicFromURL,
             createdAt: serverTimestamp(),
           });
+          setMeetingCreatorId(currentUser.uid); // Set creator ID immediately
+        } else {
+          setMeetingCreatorId(meetingDocSnap.data()?.creatorId || null);
         }
-        setMeetingCreatorId(meetingDocSnap.data()?.creatorId || currentUser.uid);
         
         const participantData = {
           userId: currentUser.uid,
@@ -532,11 +613,19 @@ export default function MeetingPage() {
     if (currentUser && meetingId && db) {
       try {
         await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
+        // Add to dismissed list
+        const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
+        const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
+        let dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
+        if (!dismissedIds.includes(meetingId)) {
+          dismissedIds.push(meetingId);
+          localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
+        }
       } catch (error) {
         console.error("[MeetingPage] Error removing participant from Firestore on leave:", error);
       }
     }
-
+    
     toast({ title: "Leaving Meeting", description: "You have left the meeting." });
     router.push('/');
   };
