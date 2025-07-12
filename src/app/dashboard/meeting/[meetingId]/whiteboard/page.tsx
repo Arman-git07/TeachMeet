@@ -1019,7 +1019,7 @@ export default function WhiteboardPage() {
             doc.addImage(imgData, 'PNG', 0, 0, mainCanvas.width, mainCanvas.height);
         }
 
-        const pdfBlob = doc.getBlob();
+        const pdfBlob = doc.output('blob');
         
         // Upload to Firebase Storage
         if (!auth.currentUser) throw new Error("Authentication required.");
