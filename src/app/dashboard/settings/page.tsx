@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft } from "lucide-react";
+import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,16 +20,19 @@ import { cn } from "@/lib/utils";
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
-  { title: string, description: string, icon: React.ElementType, children: React.ReactNode, id?: string }
->(({ title, description, icon: Icon, children, id }, ref) => (
+  { title: string, description: string, icon: React.ElementType, children: React.ReactNode, id?: string, headerAction?: React.ReactNode }
+>(({ title, description, icon: Icon, children, id, headerAction }, ref) => (
     <Card id={id} ref={ref} className="shadow-lg rounded-xl border-border/50 scroll-mt-20">
       <CardHeader className="border-b">
-        <div className="flex items-center gap-4">
-          <Icon className="h-8 w-8 text-primary" />
-          <div>
-            <CardTitle className="text-xl">{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Icon className="h-8 w-8 text-primary" />
+            <div>
+              <CardTitle className="text-xl">{title}</CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </div>
           </div>
+          {headerAction}
         </div>
       </CardHeader>
       <CardContent className="pt-6 space-y-6">
@@ -49,6 +52,7 @@ export default function SettingsPage() {
   // Refs for scrolling to sections
   const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
   const whiteboardSettingsRef = useRef<HTMLDivElement>(null);
+  const historyAndDataRef = useRef<HTMLDivElement>(null);
 
   // General Settings
   const [displayName, setDisplayName] = useState<string>('');
@@ -80,15 +84,15 @@ export default function SettingsPage() {
   // Highlight effect
   useEffect(() => {
     const highlight = searchParams.get('highlight');
-    if (highlight === 'advancedMeetingSettings' && advancedMeetingSettingsRef.current) {
-        advancedMeetingSettingsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        advancedMeetingSettingsRef.current.classList.add('highlight-blink');
-        setTimeout(() => advancedMeetingSettingsRef.current?.classList.remove('highlight-blink'), 2000);
-    }
-    if (highlight === 'whiteboardSettings' && whiteboardSettingsRef.current) {
-        whiteboardSettingsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        whiteboardSettingsRef.current.classList.add('highlight-blink');
-        setTimeout(() => whiteboardSettingsRef.current?.classList.remove('highlight-blink'), 2000);
+    let targetRef: React.RefObject<HTMLDivElement> | null = null;
+    if (highlight === 'advancedMeetingSettings') targetRef = advancedMeetingSettingsRef;
+    if (highlight === 'whiteboardSettings') targetRef = whiteboardSettingsRef;
+    if (highlight === 'historyAndData') targetRef = historyAndDataRef;
+    
+    if (targetRef && targetRef.current) {
+        targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetRef.current.classList.add('highlight-blink');
+        setTimeout(() => targetRef!.current?.classList.remove('highlight-blink'), 2000);
     }
   }, [searchParams]);
   
@@ -193,6 +197,13 @@ export default function SettingsPage() {
     localStorage.setItem('teachmeet-notif-mentions', chatMentions ? 'on' : 'off');
     localStorage.setItem('teachmeet-notif-handraise', handRaiseAlerts ? 'on' : 'off');
     toast({ title: "Notification Settings Saved", description: "Your notification preferences have been updated." });
+  };
+
+  const handleClearHistory = () => {
+    toast({
+      title: "Clear History (Simulated)",
+      description: "In a real application, this would clear your meeting history data.",
+    });
   };
   
   const videoClassNames = cn(
@@ -335,28 +346,51 @@ export default function SettingsPage() {
           </Button>
         </div>
       </SettingsSection>
-
-      <SettingsSection ref={whiteboardSettingsRef} id="whiteboardSettings" title="Whiteboard" description="Personalize your collaborative canvas." icon={Palette}>
-        <div className="space-y-2">
-          <Label htmlFor="whiteboard-bg">Background Color</Label>
-          <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
-        </div>
-        <div className="flex justify-end items-center pt-4 border-t gap-2">
-          {meetingId && (
-            <Button asChild variant="outline" className="rounded-lg">
+      
+      <SettingsSection
+        ref={whiteboardSettingsRef}
+        id="whiteboardSettings"
+        title="Whiteboard"
+        description="Personalize your collaborative canvas."
+        icon={Palette}
+        headerAction={
+          meetingId && (
+            <Button asChild variant="outline" size="sm" className="rounded-lg">
               <Link href={`/dashboard/meeting/${meetingId}/whiteboard`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Whiteboard
               </Link>
             </Button>
-          )}
+          )
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="whiteboard-bg">Background Color</Label>
+          <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
+        </div>
+        <div className="flex justify-end items-center pt-4 border-t gap-2">
           <Button onClick={handleSaveWhiteboard} className="rounded-lg btn-gel">
             <Save className="mr-2 h-4 w-4" /> Save Whiteboard Settings
           </Button>
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Privacy & Security" description="Manage your account and view our policies." icon={ShieldCheck}>
+      <SettingsSection ref={historyAndDataRef} id="historyAndData" title="History & Data" description="Manage your generated content and history." icon={History}>
+        <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Quickly access your documents and recordings from the main sidebar under "Library".</p>
+             <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="w-full justify-start text-left p-3 rounded-lg"><Trash2 className="mr-2 h-4 w-4" /> Clear All Meeting History</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action will clear your list of ongoing and recent meetings. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearHistory}>Clear History</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Account & Security" description="Manage your account and view our policies." icon={ShieldCheck}>
         <div className="space-y-4">
             <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg"><Link href="/community-guidelines" target="_blank"><Users className="mr-2 h-4 w-4" /> Community Guidelines</Link></Button>
             <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg"><Link href="/terms-of-service" target="_blank"><BookOpen className="mr-2 h-4 w-4" /> Terms of Service</Link></Button>
