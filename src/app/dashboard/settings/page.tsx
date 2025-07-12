@@ -301,7 +301,7 @@ export default function SettingsPage() {
         description="Set your default camera, microphone, and filter states."
         icon={Settings2}
         headerAction={
-          meetingId && searchParams.get('highlight') === 'advancedMeetingSettings' && (
+          meetingId && (
             <Button asChild variant="outline" size="sm" className="rounded-lg">
               <Link href={`/dashboard/meeting/${meetingId}/wait`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -381,7 +381,7 @@ export default function SettingsPage() {
         description="Personalize your collaborative canvas."
         icon={Palette}
         headerAction={
-          meetingId && searchParams.get('highlight') === 'whiteboardSettings' && (
+          meetingId && (
             <Button asChild variant="outline" size="sm" className="rounded-lg">
               <Link href={`/dashboard/meeting/${meetingId}/whiteboard`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -391,33 +391,38 @@ export default function SettingsPage() {
           )
         }
       >
-        <div className="grid md:grid-cols-2 gap-6 items-start">
-            <div className="space-y-4">
-                 <div className="space-y-2">
-                    <Label htmlFor="whiteboard-bg">Background Color</Label>
-                    <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="whiteboard-draw-color">Default Drawing Color</Label>
-                    <Input id="whiteboard-draw-color" type="color" value={whiteboardDrawColor} onChange={(e) => setWhiteboardDrawColor(e.target.value)} className="w-full h-10 rounded-lg" />
-                </div>
+        <div className="space-y-4">
+             <div className="space-y-2">
+                <Label htmlFor="whiteboard-bg">Background Color</Label>
+                <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
             </div>
-            <div className="space-y-6">
+            <div className="p-4 border rounded-lg">
+              <h4 className="font-medium text-foreground mb-3 flex items-center gap-2"><Brush className="h-5 w-5"/> Drawing Tools</h4>
+              <div className="space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="whiteboard-linewidth" className="flex items-center gap-2"><Brush className="h-4 w-4"/> Default Line Width</Label>
-                     <div className="flex items-center gap-2">
-                        <Slider
-                            id="whiteboard-linewidth"
-                            value={[whiteboardLineWidth]}
-                            onValueChange={(value) => setWhiteboardLineWidth(value[0])}
-                            min={1} max={50} step={1}
-                        />
-                        <span className="text-sm font-mono w-8 text-center">{whiteboardLineWidth}</span>
-                    </div>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="whiteboard-fontsize" className="flex items-center gap-2"><TypeIcon className="h-4 w-4"/> Default Font Size</Label>
-                     <div className="flex items-center gap-2">
+                      <Label htmlFor="whiteboard-draw-color">Default Drawing Color</Label>
+                      <Input id="whiteboard-draw-color" type="color" value={whiteboardDrawColor} onChange={(e) => setWhiteboardDrawColor(e.target.value)} className="w-full h-10 rounded-lg" />
+                  </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="whiteboard-linewidth">Default Line Width</Label>
+                      <div className="flex items-center gap-2">
+                          <Slider
+                              id="whiteboard-linewidth"
+                              value={[whiteboardLineWidth]}
+                              onValueChange={(value) => setWhiteboardLineWidth(value[0])}
+                              min={1} max={50} step={1}
+                          />
+                          <span className="text-sm font-mono w-8 text-center">{whiteboardLineWidth}</span>
+                      </div>
+                  </div>
+              </div>
+            </div>
+
+             <div className="p-4 border rounded-lg">
+              <h4 className="font-medium text-foreground mb-3 flex items-center gap-2"><TypeIcon className="h-5 w-5"/> Text Tool</h4>
+                <div className="space-y-2">
+                    <Label htmlFor="whiteboard-fontsize">Default Font Size</Label>
+                    <div className="flex items-center gap-2">
                         <Slider
                             id="whiteboard-fontsize"
                             value={[whiteboardFontSize]}
@@ -477,3 +482,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
