@@ -285,10 +285,11 @@ export default function SettingsPage() {
                     </Select>
                 </div>
             </div>
-            <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-                <video ref={videoPreviewRef} className={videoClassNames} autoPlay muted playsInline />
-                {!hasAVPermissions && <div className="p-4 text-center text-muted-foreground"><Camera className="h-8 w-8 mx-auto mb-2" /><p>Enable permissions to see video preview.</p></div>}
-            </div>
+            {hasAVPermissions && (
+              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
+                  <video ref={videoPreviewRef} className={videoClassNames} autoPlay muted playsInline />
+              </div>
+            )}
         </div>
         <div className="flex justify-end pt-4 border-t">
           <Button onClick={handleSaveAV} className="rounded-lg btn-gel" disabled={!hasAVPermissions}>
