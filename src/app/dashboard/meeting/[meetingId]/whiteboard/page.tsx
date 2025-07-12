@@ -14,7 +14,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle as ShadDialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -186,6 +195,8 @@ export default function WhiteboardPage() {
   const [bgColor, setBgColor] = useState('#FFFFFF');
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+
 
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
@@ -953,8 +964,9 @@ export default function WhiteboardPage() {
     }
   };
 
-  const handleExportToPdf = async () => {
+  const handleExportToPdf = async (destination: 'private' | 'public') => {
     if (isExporting) return;
+    setIsExportDialogOpen(false); // Close the choice dialog
     setIsExporting(true);
     setIsPagesPopoverOpen(false);
 
@@ -1014,7 +1026,7 @@ export default function WhiteboardPage() {
         
         const fileName = `Whiteboard - ${topic || meetingId} - ${new Date().toISOString()}.pdf`;
         const userId = auth.currentUser.uid;
-        const storagePath = `documents/${userId}/public/${Date.now()}-${fileName}`;
+        const storagePath = `documents/${userId}/${destination}/${Date.now()}-${fileName}`;
         const fileRef = storageRef(storage, storagePath);
 
         await uploadBytes(fileRef, pdfBlob);
@@ -1026,13 +1038,13 @@ export default function WhiteboardPage() {
             lastModified: new Date().toISOString(),
             size: `${(pdfBlob.size / (1024 * 1024)).toFixed(2)}MB`,
             uploaderId: userId,
-            isPrivate: false, // Defaulting to public
+            isPrivate: destination === 'private',
             downloadURL,
             storagePath,
             createdAt: serverTimestamp(),
         });
 
-        toast({ id: exportToastId, title: "Export Successful!", description: "Your whiteboard has been saved to your documents." });
+        toast({ id: exportToastId, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
         
     } catch (error) {
         console.error("PDF Export or Upload Failed:", error);
@@ -1258,7 +1270,7 @@ export default function WhiteboardPage() {
                         <Button onClick={handleAddPage} className="w-full rounded-lg btn-gel" size="sm">
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Page
                         </Button>
-                        <Button onClick={handleExportToPdf} className="w-full rounded-lg" size="sm" variant="outline" disabled={isExporting}>
+                        <Button onClick={() => { setIsPagesPopoverOpen(false); setIsExportDialogOpen(true); }} className="w-full rounded-lg" size="sm" variant="outline" disabled={isExporting}>
                             {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                             {isExporting ? 'Exporting...' : 'Export as PDF'}
                         </Button>
@@ -1330,6 +1342,28 @@ export default function WhiteboardPage() {
           Whiteboard is in active development. All drawings are currently local.
         </footer>
       </div>
+
+       <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <ShadDialogTitle className="text-xl">Choose Export Destination</ShadDialogTitle>
+            <DialogDescription>Where would you like to save this PDF?</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => handleExportToPdf('private')} disabled={isExporting}>
+              <Lock className="mr-2 h-5 w-5" /> Save to Private
+            </Button>
+            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => handleExportToPdf('public')} disabled={isExporting}>
+              <Globe className="mr-2 h-5 w-5" /> Save to Public
+            </Button>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary" className="rounded-lg" disabled={isExporting}>Cancel</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
