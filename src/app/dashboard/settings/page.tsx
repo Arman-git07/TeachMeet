@@ -301,7 +301,7 @@ export default function SettingsPage() {
         description="Set your default camera, microphone, and filter states."
         icon={Settings2}
         headerAction={
-          meetingId && (
+          meetingId && searchParams.get('highlight') === 'advancedMeetingSettings' && (
             <Button asChild variant="outline" size="sm" className="rounded-lg">
               <Link href={`/dashboard/meeting/${meetingId}/wait`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -381,7 +381,7 @@ export default function SettingsPage() {
         description="Personalize your collaborative canvas."
         icon={Palette}
         headerAction={
-          meetingId && (
+          meetingId && searchParams.get('highlight') === 'whiteboardSettings' && (
             <Button asChild variant="outline" size="sm" className="rounded-lg">
               <Link href={`/dashboard/meeting/${meetingId}/whiteboard`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
