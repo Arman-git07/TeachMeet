@@ -269,7 +269,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
           </div>
 
           <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
-              <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`}>
+              <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}`}>
                 <Settings2 className="h-5 w-5" />
                 Advanced Settings
               </Link>

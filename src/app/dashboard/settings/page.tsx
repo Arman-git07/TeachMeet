@@ -294,7 +294,23 @@ export default function SettingsPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection ref={advancedMeetingSettingsRef} id="advancedMeetingSettings" title="Advanced Meeting Settings" description="Set your default camera, microphone, and filter states." icon={Settings2}>
+      <SettingsSection
+        ref={advancedMeetingSettingsRef}
+        id="advancedMeetingSettings"
+        title="Advanced Meeting Settings"
+        description="Set your default camera, microphone, and filter states."
+        icon={Settings2}
+        headerAction={
+          meetingId && (
+            <Button asChild variant="outline" size="sm" className="rounded-lg">
+              <Link href={`/dashboard/meeting/${meetingId}/wait`}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Join Room
+              </Link>
+            </Button>
+          )
+        }
+      >
         <div className="space-y-4">
             <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
                 <Label htmlFor="camera-on" className="flex items-center gap-2"><Video className="h-4 w-4" /> Default camera to ON</Label>
