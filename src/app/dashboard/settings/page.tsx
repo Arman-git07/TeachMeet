@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { updateProfile } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, initializeAuth } from '@/lib/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -68,7 +68,7 @@ export default function SettingsPage() {
   const [selectedAudioInDevice, setSelectedAudioInDevice] = useState<string>('');
   const [hasAVPermissions, setHasAVPermissions] = useState<boolean | null>(null);
 
-  // Advanced Meeting Settings
+  // Advanced Meeting Settings (now merged into A/V)
   const [defaultCameraOn, setDefaultCameraOn] = useState(true);
   const [defaultMicOn, setDefaultMicOn] = useState(false);
   const [appliedFilter, setAppliedFilter] = useState<string>('none');
@@ -186,17 +186,13 @@ export default function SettingsPage() {
   const handleSaveAV = () => {
     localStorage.setItem('teachmeet-video-device', selectedVideoDevice);
     localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
-    toast({ title: "A/V Settings Saved", description: "Your camera and microphone preferences have been updated." });
-  };
-  
-  const handleSaveAdvancedMeeting = () => {
     localStorage.setItem('teachmeet-camera-default', defaultCameraOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-mic-default', defaultMicOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-camera-filter', appliedFilter);
     localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
-    toast({ title: "Meeting Settings Saved", description: "Your advanced meeting preferences have been updated." });
+    toast({ title: "Audio & Video Settings Saved", description: "Your camera and microphone preferences have been updated." });
   };
-
+  
   const handleSaveWhiteboard = () => {
     localStorage.setItem('teachmeet-whiteboard-bg-color', whiteboardBgColor);
     localStorage.setItem('teachmeet-whiteboard-color', whiteboardDrawColor);
@@ -258,8 +254,24 @@ export default function SettingsPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Audio & Video" description="Select and preview your devices." icon={Camera}>
-        {hasAVPermissions === false && (
+      <SettingsSection
+        ref={advancedMeetingSettingsRef}
+        id="advancedMeetingSettings"
+        title="Audio & Video"
+        description="Configure your camera, microphone, and default meeting states."
+        icon={Camera}
+        headerAction={
+            meetingId && (
+              <Button asChild variant="outline" size="sm" className="rounded-lg">
+                <Link href={`/dashboard/meeting/${meetingId}/wait`}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Join Room
+                </Link>
+              </Button>
+            )
+        }
+      >
+        {hasAVPermissions === false ? (
           <div className="p-4 bg-destructive/10 text-destructive rounded-lg flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 mt-0.5" />
               <div>
@@ -267,55 +279,31 @@ export default function SettingsPage() {
                   <p className="text-sm">To select devices, please grant camera and microphone permissions in your browser. <Button variant="link" size="sm" className="p-0 h-auto" onClick={getDevices}>Try Again</Button></p>
               </div>
           </div>
-        )}
-        <div className="grid md:grid-cols-2 gap-6 items-start">
-            <div className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="video-device">Camera</Label>
-                    <Select value={selectedVideoDevice} onValueChange={setSelectedVideoDevice} disabled={!hasAVPermissions}>
-                        <SelectTrigger id="video-device" className="rounded-lg"><SelectValue placeholder="Select a camera..." /></SelectTrigger>
-                        <SelectContent className="rounded-lg"><SelectItem value="default">Default</SelectItem>{videoDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="audio-in-device">Microphone</Label>
-                    <Select value={selectedAudioInDevice} onValueChange={setSelectedAudioInDevice} disabled={!hasAVPermissions}>
-                        <SelectTrigger id="audio-in-device" className="rounded-lg"><SelectValue placeholder="Select a microphone..." /></SelectTrigger>
-                        <SelectContent className="rounded-lg"><SelectItem value="default">Default</SelectItem>{audioInDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-            </div>
-            {hasAVPermissions && (
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6 items-start">
+              <div className="space-y-4">
+                  <div className="space-y-2">
+                      <Label htmlFor="video-device">Camera</Label>
+                      <Select value={selectedVideoDevice} onValueChange={setSelectedVideoDevice} disabled={!hasAVPermissions}>
+                          <SelectTrigger id="video-device" className="rounded-lg"><SelectValue placeholder="Select a camera..." /></SelectTrigger>
+                          <SelectContent className="rounded-lg"><SelectItem value="default">Default</SelectItem>{videoDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                  </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="audio-in-device">Microphone</Label>
+                      <Select value={selectedAudioInDevice} onValueChange={setSelectedAudioInDevice} disabled={!hasAVPermissions}>
+                          <SelectTrigger id="audio-in-device" className="rounded-lg"><SelectValue placeholder="Select a microphone..." /></SelectTrigger>
+                          <SelectContent className="rounded-lg"><SelectItem value="default">Default</SelectItem>{audioInDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                  </div>
+              </div>
               <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
                   <video ref={videoPreviewRef} className={videoClassNames} autoPlay muted playsInline />
               </div>
-            )}
-        </div>
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSaveAV} className="rounded-lg btn-gel" disabled={!hasAVPermissions}>
-            <Save className="mr-2 h-4 w-4" /> Save A/V Devices
-          </Button>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
-        ref={advancedMeetingSettingsRef}
-        id="advancedMeetingSettings"
-        title="Advanced Meeting Settings"
-        description="Set your default camera, microphone, and filter states."
-        icon={Settings2}
-        headerAction={
-          meetingId && (
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
-              <Link href={`/dashboard/meeting/${meetingId}/wait`}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Join Room
-              </Link>
-            </Button>
-          )
-        }
-      >
-        <div className="space-y-4">
+          </div>
+        )}
+        
+        <div className="space-y-4 pt-6 border-t">
             <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
                 <Label htmlFor="camera-on" className="flex items-center gap-2"><Video className="h-4 w-4" /> Default camera to ON</Label>
                 <Switch id="camera-on" checked={defaultCameraOn} onCheckedChange={setDefaultCameraOn} />
@@ -350,8 +338,8 @@ export default function SettingsPage() {
             </div>
         </div>
         <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSaveAdvancedMeeting} className="rounded-lg btn-gel">
-            <Save className="mr-2 h-4 w-4" /> Save Meeting Defaults
+          <Button onClick={handleSaveAV} className="rounded-lg btn-gel">
+            <Save className="mr-2 h-4 w-4" /> Save A/V Settings
           </Button>
         </div>
       </SettingsSection>
@@ -436,6 +424,9 @@ export default function SettingsPage() {
                               <SelectItem value="serif">Serif</SelectItem>
                               <SelectItem value="monospace">Monospace</SelectItem>
                               <SelectItem value="cursive">Cursive</SelectItem>
+                              <SelectItem value="fantasy">Fantasy</SelectItem>
+                              <SelectItem value="Arial">Arial</SelectItem>
+                              <SelectItem value="Georgia">Georgia</SelectItem>
                           </SelectContent>
                       </Select>
                   </div>

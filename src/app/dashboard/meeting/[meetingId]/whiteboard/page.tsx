@@ -1125,6 +1125,9 @@ export default function WhiteboardPage() {
                                     <SelectItem value="serif">Serif</SelectItem>
                                     <SelectItem value="monospace">Monospace</SelectItem>
                                     <SelectItem value="cursive">Cursive</SelectItem>
+                                    <SelectItem value="fantasy">Fantasy</SelectItem>
+                                    <SelectItem value="Arial">Arial</SelectItem>
+                                    <SelectItem value="Georgia">Georgia</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
