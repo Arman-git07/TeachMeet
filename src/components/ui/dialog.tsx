@@ -7,16 +7,6 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const DialogContext = DialogPrimitive.Context
-
-export function useDialogContext() {
-  const context = React.useContext(DialogContext)
-  if (context === null) {
-    throw new Error("`useDialogContext` must be used within `Dialog`.")
-  }
-  return context
-}
-
 const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger

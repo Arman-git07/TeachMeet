@@ -14,8 +14,7 @@ import {
   DialogFooter, 
   DialogHeader, 
   DialogTitle, 
-  DialogClose, 
-  useDialogContext
+  DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -41,29 +40,24 @@ export function StartMeetingDialogContent() {
   const { user } = useAuth();
   const [isJoining, setIsJoining] = useState(false);
 
-  const dialogContext = useDialogContext();
-  
-  // Effect to generate new meeting details when the dialog is opened
+  // This effect runs once to generate initial meeting details.
   useEffect(() => {
-    if (dialogContext.open) {
-      const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
-      
-      const newMeetingId = randomString(8);
-      setMeetingId(newMeetingId);
+    const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
+    
+    const newMeetingId = randomString(8);
+    setMeetingId(newMeetingId);
 
-      if (typeof window !== "undefined") {
-          setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
-      } else {
-          setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); 
-      }
-      
-      const codePart1 = randomString(3);
-      const codePart2 = randomString(3);
-      const codePart3 = randomString(3);
-      setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
-      setIsJoining(false); // Reset joining state
+    if (typeof window !== "undefined") {
+        setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
+    } else {
+        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); 
     }
-  }, [dialogContext.open]);
+    
+    const codePart1 = randomString(3);
+    const codePart2 = randomString(3);
+    const codePart3 = randomString(3);
+    setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
+  }, []);
 
   const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
     if (!textToCopy) {
@@ -141,7 +135,7 @@ export function StartMeetingDialogContent() {
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       
       router.push(joinNowLinkPath);
-      dialogContext.onOpenChange(false);
+      // We don't control the dialog open state from here anymore, the parent does.
 
     } catch (error: any) {
       console.error("[StartMeetingDialog] CRITICAL: Error creating meeting document in Firestore:", error);
