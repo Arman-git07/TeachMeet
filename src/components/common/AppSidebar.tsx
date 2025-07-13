@@ -35,6 +35,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   useSidebar,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
@@ -271,17 +272,21 @@ export function AppSidebar() {
             </SidebarMenu>
          ) : (
         <SidebarMenu className="space-y-2">
+          <SidebarSeparator />
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
           <NavItem icon={ShieldQuestion} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal & Info</NavItem>
           {isAuthenticated && (
-            <NavItem
-              icon={LogOut}
-              currentPath={pathname}
-              onClick={() => setShowSignOutConfirm(true)}
-            >
-              Sign Out
-            </NavItem>
+            <>
+              <SidebarSeparator />
+              <NavItem
+                icon={LogOut}
+                currentPath={pathname}
+                onClick={() => setShowSignOutConfirm(true)}
+              >
+                Sign Out
+              </NavItem>
+            </>
           )}
         </SidebarMenu>
         )}

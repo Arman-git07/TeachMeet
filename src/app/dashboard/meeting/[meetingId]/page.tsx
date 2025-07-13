@@ -25,6 +25,7 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 import {
   Mic,
@@ -49,6 +50,9 @@ import {
   PanelRight,
   GalleryVertical,
   Radio,
+  PanelLeftClose,
+  PanelRightClose,
+  ShieldCheck,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -177,6 +181,27 @@ function ParticipantView({
   );
 }
 
+function RecordingTimer({ startTime }: { startTime: number }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed(Date.now() - startTime);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  };
+
+  return <span className="text-xs font-mono tabular-nums">{formatTime(elapsed)}</span>;
+}
+
 
 export default function MeetingPage() {
   const params = useParams();
@@ -201,6 +226,8 @@ export default function MeetingPage() {
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
+
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
@@ -256,7 +283,7 @@ export default function MeetingPage() {
   };
 
   const handleOpenParticipants = () => {
-    router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
+    setIsParticipantsPanelOpen(true);
   };
 
   const handleToggleRecording = async () => {
@@ -320,10 +347,10 @@ export default function MeetingPage() {
     const newHeaderContent = (
       <div className="flex items-center justify-between w-full gap-2 sm:gap-4">
         <div className="flex-shrink min-w-0 flex items-center gap-2">
-           {isRecording && (
+           {isRecording && recordingStartTime && (
             <div className="flex items-center gap-1.5 text-red-500 animate-pulse bg-red-500/10 px-2 py-1 rounded-md">
               <Radio className="h-4 w-4" />
-              <span className="text-xs font-semibold">REC</span>
+              <RecordingTimer startTime={recordingStartTime} />
             </div>
           )}
           <div>
@@ -363,7 +390,7 @@ export default function MeetingPage() {
             <DropdownMenuItem onClick={handleOpenChat} className="cursor-pointer">
               <MessageSquare className="mr-2 h-4 w-4" /> Chat
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleOpenParticipants} className="cursor-pointer"><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
+             <DropdownMenuItem onClick={handleOpenParticipants} className="cursor-pointer"><Users className="mr-2 h-4 w-4" /> Participants</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleReportIssue} className="text-destructive focus:text-destructive cursor-pointer">
               <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
@@ -388,7 +415,8 @@ export default function MeetingPage() {
       isScreenSharingActive, 
       router, 
       isCurrentUserHost,
-      isRecording
+      isRecording,
+      recordingStartTime
     ]);
 
 
@@ -709,75 +737,114 @@ export default function MeetingPage() {
 
   return (
     <div className="h-full flex flex-col bg-background/95 relative overflow-hidden">
-      <main className="flex-1 p-2 sm:p-4">
-        {(() => {
-          // No remote participants, just show self view
-          if (remoteParticipants.length === 0) {
-            return (
-              <div className="h-full w-full">
-                {selfView ? (
-                  <ParticipantView {...selfView} />
-                ) : (
-                  <div className="h-full w-full flex flex-col items-center justify-center text-center bg-muted rounded-xl">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                    <p className="text-muted-foreground">Connecting your video...</p>
-                    <p className="text-xs text-muted-foreground mt-2">Make sure you've granted camera permissions.</p>
-                  </div>
-                )}
-              </div>
-            );
-          }
-          // 1 remote participant: Full screen
-          if (remoteParticipants.length === 1) {
-            return (
-              <div className="h-full w-full">
-                <ParticipantView {...remoteParticipants[0]} />
-              </div>
-            );
-          }
-          // 2 remote participants: Vertical split
-          if (remoteParticipants.length === 2) {
-            return (
-              <div className="h-full w-full flex flex-col gap-2 sm:gap-4">
-                {remoteParticipants.map(participant => (
-                  <div key={participant.id} className="flex-1 min-h-0">
-                    <ParticipantView {...participant} />
-                  </div>
-                ))}
-              </div>
-            );
-          }
-          // 3 remote participants: 1 on top, two below
-          if (remoteParticipants.length === 3) {
-            const topParticipant = host || remoteParticipants[0];
-            const bottomParticipants = remoteParticipants.filter(p => p.id !== topParticipant.id);
-            return (
-              <div className="h-full w-full flex flex-col gap-2 sm:gap-4">
-                <div className="flex-1 min-h-0">
-                  <ParticipantView {...topParticipant} />
-                </div>
-                <div className="flex-1 min-h-0 flex gap-2 sm:gap-4">
-                  {bottomParticipants.map(participant => (
-                    <div key={participant.id} className="flex-1 min-h-0">
-                      <ParticipantView {...participant} />
+      <div className={cn("flex flex-1 overflow-hidden transition-all duration-300 ease-in-out", isParticipantsPanelOpen ? "mr-[300px]" : "mr-0")}>
+        <main className="flex-1 p-2 sm:p-4">
+            {(() => {
+            // No remote participants, just show self view
+            if (remoteParticipants.length === 0) {
+                return (
+                <div className="h-full w-full">
+                    {selfView ? (
+                    <ParticipantView {...selfView} />
+                    ) : (
+                    <div className="h-full w-full flex flex-col items-center justify-center text-center bg-muted rounded-xl">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                        <p className="text-muted-foreground">Connecting your video...</p>
+                        <p className="text-xs text-muted-foreground mt-2">Make sure you've granted camera permissions.</p>
                     </div>
-                  ))}
+                    )}
                 </div>
-              </div>
+                );
+            }
+            // 1 remote participant: Full screen
+            if (remoteParticipants.length === 1) {
+                return (
+                <div className="h-full w-full">
+                    <ParticipantView {...remoteParticipants[0]} />
+                </div>
+                );
+            }
+            // 2 remote participants: Vertical split
+            if (remoteParticipants.length === 2) {
+                return (
+                <div className="h-full w-full flex flex-col gap-2 sm:gap-4">
+                    {remoteParticipants.map(participant => (
+                    <div key={participant.id} className="flex-1 min-h-0">
+                        <ParticipantView {...participant} />
+                    </div>
+                    ))}
+                </div>
+                );
+            }
+            // 3 remote participants: 1 on top, two below
+            if (remoteParticipants.length === 3) {
+                const topParticipant = host || remoteParticipants[0];
+                const bottomParticipants = remoteParticipants.filter(p => p.id !== topParticipant.id);
+                return (
+                <div className="h-full w-full flex flex-col gap-2 sm:gap-4">
+                    <div className="flex-1 min-h-0">
+                    <ParticipantView {...topParticipant} />
+                    </div>
+                    <div className="flex-1 min-h-0 flex gap-2 sm:gap-4">
+                    {bottomParticipants.map(participant => (
+                        <div key={participant.id} className="flex-1 min-h-0">
+                        <ParticipantView {...participant} />
+                        </div>
+                    ))}
+                    </div>
+                </div>
+                );
+            }
+            // 4 or more participants: 2x2 grid (host prioritized)
+            return (
+                <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
+                {mainGridParticipants.map(participant => (
+                    <div key={participant.id} className="min-h-0">
+                    <ParticipantView {...participant} />
+                    </div>
+                ))}
+                </div>
             );
-          }
-          // 4 or more participants: 2x2 grid (host prioritized)
-          return (
-            <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
-              {mainGridParticipants.map(participant => (
-                <div key={participant.id} className="min-h-0">
-                  <ParticipantView {...participant} />
-                </div>
-              ))}
+            })()}
+        </main>
+      </div>
+
+      <div
+        className={cn(
+          "fixed top-[var(--header-height)] bottom-0 right-0 z-30 w-[300px] bg-card border-l transform transition-transform duration-300 ease-in-out",
+          isParticipantsPanelOpen ? "translate-x-0" : "translate-x-full"
+        )}
+        style={{ '--header-height': '64px' } as React.CSSProperties}
+      >
+        <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b">
+                <h3 className="font-semibold text-foreground">Participants ({realtimeParticipants.length})</h3>
+                <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setIsParticipantsPanelOpen(false)}>
+                    <PanelRightClose className="h-5 w-5"/>
+                </Button>
             </div>
-          );
-        })()}
-      </main>
+            <ScrollArea className="flex-1">
+                <div className="p-2 space-y-1">
+                    {realtimeParticipants.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
+                            <div className="flex items-center gap-2">
+                                <Avatar className="h-8 w-8">
+                                    <AvatarImage src={p.photoURL || `https://placehold.co/32x32.png?text=${p.name.charAt(0)}`} alt={p.name} data-ai-hint="avatar user"/>
+                                    <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm font-medium truncate">{p.name}{p.isMe ? ' (You)' : ''}{p.id === meetingCreatorId ? <ShieldCheck className="inline h-4 w-4 ml-1.5 text-primary" title="Host"/> : ''}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                                {p.isHandRaisedForView && <Hand className="h-4 w-4 text-accent animate-pulse"/>}
+                                {p.isMicMuted ? <MicOff className="h-4 w-4"/> : <Mic className="h-4 w-4"/>}
+                                {p.isCameraOff ? <VideoOff className="h-4 w-4"/> : <Video className="h-4 w-4"/>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+        </div>
+      </div>
       
       {remoteParticipants.length > 0 && selfView && (
           <div className="absolute bottom-20 md:bottom-24 right-2 sm:right-4 w-40 h-28 md:w-56 md:h-36 rounded-xl overflow-hidden z-20 shadow-2xl border-2 border-background">
@@ -808,6 +875,15 @@ export default function MeetingPage() {
              <VideoOff className={cn("h-5 w-5 sm:h-6 sm:w-6", !localCameraOff || isScreenSharingActive && "hidden")} />
              <Video className={cn("h-5 w-5 sm:h-6 sm:w-6", localCameraOff && !isScreenSharingActive && "hidden")} />
           </Button>
+           <Button
+            size="icon"
+            variant="default"
+            className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
+            onClick={() => setIsParticipantsPanelOpen(prev => !prev)}
+            aria-label={isParticipantsPanelOpen ? "Close Participants Panel" : "Open Participants Panel"}
+           >
+            <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+           </Button>
 
            <Button
             size="icon"

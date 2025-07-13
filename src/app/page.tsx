@@ -278,7 +278,10 @@ export default function HomePage() {
                 })}
               </ul>
             ) : (
-              <p className="text-muted-foreground text-center">No recent activity. Start a meeting or upload a file!</p>
+              <div className="text-center py-4 text-muted-foreground">
+                <p className="mb-2">No recent activity.</p>
+                <p className="text-sm">Start a new meeting or upload a file to get started!</p>
+              </div>
             )}
           </div>
         </div>
