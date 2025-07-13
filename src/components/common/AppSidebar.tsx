@@ -221,7 +221,6 @@ export function AppSidebar() {
   const libraryItems = [
     { href: "/dashboard/documents", label: "Documents", icon: FileText },
     { href: "/dashboard/recordings", label: "Recordings", icon: Clapperboard },
-    { href: "/dashboard/settings?highlight=historyAndData", label: "History & Data", icon: History },
   ];
 
 
