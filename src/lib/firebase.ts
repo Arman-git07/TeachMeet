@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth, initializeAuth, browserLocalPersistence } from 'firebase/auth';
+import { getAuth } from 'firebase/auth'; // Replaced initializeAuth and browserLocalPersistence
 import { getStorage } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore';
 
@@ -26,10 +26,8 @@ if (
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize auth with persistence to keep the user signed in.
-const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence,
-});
+// Use getAuth() for client-side applications. This correctly handles persistence.
+const auth = getAuth(app);
 
 const storage = getStorage(app);
 const db = getFirestore(app);
