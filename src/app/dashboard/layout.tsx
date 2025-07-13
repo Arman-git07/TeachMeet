@@ -11,55 +11,44 @@ import { PanelLeftOpen } from 'lucide-react';
 import { DynamicHeaderProvider, useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { cn } from '@/lib/utils';
 
-// New component to render the header content dynamically
+// This component is defined outside the main layout component to prevent module loading issues.
 function DashboardHeaderContentInternal() {
   const { headerContent } = useDynamicHeader();
 
-  if (!headerContent) { // If no specific header content is provided by the page
+  if (!headerContent) {
     return (
-      // Minimal header: just the sidebar toggle, less height, no prominent styling
-      <header className="sticky top-0 z-40 w-full"> {/* Removed border-b, bg for minimal version */}
-        <div className="container mx-auto flex h-12 items-center px-4 sm:px-6 lg:px-8"> {/* Reduced height to h-12 */}
-          <div className="flex items-center"> {/* Removed gap, container will handle positioning */}
+      <header className="sticky top-0 z-40 w-full">
+        <div className="container mx-auto flex h-12 items-center px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center">
             <SidebarTrigger className="md:hidden">
               <PanelLeftOpen className="h-6 w-6" />
             </SidebarTrigger>
             <SidebarTrigger className="hidden md:flex" />
           </div>
-          {/* No flex-grow content area or right-aligned placeholder in minimal version */}
         </div>
       </header>
     );
   }
 
-  // Full header when headerContent is provided
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2 sm:gap-4"> {/* Adjusted gap for consistency */}
+        <div className="flex items-center gap-2 sm:gap-4">
           <SidebarTrigger className="md:hidden">
             <PanelLeftOpen className="h-6 w-6" />
           </SidebarTrigger>
-          <SidebarTrigger className="hidden md:flex">
-            {/* Uses default PanelLeftOpen/Close from SidebarTrigger, onClick is handled internally */}
-          </SidebarTrigger>
+          <SidebarTrigger className="hidden md:flex" />
         </div>
-        {/* Dynamic content area - takes up available space */}
         <div className="flex-grow flex items-center px-4">
           {headerContent}
         </div>
-        {/* Placeholder for truly right-aligned static elements if needed in the future,
-            ensure it has a defined width or use flex-shrink-0 if it contains elements.
-            For now, UserProfileDropdown and ThemeToggle are in AppHeader (RootLayout)
-        */}
         <div className="w-auto flex-shrink-0">
-          {/* e.g. <UserProfileDropdown /> if moved here */}
+          {/* Placeholder for right-aligned content */}
         </div>
       </div>
     </header>
   );
 }
-
 
 export default function DashboardLayout({
   children,
@@ -76,17 +65,15 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, loading, router]);
 
-  // Check if the current page is a meeting page to apply different styles
   const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
 
-  // The loading skeleton is also part of the auth check
   if (loading || !isAuthenticated) {
     return (
       <div className="flex h-screen bg-background">
         <div className="flex flex-1 flex-col">
           <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-start px-4 sm:px-6 lg:px-8">
-              <Skeleton className="h-8 w-8 rounded-md" /> {/* Sidebar trigger skeleton */}
+              <Skeleton className="h-8 w-8 rounded-md" />
             </div>
           </header>
           <main className="flex-1 p-4 md:p-8 bg-background">
@@ -104,7 +91,7 @@ export default function DashboardLayout({
         <DashboardHeaderContentInternal />
         <main className={cn(
           "flex flex-col flex-1 bg-background",
-          !isMeetingPage && "p-4 md:p-8" // Conditionally apply padding
+          !isMeetingPage && "p-4 md:p-8"
         )}>
           {children}
         </main>
