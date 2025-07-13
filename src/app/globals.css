@@ -284,6 +284,3 @@ html, body, #__next {
   from { transform: translateX(-5px) scale(0.5); opacity: 0; }
   to { transform: translateX(0) scale(1); opacity: 1; }
 }
-
-
-    
