@@ -1,8 +1,8 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
-import { getStorage } from 'firebase/storage';
-import { getFirestore } from 'firebase/firestore';
+import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence, getAuth } from 'firebase/auth';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -24,16 +24,31 @@ if (
   );
 }
 
+// Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Explicitly initialize Auth with local persistence to ensure users stay signed in.
-// This is the key fix for the persistent login issue.
 const auth = initializeAuth(app, {
   persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
 });
 
+// HMR-safe initialization for Firestore and Storage
+let db: Firestore;
+let storage: FirebaseStorage;
 
-const storage = getStorage(app);
-const db = getFirestore(app);
+if (typeof window !== 'undefined') {
+  if (!(global as any)._firebaseFirestore) {
+    (global as any)._firebaseFirestore = getFirestore(app);
+  }
+  db = (global as any)._firebaseFirestore;
+
+  if (!(global as any)._firebaseStorage) {
+    (global as any)._firebaseStorage = getStorage(app);
+  }
+  storage = (global as any)._firebaseStorage;
+} else {
+  // For server-side rendering (if needed in the future)
+  db = getFirestore(app);
+  storage = getStorage(app);
+}
+
 
 export { app, auth, storage, db };
