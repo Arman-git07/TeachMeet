@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon } from "lucide-react";
+import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon, Clapperboard, FileText, ToggleLeft, ToggleRight, Radio } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +81,14 @@ export default function SettingsPage() {
   const [whiteboardFontSize, setWhiteboardFontSize] = useState(16);
   const [whiteboardFontFamily, setWhiteboardFontFamily] = useState('sans-serif');
   
+  // Recording Settings
+  const [recordingQuality, setRecordingQuality] = useState('1080p');
+  const [defaultRecordingPublic, setDefaultRecordingPublic] = useState(false);
+  const [autoRecordMeetings, setAutoRecordMeetings] = useState(false);
+  
+  // Document Settings
+  const [defaultDocumentPublic, setDefaultDocumentPublic] = useState(false);
+
   // Notification Settings
   const [meetingReminders, setMeetingReminders] = useState(true);
   const [chatMentions, setChatMentions] = useState(true);
@@ -106,26 +114,34 @@ export default function SettingsPage() {
     if (user && !authLoading) {
       setDisplayName(user.displayName || '');
     }
+    // A/V
     setDefaultCameraOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setDefaultMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
-
+    const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
+    setAppliedFilter(filter);
+    setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
+    setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
+    setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
+    
+    // Whiteboard
     setWhiteboardBgColor(localStorage.getItem('teachmeet-whiteboard-bg-color') || '#FFFFFF');
     setWhiteboardDrawColor(localStorage.getItem('teachmeet-whiteboard-color') || '#000000');
     setWhiteboardLineWidth(parseInt(localStorage.getItem('teachmeet-whiteboard-linewidth') || '5', 10));
     setWhiteboardFontSize(parseInt(localStorage.getItem('teachmeet-whiteboard-fontsize') || '16', 10));
     setWhiteboardFontFamily(localStorage.getItem('teachmeet-whiteboard-fontfamily') || 'sans-serif');
     
+    // Recordings
+    setRecordingQuality(localStorage.getItem('teachmeet-recording-quality') || '1080p');
+    setDefaultRecordingPublic(localStorage.getItem('teachmeet-recording-default-public') === 'true');
+    setAutoRecordMeetings(localStorage.getItem('teachmeet-recording-auto') === 'true');
+
+    // Documents
+    setDefaultDocumentPublic(localStorage.getItem('teachmeet-document-default-public') === 'true');
+
     // Notifications
     setMeetingReminders(localStorage.getItem('teachmeet-notif-reminders') !== 'off');
     setChatMentions(localStorage.getItem('teachmeet-notif-mentions') !== 'off');
     setHandRaiseAlerts(localStorage.getItem('teachmeet-notif-handraise') !== 'off');
-
-    const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
-    setAppliedFilter(filter);
-    setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
-
-    setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
-    setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
   }, [user, authLoading]);
 
   // Get A/V devices and permissions
@@ -201,6 +217,19 @@ export default function SettingsPage() {
     localStorage.setItem('teachmeet-whiteboard-fontfamily', whiteboardFontFamily);
     toast({ title: "Whiteboard Settings Saved", description: "Your whiteboard preferences have been updated." });
   };
+  
+  const handleSaveRecordings = () => {
+    localStorage.setItem('teachmeet-recording-quality', recordingQuality);
+    localStorage.setItem('teachmeet-recording-default-public', String(defaultRecordingPublic));
+    localStorage.setItem('teachmeet-recording-auto', String(autoRecordMeetings));
+    toast({ title: "Recording Settings Saved", description: "Your recording preferences have been updated." });
+  };
+  
+  const handleSaveDocuments = () => {
+    localStorage.setItem('teachmeet-document-default-public', String(defaultDocumentPublic));
+    toast({ title: "Document Settings Saved", description: "Your document preferences have been updated." });
+  };
+
 
   const handleSaveNotifications = () => {
     localStorage.setItem('teachmeet-notif-reminders', meetingReminders ? 'on' : 'off');
@@ -340,6 +369,66 @@ export default function SettingsPage() {
         <div className="flex justify-end pt-4 border-t">
           <Button onClick={handleSaveAV} className="rounded-lg btn-gel">
             <Save className="mr-2 h-4 w-4" /> Save A/V Settings
+          </Button>
+        </div>
+      </SettingsSection>
+      
+      <SettingsSection title="Recording Settings" description="Manage your meeting recording preferences." icon={Clapperboard}>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="recording-quality">Default Recording Quality</Label>
+            <Select value={recordingQuality} onValueChange={setRecordingQuality}>
+              <SelectTrigger id="recording-quality" className="rounded-lg"><SelectValue placeholder="Select quality..." /></SelectTrigger>
+              <SelectContent className="rounded-lg">
+                <SelectItem value="720p">720p (Standard HD)</SelectItem>
+                <SelectItem value="1080p">1080p (Full HD)</SelectItem>
+                <SelectItem value="1440p">1440p (2K)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+            <Label htmlFor="recording-public" className="flex flex-col gap-1">
+              <span>Default Save Destination</span>
+              <span className="text-xs text-muted-foreground">Set recordings to public by default.</span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <ToggleLeft className="h-4 w-4 text-muted-foreground"/>
+              <Switch id="recording-public" checked={defaultRecordingPublic} onCheckedChange={setDefaultRecordingPublic} />
+              <ToggleRight className="h-4 w-4 text-muted-foreground"/>
+            </div>
+          </div>
+          <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+            <Label htmlFor="auto-record" className="flex flex-col gap-1">
+              <span>Auto-Record Meetings</span>
+              <span className="text-xs text-muted-foreground">Automatically start recording when you are the host.</span>
+            </Label>
+            <Switch id="auto-record" checked={autoRecordMeetings} onCheckedChange={setAutoRecordMeetings} />
+          </div>
+        </div>
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={handleSaveRecordings} className="rounded-lg btn-gel">
+            <Save className="mr-2 h-4 w-4" /> Save Recording Settings
+          </Button>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Document Settings" description="Manage preferences for uploaded documents." icon={FileText}>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+            <Label htmlFor="document-public" className="flex flex-col gap-1">
+              <span>Default Upload Destination</span>
+              <span className="text-xs text-muted-foreground">Set uploaded documents to public by default.</span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <ToggleLeft className="h-4 w-4 text-muted-foreground"/>
+              <Switch id="document-public" checked={defaultDocumentPublic} onCheckedChange={setDefaultDocumentPublic} />
+              <ToggleRight className="h-4 w-4 text-muted-foreground"/>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={handleSaveDocuments} className="rounded-lg btn-gel">
+            <Save className="mr-2 h-4 w-4" /> Save Document Settings
           </Button>
         </div>
       </SettingsSection>
