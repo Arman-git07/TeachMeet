@@ -380,9 +380,11 @@ export default function SettingsPage() {
             <Select value={recordingQuality} onValueChange={setRecordingQuality}>
               <SelectTrigger id="recording-quality" className="rounded-lg"><SelectValue placeholder="Select quality..." /></SelectTrigger>
               <SelectContent className="rounded-lg">
+                <SelectItem value="480p">480p (Standard Definition)</SelectItem>
                 <SelectItem value="720p">720p (Standard HD)</SelectItem>
                 <SelectItem value="1080p">1080p (Full HD)</SelectItem>
                 <SelectItem value="1440p">1440p (2K)</SelectItem>
+                <SelectItem value="2160p">2160p (4K UHD)</SelectItem>
               </SelectContent>
             </Select>
           </div>
