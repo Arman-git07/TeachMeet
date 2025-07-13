@@ -68,7 +68,6 @@ type NavItemProps = {
   isDropdown?: boolean;
   dropdownItems?: { href: string; label: string; icon: React.ElementType, target?: string }[];
   target?: string;
-  isMeetingDialog?: boolean;
 };
 
 const NavItem = ({
@@ -81,7 +80,6 @@ const NavItem = ({
   isDropdown = false,
   dropdownItems = [],
   target,
-  isMeetingDialog = false,
 }: NavItemProps) => {
   const isActive = href ? (href === '/' ? currentPath === '/' : currentPath.startsWith(href)) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
   const isStrictlyHomeActive = href === '/' && currentPath === '/';
@@ -93,7 +91,7 @@ const NavItem = ({
     if (onClickProp) {
       onClickProp();
     }
-    if (isMobile && (href || isDropdown || isMeetingDialog)) {
+    if (isMobile && (href || isDropdown)) {
       setOpenMobile(false);
     }
   };
@@ -115,26 +113,6 @@ const NavItem = ({
       ? "text-primary hover:bg-primary hover:text-primary-foreground"
       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
   );
-  
-  if (isMeetingDialog) {
-    return (
-      <SidebarMenuItem>
-        <Dialog>
-          <DialogTrigger asChild>
-            <SidebarMenuButton
-              className={cn(commonClasses, "text-primary hover:bg-primary hover:text-primary-foreground")}
-              onClick={handleClick}
-            >
-              {buttonContent}
-            </SidebarMenuButton>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg rounded-xl">
-             <StartMeetingDialogContent />
-          </DialogContent>
-        </Dialog>
-      </SidebarMenuItem>
-    );
-  }
   
   if (isDropdown) {
     return (
@@ -210,6 +188,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
   const [showSignOutConfirm, setShowSignOutConfirm] = React.useState(false);
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const legalAndInfoItems = [
     { href: "/terms-of-service", label: "Terms of Service", icon: BookOpen, target: "_blank" },
@@ -247,7 +226,19 @@ export function AppSidebar() {
               <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem>
               {pathname === '/' && (
                 <>
-                  <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme isMeetingDialog>Start New Meeting</NavItem>
+                  <SidebarMenuItem>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                         <SidebarMenuButton className="w-full justify-start text-base py-3 px-4 rounded-lg text-primary hover:bg-primary hover:text-primary-foreground">
+                            <PlusCircle className="mr-3 h-5 w-5" />
+                            Start New Meeting
+                        </SidebarMenuButton>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-lg rounded-xl">
+                        <StartMeetingDialogContent />
+                      </DialogContent>
+                    </Dialog>
+                  </SidebarMenuItem>
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}

@@ -19,7 +19,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useDialogContext } from '@radix-ui/react-dialog';
+import { useDialogContext } from '@/components/ui/dialog';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
