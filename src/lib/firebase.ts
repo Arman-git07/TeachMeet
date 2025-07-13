@@ -1,8 +1,8 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { getAuth, initializeAuth, browserLocalPersistence } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
-import { getFirestore } from 'firebase/firestore'; // Import getFirestore
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,7 +14,6 @@ const firebaseConfig: FirebaseOptions = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// A simple check to see if the config is populated, to avoid app crashes.
 if (
   !firebaseConfig.apiKey ||
   !firebaseConfig.authDomain ||
@@ -25,17 +24,14 @@ if (
   );
 }
 
-// Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+
+// Initialize auth with persistence to keep the user signed in.
+const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence,
+});
+
 const storage = getStorage(app);
-const db = getFirestore(app); // Initialize Firestore
-
-// Set auth persistence to local storage to keep user signed in
-setPersistence(auth, browserLocalPersistence)
-  .catch((error) => {
-    console.error("Firebase Auth persistence error:", error);
-  });
-
+const db = getFirestore(app);
 
 export { app, auth, storage, db };

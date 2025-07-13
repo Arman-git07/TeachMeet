@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { updateProfile } from "firebase/auth";
-import { auth, initializeAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
