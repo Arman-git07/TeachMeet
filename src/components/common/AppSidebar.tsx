@@ -112,12 +112,9 @@ const NavItem = ({
   );
   
   if (isMeetingDialog) {
-    return (
-       <SidebarMenuItem>
-         {/* The StartMeetingDialogContent now contains its own Dialog and Trigger logic */}
-         <StartMeetingDialogContent />
-       </SidebarMenuItem>
-    );
+    // Render the dialog component directly, which contains its own trigger logic.
+    // It's not wrapped in a SidebarMenuItem to ensure proper Dialog context.
+    return <StartMeetingDialogContent useSidebarButton={true} />;
   }
   
   if (isDropdown) {

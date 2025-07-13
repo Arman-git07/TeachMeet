@@ -25,7 +25,7 @@ const StartMeetingDialogContent = dynamic(() =>
   import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
   {
     ssr: false,
-    loading: () => <p className="p-4 text-center">Loading...</p>
+    loading: () => <Button size="lg" className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl" disabled>Loading...</Button>
   }
 );
 

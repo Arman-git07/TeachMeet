@@ -2,6 +2,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
+import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
@@ -32,7 +33,7 @@ interface OngoingMeeting {
 }
 
 
-export function StartMeetingDialogContent() {
+export function StartMeetingDialogContent({ useSidebarButton = false }: { useSidebarButton?: boolean }) {
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
   const [meetingId, setMeetingId] = useState("");
@@ -163,21 +164,18 @@ export function StartMeetingDialogContent() {
     }
   };
 
-  // This component now contains its own Dialog and Trigger
+  const TriggerButton = useSidebarButton ? SidebarMenuButton : Button;
+
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-         {/* This is the button that opens the dialog. It's passed from parent components. */}
-         {/* In AppSidebar, this is a SidebarMenuButton. In SlideUpPanel, this is a regular Button. */}
-         {/* The `asChild` prop on DialogTrigger makes this work seamlessly. */}
-         <Button
-            size="lg"
-            className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+         <TriggerButton
+            className={useSidebarButton ? "w-full justify-start text-base py-3 px-4 rounded-lg text-primary hover:bg-primary hover:text-primary-foreground" : "w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"}
             aria-label="Start New Meeting"
           >
             <PlusCircle className="mr-2 h-6 w-6" />
             Start New Meeting
-          </Button>
+          </TriggerButton>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg rounded-xl">
         <DialogHeader>
