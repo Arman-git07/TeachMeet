@@ -31,7 +31,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   
   const [appliedFilter, setAppliedFilter] = useState<string>("none");
-  const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false); 
+  const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false);
+  const [mirrorVideo, setMirrorVideo] = useState<boolean>(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
 
@@ -48,6 +49,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         setIsFilterToggleOn(true); 
       }
     }
+    setMirrorVideo(localStorage.getItem('teachmeet-camera-mirror') === 'true');
   }, []);
 
   useEffect(() => {
@@ -160,6 +162,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const videoClassNames = cn(
     "w-full h-full object-cover",
     {
+      "video-mirror": mirrorVideo,
       "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale" && isCameraActive,
       "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia" && isCameraActive,
       "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage" && isCameraActive,

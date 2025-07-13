@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon, Clapperboard, FileText, ToggleLeft, ToggleRight, Radio } from "lucide-react";
+import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon, Clapperboard, FileText, ToggleLeft, ToggleRight, Radio, FlipHorizontal } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,6 +71,7 @@ export default function SettingsPage() {
   // Advanced Meeting Settings (now merged into A/V)
   const [defaultCameraOn, setDefaultCameraOn] = useState(true);
   const [defaultMicOn, setDefaultMicOn] = useState(false);
+  const [mirrorCamera, setMirrorCamera] = useState(false);
   const [appliedFilter, setAppliedFilter] = useState<string>('none');
   const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
 
@@ -117,6 +118,7 @@ export default function SettingsPage() {
     // A/V
     setDefaultCameraOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setDefaultMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
+    setMirrorCamera(localStorage.getItem('teachmeet-camera-mirror') === 'true');
     const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
     setAppliedFilter(filter);
     setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
@@ -204,6 +206,7 @@ export default function SettingsPage() {
     localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
     localStorage.setItem('teachmeet-camera-default', defaultCameraOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-mic-default', defaultMicOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
     localStorage.setItem('teachmeet-camera-filter', appliedFilter);
     localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
     toast({ title: "Audio & Video Settings Saved", description: "Your camera and microphone preferences have been updated." });
@@ -248,6 +251,7 @@ export default function SettingsPage() {
   const videoClassNames = cn(
     "w-full h-full object-cover rounded-lg bg-muted",
     {
+      "video-mirror": mirrorCamera,
       "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale",
       "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia",
       "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage",
@@ -340,6 +344,10 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
                 <Label htmlFor="mic-on" className="flex items-center gap-2"><Mic className="h-4 w-4" /> Default microphone to ON</Label>
                 <Switch id="mic-on" checked={defaultMicOn} onCheckedChange={setDefaultMicOn} />
+            </div>
+             <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+                <Label htmlFor="mirror-camera" className="flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
+                <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera} />
             </div>
             <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
                 <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Enable video filter by default</Label>

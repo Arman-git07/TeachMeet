@@ -175,6 +175,11 @@ html, body, #__next {
   animation: blink-border-effect 1s ease-in-out 2; /* Blinks twice for 1s each */
 }
 
+/* Video Mirroring */
+.video-mirror {
+  transform: scaleX(-1);
+}
+
 /* Basic CSS Filters for video placeholder */
 .video-filter-grayscale {
   filter: grayscale(100%);

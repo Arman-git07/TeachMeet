@@ -83,6 +83,13 @@ function ParticipantView({
 }: Participant) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [mirrorVideo, setMirrorVideo] = useState(false);
+
+  useEffect(() => {
+      if (isMe) {
+        setMirrorVideo(localStorage.getItem('teachmeet-camera-mirror') === 'true');
+      }
+  }, [isMe]);
 
   useEffect(() => {
     if (isMe && videoRef.current) {
@@ -119,7 +126,7 @@ function ParticipantView({
         playsInline
         src={!isMe && showVideo ? "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" : undefined}
         loop={!isMe}
-        className={cn("w-full h-full object-cover bg-black", !showVideo && "hidden")}
+        className={cn("w-full h-full object-cover bg-black", !showVideo && "hidden", isMe && mirrorVideo && "video-mirror")}
       />
       
       {!showVideo && (
