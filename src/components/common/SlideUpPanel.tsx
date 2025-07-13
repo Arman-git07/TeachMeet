@@ -25,7 +25,7 @@ const StartMeetingDialogContent = dynamic(() =>
   import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
   {
     ssr: false,
-    loading: () => <Button size="lg" className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl" disabled>Loading...</Button>
+    loading: () => <p>Loading dialog...</p>
   }
 );
 
@@ -72,9 +72,23 @@ export function SlideUpPanel() {
         {/* Start New Meeting Button with Dialog */}
         <div className="w-full sm:flex-1 flex justify-center">
           {isAuthenticated ? (
-             <Suspense fallback={<Button size="lg" className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl" disabled>Loading...</Button>}>
-                <StartMeetingDialogContent />
-            </Suspense>
+             <Dialog>
+                <DialogTrigger asChild>
+                    <Button
+                        size="lg"
+                        className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+                        aria-label="Start New Meeting"
+                    >
+                        <PlusCircle className="mr-2 h-6 w-6" />
+                        Start New Meeting
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg rounded-xl">
+                    <Suspense fallback={<p>Loading dialog...</p>}>
+                        <StartMeetingDialogContent />
+                    </Suspense>
+                </DialogContent>
+             </Dialog>
           ) : (
             <Button
               asChild

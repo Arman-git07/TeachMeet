@@ -2,27 +2,24 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2, PlusCircle } from "lucide-react";
+import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { 
-  Dialog, 
-  DialogContent, 
   DialogDescription, 
   DialogFooter, 
   DialogHeader, 
   DialogTitle, 
   DialogClose, 
-  DialogTrigger 
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useDialogContext } from '@radix-ui/react-dialog';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
@@ -33,21 +30,22 @@ interface OngoingMeeting {
 }
 
 
-export function StartMeetingDialogContent({ useSidebarButton = false }: { useSidebarButton?: boolean }) {
+export function StartMeetingDialogContent() {
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
   const [meetingId, setMeetingId] = useState("");
   const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
   const [isJoining, setIsJoining] = useState(false);
 
+  const dialogContext = useDialogContext();
+  
   // Effect to generate new meeting details when the dialog is opened
   useEffect(() => {
-    if (isDialogOpen) {
+    if (dialogContext.open) {
       const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
       
       const newMeetingId = randomString(8);
@@ -65,7 +63,7 @@ export function StartMeetingDialogContent({ useSidebarButton = false }: { useSid
       setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
       setIsJoining(false); // Reset joining state
     }
-  }, [isDialogOpen]);
+  }, [dialogContext.open]);
 
   const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
     if (!textToCopy) {
@@ -143,7 +141,7 @@ export function StartMeetingDialogContent({ useSidebarButton = false }: { useSid
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       
       router.push(joinNowLinkPath);
-      setIsDialogOpen(false);
+      dialogContext.onOpenChange(false);
 
     } catch (error: any) {
       console.error("[StartMeetingDialog] CRITICAL: Error creating meeting document in Firestore:", error);
@@ -164,20 +162,8 @@ export function StartMeetingDialogContent({ useSidebarButton = false }: { useSid
     }
   };
 
-  const TriggerButton = useSidebarButton ? SidebarMenuButton : Button;
-
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogTrigger asChild>
-         <TriggerButton
-            className={useSidebarButton ? "w-full justify-start text-base py-3 px-4 rounded-lg text-primary hover:bg-primary hover:text-primary-foreground" : "w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"}
-            aria-label="Start New Meeting"
-          >
-            <PlusCircle className="mr-2 h-6 w-6" />
-            Start New Meeting
-          </TriggerButton>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg rounded-xl">
+    <>
         <DialogHeader>
           <DialogTitle>
             <Video className="mr-2 h-6 w-6 text-primary inline-block" />
@@ -272,7 +258,6 @@ export function StartMeetingDialogContent({ useSidebarButton = false }: { useSid
           meetingCode={meetingCode}
           meetingTitle={meetingTitle.trim()} 
         />
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }

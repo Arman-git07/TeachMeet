@@ -50,6 +50,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { buttonVariants } from '@/components/ui/button';
 
 
@@ -112,9 +117,23 @@ const NavItem = ({
   );
   
   if (isMeetingDialog) {
-    // Render the dialog component directly, which contains its own trigger logic.
-    // It's not wrapped in a SidebarMenuItem to ensure proper Dialog context.
-    return <StartMeetingDialogContent useSidebarButton={true} />;
+    return (
+      <SidebarMenuItem>
+        <Dialog>
+          <DialogTrigger asChild>
+            <SidebarMenuButton
+              className={cn(commonClasses, "text-primary hover:bg-primary hover:text-primary-foreground")}
+              onClick={handleClick}
+            >
+              {buttonContent}
+            </SidebarMenuButton>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg rounded-xl">
+             <StartMeetingDialogContent />
+          </DialogContent>
+        </Dialog>
+      </SidebarMenuItem>
+    );
   }
   
   if (isDropdown) {
