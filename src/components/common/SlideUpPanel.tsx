@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Video, PlusCircle, Code } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useState, useEffect, Suspense } from 'react'; // Added Suspense
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -19,15 +19,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-
-// Dynamic import for StartMeetingDialogContent
-const StartMeetingDialogContent = dynamic(() =>
-  import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
-  {
-    ssr: false,
-    loading: () => <p>Loading dialog...</p>
-  }
-);
+import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
 
 
 export function SlideUpPanel() {
@@ -84,9 +76,7 @@ export function SlideUpPanel() {
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg rounded-xl">
-                    <Suspense fallback={<p>Loading dialog...</p>}>
-                        <StartMeetingDialogContent />
-                    </Suspense>
+                    <StartMeetingDialogContent />
                 </DialogContent>
              </Dialog>
           ) : (
