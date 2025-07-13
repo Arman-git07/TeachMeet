@@ -39,7 +39,6 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -50,7 +49,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger as SignOutAlertDialogTrigger, // Keep this specific alias if used elsewhere, or remove if only general trigger needed
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from '@/components/ui/button';
 
@@ -62,10 +60,10 @@ type NavItemProps = {
   currentPath: string,
   isGreenTheme?: boolean,
   onClick?: () => void;
-  asDialogTrigger?: boolean;
   isDropdown?: boolean;
   dropdownItems?: { href: string; label: string; icon: React.ElementType, target?: string }[];
   target?: string;
+  isMeetingDialog?: boolean;
 };
 
 const NavItem = ({
@@ -75,23 +73,22 @@ const NavItem = ({
   currentPath,
   isGreenTheme = false,
   onClick: onClickProp,
-  asDialogTrigger = false,
   isDropdown = false,
   dropdownItems = [],
   target,
+  isMeetingDialog = false,
 }: NavItemProps) => {
   const isActive = href ? (href === '/' ? currentPath === '/' : currentPath.startsWith(href)) : (isDropdown && dropdownItems.some(item => currentPath.startsWith(item.href)));
   const isStrictlyHomeActive = href === '/' && currentPath === '/';
 
   const commonClasses = "w-full justify-start text-base py-3 px-4 rounded-lg";
   const { isMobile, setOpenMobile } = useSidebar();
-  const router = useRouter();
 
   const handleClick = () => {
-    if (onClickProp && !asDialogTrigger && !isDropdown) {
+    if (onClickProp) {
       onClickProp();
     }
-    if (isMobile && (href || asDialogTrigger || isDropdown)) {
+    if (isMobile && (href || isDropdown || isMeetingDialog)) {
       setOpenMobile(false);
     }
   };
@@ -113,26 +110,13 @@ const NavItem = ({
       ? "text-primary hover:bg-primary hover:text-primary-foreground"
       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
   );
-
-
-  if (asDialogTrigger) {
-    // This case is specific for StartMeetingDialog
+  
+  if (isMeetingDialog) {
     return (
-      <SidebarMenuItem>
-        <Dialog>
-          <DialogTrigger asChild>
-            <SidebarMenuButton
-              onClick={handleClick}
-              className={buttonClassName}
-            >
-              {buttonContent}
-            </SidebarMenuButton>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg rounded-xl">
-            <StartMeetingDialogContent />
-          </DialogContent>
-        </Dialog>
-      </SidebarMenuItem>
+       <SidebarMenuItem>
+         {/* The StartMeetingDialogContent now contains its own Dialog and Trigger logic */}
+         <StartMeetingDialogContent />
+       </SidebarMenuItem>
     );
   }
   
@@ -209,8 +193,6 @@ const NavItem = ({
 export function AppSidebar() {
   const pathname = usePathname();
   const { isAuthenticated, signOut, loading } = useAuth();
-  const router = useRouter();
-  const { isMobile, setOpenMobile } = useSidebar();
   const [showSignOutConfirm, setShowSignOutConfirm] = React.useState(false);
 
   const legalAndInfoItems = [
@@ -249,7 +231,7 @@ export function AppSidebar() {
               <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem>
               {pathname === '/' && (
                 <>
-                  <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme asDialogTrigger>Start New Meeting</NavItem>
+                  <NavItem icon={PlusCircle} currentPath={pathname} isGreenTheme isMeetingDialog>Start New Meeting</NavItem>
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}

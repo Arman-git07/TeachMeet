@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
 import { Video, PlusCircle, Code } from 'lucide-react';
@@ -19,13 +20,15 @@ import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
+// Dynamic import for StartMeetingDialogContent
 const StartMeetingDialogContent = dynamic(() =>
   import('@/components/meeting/StartMeetingDialogContent').then(mod => mod.StartMeetingDialogContent),
   {
     ssr: false,
-    loading: () => <p className="p-4 text-center">Loading dialog...</p>
+    loading: () => <p className="p-4 text-center">Loading...</p>
   }
 );
+
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
@@ -69,35 +72,9 @@ export function SlideUpPanel() {
         {/* Start New Meeting Button with Dialog */}
         <div className="w-full sm:flex-1 flex justify-center">
           {isAuthenticated ? (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  size="lg"
-                  className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
-                  aria-label="Start New Meeting"
-                  disabled={authLoading}
-                >
-                  <PlusCircle className="mr-2 h-6 w-6" />
-                  Start New Meeting
-                </Button>
-              </DialogTrigger>
-              <DialogContent
-                className="sm:max-w-lg rounded-xl"
-              >
-                <DialogHeader>
-                  <DialogTitle>
-                    <Video className="mr-2 h-6 w-6 text-primary inline-block" />
-                    Start a New Meeting
-                  </DialogTitle>
-                  <DialogDescription>
-                    Set a topic and share the invite to begin.
-                  </DialogDescription>
-                </DialogHeader>
-                <Suspense fallback={<p className="p-4 text-center">Loading meeting setup...</p>}>
-                  <StartMeetingDialogContent />
-                </Suspense>
-              </DialogContent>
-            </Dialog>
+             <Suspense fallback={<Button size="lg" className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl" disabled>Loading...</Button>}>
+                <StartMeetingDialogContent />
+            </Suspense>
           ) : (
             <Button
               asChild

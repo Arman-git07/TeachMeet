@@ -6,10 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2 } from "lucide-react";
+import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2, PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogClose, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -24,34 +33,38 @@ interface OngoingMeeting {
 
 
 export function StartMeetingDialogContent() {
-  console.log('[StartMeetingDialogContent] Component rendering/mounting.'); // Diagnostic log
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
   const [meetingId, setMeetingId] = useState("");
   const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
   const [isJoining, setIsJoining] = useState(false);
 
+  // Effect to generate new meeting details when the dialog is opened
   useEffect(() => {
-    const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
-    
-    const newMeetingId = randomString(8);
-    setMeetingId(newMeetingId);
+    if (isDialogOpen) {
+      const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
+      
+      const newMeetingId = randomString(8);
+      setMeetingId(newMeetingId);
 
-    if (typeof window !== "undefined") {
-        setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
-    } else {
-        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); 
+      if (typeof window !== "undefined") {
+          setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
+      } else {
+          setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); 
+      }
+      
+      const codePart1 = randomString(3);
+      const codePart2 = randomString(3);
+      const codePart3 = randomString(3);
+      setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
+      setIsJoining(false); // Reset joining state
     }
-    
-    const codePart1 = randomString(3);
-    const codePart2 = randomString(3);
-    const codePart3 = randomString(3);
-    setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
-  }, []);
+  }, [isDialogOpen]);
 
   const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
     if (!textToCopy) {
@@ -129,6 +142,7 @@ export function StartMeetingDialogContent() {
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       
       router.push(joinNowLinkPath);
+      setIsDialogOpen(false);
 
     } catch (error: any) {
       console.error("[StartMeetingDialog] CRITICAL: Error creating meeting document in Firestore:", error);
@@ -149,94 +163,118 @@ export function StartMeetingDialogContent() {
     }
   };
 
+  // This component now contains its own Dialog and Trigger
   return (
-    <>
-      {/* DialogTitle and DialogDescription are now rendered by SlideUpPanel.tsx */}
-      <div className="space-y-5 py-4">
-        <div>
-          <Label htmlFor="meetingTopicDialog" className="block text-sm font-medium text-muted-foreground mb-1">
-            Meeting Topic / Purpose
-          </Label>
-          <Input
-            id="meetingTopicDialog"
-            placeholder="e.g., Weekly Sync, Project Brainstorm..."
-            value={meetingTitle}
-            onChange={(e) => setMeetingTitle(e.target.value)}
-            className="rounded-lg text-base"
-            disabled={isJoining}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="meetingLinkDialog" className="block text-sm font-medium text-muted-foreground mb-1">
-            Meeting Link
-          </Label>
-          <div className="flex items-center space-x-2">
-            <div className="relative flex-grow">
-                <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                id="meetingLinkDialog"
-                type="text"
-                readOnly
-                value={meetingLink || "Generating..."}
-                className="pl-10 rounded-lg"
-                />
-            </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink || isJoining} className="rounded-lg">
-              <Copy className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="meetingCodeDialog" className="block text-sm font-medium text-muted-foreground mb-1">
-            Meeting Code
-          </Label>
-          <div className="flex items-center space-x-2">
-            <div className="relative flex-grow">
-              <Hash className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="meetingCodeDialog"
-                type="text"
-                readOnly
-                value={meetingCode || "Generating..."}
-                className="pl-10 rounded-lg"
-              />
-            </div>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode || isJoining} className="rounded-lg">
-              <Copy className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
-        <Button variant="outline" className="w-full rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode || isJoining}>
-          <Share2 className="mr-2 h-5 w-5" />
-          Share Invite
-        </Button>
-      </div>
-      <DialogFooter className="gap-2 sm:gap-0">
-        <DialogClose asChild>
-          <Button type="button" variant="outline" className="rounded-lg" disabled={isJoining}>
-            Cancel
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogTrigger asChild>
+         {/* This is the button that opens the dialog. It's passed from parent components. */}
+         {/* In AppSidebar, this is a SidebarMenuButton. In SlideUpPanel, this is a regular Button. */}
+         {/* The `asChild` prop on DialogTrigger makes this work seamlessly. */}
+         <Button
+            size="lg"
+            className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+            aria-label="Start New Meeting"
+          >
+            <PlusCircle className="mr-2 h-6 w-6" />
+            Start New Meeting
           </Button>
-        </DialogClose>
-        <Button 
-          type="button" 
-          onClick={handleStartAndJoinMeeting} 
-          className="btn-gel rounded-lg" 
-          disabled={!meetingId || !meetingTitle.trim() || isJoining || !user}
-        >
-          {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-          {isJoining ? "Starting..." : (meetingId ? "Start and Join Meeting" : "Generating ID...")}
-        </Button>
-      </DialogFooter>
-      <ShareOptionsPanel
-        isOpen={isSharePanelOpen}
-        onClose={() => setIsSharePanelOpen(false)}
-        meetingLink={meetingLink}
-        meetingCode={meetingCode}
-        meetingTitle={meetingTitle.trim()} 
-      />
-    </>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg rounded-xl">
+        <DialogHeader>
+          <DialogTitle>
+            <Video className="mr-2 h-6 w-6 text-primary inline-block" />
+            Start a New Meeting
+          </DialogTitle>
+          <DialogDescription>
+            Set a topic and share the invite to begin.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5 py-4">
+          <div>
+            <Label htmlFor="meetingTopicDialog" className="block text-sm font-medium text-muted-foreground mb-1">
+              Meeting Topic / Purpose
+            </Label>
+            <Input
+              id="meetingTopicDialog"
+              placeholder="e.g., Weekly Sync, Project Brainstorm..."
+              value={meetingTitle}
+              onChange={(e) => setMeetingTitle(e.target.value)}
+              className="rounded-lg text-base"
+              disabled={isJoining}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="meetingLinkDialog" className="block text-sm font-medium text-muted-foreground mb-1">
+              Meeting Link
+            </Label>
+            <div className="flex items-center space-x-2">
+              <div className="relative flex-grow">
+                  <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                  id="meetingLinkDialog"
+                  type="text"
+                  readOnly
+                  value={meetingLink || "Generating..."}
+                  className="pl-10 rounded-lg"
+                  />
+              </div>
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink || isJoining} className="rounded-lg">
+                <Copy className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="meetingCodeDialog" className="block text-sm font-medium text-muted-foreground mb-1">
+              Meeting Code
+            </Label>
+            <div className="flex items-center space-x-2">
+              <div className="relative flex-grow">
+                <Hash className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="meetingCodeDialog"
+                  type="text"
+                  readOnly
+                  value={meetingCode || "Generating..."}
+                  className="pl-10 rounded-lg"
+                />
+              </div>
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode || isJoining} className="rounded-lg">
+                <Copy className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+
+          <Button variant="outline" className="w-full rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode || isJoining}>
+            <Share2 className="mr-2 h-5 w-5" />
+            Share Invite
+          </Button>
+        </div>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <DialogClose asChild>
+            <Button type="button" variant="outline" className="rounded-lg" disabled={isJoining}>
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button 
+            type="button" 
+            onClick={handleStartAndJoinMeeting} 
+            className="btn-gel rounded-lg" 
+            disabled={!meetingId || !meetingTitle.trim() || isJoining || !user}
+          >
+            {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+            {isJoining ? "Starting..." : (meetingId ? "Start and Join Meeting" : "Generating ID...")}
+          </Button>
+        </DialogFooter>
+        <ShareOptionsPanel
+          isOpen={isSharePanelOpen}
+          onClose={() => setIsSharePanelOpen(false)}
+          meetingLink={meetingLink}
+          meetingCode={meetingCode}
+          meetingTitle={meetingTitle.trim()} 
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
