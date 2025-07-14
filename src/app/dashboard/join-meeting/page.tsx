@@ -163,7 +163,10 @@ export default function JoinMeetingPage() {
   };
 
   const handleInputBlur = () => {
+    // This timeout is a bit of a hack to allow a click on the paste buttons
+    // to register before the blur event hides them.
     setTimeout(() => {
+      // Check if the new focused element is one of the paste buttons. If not, hide them.
       if (!document.activeElement || !document.activeElement.closest('[data-paste-button-area]')) {
         setShowPasteButton(false);
       }
@@ -235,6 +238,7 @@ export default function JoinMeetingPage() {
                     size="sm"
                     className="rounded-md px-2 py-1 text-xs h-7 bg-background hover:bg-muted"
                     onClick={handleAttemptPaste}
+                    onBlur={handleInputBlur}
                     title="Paste from clipboard"
                   >
                     <ClipboardPaste className="h-3.5 w-3.5" />
@@ -244,10 +248,12 @@ export default function JoinMeetingPage() {
                     variant="ghost"
                     size="icon"
                     className="rounded-full h-6 w-6 hover:bg-muted"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
                       setShowPasteButton(false);
                       clearLongPressTimer();
                     }}
+                    onBlur={handleInputBlur}
                     title="Close paste option"
                   >
                     <X className="h-3.5 w-3.5" />

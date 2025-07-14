@@ -12,13 +12,13 @@ export default function PrivacyPolicyPage() {
         <Card className="max-w-3xl mx-auto shadow-lg rounded-xl border-border/50">
           <CardHeader className="text-center border-b pb-6">
             <CardTitle className="text-3xl font-bold">Privacy Policy</CardTitle>
-            <CardDescription className="text-muted-foreground mt-2">Last Updated: [Date]</CardDescription>
+            <CardDescription className="text-muted-foreground mt-2">Last Updated: {new Date().toLocaleDateString()}</CardDescription>
           </CardHeader>
           <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none py-8 px-6 space-y-6">
             <p className="text-lg font-semibold text-center text-destructive">This is a Placeholder Privacy Policy.</p>
             <p>
               This document is a template and does not constitute legal advice. You should consult with a legal professional
-              to create a privacy policy that is compliant with all applicable laws and regulations for your specific
+              to create a privacy policy that is compliant with all applicable laws for your specific
               application and data processing activities.
             </p>
             <p>
@@ -26,51 +26,54 @@ export default function PrivacyPolicyPage() {
               collect, use, disclose, and safeguard your information when you use our application.
             </p>
 
-            <h2 className="text-xl font-semibold">1. Information We Collect (Placeholder)</h2>
+            <h2 className="text-xl font-semibold">1. Information We Collect</h2>
             <p>
-              We may collect personal information that you voluntarily provide to us when you register for an account,
-              participate in meetings, or use other features of the app. This may include:
+              We may collect the following information:
             </p>
             <ul>
-              <li>Name, email address, profile picture.</li>
-              <li>Meeting recordings and shared documents (if you choose to record or share).</li>
-              <li>Usage data and analytics.</li>
+              <li><strong>Personal Information:</strong> When you register, we collect your name, email address, and an encrypted version of your password.</li>
+              <li><strong>User-Generated Content:</strong> Any files you upload (documents, recordings) or content you generate (whiteboard screenshots) are stored on our servers. You control whether this content is private or public.</li>
+              <li><strong>Usage Data:</strong> We may collect data about your interactions with the service, such as features used and session duration, to improve our application.</li>
             </ul>
 
-            <h2 className="text-xl font-semibold">2. How We Use Your Information (Placeholder)</h2>
+            <h2 className="text-xl font-semibold">2. How We Use Your Information</h2>
             <p>
-              We may use the information we collect to:
+              We use the information we collect to:
             </p>
             <ul>
               <li>Provide, operate, and maintain the TeachMeet application.</li>
               <li>Improve, personalize, and expand our services.</li>
-              <li>Communicate with you, including for customer service and support.</li>
-              <li>Process your transactions.</li>
-              <li>Monitor and analyze usage and trends to improve your experience.</li>
+              <li>Authenticate users and manage accounts.</li>
+              <li>Communicate with you for service-related purposes.</li>
+              <li>Enforce our Terms of Service and Community Guidelines.</li>
             </ul>
-             <p className="text-sm text-muted-foreground">
-              Communications within TeachMeet meetings (audio, video, chat) are transmitted over encrypted channels (HTTPS/WSS).
-              Data stored with Firebase (like user profiles and uploaded files) uses Firebase's standard encryption-at-rest.
-              End-to-end encryption for meeting content itself is a complex feature and is not implemented in this prototype.
+            
+            <h2 className="text-xl font-semibold">3. Data Security and Encryption</h2>
+            <p>
+              We take the security of your data seriously. Our security measures include:
+            </p>
+            <ul>
+              <li><strong>Encryption in Transit:</strong> All communications between your device and our servers (including audio, video, and chat signaling) are encrypted using industry-standard protocols like TLS (HTTPS/WSS).</li>
+              <li><strong>Encryption at Rest:</strong> Your data, including uploaded files and user information, is stored on Google Firebase servers and is encrypted at rest by default.</li>
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              Note: True end-to-end encryption (E2EE), where only participants can decrypt meeting content, is a highly complex feature and is not implemented in this prototype. Our current model secures the data channels to and from our servers.
             </p>
 
-            <h2 className="text-xl font-semibold">3. Disclosure of Your Information (Placeholder)</h2>
+            <h2 className="text-xl font-semibold">4. Data Sharing and Disclosure</h2>
             <p>
-              We will not share your personal information with third parties except as described in a complete and legally compliant
-              Privacy Policy.
+              We do not sell your personal information. We will not share your personal information with third parties except in the following situations:
             </p>
+             <ul>
+              <li>With your explicit consent.</li>
+              <li>To comply with legal obligations.</li>
+              <li>To protect and defend our rights and property.</li>
+              <li>For service provision with vendors who are bound by confidentiality agreements (e.g., our cloud provider, Google Firebase).</li>
+            </ul>
 
-            <h2 className="text-xl font-semibold">4. Security of Your Information (Placeholder)</h2>
+            <h2 className="text-xl font-semibold">5. Your Choices and Rights</h2>
             <p>
-              We use administrative, technical, and physical security measures to help protect your personal information.
-              While we have taken reasonable steps to secure the personal information you provide to us, please be aware that
-              no security measures are perfect or impenetrable.
-            </p>
-
-            <h2 className="text-xl font-semibold">5. Your Choices and Rights (Placeholder)</h2>
-            <p>
-              You may have certain rights regarding your personal information, subject to local data protection laws.
-              These may include the right to access, correct, or delete your personal data.
+              You have control over your data. From the dashboard and settings, you can access, manage, and delete your uploaded content (documents and recordings). You can also update your profile information or delete your account, subject to our data retention policies.
             </p>
 
             <p className="mt-8 text-center">

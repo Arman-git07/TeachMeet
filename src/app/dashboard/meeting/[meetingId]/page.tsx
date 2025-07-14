@@ -575,7 +575,7 @@ export default function MeetingPage() {
   }, [meetingId]);
 
 
-  const updateUserStatusInFirestore = async (updates: Partial<Omit<Participant, 'id' | 'name' | 'stream' | 'hasCameraPermissionForView' | 'photoURL' | 'isMe'>>) => {
+  const updateUserStatusInFirestore = async (updates: { [key: string]: any }) => {
     if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
     const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
     try {
