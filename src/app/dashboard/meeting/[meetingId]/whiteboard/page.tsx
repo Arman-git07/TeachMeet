@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
+  DialogTrigger,
   DialogContent,
   DialogDescription,
   DialogFooter,
