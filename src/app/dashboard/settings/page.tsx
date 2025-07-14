@@ -13,11 +13,12 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { updateProfile } from "firebase/auth";
-import { auth } from '@/lib/firebase';
+import { auth, messaging } from '@/lib/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
+import { getToken } from 'firebase/messaging';
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -91,6 +92,8 @@ export default function SettingsPage() {
   const [defaultDocumentPublic, setDefaultDocumentPublic] = useState(false);
 
   // Notification Settings
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [isEnablingNotifications, setIsEnablingNotifications] = useState(false);
   const [meetingReminders, setMeetingReminders] = useState(true);
   const [chatMentions, setChatMentions] = useState(true);
   const [handRaiseAlerts, setHandRaiseAlerts] = useState(true);
@@ -109,6 +112,14 @@ export default function SettingsPage() {
         setTimeout(() => targetRef!.current?.classList.remove('highlight-blink'), 2000);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    } else {
+      setNotificationPermission('unsupported');
+    }
+  }, []);
   
   // Populate state from user profile and localStorage
   useEffect(() => {
@@ -233,6 +244,43 @@ export default function SettingsPage() {
     toast({ title: "Document Settings Saved", description: "Your document preferences have been updated." });
   };
 
+  const handleEnableNotifications = async () => {
+    setIsEnablingNotifications(true);
+    if (!messaging || typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+        toast({ variant: 'destructive', title: 'Unsupported', description: 'Push notifications are not supported in this browser.' });
+        setNotificationPermission('unsupported');
+        setIsEnablingNotifications(false);
+        return;
+    }
+
+    try {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+
+        if (permission === 'granted') {
+            const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            const fcmToken = await getToken(messaging, { vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY, serviceWorkerRegistration: swRegistration });
+            
+            if (fcmToken) {
+                // In a real app, you would send this token to your server to associate it with the user.
+                // For this prototype, we'll just log it and show a success message.
+                console.log('FCM Token:', fcmToken);
+                toast({ title: 'Notifications Enabled', description: 'You will now receive notifications from TeachMeet.' });
+            } else {
+                 toast({ variant: 'destructive', title: 'Token Error', description: 'Could not retrieve a push notification token.' });
+            }
+        } else if (permission === 'denied') {
+            toast({ variant: 'destructive', title: 'Permission Denied', description: 'You have blocked notifications. To enable them, please update your browser settings.' });
+        } else {
+            toast({ title: 'Permission Not Granted', description: 'You did not grant permission for notifications.' });
+        }
+    } catch (error) {
+        console.error('Error enabling push notifications:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while enabling notifications.' });
+    } finally {
+        setIsEnablingNotifications(false);
+    }
+};
 
   const handleSaveNotifications = () => {
     localStorage.setItem('teachmeet-notif-reminders', meetingReminders ? 'on' : 'off');
@@ -444,7 +492,28 @@ export default function SettingsPage() {
       </SettingsSection>
 
       <SettingsSection title="Notifications" description="Manage how you receive alerts." icon={Bell}>
-        <div className="space-y-4">
+         <div className="space-y-4">
+            <div className="p-3 border rounded-lg shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                    <Label htmlFor="push-notifications">Push Notifications</Label>
+                    <p className="text-xs text-muted-foreground">
+                        Status: <span className={cn(
+                          "font-medium",
+                          notificationPermission === 'granted' && "text-primary",
+                          notificationPermission === 'denied' && "text-destructive"
+                        )}>{notificationPermission}</span>
+                    </p>
+                </div>
+                {notificationPermission !== 'granted' && (
+                    <Button onClick={handleEnableNotifications} disabled={isEnablingNotifications || notificationPermission === 'denied' || notificationPermission === 'unsupported'}>
+                        {isEnablingNotifications ? <Loader2 className="h-4 w-4 animate-spin"/> : "Enable"}
+                    </Button>
+                )}
+              </div>
+              {notificationPermission === 'denied' && <p className="text-xs text-destructive mt-2">You have blocked notifications. Please enable them in your browser settings.</p>}
+              {notificationPermission === 'unsupported' && <p className="text-xs text-destructive mt-2">Push notifications are not supported by your browser.</p>}
+            </div>
             <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
                 <Label htmlFor="meeting-reminders" className="flex items-center gap-2"><Video className="h-4 w-4" /> Meeting Reminders</Label>
                 <Switch id="meeting-reminders" checked={meetingReminders} onCheckedChange={setMeetingReminders} />

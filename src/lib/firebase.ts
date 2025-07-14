@@ -3,6 +3,7 @@ import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/a
 import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence, getAuth } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getMessaging, Messaging } from 'firebase/messaging';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -30,9 +31,10 @@ const auth = initializeAuth(app, {
   persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
 });
 
-// HMR-safe initialization for Firestore and Storage
+// HMR-safe initialization for Firestore, Storage, and Messaging
 let db: Firestore;
 let storage: FirebaseStorage;
+let messaging: Messaging | null = null;
 
 if (typeof window !== 'undefined') {
   if (!(global as any)._firebaseFirestore) {
@@ -44,11 +46,18 @@ if (typeof window !== 'undefined') {
     (global as any)._firebaseStorage = getStorage(app);
   }
   storage = (global as any)._firebaseStorage;
+
+  if (!(global as any)._firebaseMessaging) {
+    (global as any)._firebaseMessaging = getMessaging(app);
+  }
+  messaging = (global as any)._firebaseMessaging;
+
 } else {
   // For server-side rendering (if needed in the future)
   db = getFirestore(app);
   storage = getStorage(app);
+  // Messaging is not available on the server
 }
 
 
-export { app, auth, storage, db };
+export { app, auth, storage, db, messaging };
