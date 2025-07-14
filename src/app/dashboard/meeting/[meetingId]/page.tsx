@@ -648,14 +648,17 @@ export default function MeetingPage() {
     if (currentUser && meetingId && db) {
       try {
         await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
-        // Add to dismissed list
-        const DISMISSED_MEETINGS_KEY = 'teachmeet-dismissed-meetings';
-        const dismissedIdsString = localStorage.getItem(DISMISSED_MEETINGS_KEY);
-        let dismissedIds: string[] = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
-        if (!dismissedIds.includes(meetingId)) {
-          dismissedIds.push(meetingId);
-          localStorage.setItem(DISMISSED_MEETINGS_KEY, JSON.stringify(dismissedIds));
+        
+        // Add the meeting to the dismissed list in localStorage
+        const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
+        const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
+        let dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
+        const activityFeedMeetingId = `meeting-${meetingId}`;
+        if (!dismissedItemIds.includes(activityFeedMeetingId)) {
+          dismissedItemIds.push(activityFeedMeetingId);
+          localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedItemIds));
         }
+
       } catch (error) {
         console.error("[MeetingPage] Error removing participant from Firestore on leave:", error);
       }
