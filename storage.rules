@@ -3,41 +3,41 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // Helper function to check for authentication
-    function isAuthenticated() {
-      return request.auth != null;
+    
+    // Allow users to upload to their own private or public folders.
+    match /documents/{userId}/{privacy}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow read access to public documents for anyone.
+    match /documents/{userId}/public/{fileName} {
+      allow read: if true;
+    }
+    
+    // Only allow the uploader to read their private documents.
+    match /documents/{userId}/private/{fileName} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Allow users to read/write their own avatars in a protected path
+    // Allow users to upload to their own recording folders.
+    match /recordings/{userId}/{privacy}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow read access to public recordings.
+    match /recordings/{userId}/public/{fileName} {
+       allow read: if true;
+    }
+
+    // Only allow the uploader to read their private recordings.
+    match /recordings/{userId}/private/{fileName} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow users to upload their own avatar.
     match /avatars/{userId}/{fileName} {
-      allow read; // Anyone can read avatars
-      allow write: if isAuthenticated() && request.auth.uid == userId;
-    }
-
-    // Rules for documents
-    match /documents/{userId}/{accessType}/{fileName} {
-      // User can write to their own private or public folders
-      allow write: if isAuthenticated() && request.auth.uid == userId;
-
-      // Anyone can read from the public folder
-      // Users can read from their own private folder
-      allow read: if (accessType == 'public') || (isAuthenticated() && request.auth.uid == userId && accessType == 'private');
-    }
-
-    // Rules for recordings
-    match /recordings/{userId}/{accessType}/{fileName} {
-      // User can write to their own recording folders
-      allow write: if isAuthenticated() && request.auth.uid == userId;
-
-      // Anyone can read from a public recording folder
-      // A user can read from their own private recording folder
-      allow read: if (accessType == 'public') || (isAuthenticated() && request.auth.uid == userId && accessType == 'private');
-    }
-
-    // Default deny all other paths
-    match /{allPaths=**} {
-      allow read, write: if false;
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if true; // Avatars are public
     }
   }
 }

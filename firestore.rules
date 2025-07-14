@@ -3,60 +3,41 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Rules for 'meetings' collection
+    
+    // Meetings can be read by any authenticated user.
+    // A meeting can be created by any authenticated user.
+    // Only the creator of the meeting can update or delete it.
     match /meetings/{meetingId} {
-      // Anyone authenticated can create a meeting document
-      allow create: if isAuthenticated();
+      allow read, create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
 
-      // Anyone authenticated can read meeting details (like topic, creatorId)
-      allow read: if isAuthenticated();
-
-      // Only the creator of the meeting can update it (e.g., change the topic)
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.creatorId;
-
-      // Only the creator can delete the meeting document
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.creatorId;
-
-      // Rules for 'participants' subcollection
+      // Participants can be read by any authenticated user.
+      // A user can only add or remove themselves from the participants list.
       match /participants/{userId} {
-        // A user can only read their own participant document or the host can read all
-        allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
-
-        // Any authenticated user can join a meeting (create their participant document)
-        // A user can only update their own participant document
-        // The host can also update any participant document (e.g., to mute them)
-        allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
+        allow read, create: if request.auth != null;
+        allow update, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
-
-    // Rules for 'documents' collection
+    
+    // Allow users to manage their own documents.
+    // Public documents can be read by anyone.
     match /documents/{documentId} {
-      // Anyone authenticated can create a document entry
-      allow create: if isAuthenticated();
-
-      // Users can read public documents, or their own private documents
-      allow read: if isAuthenticated() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-
-      // Only the uploader can update or delete their document entry
-      allow update, delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
+      allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
     }
 
-    // Rules for 'recordings' collection
+    // Allow users to manage their own recordings.
+    // Public recordings can be read by anyone.
     match /recordings/{recordingId} {
-        // Authenticated users can create new recording entries
-        allow create: if isAuthenticated();
-        
-        // Users can read public recordings, or their own private recordings
-        allow read: if isAuthenticated() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-        
-        // Only the uploader of the recording can update or delete it
-        allow update, delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
+      allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
+    }
+    
+    // Allow users to manage their own FCM tokens for push notifications.
+    match /fcmTokens/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
