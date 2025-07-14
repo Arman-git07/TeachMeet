@@ -3,9 +3,8 @@
 import { Button } from '@/components/ui/button';
 import { Video, PlusCircle, Code } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import {
   Dialog,
   DialogContent,
@@ -49,8 +48,7 @@ export function SlideUpPanel() {
       });
     }
   };
-
-  const startMeetingHref = isAuthenticated ? "#" : "/auth/signin?action=start";
+  
   const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
 
 
@@ -87,7 +85,7 @@ export function SlideUpPanel() {
               aria-label="Start New Meeting"
               disabled={authLoading}
             >
-              <Link href={startMeetingHref}>
+              <Link href="/auth/signin?action=start">
                 <PlusCircle className="mr-2 h-6 w-6" />
                 Start New Meeting
               </Link>
