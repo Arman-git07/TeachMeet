@@ -11,7 +11,7 @@ import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, orderBy, limit, where, Timestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, limit, where, Timestamp, or } from 'firebase/firestore';
 
 type ActivityItemType = 'meeting' | 'document' | 'recording';
 
