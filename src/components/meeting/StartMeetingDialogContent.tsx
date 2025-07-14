@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2 } from "lucide-react";
+import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   DialogDescription, 
   DialogFooter, 
@@ -40,8 +40,7 @@ export function StartMeetingDialogContent() {
   const { user } = useAuth();
   const [isJoining, setIsJoining] = useState(false);
 
-  // This effect runs once to generate initial meeting details.
-  useEffect(() => {
+  const generateMeetingDetails = useCallback(() => {
     const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
     
     const newMeetingId = randomString(8);
@@ -58,6 +57,11 @@ export function StartMeetingDialogContent() {
     const codePart3 = randomString(3);
     setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
   }, []);
+
+  // This effect runs once to generate initial meeting details.
+  useEffect(() => {
+    generateMeetingDetails();
+  }, [generateMeetingDetails]);
 
   const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
     if (!textToCopy) {
@@ -223,11 +227,16 @@ export function StartMeetingDialogContent() {
               </Button>
             </div>
           </div>
-
-          <Button variant="outline" className="w-full rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode || isJoining}>
-            <Share2 className="mr-2 h-5 w-5" />
-            Share Invite
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="flex-grow rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode || isJoining}>
+              <Share2 className="mr-2 h-5 w-5" />
+              Share Invite
+            </Button>
+            <Button variant="ghost" size="icon" onClick={generateMeetingDetails} aria-label="Generate new link and code" disabled={isJoining} className="rounded-lg text-muted-foreground">
+              <RefreshCw className="h-5 w-5"/>
+            </Button>
+          </div>
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <DialogClose asChild>
@@ -242,7 +251,7 @@ export function StartMeetingDialogContent() {
             disabled={!meetingId || !meetingTitle.trim() || isJoining || !user}
           >
             {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isJoining ? "Starting..." : (meetingId ? "Start and Join Meeting" : "Generating ID...")}
+            {isJoining ? "Starting..." : "Start and Join Meeting"}
           </Button>
         </DialogFooter>
         <ShareOptionsPanel
