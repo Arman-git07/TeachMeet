@@ -797,12 +797,8 @@ export default function WhiteboardPage() {
     lastDrawToolRef.current = tool;
   };
   
-  const handleNonDrawingToolSelect = (tool: 'erase' | 'lasso' | 'select' | 'screenshot') => {
-      if (tool === 'screenshot') {
-        setIsScreenshotDialogOpen(true);
-      } else {
-        setActiveTool(tool);
-      }
+  const handleNonDrawingToolSelect = (tool: 'erase' | 'lasso' | 'select') => {
+      setActiveTool(tool);
       setIsDrawPanelVisible(false);
       setIsTextPanelVisible(false);
   };
@@ -1152,6 +1148,13 @@ export default function WhiteboardPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
                 <DropdownMenuItem
+                    onSelect={() => setIsScreenshotDialogOpen(true)}
+                    className="cursor-pointer"
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    <span>Screenshot</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)}
                   className="cursor-pointer"
                 >
@@ -1377,8 +1380,6 @@ export default function WhiteboardPage() {
                     </div>
                 </PopoverContent>
              </Popover>
-
-              <ToolButton icon={Camera} label="Screenshot" onClick={() => handleNonDrawingToolSelect("screenshot")} />
 
              <AlertDialog>
                 <AlertDialogTrigger asChild>
