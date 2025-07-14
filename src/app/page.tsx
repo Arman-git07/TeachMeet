@@ -69,53 +69,59 @@ export default function HomePage() {
   
   useEffect(() => {
     let combinedUnsubscribers: (() => void)[] = [];
-
+  
     const loadActivities = () => {
       setIsLoading(true);
-
-      // 1. Get dismissed items
+  
+      // 1. Get dismissed items and started meetings from localStorage
       const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
-      let dismissedItemIds: string[] = [];
-      try {
-        dismissedItemIds = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
-        if (!Array.isArray(dismissedItemIds)) dismissedItemIds = [];
-      } catch (e) {
-        console.error("Error parsing dismissed items:", e);
-        dismissedItemIds = [];
-      }
-
-      // 2. Process meetings from localStorage
+      let dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
+  
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-      let activeMeetings: MeetingActivityItem[] = [];
-      try {
-          const storedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+      let ongoingMeetings: MeetingActivityItem[] = [];
+      if (startedMeetingsRaw) {
+          const storedMeetings = JSON.parse(startedMeetingsRaw);
           if (Array.isArray(storedMeetings)) {
               const now = Date.now();
-              storedMeetings.forEach(meeting => {
-                  if (meeting.startedAt && (now - meeting.startedAt > TWO_HOURS_IN_MS) && !dismissedItemIds.includes(`meeting-${meeting.id}`)) {
-                      dismissedItemIds.push(`meeting-${meeting.id}`);
-                  }
-              });
-              activeMeetings = storedMeetings.map(m => ({ ...m, type: 'meeting', id: `meeting-${m.id}`, timestamp: m.startedAt || now }));
+              ongoingMeetings = storedMeetings
+                  .filter(meeting => {
+                      if (meeting.startedAt && (now - meeting.startedAt > TWO_HOURS_IN_MS)) {
+                          const meetingId = `meeting-${meeting.id}`;
+                          if (!dismissedItemIds.includes(meetingId)) {
+                              dismissedItemIds.push(meetingId);
+                          }
+                          return false; // This meeting is expired and should not be shown
+                      }
+                      return true;
+                  })
+                  .map(m => ({
+                      ...m,
+                      type: 'meeting',
+                      id: `meeting-${m.id}`,
+                      timestamp: m.startedAt || now
+                  }));
           }
-      } catch (e) { console.error("Error parsing started meetings:", e); }
+      }
       localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedItemIds));
-
-
-      let firestoreActivities: ActivityItem[] = [];
-
-      // 3. Set up Firestore listeners for documents and recordings
+  
+      // Immediately set ongoing meetings so they appear while Firestore loads
+      const filteredOngoingMeetings = ongoingMeetings.filter(item => !dismissedItemIds.includes(item.id));
+      setAllActivity(filteredOngoingMeetings);
+  
+      // 2. Set up Firestore listeners for documents and recordings
       const collectionsToQuery: ActivityItemType[] = ['document', 'recording'];
+      let firestoreActivities: ActivityItem[] = [];
+  
       collectionsToQuery.forEach(type => {
         const pluralType = `${type}s` as 'documents' | 'recordings';
         const q = query(collection(db, pluralType), orderBy("createdAt", "desc"), limit(5));
-
+  
         const unsubscribe = onSnapshot(q, (snapshot) => {
           const newItems = snapshot.docs.map(doc => {
             const data = doc.data();
             const isVisible = user ? (data.isPrivate ? data.uploaderId === user.uid : true) : !data.isPrivate;
             if (!isVisible) return null;
-
+  
             const createdAt = (data.createdAt as Timestamp)?.toDate().getTime() || Date.now();
             return {
               id: `${type}-${doc.id}`,
@@ -126,10 +132,11 @@ export default function HomePage() {
               ...(type === 'recording' && { thumbnailUrl: data.thumbnailUrl }),
             } as ActivityItem;
           }).filter((item): item is ActivityItem => item !== null);
-
+  
+          // Merge Firestore results with the latest state
           firestoreActivities = [...firestoreActivities.filter(item => item.type !== type), ...newItems];
           
-          const combined = [...activeMeetings, ...firestoreActivities]
+          const combined = [...ongoingMeetings, ...firestoreActivities]
             .filter(item => !dismissedItemIds.includes(item.id))
             .sort((a, b) => b.timestamp - a.timestamp);
             
@@ -137,18 +144,22 @@ export default function HomePage() {
           setIsLoading(false);
         }, (error) => {
           console.error(`Error fetching ${pluralType}:`, error);
-          setIsLoading(false);
+          setIsLoading(false); // Stop loading even on error
         });
         combinedUnsubscribers.push(unsubscribe);
       });
-
+  
+      // If there are no Firestore listeners, we still need to stop loading
+      if (collectionsToQuery.length === 0) {
+        setIsLoading(false);
+      }
     };
-
+  
     loadActivities();
-
+  
     const handleMeetingStarted = () => loadActivities();
     window.addEventListener('teachmeet_meeting_started', handleMeetingStarted);
-
+  
     return () => {
       window.removeEventListener('teachmeet_meeting_started', handleMeetingStarted);
       combinedUnsubscribers.forEach(unsub => unsub());
