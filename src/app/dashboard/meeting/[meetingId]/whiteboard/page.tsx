@@ -23,7 +23,7 @@ import {
   DialogTitle as ShadDialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -46,7 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import jsPDF from 'jspdf';
 import { auth, storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firestore';
 
 
 // --- Type Definitions ---
@@ -194,8 +194,9 @@ export default function WhiteboardPage() {
   const [tempDragPreview, setTempDragPreview] = useState<WhiteboardElement[]>([]);
   const [bgColor, setBgColor] = useState('#FFFFFF');
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
-  const [isExporting, setIsExporting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isScreenshotDialogOpen, setIsScreenshotDialogOpen] = useState(false);
 
 
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
@@ -795,8 +796,12 @@ export default function WhiteboardPage() {
     lastDrawToolRef.current = tool;
   };
   
-  const handleNonDrawingToolSelect = (tool: 'erase' | 'lasso' | 'select') => {
-      setActiveTool(tool);
+  const handleNonDrawingToolSelect = (tool: 'erase' | 'lasso' | 'select' | 'screenshot') => {
+      if (tool === 'screenshot') {
+        setIsScreenshotDialogOpen(true);
+      } else {
+        setActiveTool(tool);
+      }
       setIsDrawPanelVisible(false);
       setIsTextPanelVisible(false);
   };
@@ -964,10 +969,75 @@ export default function WhiteboardPage() {
     }
   };
 
+  const getCanvasAsBlob = async (): Promise<Blob | null> => {
+    const canvas = mainCanvasRef.current;
+    if (!canvas) return null;
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  };
+
+  const handleDownloadScreenshot = async () => {
+    setIsScreenshotDialogOpen(false);
+    const blob = await getCanvasAsBlob();
+    if (!blob) {
+        toast({ variant: "destructive", title: "Error", description: "Could not capture screenshot." });
+        return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TeachMeet Whiteboard - ${new Date().toISOString()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Screenshot Downloaded", description: "Your whiteboard has been saved." });
+  };
+  
+  const handleSaveScreenshotToDocuments = async (destination: 'private' | 'public') => {
+    setIsScreenshotDialogOpen(false);
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const toastId = `screenshot-save-${Date.now()}`;
+    toast({ id: toastId, title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
+    
+    try {
+      const blob = await getCanvasAsBlob();
+      if (!blob) throw new Error("Could not capture screenshot blob.");
+
+      if (!auth.currentUser) throw new Error("Authentication required to save.");
+      const userId = auth.currentUser.uid;
+      const fileName = `Whiteboard Screenshot - ${new Date().toISOString()}.png`;
+      const path = `documents/${userId}/${destination}/${Date.now()}-${fileName}`;
+      const fileRef = storageRef(storage, path);
+      
+      await uploadBytes(fileRef, blob);
+      const downloadURL = await getDownloadURL(fileRef);
+
+      await addDoc(collection(db, "documents"), {
+          name: fileName,
+          lastModified: new Date().toISOString(),
+          size: `${(blob.size / 1024 / 1024).toFixed(2)}MB`,
+          uploaderId: userId,
+          isPrivate: destination === 'private',
+          downloadURL,
+          storagePath: path,
+          createdAt: serverTimestamp(),
+      });
+      
+      toast({ id: toastId, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+
+    } catch (error) {
+      console.error("Failed to save screenshot:", error);
+      toast({ id: toastId, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleExportToPdf = async (destination: 'private' | 'public') => {
-    if (isExporting) return;
-    setIsExportDialogOpen(false); // Close the choice dialog
-    setIsExporting(true);
+    if (isProcessing) return;
+    setIsExportDialogOpen(false);
+    setIsProcessing(true);
     setIsPagesPopoverOpen(false);
 
     const exportToastId = `export-${Date.now()}`;
@@ -982,7 +1052,7 @@ export default function WhiteboardPage() {
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) {
         toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
-        setIsExporting(false);
+        setIsProcessing(false);
         return;
     }
 
@@ -991,7 +1061,7 @@ export default function WhiteboardPage() {
     const offscreenCtx = offscreenCanvas.getContext('2d');
     if (!offscreenCtx) {
         toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
-        setIsExporting(false);
+        setIsProcessing(false);
         return;
     }
 
@@ -1005,7 +1075,6 @@ export default function WhiteboardPage() {
         for (let i = 0; i < pages.length; i++) {
             toast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
-            // Draw the page content onto the offscreen canvas
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
             for (const element of pages[i].elements) {
@@ -1021,7 +1090,6 @@ export default function WhiteboardPage() {
 
         const pdfBlob = doc.output('blob');
         
-        // Upload to Firebase Storage
         if (!auth.currentUser) throw new Error("Authentication required.");
         
         const fileName = `Whiteboard - ${topic || meetingId} - ${new Date().toISOString()}.pdf`;
@@ -1032,7 +1100,6 @@ export default function WhiteboardPage() {
         await uploadBytes(fileRef, pdfBlob);
         const downloadURL = await getDownloadURL(fileRef);
 
-        // Add to Firestore 'documents' collection
         await addDoc(collection(db, "documents"), {
             name: fileName,
             lastModified: new Date().toISOString(),
@@ -1050,7 +1117,7 @@ export default function WhiteboardPage() {
         console.error("PDF Export or Upload Failed:", error);
         toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
-        setIsExporting(false);
+        setIsProcessing(false);
     }
 };
 
@@ -1270,9 +1337,9 @@ export default function WhiteboardPage() {
                         <Button onClick={handleAddPage} className="w-full rounded-lg btn-gel" size="sm">
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Page
                         </Button>
-                        <Button onClick={() => { setIsPagesPopoverOpen(false); setIsExportDialogOpen(true); }} className="w-full rounded-lg" size="sm" variant="outline" disabled={isExporting}>
-                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                            {isExporting ? 'Exporting...' : 'Export as PDF'}
+                        <Button onClick={() => { setIsPagesPopoverOpen(false); setIsExportDialogOpen(true); }} className="w-full rounded-lg" size="sm" variant="outline" disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                            {isProcessing ? 'Processing...' : 'Export as PDF'}
                         </Button>
                         <div className="relative py-2">
                             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
@@ -1309,6 +1376,8 @@ export default function WhiteboardPage() {
                     </div>
                 </PopoverContent>
              </Popover>
+
+              <ToolButton icon={Camera} label="Screenshot" onClick={() => handleNonDrawingToolSelect("screenshot")} />
 
              <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -1350,16 +1419,56 @@ export default function WhiteboardPage() {
             <DialogDescription>Where would you like to save this PDF?</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => handleExportToPdf('private')} disabled={isExporting}>
+            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => handleExportToPdf('private')} disabled={isProcessing}>
               <Lock className="mr-2 h-5 w-5" /> Save to Private
             </Button>
-            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => handleExportToPdf('public')} disabled={isExporting}>
+            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => handleExportToPdf('public')} disabled={isProcessing}>
               <Globe className="mr-2 h-5 w-5" /> Save to Public
             </Button>
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="secondary" className="rounded-lg" disabled={isExporting}>Cancel</Button>
+              <Button type="button" variant="secondary" className="rounded-lg" disabled={isProcessing}>Cancel</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isScreenshotDialogOpen} onOpenChange={setIsScreenshotDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <ShadDialogTitle className="text-xl">Save Screenshot</ShadDialogTitle>
+            <DialogDescription>How would you like to save the screenshot of your whiteboard?</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={handleDownloadScreenshot} disabled={isProcessing}>
+              <FileDown className="mr-2 h-5 w-5" /> Download to Device
+            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                 <Button variant="outline" className="w-full rounded-lg py-6 text-base" disabled={isProcessing}>
+                   <Globe className="mr-2 h-5 w-5" /> Save to Documents
+                 </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-xs rounded-xl">
+                 <DialogHeader>
+                    <ShadDialogTitle>Save to Documents</ShadDialogTitle>
+                    <DialogDescription>Choose a destination for your screenshot.</DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-3">
+                    <Button variant="outline" className="w-full rounded-lg" onClick={() => handleSaveScreenshotToDocuments('private')} disabled={isProcessing}>
+                      <Lock className="mr-2 h-4 w-4" /> Save as Private
+                    </Button>
+                    <Button variant="outline" className="w-full rounded-lg" onClick={() => handleSaveScreenshotToDocuments('public')} disabled={isProcessing}>
+                      <Globe className="mr-2 h-4 w-4" /> Save as Public
+                    </Button>
+                  </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary" className="w-full rounded-lg" disabled={isProcessing}>Cancel</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
