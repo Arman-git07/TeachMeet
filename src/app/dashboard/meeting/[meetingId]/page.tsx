@@ -96,10 +96,12 @@ function ParticipantView({
   }, [isMe]);
 
   useEffect(() => {
-    if (isMe && videoRef.current) {
+    if (videoRef.current) {
+      // For remote participants (not implemented with WebRTC yet), you might show a placeholder.
+      // For the local user, we directly assign their stream.
       videoRef.current.srcObject = stream || null;
     }
-  }, [stream, isMe]);
+  }, [stream]);
 
   const handleFullScreenClick = () => {
     const targetElement = videoRef.current;
@@ -119,7 +121,7 @@ function ParticipantView({
 
   const avatarFallbackName = name ? name.charAt(0).toUpperCase() : 'U';
   const avatarSrc = photoURL || `https://placehold.co/128x128.png?text=${avatarFallbackName}`;
-  const showVideo = !isCameraOff && !isScreenSharing;
+  const showVideo = stream && !isCameraOff && !isScreenSharing;
 
   return (
     <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
@@ -128,8 +130,6 @@ function ParticipantView({
         muted={isMe || isMicMuted}
         autoPlay
         playsInline
-        src={!isMe && showVideo ? "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" : undefined}
-        loop={!isMe}
         className={cn("w-full h-full object-cover bg-black", !showVideo && "hidden", isMe && mirrorVideo && "video-mirror")}
       />
       
@@ -524,7 +524,7 @@ export default function MeetingPage() {
 
 
   useEffect(() => {
-    if (joinStatus !== 'joined' || isScreenSharingActive) return;
+    if (joinStatus !== 'joined') return;
 
     const initializeMedia = async () => {
       try {
@@ -543,6 +543,8 @@ export default function MeetingPage() {
         if (audioTrack) {
           audioTrack.enabled = !localMicMuted;
         }
+        // Force a re-render to update the self-view with the new stream
+        setRealtimeParticipants(prev => [...prev]);
 
       } catch (err) {
         console.error("[MeetingPage] Failed to get media on mount:", err);
@@ -557,8 +559,12 @@ export default function MeetingPage() {
       }
     };
 
-    initializeMedia();
-  }, [joinStatus, isScreenSharingActive]);
+    // Only initialize media if we aren't screen sharing.
+    if (!isScreenSharingActive) {
+      initializeMedia();
+    }
+    
+  }, [joinStatus]);
 
    useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
@@ -600,18 +606,29 @@ export default function MeetingPage() {
     }
   };
 
-  const stopScreenShare = async (showToast = true) => {
+  const stopScreenShare = useCallback(async (showToast = true) => {
+    if (!isScreenSharingActive) return;
+
     if (screenShareStreamRef.current) {
       screenShareStreamRef.current.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current = null;
     }
     setIsScreenSharingActive(false);
-    await updateUserStatusInFirestore({ isScreenSharing: false });
+    await updateUserStatusInFirestore({ isScreenSharing: false, isCameraOff: localCameraOff });
+
+    // Restore camera view if it was on before sharing
+    if (localStreamRef.current) {
+        const videoTrack = localStreamRef.current.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !localCameraOff;
+        }
+    }
 
     if (showToast) {
         toast({ title: "Screen Sharing Stopped" });
     }
-  };
+    setRealtimeParticipants(prev => [...prev]); // Force update
+  }, [isScreenSharingActive, localCameraOff, toast, updateUserStatusInFirestore]);
 
   const toggleCamera = async () => {
     if (isScreenSharingActive) {
@@ -642,14 +659,15 @@ export default function MeetingPage() {
   };
 
   const leaveMeeting = async () => {
-    await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
+    if(isScreenSharingActive) {
+        await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
+    }
     localStreamRef.current?.getTracks().forEach(track => track.stop());
 
     if (currentUser && meetingId && db) {
       try {
         await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
         
-        // Add the meeting to the dismissed list in localStorage
         const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
         const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
         let dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
@@ -685,6 +703,7 @@ export default function MeetingPage() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
 
+      // Disable the camera track while screen sharing
       if (localStreamRef.current) {
         const videoTrack = localStreamRef.current.getVideoTracks()[0];
         if (videoTrack) videoTrack.enabled = false;
@@ -697,6 +716,7 @@ export default function MeetingPage() {
       toast({ title: "Screen Sharing Started" });
 
       stream.getVideoTracks()[0].onended = () => stopScreenShare();
+      setRealtimeParticipants(prev => [...prev]); // Force update
 
     } catch (err) {
       console.error("[MeetingPage] Error starting screen share:", err);
@@ -873,10 +893,9 @@ export default function MeetingPage() {
              className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
              onClick={toggleCamera}
              aria-label={localCameraOff ? "Turn Camera On" : "Turn Camera Off"}
-             disabled={isScreenSharingActive}
           >
-             <VideoOff className={cn("h-5 w-5 sm:h-6 sm:w-6", !localCameraOff || isScreenSharingActive && "hidden")} />
-             <Video className={cn("h-5 w-5 sm:h-6 sm:w-6", localCameraOff && !isScreenSharingActive && "hidden")} />
+             <VideoOff className={cn("h-5 w-5 sm:h-6 sm:w-6", !localCameraOff && "hidden")} />
+             <Video className={cn("h-5 w-5 sm:h-6 sm:w-6", localCameraOff && "hidden")} />
           </Button>
            <Button
             size="icon"
