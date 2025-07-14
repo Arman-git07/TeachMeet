@@ -200,7 +200,7 @@ export default function RecordingsPage() {
     recordings.filter(rec => rec.name.toLowerCase().includes(searchQuery.toLowerCase()))
   , [recordings, searchQuery]);
 
-  const privateRecs = useMemo(() => filteredRecordings.filter(d => d.isPrivate && d.uploaderId === currentUser?.uid), [filteredRecordings, currentUser]);
+  const privateRecs = useMemo(() => filteredRecordings.filter(d => d.isPrivate), [filteredRecordings]);
   const publicRecs = useMemo(() => filteredRecordings.filter(d => !d.isPrivate), [filteredRecordings]);
 
   const renderRecordingGrid = (recs: Recording[], emptyState: React.ReactNode) => {
@@ -347,5 +347,3 @@ export default function RecordingsPage() {
     </>
   );
 }
-
-    
