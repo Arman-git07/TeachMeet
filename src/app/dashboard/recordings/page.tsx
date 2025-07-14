@@ -23,7 +23,7 @@ export default async function RecordingsPage() {
   );
 
   const snapshot = await getDocs(q);
-  const recordings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
+  const recordings = snapshot.docs.map(doc => JSON.parse(JSON.stringify({ id: doc.id, ...doc.data() })) as Recording);
 
   return <RecordingsClientUI initialRecordings={recordings} currentUserId={currentUser.uid} />;
 }

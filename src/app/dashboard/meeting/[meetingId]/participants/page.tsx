@@ -43,7 +43,6 @@ interface Participant {
   photoURL?: string;
   isMicMuted?: boolean;
   isCameraOff?: boolean;
-  // isHost property will be determined by comparing id with meetingCreatorId
 }
 
 const ParticipantItem = React.memo(function ParticipantItem({
@@ -150,24 +149,26 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   useEffect(() => {
     if (!meetingId || !db) return;
     setIsLoading(true);
-    console.log(`[ParticipantsPage] Fetching meeting details for ${meetingId}`);
 
     const meetingDocRef = doc(db, "meetings", meetingId);
-    getDoc(meetingDocRef).then(docSnap => {
-      if (docSnap.exists()) {
-        const creator = docSnap.data().creatorId;
-        console.log(`[ParticipantsPage] Meeting creator ID: ${creator}`);
-        setMeetingCreatorId(creator);
-      } else {
-        toast({ variant: "destructive", title: "Meeting Not Found", description: "Could not load meeting details." });
-        console.error("[ParticipantsPage] Meeting document not found for ID:", meetingId);
-      }
-    }).catch(error => {
-      toast({ variant: "destructive", title: "Error Fetching Meeting", description: "Could not load meeting details." });
-      console.error("[ParticipantsPage] Error fetching meeting document:", error);
-    });
-
-    console.log(`[ParticipantsPage] Setting up Firestore listener for participants in meeting ${meetingId}`);
+    
+    const fetchMeetingDetails = async () => {
+        try {
+            const docSnap = await getDoc(meetingDocRef);
+            if (docSnap.exists()) {
+                const creator = docSnap.data().creatorId;
+                setMeetingCreatorId(creator);
+            } else {
+                toast({ variant: "destructive", title: "Meeting Not Found", description: "Could not load meeting details." });
+            }
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error Fetching Meeting", description: "Could not load meeting details. Check security rules." });
+            console.error("[ParticipantsPage] Error fetching meeting document:", error);
+        }
+    };
+    
+    fetchMeetingDetails();
+    
     const participantsColRef = collection(db, "meetings", meetingId, "participants");
     const q = query(participantsColRef);
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -182,7 +183,6 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
           isCameraOff: data.isCameraOff,
         });
       });
-      console.log("[ParticipantsPage] Fetched participants from Firestore:", fetchedParticipants);
       setRealtimeParticipants(fetchedParticipants);
       setIsLoading(false);
     }, (error) => {
@@ -197,7 +197,6 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     });
 
     return () => {
-      console.log(`[ParticipantsPage] Cleaning up Firestore listener for meeting ${meetingId}`);
       unsubscribe();
     };
   }, [meetingId, db, toast]);
@@ -243,19 +242,9 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                 </div>
               ) : realtimeParticipants.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <ShieldCheck className="w-16 h-16 mb-4 text-primary" />
-                   {isCurrentUserTheHost ? (
-                    <>
-                      <p className="text-lg">You are the host.</p>
-                      <p className="text-sm">Meeting ID: {meetingId}</p>
-                      <p className="text-sm mt-2">Waiting for others to join...</p>
-                    </>
-                   ) : (
-                    <>
-                      <p className="text-lg">No participants yet.</p>
-                      <p className="text-sm mt-2">You might be the first one here, or waiting for others to join.</p>
-                    </>
-                   )}
+                  <UsersIcon className="w-16 h-16 mb-4 text-primary" />
+                  <p className="text-lg">No one is here yet.</p>
+                  <p className="text-sm mt-2">Waiting for others to join...</p>
                 </div>
               ) : (
                 <div className="space-y-1">

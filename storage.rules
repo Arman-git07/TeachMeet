@@ -4,40 +4,26 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Allow users to upload to their own private or public folders.
-    match /documents/{userId}/{privacy}/{fileName} {
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow read access to public documents for anyone.
-    match /documents/{userId}/public/{fileName} {
-      allow read: if true;
-    }
-    
-    // Only allow the uploader to read their private documents.
-    match /documents/{userId}/private/{fileName} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Allow users to upload to their own recording folders.
-    match /recordings/{userId}/{privacy}/{fileName} {
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow read access to public recordings.
-    match /recordings/{userId}/public/{fileName} {
-       allow read: if true;
-    }
-
-    // Only allow the uploader to read their private recordings.
-    match /recordings/{userId}/private/{fileName} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow users to upload their own avatar.
+    // Rules for user avatars
+    // Anyone can read avatars (they are public profile images)
+    // Only the authenticated user can write to their own avatar path
     match /avatars/{userId}/{fileName} {
+      allow read;
       allow write: if request.auth != null && request.auth.uid == userId;
-      allow read: if true; // Avatars are public
+    }
+
+    // Rules for documents and recordings
+    // The path contains the destination (public/private)
+    match /{collection}/{userId}/{destination}/{fileName} where collection in ['documents', 'recordings'] {
+      // A user can only write to their own folder structure.
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow read access if the destination is 'public'
+      // OR if the user is reading from their own private folder.
+      allow read: if destination == 'public' || (request.auth != null && request.auth.uid == userId && destination == 'private');
+      
+      // Only the owner can delete their files.
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

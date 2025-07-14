@@ -73,10 +73,15 @@ export default function HomePage() {
     const loadActivities = () => {
       setIsLoading(true);
   
-      // 1. Get dismissed items and started meetings from localStorage
       const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
-      let dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
-  
+      let dismissedItemIds: string[] = [];
+      try {
+        dismissedItemIds = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
+      } catch (e) {
+        console.error("Error parsing dismissed items:", e);
+        dismissedItemIds = [];
+      }
+      
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
       let ongoingMeetings: MeetingActivityItem[] = [];
       if (startedMeetingsRaw) {
@@ -90,7 +95,7 @@ export default function HomePage() {
                           if (!dismissedItemIds.includes(meetingId)) {
                               dismissedItemIds.push(meetingId);
                           }
-                          return false; // This meeting is expired and should not be shown
+                          return false;
                       }
                       return true;
                   })
@@ -104,24 +109,29 @@ export default function HomePage() {
       }
       localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedItemIds));
   
-      // Immediately set ongoing meetings so they appear while Firestore loads
       const filteredOngoingMeetings = ongoingMeetings.filter(item => !dismissedItemIds.includes(item.id));
       setAllActivity(filteredOngoingMeetings);
   
-      // 2. Set up Firestore listeners for documents and recordings
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
       const collectionsToQuery: ActivityItemType[] = ['document', 'recording'];
       let firestoreActivities: ActivityItem[] = [];
   
       collectionsToQuery.forEach(type => {
         const pluralType = `${type}s` as 'documents' | 'recordings';
-        const q = query(collection(db, pluralType), orderBy("createdAt", "desc"), limit(5));
+        const q = query(
+          collection(db, pluralType),
+          or(where("isPrivate", "==", false), where("uploaderId", "==", user.uid)),
+          orderBy("createdAt", "desc"), 
+          limit(5)
+        );
   
         const unsubscribe = onSnapshot(q, (snapshot) => {
           const newItems = snapshot.docs.map(doc => {
             const data = doc.data();
-            const isVisible = user ? (data.isPrivate ? data.uploaderId === user.uid : true) : !data.isPrivate;
-            if (!isVisible) return null;
-  
             const createdAt = (data.createdAt as Timestamp)?.toDate().getTime() || Date.now();
             return {
               id: `${type}-${doc.id}`,
@@ -131,9 +141,8 @@ export default function HomePage() {
               isPrivate: data.isPrivate,
               ...(type === 'recording' && { thumbnailUrl: data.thumbnailUrl }),
             } as ActivityItem;
-          }).filter((item): item is ActivityItem => item !== null);
+          });
   
-          // Merge Firestore results with the latest state
           firestoreActivities = [...firestoreActivities.filter(item => item.type !== type), ...newItems];
           
           const combined = [...ongoingMeetings, ...firestoreActivities]
@@ -144,12 +153,11 @@ export default function HomePage() {
           setIsLoading(false);
         }, (error) => {
           console.error(`Error fetching ${pluralType}:`, error);
-          setIsLoading(false); // Stop loading even on error
+          setIsLoading(false);
         });
         combinedUnsubscribers.push(unsubscribe);
       });
   
-      // If there are no Firestore listeners, we still need to stop loading
       if (collectionsToQuery.length === 0) {
         setIsLoading(false);
       }

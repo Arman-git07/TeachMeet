@@ -17,17 +17,6 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
-
-interface OngoingMeeting {
-  id: string;
-  title: string;
-  startedAt?: number;
-}
-
 
 export function StartMeetingDialogContent() {
   const [meetingLink, setMeetingLink] = useState("");
@@ -58,7 +47,6 @@ export function StartMeetingDialogContent() {
     setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
   }, []);
 
-  // This effect runs once to generate initial meeting details.
   useEffect(() => {
     generateMeetingDetails();
   }, [generateMeetingDetails]);
@@ -98,65 +86,21 @@ export function StartMeetingDialogContent() {
 
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
-    console.log(`[StartMeetingDialog] Attempting to create meeting: ID=${meetingId}, Topic=${trimmedMeetingTitle}, Creator=${user.uid}`);
-
+    
+    // The meeting document will now be created on the meeting page itself when the first user joins.
+    // This dialog's only job is to generate the ID and navigate.
+    
     try {
-      const meetingDocRef = doc(db, 'meetings', meetingId);
-      const meetingData = {
-        creatorId: user.uid,
-        topic: trimmedMeetingTitle,
-        createdAt: serverTimestamp(),
-      };
-      
-      console.log("[StartMeetingDialog] Data to write for main meeting document:", meetingData);
-      await setDoc(meetingDocRef, meetingData);
-      console.log("[StartMeetingDialog] Successfully created main meeting document in Firestore.");
-
-
-      const newMeetingEntry: OngoingMeeting = { 
-        id: meetingId, 
-        title: trimmedMeetingTitle, 
-        startedAt: Date.now() 
-      };
-      const existingStartedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-      let existingStartedMeetings: OngoingMeeting[] = [];
-      if (existingStartedMeetingsRaw) {
-        try {
-          existingStartedMeetings = JSON.parse(existingStartedMeetingsRaw);
-          if (!Array.isArray(existingStartedMeetings)) existingStartedMeetings = [];
-        } catch (e) {
-          console.error("[StartMeetingDialog] Error parsing started meetings from localStorage:", e);
-          localStorage.removeItem(STARTED_MEETINGS_KEY);
-        }
-      }
-      if (!existingStartedMeetings.find(m => m.id === newMeetingEntry.id)) {
-        const updatedStartedMeetings = [...existingStartedMeetings, newMeetingEntry];
-        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedStartedMeetings));
-        console.log("[StartMeetingDialog] Meeting added to localStorage 'started-meetings'.");
-        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started')); 
-      }
-
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
-      
       router.push(joinNowLinkPath);
-      // We don't control the dialog open state from here anymore, the parent does.
-
-    } catch (error: any) {
-      console.error("[StartMeetingDialog] CRITICAL: Error creating meeting document in Firestore:", error);
-      let description = `Could not create the meeting in the database: ${error.message}.`;
-      if (error.message && error.message.toLowerCase().includes('permission')) {
-        description = `Permission Denied: ${error.message}. Please check your Firebase Firestore security rules to allow writes to the 'meetings' collection for authenticated users. For development, you might need a rule like 'allow write: if request.auth != null;'.`;
-      } else {
-        description += " Check console & Firestore rules.";
-      }
+    } catch (error) {
+      console.error("Navigation error:", error);
       toast({
         variant: "destructive",
-        title: "Failed to Start Meeting",
-        description: description,
-        duration: 10000,
+        title: "Navigation Failed",
+        description: "Could not navigate to the meeting room.",
       });
-    } finally {
-        setIsJoining(false); 
+      setIsJoining(false);
     }
   };
 
