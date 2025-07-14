@@ -196,12 +196,6 @@ export function AppSidebar() {
     { href: "/community-guidelines", label: "Community Guidelines", icon: Users, target: "_blank" },
   ];
   
-  const libraryItems = [
-    { href: "/dashboard/documents", label: "Documents", icon: FileText },
-    { href: "/dashboard/recordings", label: "Recordings", icon: Clapperboard },
-  ];
-
-
   return (
     <>
     <Sidebar side="left" variant="sidebar" collapsible="icon">
@@ -242,7 +236,8 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
-               <NavItem icon={Library} currentPath={pathname} isDropdown dropdownItems={libraryItems}>Library</NavItem>
+               <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
+               <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
           ) : (
             <>
