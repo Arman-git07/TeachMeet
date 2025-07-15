@@ -38,12 +38,21 @@ export interface Recording {
   createdAt?: any;
 }
 
+export interface Teaching {
+  id: string;
+  title: string;
+  description: string;
+  creatorId: string;
+  createdAt?: any;
+}
+
 interface AuthContextType {
   user: FirebaseUser | null;
   loading: boolean;
   isAuthenticated: boolean;
   documents: Document[];
   recordings: Recording[];
+  teachings: Teaching[];
   signOut: () => Promise<void>;
 }
 
@@ -54,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [teachings, setTeachings] = useState<Teaching[]>([]);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -90,6 +100,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         unsubscribers.push(recordingsUnsubscribe);
 
+        // Teachings listener
+        const teachingsRef = collection(db, "teachings");
+        const teachingsQuery = query(teachingsRef, where("creatorId", "==", currentUser.uid), orderBy("createdAt", "desc"));
+        const teachingsUnsubscribe = onSnapshot(teachingsQuery,
+          (snapshot) => setTeachings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching))),
+          (error) => console.error("Error fetching teachings:", error)
+        );
+        unsubscribers.push(teachingsUnsubscribe);
+
         // FCM Token
         if (messaging) {
           try {
@@ -110,6 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // User is signed out, clear data
         setDocuments([]);
         setRecordings([]);
+        setTeachings([]);
       }
       setLoading(false);
     });
@@ -136,7 +156,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated, documents, recordings, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated, documents, recordings, teachings, signOut }}>
       {children}
     </AuthContext.Provider>
   );
