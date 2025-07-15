@@ -17,7 +17,6 @@ import {
   Lock,
   Globe,
   BookOpen,
-  ShieldQuestion,
   Users,
   School,
   Library,
@@ -192,7 +191,7 @@ export function AppSidebar() {
 
   const legalAndInfoItems = [
     { href: "/terms-of-service", label: "Terms of Service", icon: BookOpen, target: "_blank" },
-    { href: "/privacy-policy", label: "Privacy Policy", icon: ShieldQuestion, target: "_blank" },
+    { href: "/privacy-policy", label: "Privacy Policy", icon: Users, target: "_blank" },
     { href: "/community-guidelines", label: "Community Guidelines", icon: Users, target: "_blank" },
   ];
   
@@ -236,6 +235,7 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
+               <NavItem href="/dashboard/teachings" icon={School} currentPath={pathname}>Teachings</NavItem>
                <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
                <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>
@@ -259,7 +259,7 @@ export function AppSidebar() {
           <SidebarSeparator />
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
-          <NavItem icon={ShieldQuestion} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal & Info</NavItem>
+          <NavItem icon={Library} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal & Info</NavItem>
           {isAuthenticated && (
             <>
               <SidebarSeparator />
