@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence, getAuth } from 'firebase/auth';
+import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
