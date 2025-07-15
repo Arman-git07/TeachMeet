@@ -246,11 +246,22 @@ export default function TeachingsPage() {
 
     const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
         if (!user) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
+        
         const myTeachings = teachings.filter(t => t.creatorId === user.uid);
-        const enrolledTeachings = teachings.filter(t => t.creatorId !== user.uid && t.members?.includes(user.uid));
-        const publicTeachings = teachings.filter(t => t.isPublic && t.creatorId !== user.uid && !t.members?.includes(user.uid));
+        
+        const enrolledTeachings = teachings.filter(t => 
+            t.creatorId !== user.uid && 
+            t.members?.includes(user.uid)
+        );
+        
+        const publicTeachings = teachings.filter(t => 
+            t.isPublic && 
+            !t.members?.includes(user.uid)
+        );
+
         return { myTeachings, enrolledTeachings, publicTeachings };
     }, [teachings, user]);
+
 
     const handleEdit = (teaching: Teaching) => {
         setTeachingToEdit(teaching);
@@ -319,12 +330,12 @@ export default function TeachingsPage() {
                     <TeachingCard 
                         key={t.id} 
                         teaching={t} 
-                        userRole={userRole}
+                        userRole={t.creatorId === user?.uid ? 'creator' : userRole}
                         currentUserId={user?.uid || null}
-                        onEdit={userRole === 'creator' ? handleEdit : undefined}
-                        onDelete={userRole === 'creator' ? handleDelete : undefined}
+                        onEdit={t.creatorId === user?.uid ? handleEdit : undefined}
+                        onDelete={t.creatorId === user?.uid ? handleDelete : undefined}
                         onRequestToJoin={userRole === 'guest' ? handleRequestToJoin : undefined}
-                        onManageRequests={userRole === 'creator' ? handleManageRequests : undefined}
+                        onManageRequests={t.creatorId === user?.uid ? handleManageRequests : undefined}
                     />
                 ))}
             </div>
