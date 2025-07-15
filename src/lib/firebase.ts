@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
+import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence, getAuth } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
@@ -25,38 +25,24 @@ if (
   );
 }
 
-// Initialize Firebase
+// Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Initialize services
 const auth = initializeAuth(app, {
   persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
 });
-
-// HMR-safe initialization for Firestore, Storage, and Messaging
-let db: Firestore;
-let storage: FirebaseStorage;
+const db = getFirestore(app);
+const storage = getStorage(app);
 let messaging: Messaging | null = null;
 
 if (typeof window !== 'undefined') {
-  if (!(global as any)._firebaseFirestore) {
-    (global as any)._firebaseFirestore = getFirestore(app);
-  }
-  db = (global as any)._firebaseFirestore;
-
-  if (!(global as any)._firebaseStorage) {
-    (global as any)._firebaseStorage = getStorage(app);
-  }
-  storage = (global as any)._firebaseStorage;
-
-  if (!(global as any)._firebaseMessaging) {
-    (global as any)._firebaseMessaging = getMessaging(app);
-  }
-  messaging = (global as any)._firebaseMessaging;
-
-} else {
-  // For server-side rendering (if needed in the future)
-  db = getFirestore(app);
-  storage = getStorage(app);
-  // Messaging is not available on the server
+    try {
+        messaging = getMessaging(app);
+    } catch (error) {
+        console.warn("Could not initialize Firebase Messaging. This may be due to an unsupported environment.");
+        messaging = null;
+    }
 }
 
 
