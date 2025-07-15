@@ -5,8 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 
 
 export default function DocumentsPage() {
-  const { user } = useAuth();
-  // The data fetching is now handled inside DocumentsClientUI via a real-time listener,
-  // which simplifies this page and aligns with client-side authentication.
-  return <DocumentsClientUI initialDocuments={[]} currentUserId={user?.uid || null} />;
+  const { user, documents } = useAuth();
+  // The data fetching is now handled inside the useAuth hook to centralize listeners
+  // and prevent re-initialization errors.
+  return <DocumentsClientUI initialDocuments={documents} currentUserId={user?.uid || null} />;
 }

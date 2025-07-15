@@ -10,10 +10,9 @@ import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Lo
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, orderBy, limit, where, Timestamp, or } from 'firebase/firestore';
 
-type ActivityItemType = 'meeting' | 'document' | 'recording';
+
+export type ActivityItemType = 'meeting' | 'document' | 'recording';
 
 interface BaseActivityItem {
   id: string;
@@ -22,23 +21,23 @@ interface BaseActivityItem {
   timestamp: number;
 }
 
-interface MeetingActivityItem extends BaseActivityItem {
+export interface MeetingActivityItem extends BaseActivityItem {
   type: 'meeting';
   participants?: number;
 }
 
-interface DocumentActivityItem extends BaseActivityItem {
+export interface DocumentActivityItem extends BaseActivityItem {
   type: 'document';
   isPrivate: boolean;
 }
 
-interface RecordingActivityItem extends BaseActivityItem {
+export interface RecordingActivityItem extends BaseActivityItem {
   type: 'recording';
   isPrivate: boolean;
   thumbnailUrl?: string;
 }
 
-type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem;
+export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem;
 
 
 const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
@@ -65,11 +64,9 @@ export default function HomePage() {
   const [animationLock, setAnimationLock] = useState(false);
 
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, documents, recordings, loading: authLoading } = useAuth();
   
   useEffect(() => {
-    let combinedUnsubscribers: (() => void)[] = [];
-  
     const loadActivities = () => {
       setIsLoading(true);
   
@@ -109,70 +106,44 @@ export default function HomePage() {
       }
       localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedItemIds));
   
-      const filteredOngoingMeetings = ongoingMeetings.filter(item => !dismissedItemIds.includes(item.id));
-      setAllActivity(filteredOngoingMeetings);
-  
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
+      const documentActivities: DocumentActivityItem[] = documents.map(doc => ({
+        id: `document-${doc.id}`,
+        type: 'document',
+        title: doc.name || 'Untitled Document',
+        timestamp: (doc.createdAt as any)?.toDate().getTime() || new Date(doc.lastModified).getTime(),
+        isPrivate: doc.isPrivate,
+      }));
 
-      const collectionsToQuery: ActivityItemType[] = ['document', 'recording'];
-      let firestoreActivities: ActivityItem[] = [];
-  
-      collectionsToQuery.forEach(type => {
-        const pluralType = `${type}s` as 'documents' | 'recordings';
-        const q = query(
-          collection(db, pluralType),
-          or(where("isPrivate", "==", false), where("uploaderId", "==", user.uid)),
-          orderBy("createdAt", "desc"), 
-          limit(5)
-        );
-  
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          const newItems = snapshot.docs.map(doc => {
-            const data = doc.data();
-            const createdAt = (data.createdAt as Timestamp)?.toDate().getTime() || Date.now();
-            return {
-              id: `${type}-${doc.id}`,
-              type: type,
-              title: data.name || 'Untitled',
-              timestamp: createdAt,
-              isPrivate: data.isPrivate,
-              ...(type === 'recording' && { thumbnailUrl: data.thumbnailUrl }),
-            } as ActivityItem;
-          });
-  
-          firestoreActivities = [...firestoreActivities.filter(item => item.type !== type), ...newItems];
-          
-          const combined = [...ongoingMeetings, ...firestoreActivities]
-            .filter(item => !dismissedItemIds.includes(item.id))
-            .sort((a, b) => b.timestamp - a.timestamp);
-            
-          setAllActivity(combined);
-          setIsLoading(false);
-        }, (error) => {
-          console.error(`Error fetching ${pluralType}:`, error);
-          setIsLoading(false);
-        });
-        combinedUnsubscribers.push(unsubscribe);
-      });
-  
-      if (collectionsToQuery.length === 0) {
-        setIsLoading(false);
-      }
+      const recordingActivities: RecordingActivityItem[] = recordings.map(rec => ({
+        id: `recording-${rec.id}`,
+        type: 'recording',
+        title: rec.name || 'Untitled Recording',
+        timestamp: (rec.createdAt as any)?.toDate().getTime() || new Date(rec.date).getTime(),
+        isPrivate: rec.isPrivate,
+        thumbnailUrl: rec.thumbnailUrl,
+      }));
+
+      const combined = [...ongoingMeetings, ...documentActivities, ...recordingActivities]
+        .filter(item => !dismissedItemIds.includes(item.id))
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10); // Limit to 10 most recent items
+
+      setAllActivity(combined);
+      setIsLoading(false);
     };
   
-    loadActivities();
+    // Load activities whenever the auth state or the data from the auth hook changes.
+    if (!authLoading) {
+      loadActivities();
+    }
   
     const handleMeetingStarted = () => loadActivities();
     window.addEventListener('teachmeet_meeting_started', handleMeetingStarted);
   
     return () => {
       window.removeEventListener('teachmeet_meeting_started', handleMeetingStarted);
-      combinedUnsubscribers.forEach(unsub => unsub());
     };
-  }, [user]);
+  }, [user, documents, recordings, authLoading]);
 
 
   const tmVisibleDuration = 350;
@@ -257,7 +228,7 @@ export default function HomePage() {
               <History className="mr-3 h-6 w-6" />
               Latest Activity
             </h2>
-            {isLoading ? (
+            {isLoading || authLoading ? (
                 <div className="flex justify-center items-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-primary"/>
                   <p className="ml-2 text-muted-foreground">Loading activities...</p>

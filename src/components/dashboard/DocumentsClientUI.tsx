@@ -16,18 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
-
-export interface Document {
-  id: string;
-  name: string;
-  lastModified: string;
-  size: string;
-  uploaderId: string;
-  isPrivate: boolean;
-  downloadURL: string;
-  storagePath: string;
-  createdAt?: any;
-}
+import type { Document } from "@/hooks/useAuth";
 
 const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete: (id: string, name: string, storagePath: string) => void; currentUserId: string | null }) => {
   const isOwner = currentUserId === doc.uploaderId;
@@ -65,7 +54,7 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
   const { toast } = useToast();
   
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -73,32 +62,10 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Real-time updates
   useEffect(() => {
-    if (!currentUserId) {
-        setDocuments(initialDocuments);
-        return;
-    }
-
-    const docsRef = collection(db, "documents");
-    const q = query(docsRef, 
-      or(
-        where("isPrivate", "==", false),
-        where("uploaderId", "==", currentUserId)
-      ),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
-      setDocuments(docs);
-    }, (error) => {
-        console.error("Error with real-time document updates:", error);
-        toast({ variant: "destructive", title: "Update Error", description: "Could not get real-time document updates." });
-    });
-
-    return () => unsubscribe();
-  }, [currentUserId, toast, initialDocuments]);
+    setDocuments(initialDocuments);
+    setIsLoading(false);
+  }, [initialDocuments]);
 
 
   const handleUploadClick = () => {

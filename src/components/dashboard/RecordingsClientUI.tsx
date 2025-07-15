@@ -15,20 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
-
-export interface Recording {
-  id: string;
-  name: string;
-  date: string;
-  duration: string;
-  size: string;
-  thumbnailUrl?: string;
-  downloadURL: string;
-  storagePath: string;
-  uploaderId: string;
-  isPrivate: boolean;
-  createdAt?: any;
-}
+import type { Recording } from "@/hooks/useAuth";
 
 const RecordingCard = ({ rec, onDelete, currentUserId }: { rec: Recording; onDelete: (id: string, name: string, storagePath: string) => void; currentUserId: string | null }) => {
   const { toast } = useToast();
@@ -82,7 +69,7 @@ export function RecordingsClientUI({ initialRecordings, currentUserId }: { initi
   const { toast } = useToast();
   
   const [recordings, setRecordings] = useState<Recording[]>(initialRecordings);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -90,32 +77,10 @@ export function RecordingsClientUI({ initialRecordings, currentUserId }: { initi
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Real-time updates
   useEffect(() => {
-    if (!currentUserId) {
-      setRecordings(initialRecordings);
-      return;
-    }
-
-    const recordingsRef = collection(db, "recordings");
-    const q = query(recordingsRef, 
-      or(
-        where("isPrivate", "==", false),
-        where("uploaderId", "==", currentUserId)
-      ),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
-      setRecordings(docs);
-    }, (error) => {
-        console.error("Error with real-time recording updates:", error);
-        toast({ variant: "destructive", title: "Update Error", description: "Could not get real-time recording updates." });
-    });
-
-    return () => unsubscribe();
-  }, [currentUserId, toast, initialRecordings]);
+    setRecordings(initialRecordings);
+    setIsLoading(false);
+  }, [initialRecordings]);
   
   const handleUploadClick = () => {
     if (!currentUserId) {
