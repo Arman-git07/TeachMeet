@@ -148,7 +148,7 @@ function CreateTeachingDialogContent({ setOpen, teachingToEdit }: { setOpen: (op
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="title" className="text-right">Title</Label>
+                    <Label htmlFor="title" className="text-right">Teaching name</Label>
                     <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3 rounded-lg" placeholder="e.g., Introduction to Algebra" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
