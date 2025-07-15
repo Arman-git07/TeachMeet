@@ -79,7 +79,7 @@ function ManageRequestsDialog({ teaching, setOpen }: { teaching: Teaching, setOp
     )
 }
 
-function CreateTeachingDialogContent({ setOpen, teachingToEdit }: { setOpen: (open: boolean) => void, teachingToEdit?: Teaching | null }) {
+function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenChange: (open: boolean) => void, teachingToEdit?: Teaching | null }) {
     const { user } = useAuth();
     const { toast } = useToast();
     const [title, setTitle] = useState('');
@@ -122,14 +122,14 @@ function CreateTeachingDialogContent({ setOpen, teachingToEdit }: { setOpen: (op
                     description: description.trim(),
                     isPublic,
                     creatorId: user.uid,
-                    creatorName: user.displayName || user.email || 'Anonymous',
+                    creatorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
                     createdAt: serverTimestamp(),
                     members: [user.uid],
                     pendingRequests: [],
                 });
                 toast({ title: "Teaching Created!", description: "Your new teaching is now available." });
             }
-            setOpen(false);
+            onOpenChange(false);
         } catch (error) {
             console.error("Error saving teaching:", error);
             toast({ variant: "destructive", title: "Save Failed", description: "Could not save the teaching." });
@@ -356,7 +356,7 @@ export default function TeachingsPage() {
                                 <PlusCircle className="mr-2 h-5 w-5" /> Create New Teaching
                             </Button>
                         </DialogTrigger>
-                        <CreateTeachingDialogContent setOpen={setIsCreateDialogOpen} teachingToEdit={teachingToEdit} />
+                        <CreateTeachingDialogContent onOpenChange={setIsCreateDialogOpen} teachingToEdit={teachingToEdit} />
                     </Dialog>
                 </div>
 
