@@ -147,11 +147,11 @@ export default function TeachingsPage() {
     }, [isCreateDialogOpen]);
 
     return (
-        <div className="space-y-4">
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <div className="space-y-4">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">My Teachings</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Teachings</h1>
                         <p className="text-muted-foreground">Manage your teaching sessions and classes.</p>
                     </div>
                     <DialogTrigger asChild>
@@ -180,7 +180,7 @@ export default function TeachingsPage() {
                 )}
                 
                 <CreateTeachingDialogContent setOpen={setIsCreateDialogOpen} teachingToEdit={teachingToEdit} />
-            </Dialog>
-        </div>
+            </div>
+        </Dialog>
     );
 }
