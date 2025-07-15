@@ -27,7 +27,7 @@ export default function DashboardLayout({
 
   const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
 
-  if (loading || !isAuthenticated) {
+  if (loading) {
     return (
       <div className="flex h-screen bg-background">
         <div className="flex flex-1 flex-col">
@@ -43,6 +43,11 @@ export default function DashboardLayout({
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    // Return null or a minimal loader while redirecting to avoid showing content to unauthenticated users.
+    return null;
   }
 
   return (

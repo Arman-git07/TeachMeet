@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let unsubscribers: Unsubscribe[] = [];
 
     const authUnsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      // Clear previous listeners
+      // Clear previous listeners to prevent duplicates on auth state change
       unsubscribers.forEach(unsub => unsub());
       unsubscribers = [];
       
