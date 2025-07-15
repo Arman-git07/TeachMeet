@@ -1,66 +1,66 @@
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
+
+    // Allow public read access to user profiles
+    match /users/{userId} {
+      allow read;
+      allow write: if request.auth.uid == userId;
     }
     
-    // Helper function to check if a user is the owner of a resource
-    function isOwner(resource) {
-      return request.auth.uid == resource.data.uploaderId || request.auth.uid == resource.data.creatorId;
+    // Allow read/write access to fcmTokens for authenticated users
+    match /fcmTokens/{userId} {
+      allow read, write: if request.auth.uid == userId;
     }
 
-    // Rules for Meetings
+    // Rules for meetings
     match /meetings/{meetingId} {
-      // Anyone authenticated can create a new meeting document
-      allow create: if isAuthenticated();
-      // Only participants of the meeting can read or update it
-      allow read, update: if isAuthenticated() && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
-      // Only the creator of the meeting can delete it (future-proofing)
-      allow delete: if isAuthenticated() && isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)));
+      // Anyone authenticated can create a meeting document
+      allow create: if request.auth != null;
+      // Anyone authenticated can read the meeting details (like creatorId)
+      allow read: if request.auth != null;
+      // Only the creator can update or delete the meeting document
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
 
-      // Rules for Participants subcollection
       match /participants/{participantId} {
-        // Any authenticated user can join a meeting (create their participant doc)
-        // A user can only create their own participant document
-        allow create: if isAuthenticated() && request.auth.uid == participantId;
-        // Any authenticated user in the meeting can see other participants
-        allow read: if isAuthenticated() && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
-        // A user can only update or delete their own participant document
-        allow update, delete: if isAuthenticated() && request.auth.uid == participantId;
+        // A user can only add/remove/update themselves from the participants list
+        allow read, write, delete: if request.auth != null && request.auth.uid == participantId;
       }
     }
+    
+    // Rules for documents and recordings
+    match /{collection}/{docId} where collection in ['documents', 'recordings'] {
+      // Allow create for any authenticated user
+      allow create: if request.auth != null;
+      // Allow read if the document/recording is public OR if the user is the uploader
+      allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
+      // Allow update/delete only if the user is the uploader
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+    }
 
-    // Rules for Documents
-    match /documents/{documentId} {
-      allow create: if isAuthenticated();
-      // Allow read if the document is public, or if the user is the owner of a private doc
-      allow read: if resource.data.isPrivate == false || isOwner(resource);
-      // Allow update/delete only if the user is the owner
-      allow update, delete: if isOwner(resource);
-    }
-    
-    // Rules for Recordings
-    match /recordings/{recordingId} {
-      allow create: if isAuthenticated();
-      allow read: if resource.data.isPrivate == false || isOwner(resource);
-      allow update, delete: if isOwner(resource);
-    }
-    
     // Rules for Teachings
     match /teachings/{teachingId} {
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.creatorId;
-      // Only the creator can read, update, or delete their own teachings
-      allow read, update, delete: if isAuthenticated() && isOwner(resource);
-    }
-    
-    // Rules for FCM tokens
-    match /fcmTokens/{userId} {
-        // A user can only create, read, or update their own FCM token document
-        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Allow any authenticated user to create a teaching
+      allow create: if request.auth != null;
+
+      // Allow read if the teaching is public OR if the user is a member
+      allow read: if resource.data.isPublic == true || (request.auth != null && request.auth.uid in resource.data.members);
+
+      // Allow updates (like joining, leaving, managing) under specific conditions
+      allow update: if request.auth != null && (
+        // Case 1: The user is the creator. They can change anything.
+        request.auth.uid == resource.data.creatorId ||
+        // Case 2: A user is requesting to join (adding their UID to pendingRequests)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+         request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid])) ||
+        // Case 3: A user is leaving the class (removing their UID from members)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
+         request.resource.data.members == resource.data.members.removed(request.auth.uid))
+      );
+
+      // Only the creator can delete the teaching
+      allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
     }
   }
 }

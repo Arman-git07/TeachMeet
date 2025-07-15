@@ -43,8 +43,13 @@ export interface Teaching {
   title: string;
   description: string;
   creatorId: string;
+  creatorName: string;
+  isPublic: boolean;
+  members: string[]; // List of user IDs
+  pendingRequests: string[]; // List of user IDs
   createdAt?: any;
 }
+
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -100,9 +105,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         unsubscribers.push(recordingsUnsubscribe);
 
-        // Teachings listener
+        // Teachings listener - listen for public teachings OR teachings where user is a member
         const teachingsRef = collection(db, "teachings");
-        const teachingsQuery = query(teachingsRef, where("creatorId", "==", currentUser.uid), orderBy("createdAt", "desc"));
+        const teachingsQuery = query(teachingsRef, or(
+            where("isPublic", "==", true),
+            where("members", "array-contains", currentUser.uid)
+        ));
         const teachingsUnsubscribe = onSnapshot(teachingsQuery,
           (snapshot) => setTeachings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching))),
           (error) => console.error("Error fetching teachings:", error)
