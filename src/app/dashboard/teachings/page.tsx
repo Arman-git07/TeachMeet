@@ -118,11 +118,11 @@ function CreateTeachingDialogContent({ setOpen, teachingToEdit }: { setOpen: (op
                 toast({ title: "Teaching Updated!", description: "Your teaching has been successfully updated." });
             } else {
                 await addDoc(collection(db, "teachings"), {
-                    title,
-                    description,
+                    title: title.trim(),
+                    description: description.trim(),
                     isPublic,
                     creatorId: user.uid,
-                    creatorName: user.displayName || user.email,
+                    creatorName: user.displayName || user.email || 'Anonymous',
                     createdAt: serverTimestamp(),
                     members: [user.uid],
                     pendingRequests: [],
@@ -164,6 +164,9 @@ function CreateTeachingDialogContent({ setOpen, teachingToEdit }: { setOpen: (op
                 </div>
             </div>
             <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="secondary" className="rounded-lg" disabled={isLoading}>Cancel</Button>
+                </DialogClose>
                 <Button onClick={handleSubmit} disabled={isLoading} className="btn-gel rounded-lg">
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     {isLoading ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Teaching')}
@@ -242,9 +245,10 @@ export default function TeachingsPage() {
     const { toast } = useToast();
 
     const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
-        const myTeachings = teachings.filter(t => t.creatorId === user?.uid);
-        const enrolledTeachings = teachings.filter(t => t.creatorId !== user?.uid && t.members?.includes(user?.uid || ''));
-        const publicTeachings = teachings.filter(t => t.isPublic && t.creatorId !== user?.uid && !t.members?.includes(user?.uid || ''));
+        if (!user) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
+        const myTeachings = teachings.filter(t => t.creatorId === user.uid);
+        const enrolledTeachings = teachings.filter(t => t.creatorId !== user.uid && t.members?.includes(user.uid));
+        const publicTeachings = teachings.filter(t => t.isPublic && t.creatorId !== user.uid && !t.members?.includes(user.uid));
         return { myTeachings, enrolledTeachings, publicTeachings };
     }, [teachings, user]);
 
@@ -293,7 +297,7 @@ export default function TeachingsPage() {
         if (!searchQuery) return publicTeachings;
         return publicTeachings.filter(t => 
             t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            t.description.toLowerCase().includes(searchQuery.toLowerCase())
+            (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
         );
     }, [publicTeachings, searchQuery]);
 
