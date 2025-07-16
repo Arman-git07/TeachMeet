@@ -115,8 +115,8 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
             if (isEditing && teachingToEdit) {
                 const teachingRef = doc(db, 'teachings', teachingToEdit.id);
                 await updateDoc(teachingRef, { 
-                    title, 
-                    description, 
+                    title: title.trim(), 
+                    description: description.trim(), 
                     isPublic,
                 });
                 toast({ title: "Teaching Updated!", description: "Your teaching has been successfully updated." });
@@ -256,8 +256,8 @@ export default function TeachingsPage() {
         const publicList: Teaching[] = [];
 
         teachings.forEach(t => {
-            const isMember = t.members?.includes(user.uid);
             const isCreator = t.creatorId === user.uid;
+            const isMember = t.members?.includes(user.uid);
 
             if (isCreator) {
                 my.push(t);
@@ -301,7 +301,7 @@ export default function TeachingsPage() {
             toast({ title: "Request Sent!", description: "Your request to join has been sent to the teacher."});
         } catch(error) {
             console.error("Error requesting to join:", error);
-            toast({variant: "destructive", title: "Request Failed", description: "Could not send your join request."});
+            toast({variant: "destructive", title: "Request Failed", description: "Could not send your join request. Check Firestore rules."});
         }
     };
 
@@ -391,7 +391,7 @@ export default function TeachingsPage() {
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <BookOpen className="mx-auto h-12 w-12 mb-4" />
                                 <h3 className="text-lg font-semibold text-foreground">You haven't created any classes yet.</h3>
-                                <p className="text-sm mt-1 mb-4">All teachings created by you should show here. Click "Create New Teaching" to get started.</p>
+                                <p className="text-sm mt-1 mb-4">Teachings you create will appear here. Click "Create New Teaching" to get started.</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -400,7 +400,7 @@ export default function TeachingsPage() {
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <School className="mx-auto h-12 w-12 mb-4" />
                                 <h3 className="text-lg font-semibold text-foreground">No Enrolled Classes</h3>
-                                <p className="text-sm mt-1 mb-4">All teachings who's request are accepted by teacher should show here</p>
+                                <p className="text-sm mt-1 mb-4">Classes you have joined will appear here.</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -419,7 +419,7 @@ export default function TeachingsPage() {
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <FilterX className="mx-auto h-12 w-12 mb-4" />
                                 <h3 className="text-lg font-semibold text-foreground">No Public Classes Available</h3>
-                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term." : "All public teachings should show here and visible to everyone"}</p>
+                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term." : "All public teachings available to join will appear here."}</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -432,3 +432,4 @@ export default function TeachingsPage() {
         </>
     );
 }
+
