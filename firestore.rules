@@ -1,68 +1,31 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Rules for the 'teachings' collection
+  
+    // Teachings Collection Rules
     match /teachings/{teachingId} {
+      // Anyone authenticated can read public teachings or teachings they are a member of.
+      allow read: if request.auth != null && (resource.data.isPublic == true || request.auth.uid in resource.data.members);
+
       // Anyone authenticated can create a teaching.
-      // The creatorId must match the user making the request.
-      allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+      allow create: if request.auth != null;
 
-      // Allow reading of public teachings or teachings the user is a member of.
-      allow read: if isAuthenticated() && (resource.data.isPublic == true || request.auth.uid in resource.data.members);
+      // Only the creator can delete their teaching.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
 
-      // Only the creator can delete the teaching.
-      allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
-
-      // Allow updates under specific conditions:
-      // 1. The user is the creator (can change title, description, isPublic).
-      // 2. The user is authenticated and is adding themselves to pendingRequests (joining a class).
-      allow update: if isAuthenticated() && (
-        (resource.data.creatorId == request.auth.uid) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) && request.auth.uid in request.resource.data.pendingRequests)
+      // Allow the creator to update all fields.
+      // Allow any authenticated user to add themselves to the pendingRequests list (request to join).
+      allow update: if request.auth != null && (
+        (request.auth.uid == resource.data.creatorId) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+         request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]))
       );
     }
 
-    // Rules for other collections can be added here.
-    // Example for user documents or recordings:
-    match /documents/{documentId} {
-      allow read: if isAuthenticated() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-      allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
+    // Default deny all other collections for now
+    match /{document=**} {
+      allow read, write: if false;
     }
-
-    match /recordings/{recordingId} {
-      allow read: if isAuthenticated() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-      allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
-    }
-
-    // Rules for meeting participants
-    match /meetings/{meetingId}/participants/{participantId} {
-        // Allow anyone authenticated to join a meeting (create their own participant document)
-        allow create, read, update, delete: if isAuthenticated() && request.auth.uid == participantId;
-    }
-
-     // Rules for the top-level meeting document
-    match /meetings/{meetingId} {
-        // Allow any authenticated user to create a meeting document (if it doesn't exist)
-        // or read it.
-        allow read, create: if isAuthenticated();
-        // Only the creator can update or delete the meeting document itself
-        allow update, delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
-    }
-
-    // Rules for fcmTokens
-    match /fcmTokens/{userId} {
-        allow read, write: if isAuthenticated() && request.auth.uid == userId;
-    }
-
   }
 }

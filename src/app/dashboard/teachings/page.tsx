@@ -117,7 +117,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
                 await updateDoc(teachingRef, { 
                     title, 
                     description, 
-                    isPublic, // Added missing isPublic field on update
+                    isPublic,
                 });
                 toast({ title: "Teaching Updated!", description: "Your teaching has been successfully updated." });
             } else {
@@ -248,25 +248,29 @@ export default function TeachingsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();
 
-    const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
-        if (!user || !teachings) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
+    const { myTeachings, enrolledTeachings, publicTeachingsToJoin } = useMemo(() => {
+        if (!user || !teachings) return { myTeachings: [], enrolledTeachings: [], publicTeachingsToJoin: [] };
         
         const my: Teaching[] = [];
         const enrolled: Teaching[] = [];
         const publicList: Teaching[] = [];
 
         teachings.forEach(t => {
-            if (t.creatorId === user.uid) {
+            const isMember = t.members?.includes(user.uid);
+            const isCreator = t.creatorId === user.uid;
+
+            if (isCreator) {
                 my.push(t);
-            } else if (t.members?.includes(user.uid)) {
+            } else if (isMember) {
                 enrolled.push(t);
             }
-            if (t.isPublic) {
+            
+            if (t.isPublic && !isMember) {
                 publicList.push(t);
             }
         });
 
-        return { myTeachings: my, enrolledTeachings: enrolled, publicTeachings: publicList };
+        return { myTeachings: my, enrolledTeachings: enrolled, publicTeachingsToJoin: publicList };
     }, [teachings, user]);
 
 
@@ -312,12 +316,12 @@ export default function TeachingsPage() {
     }, [isCreateDialogOpen]);
 
     const filteredPublicTeachings = useMemo(() => {
-        if (!searchQuery) return publicTeachings;
-        return publicTeachings.filter(t => 
+        if (!searchQuery) return publicTeachingsToJoin;
+        return publicTeachingsToJoin.filter(t => 
             t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
         );
-    }, [publicTeachings, searchQuery]);
+    }, [publicTeachingsToJoin, searchQuery]);
 
 
     const renderGrid = (teachingsList: Teaching[], userRole: 'creator' | 'member' | 'guest', emptyState: React.ReactNode) => {
@@ -334,23 +338,23 @@ export default function TeachingsPage() {
         return (
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {teachingsList.map(t => {
-                    let role: 'creator' | 'member' | 'guest' = 'guest';
+                    let roleForCard: 'creator' | 'member' | 'guest' = 'guest';
                     if (user && t.creatorId === user.uid) {
-                        role = 'creator';
+                        roleForCard = 'creator';
                     } else if (user && t.members?.includes(user.uid)) {
-                        role = 'member';
+                        roleForCard = 'member';
                     }
 
                     return (
                         <TeachingCard 
                             key={t.id} 
                             teaching={t} 
-                            userRole={role}
+                            userRole={roleForCard}
                             currentUserId={user?.uid || null}
-                            onEdit={role === 'creator' ? handleEdit : undefined}
-                            onDelete={role === 'creator' ? handleDelete : undefined}
-                            onRequestToJoin={role === 'guest' ? handleRequestToJoin : undefined}
-                            onManageRequests={role === 'creator' ? handleManageRequests : undefined}
+                            onEdit={roleForCard === 'creator' ? handleEdit : undefined}
+                            onDelete={roleForCard === 'creator' ? handleDelete : undefined}
+                            onRequestToJoin={roleForCard === 'guest' ? handleRequestToJoin : undefined}
+                            onManageRequests={roleForCard === 'creator' ? handleManageRequests : undefined}
                         />
                     );
                 })}
