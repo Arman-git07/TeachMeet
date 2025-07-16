@@ -248,32 +248,22 @@ export default function MeetingPage() {
 
   const isCurrentUserHost = currentUser?.uid === meetingCreatorId;
 
-  const handleApproveRequest = async (userId: string, userName: string) => {
+  const handleApproveRequest = useCallback(async (userId: string, userName: string) => {
     if (!isCurrentUserHost) return;
-    const participantDocRef = doc(db, "meetings", meetingId, "participants", userId);
     const meetingDocRef = doc(db, "meetings", meetingId);
     try {
-        await setDoc(participantDocRef, {
-            userId: userId,
-            name: userName, // A placeholder name, real one should be fetched or stored
-            photoURL: null, // Placeholder
-            isMicMuted: true,
-            isCameraOff: true,
-            isHandRaised: false,
-            isScreenSharing: false,
-            joinedAt: serverTimestamp(),
-        });
         await updateDoc(meetingDocRef, {
-            pendingRequests: arrayRemove(userId)
+            pendingRequests: arrayRemove(userId),
+            members: arrayUnion(userId)
         });
         toast({ title: "Request Approved", description: `${userName} has joined the meeting.` });
     } catch (error) {
         console.error("Failed to approve request:", error);
         toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant.' });
     }
-  };
+  }, [isCurrentUserHost, meetingId, toast]);
   
-  const handleDenyRequest = async (userId: string, userName: string) => {
+  const handleDenyRequest = useCallback(async (userId: string, userName: string) => {
     if (!isCurrentUserHost) return;
     const meetingDocRef = doc(db, "meetings", meetingId);
     try {
@@ -285,7 +275,7 @@ export default function MeetingPage() {
         console.error("Failed to deny request:", error);
         toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not deny the request.' });
     }
-  };
+  }, [isCurrentUserHost, meetingId, toast]);
 
   useEffect(() => {
     if (!isCurrentUserHost || !meetingId) return;
@@ -294,27 +284,29 @@ export default function MeetingPage() {
     const unsubscribe = onSnapshot(meetingDocRef, (docSnap) => {
         const data = docSnap.data();
         if (data && data.pendingRequests && data.pendingRequests.length > 0) {
-            const latestRequestorId = data.pendingRequests[data.pendingRequests.length - 1];
-            // Here, we'd ideally fetch the user's name from a 'users' collection.
-            // For now, we'll use a placeholder name.
-            const placeholderName = `User...${latestRequestorId.slice(-4)}`;
-            
-            const toastId = `join-request-${latestRequestorId}`;
-            toast({
-                id: toastId,
-                title: 'Join Request',
-                description: `${placeholderName} wants to join the meeting.`,
-                duration: Infinity,
-                action: (
-                  <div className="flex gap-2 mt-2">
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(latestRequestorId, placeholderName); dismiss(toastId); }}>
-                      <Check className="h-4 w-4 mr-1" /> Approve
-                    </Button>
-                    <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(latestRequestorId, placeholderName); dismiss(toastId); }}>
-                       <X className="h-4 w-4 mr-1" /> Deny
-                    </Button>
-                  </div>
-                ),
+            data.pendingRequests.forEach(async (requestorId: string) => {
+                const toastId = `join-request-${requestorId}`;
+
+                // Ideally, fetch user's name from a 'users' collection.
+                // For now, we use a placeholder. This part can be improved.
+                const placeholderName = `User...${requestorId.slice(-4)}`;
+
+                toast({
+                    id: toastId,
+                    title: 'Join Request',
+                    description: `${placeholderName} wants to join the meeting.`,
+                    duration: Infinity,
+                    action: (
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(requestorId, placeholderName); dismiss(toastId); }}>
+                          <Check className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(requestorId, placeholderName); dismiss(toastId); }}>
+                           <X className="h-4 w-4 mr-1" /> Deny
+                        </Button>
+                      </div>
+                    ),
+                });
             });
         }
     });
@@ -513,23 +505,26 @@ export default function MeetingPage() {
       setLocalMicMuted(initialMicMuted);
 
       const meetingDocRef = doc(db, "meetings", meetingId);
-      const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
-
+      
       try {
         const meetingDocSnap = await getDoc(meetingDocRef);
         if (!meetingDocSnap.exists()) {
-          const meetingTopicFromURL = searchParamsHook.get('topic') || `Meeting ${meetingId}`;
-          await setDoc(meetingDocRef, {
-            creatorId: currentUser.uid, 
-            topic: meetingTopicFromURL,
-            createdAt: serverTimestamp(),
-            pendingRequests: [],
-          });
-          setMeetingCreatorId(currentUser.uid); // Set creator ID immediately
-        } else {
-          setMeetingCreatorId(meetingDocSnap.data()?.creatorId || null);
+          // This case should be rare now that the meeting doc is created before navigating here
+          console.error("[MeetingPage] Meeting document does not exist. This shouldn't happen.");
+          setJoinStatus('failed');
+          return;
+        }
+
+        setMeetingCreatorId(meetingDocSnap.data()?.creatorId || null);
+        
+        const isUserMember = meetingDocSnap.data()?.members?.includes(currentUser.uid);
+        if (!isUserMember) {
+            await updateDoc(meetingDocRef, {
+                members: arrayUnion(currentUser.uid)
+            });
         }
         
+        const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
         const participantData = {
           userId: currentUser.uid,
           name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
@@ -545,10 +540,10 @@ export default function MeetingPage() {
         setJoinStatus('joined');
 
       } catch (error) {
-        console.error("[MeetingPage] CRITICAL: Failed to ensure meeting document or add participant:", error);
+        console.error("[MeetingPage] CRITICAL: Failed to join meeting room:", error);
         toast({
           variant: "destructive",
-          title: "Failed to Register in Meeting Room",
+          title: "Failed to Join Meeting Room",
           description: `Could not register your presence: ${(error as Error).message}. Check console & Firestore rules.`,
           duration: 10000,
         });
