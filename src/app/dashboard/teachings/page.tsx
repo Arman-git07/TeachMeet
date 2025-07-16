@@ -124,7 +124,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
                 await addDoc(collection(db, "teachings"), {
                     title: title.trim(),
                     description: description.trim(),
-                    isPublic,
+                    isPublic: isPublic ?? true,
                     creatorId: user.uid,
                     creatorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
                     createdAt: serverTimestamp(),
@@ -432,4 +432,3 @@ export default function TeachingsPage() {
         </>
     );
 }
-
