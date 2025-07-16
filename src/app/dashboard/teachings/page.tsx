@@ -114,7 +114,11 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
         try {
             if (isEditing && teachingToEdit) {
                 const teachingRef = doc(db, 'teachings', teachingToEdit.id);
-                await updateDoc(teachingRef, { title, description, isPublic });
+                await updateDoc(teachingRef, { 
+                    title, 
+                    description, 
+                    isPublic, // Added missing isPublic field on update
+                });
                 toast({ title: "Teaching Updated!", description: "Your teaching has been successfully updated." });
             } else {
                 await addDoc(collection(db, "teachings"), {
@@ -132,7 +136,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving teaching:", error);
-            toast({ variant: "destructive", title: "Save Failed", description: "Could not save the teaching." });
+            toast({ variant: "destructive", title: "Save Failed", description: "Could not save the teaching. Check Firestore rules and network connection." });
         } finally {
             setIsLoading(false);
         }
@@ -245,24 +249,24 @@ export default function TeachingsPage() {
     const { toast } = useToast();
 
     const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
-        if (!user) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
+        if (!user || !teachings) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
         
-        const myTeachings: Teaching[] = [];
-        const enrolledTeachings: Teaching[] = [];
-        const publicTeachings: Teaching[] = [];
+        const my: Teaching[] = [];
+        const enrolled: Teaching[] = [];
+        const publicList: Teaching[] = [];
 
         teachings.forEach(t => {
-            if (t.isPublic) {
-                publicTeachings.push(t);
-            }
             if (t.creatorId === user.uid) {
-                myTeachings.push(t);
+                my.push(t);
             } else if (t.members?.includes(user.uid)) {
-                enrolledTeachings.push(t);
+                enrolled.push(t);
+            }
+            if (t.isPublic) {
+                publicList.push(t);
             }
         });
 
-        return { myTeachings, enrolledTeachings, publicTeachings };
+        return { myTeachings: my, enrolledTeachings: enrolled, publicTeachings: publicList };
     }, [teachings, user]);
 
 
@@ -308,19 +312,12 @@ export default function TeachingsPage() {
     }, [isCreateDialogOpen]);
 
     const filteredPublicTeachings = useMemo(() => {
-        const discoverable = publicTeachings.filter(t => {
-            const isMember = t.members?.includes(user?.uid || '');
-            const isCreator = t.creatorId === user?.uid;
-            return !isMember && !isCreator;
-        });
-
-        if (!searchQuery) return discoverable;
-
-        return discoverable.filter(t => 
+        if (!searchQuery) return publicTeachings;
+        return publicTeachings.filter(t => 
             t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
         );
-    }, [publicTeachings, searchQuery, user]);
+    }, [publicTeachings, searchQuery]);
 
 
     const renderGrid = (teachingsList: Teaching[], userRole: 'creator' | 'member' | 'guest', emptyState: React.ReactNode) => {
@@ -336,18 +333,27 @@ export default function TeachingsPage() {
         if (teachingsList.length === 0) return emptyState;
         return (
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {teachingsList.map(t => (
-                    <TeachingCard 
-                        key={t.id} 
-                        teaching={t} 
-                        userRole={t.creatorId === user?.uid ? 'creator' : userRole}
-                        currentUserId={user?.uid || null}
-                        onEdit={t.creatorId === user?.uid ? handleEdit : undefined}
-                        onDelete={t.creatorId === user?.uid ? handleDelete : undefined}
-                        onRequestToJoin={userRole === 'guest' ? handleRequestToJoin : undefined}
-                        onManageRequests={t.creatorId === user?.uid ? handleManageRequests : undefined}
-                    />
-                ))}
+                {teachingsList.map(t => {
+                    let role: 'creator' | 'member' | 'guest' = 'guest';
+                    if (user && t.creatorId === user.uid) {
+                        role = 'creator';
+                    } else if (user && t.members?.includes(user.uid)) {
+                        role = 'member';
+                    }
+
+                    return (
+                        <TeachingCard 
+                            key={t.id} 
+                            teaching={t} 
+                            userRole={role}
+                            currentUserId={user?.uid || null}
+                            onEdit={role === 'creator' ? handleEdit : undefined}
+                            onDelete={role === 'creator' ? handleDelete : undefined}
+                            onRequestToJoin={role === 'guest' ? handleRequestToJoin : undefined}
+                            onManageRequests={role === 'creator' ? handleManageRequests : undefined}
+                        />
+                    );
+                })}
             </div>
         )
     }
