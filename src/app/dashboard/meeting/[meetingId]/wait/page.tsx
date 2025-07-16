@@ -4,18 +4,23 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, ShieldAlert, Loader2 } from "lucide-react";
 import Link from "next/link";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth"; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, useParams } from "next/navigation";
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData } from 'firebase/firestore';
+
+
+type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
 
 export default function WaitingAreaPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -34,12 +39,35 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false);
   const [mirrorVideo, setMirrorVideo] = useState<boolean>(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  
+  const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
 
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoStreamRef = useRef<MediaStream | null>(null);
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!user || !meetingId) return;
+
+    // Listen for changes in the meeting participants list
+    const participantsColRef = collection(db, "meetings", meetingId, "participants");
+    const unsubscribe = onSnapshot(participantsColRef, (snapshot) => {
+        const isUserInMeeting = snapshot.docs.some(doc => doc.id === user.uid);
+        if (isUserInMeeting && joinStatus === 'pending') {
+            setJoinStatus('approved');
+            toast({ title: "Request Approved!", description: "You are now joining the meeting." });
+            const joinNowLinkPath = topic 
+              ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+              : `/dashboard/meeting/${meetingId}`;
+            router.push(joinNowLinkPath);
+        }
+    });
+
+    return () => unsubscribe();
+  }, [user, meetingId, joinStatus, router, topic, toast]);
+
 
   useEffect(() => {
     const storedFilter = localStorage.getItem("teachmeet-camera-filter");
@@ -147,17 +175,35 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   
-  const handleJoinNow = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
-      localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
+  const handleAskToJoin = async () => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
+        return;
     }
-    const joinNowLinkPath = topic 
-      ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-      : `/dashboard/meeting/${meetingId}`;
-    router.push(joinNowLinkPath);
+    setJoinStatus('pending');
+    toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
+    
+    try {
+        const meetingRef = doc(db, 'meetings', meetingId);
+        await updateDoc(meetingRef, {
+            pendingRequests: arrayUnion(user.uid)
+        });
+    } catch (error) {
+        console.error("Error sending join request:", error);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Please check the meeting ID and your connection.'});
+        setJoinStatus('idle');
+    }
   };
 
+  const getButtonState = () => {
+    const disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
+    let text = "Ask to Join";
+    if (joinStatus === 'pending') text = "Waiting for Host...";
+    if (joinStatus === 'approved') text = "Joining...";
+    if (joinStatus === 'denied') text = "Request Denied. Try Again?";
+    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved' };
+  };
+  const { text: buttonText, disabled: buttonDisabled, showSpinner } = getButtonState();
 
   const videoClassNames = cn(
     "w-full h-full object-cover",
@@ -293,8 +339,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             </Label>
           </div>
 
-          <Button onClick={handleJoinNow} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={!agreedToTerms}>
-            Join Now
+          <Button onClick={handleAskToJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={buttonDisabled}>
+            {showSpinner && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+            {buttonText}
           </Button>
           {!agreedToTerms && (
             <p className="text-xs text-destructive text-center">

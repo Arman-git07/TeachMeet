@@ -53,12 +53,15 @@ import {
   PanelLeftClose,
   PanelRightClose,
   ShieldCheck,
+  Bell,
+  Check,
+  X,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, storage } from '@/lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc, addDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc, addDoc, arrayRemove } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
@@ -209,7 +212,7 @@ export default function MeetingPage() {
 
   const searchParamsHook = useSearchParams();
   const topic = searchParamsHook.get('topic');
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const router = useRouter();
   const currentUser = auth.currentUser;
   const { setHeaderContent } = useDynamicHeader();
@@ -244,6 +247,81 @@ export default function MeetingPage() {
   const mainGridParticipants = (host ? [host] : []).concat(otherParticipants).slice(0, 4);
 
   const isCurrentUserHost = currentUser?.uid === meetingCreatorId;
+
+  const handleApproveRequest = async (userId: string, userName: string) => {
+    if (!isCurrentUserHost) return;
+    const participantDocRef = doc(db, "meetings", meetingId, "participants", userId);
+    const meetingDocRef = doc(db, "meetings", meetingId);
+    try {
+        await setDoc(participantDocRef, {
+            userId: userId,
+            name: userName, // A placeholder name, real one should be fetched or stored
+            photoURL: null, // Placeholder
+            isMicMuted: true,
+            isCameraOff: true,
+            isHandRaised: false,
+            isScreenSharing: false,
+            joinedAt: serverTimestamp(),
+        });
+        await updateDoc(meetingDocRef, {
+            pendingRequests: arrayRemove(userId)
+        });
+        toast({ title: "Request Approved", description: `${userName} has joined the meeting.` });
+    } catch (error) {
+        console.error("Failed to approve request:", error);
+        toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant.' });
+    }
+  };
+  
+  const handleDenyRequest = async (userId: string, userName: string) => {
+    if (!isCurrentUserHost) return;
+    const meetingDocRef = doc(db, "meetings", meetingId);
+    try {
+        await updateDoc(meetingDocRef, {
+            pendingRequests: arrayRemove(userId)
+        });
+        toast({ title: "Request Denied", description: `${userName}'s request to join has been denied.` });
+    } catch (error) {
+        console.error("Failed to deny request:", error);
+        toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not deny the request.' });
+    }
+  };
+
+  useEffect(() => {
+    if (!isCurrentUserHost || !meetingId) return;
+
+    const meetingDocRef = doc(db, "meetings", meetingId);
+    const unsubscribe = onSnapshot(meetingDocRef, (docSnap) => {
+        const data = docSnap.data();
+        if (data && data.pendingRequests && data.pendingRequests.length > 0) {
+            const latestRequestorId = data.pendingRequests[data.pendingRequests.length - 1];
+            // Here, we'd ideally fetch the user's name from a 'users' collection.
+            // For now, we'll use a placeholder name.
+            const placeholderName = `User...${latestRequestorId.slice(-4)}`;
+            
+            const toastId = `join-request-${latestRequestorId}`;
+            toast({
+                id: toastId,
+                title: 'Join Request',
+                description: `${placeholderName} wants to join the meeting.`,
+                duration: Infinity,
+                action: (
+                  <div className="flex gap-2 mt-2">
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(latestRequestorId, placeholderName); dismiss(toastId); }}>
+                      <Check className="h-4 w-4 mr-1" /> Approve
+                    </Button>
+                    <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(latestRequestorId, placeholderName); dismiss(toastId); }}>
+                       <X className="h-4 w-4 mr-1" /> Deny
+                    </Button>
+                  </div>
+                ),
+            });
+        }
+    });
+
+    return () => unsubscribe();
+  }, [isCurrentUserHost, meetingId, toast, dismiss]);
+
 
   const handleReportIssue = () => {
     toast({
@@ -445,6 +523,7 @@ export default function MeetingPage() {
             creatorId: currentUser.uid, 
             topic: meetingTopicFromURL,
             createdAt: serverTimestamp(),
+            pendingRequests: [],
           });
           setMeetingCreatorId(currentUser.uid); // Set creator ID immediately
         } else {
