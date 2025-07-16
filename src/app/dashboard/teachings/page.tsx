@@ -247,17 +247,22 @@ export default function TeachingsPage() {
     const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
         if (!user) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
         
-        const myTeachings = teachings.filter(t => t.creatorId === user.uid);
-        
-        const enrolledTeachings = teachings.filter(t => 
-            t.creatorId !== user.uid && 
-            t.members?.includes(user.uid)
-        );
-        
-        const publicTeachings = teachings.filter(t => 
-            t.isPublic && 
-            !t.members?.includes(user.uid)
-        );
+        const myTeachings: Teaching[] = [];
+        const enrolledTeachings: Teaching[] = [];
+        const publicTeachings: Teaching[] = [];
+
+        teachings.forEach(t => {
+            const isCreator = t.creatorId === user.uid;
+            const isMember = t.members?.includes(user.uid);
+
+            if (isCreator) {
+                myTeachings.push(t);
+            } else if (isMember) {
+                enrolledTeachings.push(t);
+            } else if (t.isPublic) {
+                publicTeachings.push(t);
+            }
+        });
 
         return { myTeachings, enrolledTeachings, publicTeachings };
     }, [teachings, user]);
