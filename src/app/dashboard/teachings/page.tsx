@@ -97,7 +97,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
         } else {
             setTitle('');
             setDescription('');
-            setIsPublic(true);
+            setIsPublic(true); // Default to public for new teachings
         }
     }, [teachingToEdit, isEditing]);
 
@@ -124,7 +124,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
                 await addDoc(collection(db, "teachings"), {
                     title: title.trim(),
                     description: description.trim(),
-                    isPublic: isPublic ?? true,
+                    isPublic: isPublic,
                     creatorId: user.uid,
                     creatorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
                     createdAt: serverTimestamp(),
