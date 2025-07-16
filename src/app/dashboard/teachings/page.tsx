@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from "react";
@@ -97,7 +96,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
         } else {
             setTitle('');
             setDescription('');
-            setIsPublic(true); // Default to public for new teachings
+            setIsPublic(true);
         }
     }, [teachingToEdit, isEditing]);
 
@@ -129,7 +128,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
                     creatorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
                     createdAt: serverTimestamp(),
                     members: [user.uid],
-                    pendingRequests: [],
+                    pendingRequests: [], // Explicitly initialize as empty array
                 });
                 toast({ title: "Teaching Created!", description: "Your new teaching is now available." });
             }

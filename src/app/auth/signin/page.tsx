@@ -65,17 +65,23 @@ export default function SignInPage() {
           errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
           break;
         case 'auth/network-request-failed':
-          errorMessage = "Network error. Please check your connection.";
+          errorMessage = "Network error. Could not connect to authentication services. Please check your internet connection and ensure Firebase API keys are correctly configured in your .env file.";
           break;
         case String(error.code.match(/auth\/requests-to-this-api-.*/)):
-            errorMessage = "Authentication is temporarily unavailable. Please try again later.";
+            errorMessage = "Authentication is temporarily unavailable. This may be due to an incorrect or restricted API key. Please check your Firebase project configuration.";
             break;
+        default:
+           if (error.message.includes("API key")) {
+              errorMessage = "There is an issue with the API key configuration. Please ensure it is correct and valid in your .env file.";
+           }
+           break;
       }
       
       toast({
         variant: "destructive",
         title: "Sign In Failed",
         description: errorMessage,
+        duration: 7000
       });
     } finally {
       setIsLoading(false);
