@@ -252,20 +252,13 @@ export default function TeachingsPage() {
         const publicTeachings: Teaching[] = [];
 
         teachings.forEach(t => {
-            // A user can be the creator of a teaching.
-            if (t.creatorId === user.uid) {
-                myTeachings.push(t);
-            }
-            // A user can be an enrolled member of a teaching (and not the creator).
-            else if (t.members?.includes(user.uid)) {
-                enrolledTeachings.push(t);
-            }
-
-            // Public teachings are a separate category. A teaching can be public
-            // regardless of whether the current user is the creator or a member.
-            // A user who is not a member or creator can see it here to request to join.
             if (t.isPublic) {
                 publicTeachings.push(t);
+            }
+            if (t.creatorId === user.uid) {
+                myTeachings.push(t);
+            } else if (t.members?.includes(user.uid)) {
+                enrolledTeachings.push(t);
             }
         });
 
@@ -315,8 +308,14 @@ export default function TeachingsPage() {
     }, [isCreateDialogOpen]);
 
     const filteredPublicTeachings = useMemo(() => {
-        const discoverable = publicTeachings.filter(t => t.creatorId !== user?.uid && !t.members.includes(user?.uid || ''));
+        const discoverable = publicTeachings.filter(t => {
+            const isMember = t.members?.includes(user?.uid || '');
+            const isCreator = t.creatorId === user?.uid;
+            return !isMember && !isCreator;
+        });
+
         if (!searchQuery) return discoverable;
+
         return discoverable.filter(t => 
             t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -391,7 +390,7 @@ export default function TeachingsPage() {
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <School className="mx-auto h-12 w-12 mb-4" />
                                 <h3 className="text-lg font-semibold text-foreground">No Enrolled Classes</h3>
-                                <p className="text-sm mt-1 mb-4">All teachings where your request is accepted by the teacher will show here.</p>
+                                <p className="text-sm mt-1 mb-4">All teachings who's request are accepted by teacher should show here</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -410,7 +409,7 @@ export default function TeachingsPage() {
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <FilterX className="mx-auto h-12 w-12 mb-4" />
                                 <h3 className="text-lg font-semibold text-foreground">No Public Classes Available</h3>
-                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term." : "All public teachings are visible to everyone and will be shown here."}</p>
+                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term." : "All public teachings should show here and visible to everyone"}</p>
                            </div>
                        ))}
                     </TabsContent>
