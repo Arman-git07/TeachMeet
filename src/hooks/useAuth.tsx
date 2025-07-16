@@ -105,10 +105,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         unsubscribers.push(recordingsUnsubscribe);
 
-        // Teachings listener - listen for public teachings OR teachings where user is a member
+        // Teachings listener - listen for public teachings, teachings created by user, OR teachings where user is a member
         const teachingsRef = collection(db, "teachings");
         const teachingsQuery = query(teachingsRef, or(
             where("isPublic", "==", true),
+            where("creatorId", "==", currentUser.uid),
             where("members", "array-contains", currentUser.uid)
         ));
         const teachingsUnsubscribe = onSnapshot(teachingsQuery,
