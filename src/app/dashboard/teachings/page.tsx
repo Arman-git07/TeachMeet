@@ -376,7 +376,7 @@ export default function TeachingsPage() {
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <BookOpen className="mx-auto h-12 w-12 mb-4" />
                                 <h3 className="text-lg font-semibold text-foreground">You haven't created any classes yet.</h3>
-                                <p className="text-sm mt-1 mb-4">All teachings created by you will show here. Click "Create New Teaching" to get started.</p>
+                                <p className="text-sm mt-1 mb-4">All teachings created by you should show here. Click "Create New Teaching" to get started.</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -384,8 +384,8 @@ export default function TeachingsPage() {
                        {renderGrid(enrolledTeachings, 'member', (
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <School className="mx-auto h-12 w-12 mb-4" />
-                                <h3 className="text-lg font-semibold text-foreground">Not Enrolled in Any Classes</h3>
-                                <p className="text-sm mt-1 mb-4">Go to the "Join a Class" tab to find classes.</p>
+                                <h3 className="text-lg font-semibold text-foreground">No Enrolled Classes</h3>
+                                <p className="text-sm mt-1 mb-4">All teachings where your request is accepted by the teacher will show here.</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -404,7 +404,7 @@ export default function TeachingsPage() {
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <FilterX className="mx-auto h-12 w-12 mb-4" />
                                 <h3 className="text-lg font-semibold text-foreground">No Public Classes Available</h3>
-                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term, or check back later." : "All available public teachings will be shown here for everyone to discover."}</p>
+                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term." : "All public teachings are visible to everyone and will be shown here."}</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -417,3 +417,5 @@ export default function TeachingsPage() {
         </>
     );
 }
+
+    
