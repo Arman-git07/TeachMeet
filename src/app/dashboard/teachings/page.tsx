@@ -249,7 +249,9 @@ export default function TeachingsPage() {
     }, [toast]);
 
     const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
-        if (!user) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
+        if (!user) {
+            return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
+        }
         
         const my: Teaching[] = [];
         const enrolled: Teaching[] = [];
@@ -259,13 +261,18 @@ export default function TeachingsPage() {
             const isCreator = t.creatorId === user.uid;
             const isMember = t.members?.includes(user.uid);
 
-            if (isCreator) my.push(t);
-            else if (isMember) enrolled.push(t);
+            if (isCreator) {
+                my.push(t);
+            } else if (isMember) {
+                enrolled.push(t);
+            }
             
-            if (t.isPublic && !isMember) publicList.push(t);
+            if (t.isPublic && !isCreator && !isMember) {
+                publicList.push(t);
+            }
         });
 
-        return { myTeachings, enrolledTeachings, publicTeachings };
+        return { myTeachings: my, enrolledTeachings: enrolled, publicTeachings: publicList };
     }, [allTeachings, user]);
 
     const handleEdit = (teaching: Teaching) => {
@@ -405,5 +412,3 @@ export default function TeachingsPage() {
         </>
     );
 }
-
-    
