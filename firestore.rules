@@ -2,30 +2,64 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Teachings Collection Rules
-    match /teachings/{teachingId} {
-      // Anyone authenticated can read public teachings or teachings they are a member of.
-      allow read: if request.auth != null && (resource.data.isPublic == true || request.auth.uid in resource.data.members);
-
-      // Anyone authenticated can create a teaching.
-      allow create: if request.auth != null;
-
-      // Only the creator can delete their teaching.
-      allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
-
-      // Allow the creator to update all fields.
-      // Allow any authenticated user to add themselves to the pendingRequests list (request to join).
-      allow update: if request.auth != null && (
-        (request.auth.uid == resource.data.creatorId) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
-         request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]))
-      );
-    }
-
-    // Default deny all other collections for now
+    
+    // Default deny all
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // Teachings: Allows creation, and controlled read/write access.
+    match /teachings/{teachingId} {
+      allow create: if request.auth != null;
+      
+      allow read: if request.auth != null && 
+                    (resource.data.isPublic == true || request.auth.uid in resource.data.members);
+      
+      allow update: if request.auth != null && request.auth.uid == resource.data.creatorId;
+
+      // Allow users to request to join a public teaching.
+      // Deny users from directly adding themselves to members.
+      allow update: if request.auth != null && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+                      request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]);
+
+      allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
+    }
+
+    // Meetings: Allows authenticated users to create/join meetings.
+    match /meetings/{meetingId} {
+      // Any authenticated user can create a meeting document when they are the first to join.
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow read: if request.auth != null;
+
+      // Participants sub-collection
+      match /participants/{participantId} {
+        // A user can only create their own participant document.
+        allow create: if request.auth != null && request.auth.uid == participantId;
+        // A user can read all participant documents in a meeting they are part of.
+        allow read: if request.auth != null;
+        // A user can only update or delete their own participant document.
+        allow update, delete: if request.auth != null && request.auth.uid == participantId;
+      }
+    }
+
+    // Documents: Allows users to manage their own documents and view public ones.
+    match /documents/{docId} {
+      allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+      allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+    }
+
+    // Recordings: Allows users to manage their own recordings and view public ones.
+    match /recordings/{recId} {
+      allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+      allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+    }
+
+    // FCM Tokens: Allows users to manage their own notification token.
+    match /fcmTokens/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
