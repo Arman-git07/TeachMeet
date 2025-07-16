@@ -252,15 +252,15 @@ export default function TeachingsPage() {
         const publicTeachings: Teaching[] = [];
 
         teachings.forEach(t => {
-            const isCreator = t.creatorId === user.uid;
-            const isMember = t.members?.includes(user.uid);
-
-            if (isCreator) {
+            if (t.creatorId === user.uid) {
                 myTeachings.push(t);
-            } else if (isMember) {
-                enrolledTeachings.push(t);
-            } else if (t.isPublic) {
-                publicTeachings.push(t);
+            } else {
+                const isMember = t.members?.includes(user.uid);
+                if (isMember) {
+                    enrolledTeachings.push(t);
+                } else if (t.isPublic) {
+                    publicTeachings.push(t);
+                }
             }
         });
 
@@ -375,8 +375,8 @@ export default function TeachingsPage() {
                        {renderGrid(myTeachings, 'creator', (
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <BookOpen className="mx-auto h-12 w-12 mb-4" />
-                                <h3 className="text-lg font-semibold text-foreground">No Classes Created Yet</h3>
-                                <p className="text-sm mt-1 mb-4">Click "Create New Teaching" to get started.</p>
+                                <h3 className="text-lg font-semibold text-foreground">You haven't created any classes yet.</h3>
+                                <p className="text-sm mt-1 mb-4">All teachings created by you will show here. Click "Create New Teaching" to get started.</p>
                            </div>
                        ))}
                     </TabsContent>
@@ -403,8 +403,8 @@ export default function TeachingsPage() {
                        {renderGrid(filteredPublicTeachings, 'guest', (
                            <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
                                 <FilterX className="mx-auto h-12 w-12 mb-4" />
-                                <h3 className="text-lg font-semibold text-foreground">No Matching Classes Found</h3>
-                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term." : "There are currently no public classes available to join."}</p>
+                                <h3 className="text-lg font-semibold text-foreground">No Public Classes Available</h3>
+                                <p className="text-sm mt-1 mb-4">{searchQuery ? "Try a different search term, or check back later." : "All available public teachings will be shown here for everyone to discover."}</p>
                            </div>
                        ))}
                     </TabsContent>
