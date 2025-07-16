@@ -17,6 +17,8 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export function StartMeetingDialogContent() {
   const [meetingLink, setMeetingLink] = useState("");
@@ -87,18 +89,24 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // The meeting document will now be created on the meeting page itself when the first user joins.
-    // This dialog's only job is to generate the ID and navigate.
-    
+    // Create the meeting document in Firestore immediately
+    const meetingDocRef = doc(db, "meetings", meetingId);
     try {
+      await setDoc(meetingDocRef, {
+        creatorId: user.uid,
+        topic: trimmedMeetingTitle,
+        createdAt: serverTimestamp(),
+        pendingRequests: [],
+      });
+
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       router.push(joinNowLinkPath);
     } catch (error) {
-      console.error("Navigation error:", error);
+      console.error("Error creating meeting document:", error);
       toast({
         variant: "destructive",
-        title: "Navigation Failed",
-        description: "Could not navigate to the meeting room.",
+        title: "Creation Failed",
+        description: "Could not create the meeting room. Please check your connection and try again.",
       });
       setIsJoining(false);
     }

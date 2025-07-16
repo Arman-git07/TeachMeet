@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, collection, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, collection, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -60,8 +60,27 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       if (docSnap.exists()) {
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
-        toast({ variant: 'destructive', title: 'Meeting not found', description: 'This meeting does not seem to exist.'});
-        router.push('/');
+        // If the user is the one who was meant to create it, they can create it now.
+        // This handles cases where a user gets a direct link.
+        // For the main flow, the dialog now creates the doc first.
+        const potentialCreatorId = new URLSearchParams(window.location.search).get('creator');
+        if (user.uid === potentialCreatorId) {
+            setDoc(meetingDocRef, {
+                creatorId: user.uid,
+                topic: topic || `Meeting ${meetingId}`,
+                createdAt: serverTimestamp(),
+                pendingRequests: [],
+            }).then(() => {
+                setMeetingCreatorId(user.uid);
+            }).catch(e => {
+                console.error("Error creating meeting doc on the fly:", e);
+                toast({ variant: 'destructive', title: 'Meeting Creation Error', description: 'Could not initialize the meeting room.'});
+                router.push('/');
+            });
+        } else {
+            toast({ variant: 'destructive', title: 'Meeting not found', description: 'This meeting does not seem to exist.'});
+            router.push('/');
+        }
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -69,7 +88,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, user, toast, router]);
+  }, [meetingId, user, toast, router, topic]);
 
   useEffect(() => {
     if (!user || !meetingId || isHost) return;
@@ -199,6 +218,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   
   const handleJoinAction = async () => {
+    // Store desired state for the meeting page to pick up
+    localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
+    localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
+    
     if (isHost) {
       // Host joins directly
       const joinNowLinkPath = topic 
