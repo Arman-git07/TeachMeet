@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, collection } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, collection, getDoc } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -41,15 +41,38 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
-
+  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
+  const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoStreamRef = useRef<MediaStream | null>(null);
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
+  
+  const isHost = user?.uid === meetingCreatorId;
 
   useEffect(() => {
-    if (!user || !meetingId) return;
+    if (!meetingId || !user) return;
+    setIsLoadingMeetingData(true);
+    const meetingDocRef = doc(db, 'meetings', meetingId);
+
+    getDoc(meetingDocRef).then(docSnap => {
+      if (docSnap.exists()) {
+        setMeetingCreatorId(docSnap.data().creatorId || null);
+      } else {
+        toast({ variant: 'destructive', title: 'Meeting not found', description: 'This meeting does not seem to exist.'});
+        router.push('/');
+      }
+    }).catch(err => {
+      console.error("Error fetching meeting details:", err);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch meeting details.'});
+    }).finally(() => {
+      setIsLoadingMeetingData(false);
+    });
+  }, [meetingId, user, toast, router]);
+
+  useEffect(() => {
+    if (!user || !meetingId || isHost) return;
 
     // Listen for changes in the meeting participants list
     const participantsColRef = collection(db, "meetings", meetingId, "participants");
@@ -66,7 +89,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     });
 
     return () => unsubscribe();
-  }, [user, meetingId, joinStatus, router, topic, toast]);
+  }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
 
 
   useEffect(() => {
@@ -175,27 +198,46 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
   
-  const handleAskToJoin = async () => {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
-        return;
-    }
-    setJoinStatus('pending');
-    toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
-    
-    try {
-        const meetingRef = doc(db, 'meetings', meetingId);
-        await updateDoc(meetingRef, {
-            pendingRequests: arrayUnion(user.uid)
-        });
-    } catch (error) {
-        console.error("Error sending join request:", error);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Please check the meeting ID and your connection.'});
-        setJoinStatus('idle');
+  const handleJoinAction = async () => {
+    if (isHost) {
+      // Host joins directly
+      const joinNowLinkPath = topic 
+          ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+          : `/dashboard/meeting/${meetingId}`;
+      router.push(joinNowLinkPath);
+    } else {
+      // Participant asks to join
+      if (!user) {
+          toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
+          return;
+      }
+      setJoinStatus('pending');
+      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
+      
+      try {
+          const meetingRef = doc(db, 'meetings', meetingId);
+          await updateDoc(meetingRef, {
+              pendingRequests: arrayUnion(user.uid)
+          });
+      } catch (error) {
+          console.error("Error sending join request:", error);
+          toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Please check the meeting ID and your connection.'});
+          setJoinStatus('idle');
+      }
     }
   };
 
   const getButtonState = () => {
+    if (authLoading || isLoadingMeetingData) {
+      return { text: "Loading...", disabled: true, showSpinner: true };
+    }
+
+    if (isHost) {
+      const disabled = !agreedToTerms;
+      return { text: "Join Now", disabled, showSpinner: false };
+    }
+
+    // Participant logic
     const disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
     let text = "Ask to Join";
     if (joinStatus === 'pending') text = "Waiting for Host...";
@@ -203,6 +245,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     if (joinStatus === 'denied') text = "Request Denied. Try Again?";
     return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved' };
   };
+
   const { text: buttonText, disabled: buttonDisabled, showSpinner } = getButtonState();
 
   const videoClassNames = cn(
@@ -339,7 +382,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             </Label>
           </div>
 
-          <Button onClick={handleAskToJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={buttonDisabled}>
+          <Button onClick={handleJoinAction} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={buttonDisabled}>
             {showSpinner && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
             {buttonText}
           </Button>
