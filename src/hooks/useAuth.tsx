@@ -111,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             where("isPublic", "==", true),
             where("creatorId", "==", currentUser.uid),
             where("members", "array-contains", currentUser.uid)
-        ));
+        ), orderBy("createdAt", "desc"));
         const teachingsUnsubscribe = onSnapshot(teachingsQuery,
           (snapshot) => setTeachings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching))),
           (error) => console.error("Error fetching teachings:", error)
