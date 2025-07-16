@@ -20,6 +20,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+
 export function StartMeetingDialogContent() {
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingCode, setMeetingCode] = useState("");
@@ -98,6 +100,26 @@ export function StartMeetingDialogContent() {
         createdAt: serverTimestamp(),
         pendingRequests: [],
       });
+
+      // Save meeting to localStorage for the activity feed
+      const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+      let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+      if (!Array.isArray(startedMeetings)) startedMeetings = [];
+      
+      const newMeeting = {
+        id: meetingId,
+        title: trimmedMeetingTitle,
+        startedAt: Date.now(),
+      };
+
+      // Remove any existing meeting with the same ID and add the new one
+      startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingId);
+      startedMeetings.unshift(newMeeting); // Add to the beginning
+      
+      localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10))); // Keep max 10
+      
+      // Dispatch an event to notify the homepage to update
+      window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
 
       const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       router.push(joinNowLinkPath);
