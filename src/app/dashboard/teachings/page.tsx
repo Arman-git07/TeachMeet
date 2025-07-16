@@ -252,15 +252,20 @@ export default function TeachingsPage() {
         const publicTeachings: Teaching[] = [];
 
         teachings.forEach(t => {
+            // A user can be the creator of a teaching.
             if (t.creatorId === user.uid) {
                 myTeachings.push(t);
-            } else {
-                const isMember = t.members?.includes(user.uid);
-                if (isMember) {
-                    enrolledTeachings.push(t);
-                } else if (t.isPublic) {
-                    publicTeachings.push(t);
-                }
+            }
+            // A user can be an enrolled member of a teaching (and not the creator).
+            else if (t.members?.includes(user.uid)) {
+                enrolledTeachings.push(t);
+            }
+
+            // Public teachings are a separate category. A teaching can be public
+            // regardless of whether the current user is the creator or a member.
+            // A user who is not a member or creator can see it here to request to join.
+            if (t.isPublic) {
+                publicTeachings.push(t);
             }
         });
 
@@ -310,12 +315,13 @@ export default function TeachingsPage() {
     }, [isCreateDialogOpen]);
 
     const filteredPublicTeachings = useMemo(() => {
-        if (!searchQuery) return publicTeachings;
-        return publicTeachings.filter(t => 
+        const discoverable = publicTeachings.filter(t => t.creatorId !== user?.uid && !t.members.includes(user?.uid || ''));
+        if (!searchQuery) return discoverable;
+        return discoverable.filter(t => 
             t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
         );
-    }, [publicTeachings, searchQuery]);
+    }, [publicTeachings, searchQuery, user]);
 
 
     const renderGrid = (teachingsList: Teaching[], userRole: 'creator' | 'member' | 'guest', emptyState: React.ReactNode) => {
@@ -417,5 +423,3 @@ export default function TeachingsPage() {
         </>
     );
 }
-
-    
