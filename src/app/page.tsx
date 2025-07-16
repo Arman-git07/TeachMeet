@@ -42,7 +42,7 @@ export type ActivityItem = MeetingActivityItem | DocumentActivityItem | Recordin
 
 const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
-const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
+const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
 const itemIcons: Record<ActivityItemType, React.ElementType> = {
   meeting: Video,
@@ -87,7 +87,7 @@ export default function HomePage() {
               const now = Date.now();
               ongoingMeetings = storedMeetings
                   .filter(meeting => {
-                      if (meeting.startedAt && (now - meeting.startedAt > TWO_HOURS_IN_MS)) {
+                      if (meeting.startedAt && (now - meeting.startedAt > THIRTY_MINUTES_IN_MS)) {
                           const meetingId = `meeting-${meeting.id}`;
                           if (!dismissedItemIds.includes(meetingId)) {
                               dismissedItemIds.push(meetingId);
