@@ -57,7 +57,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   documents: Document[];
   recordings: Recording[];
-  teachings: Teaching[];
+  // Teachings are now fetched directly in the component to simplify logic
   signOut: () => Promise<void>;
 }
 
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [teachings, setTeachings] = useState<Teaching[]>([]);
+  // Removed teachings state from here
 
   const router = useRouter();
   const pathname = usePathname();
@@ -105,15 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         unsubscribers.push(recordingsUnsubscribe);
 
-        // Teachings listener - Fetch ALL teachings and filter on the client.
-        // This is simpler and more reliable for the complex query logic needed.
-        const teachingsRef = collection(db, "teachings");
-        const teachingsQuery = query(teachingsRef, orderBy("createdAt", "desc"));
-        const teachingsUnsubscribe = onSnapshot(teachingsQuery,
-          (snapshot) => setTeachings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching))),
-          (error) => console.error("Error fetching teachings:", error)
-        );
-        unsubscribers.push(teachingsUnsubscribe);
+        // Teachings listener is now handled in the TeachingsPage component directly.
 
         // FCM Token
         if (messaging) {
@@ -135,7 +127,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // User is signed out, clear data
         setDocuments([]);
         setRecordings([]);
-        setTeachings([]);
       }
       setLoading(false);
     });
@@ -162,16 +153,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated, documents, recordings, teachings, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated, documents, recordings, signOut }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = (): Omit<AuthContextType, 'teachings'> => { // teachings is removed from the returned type
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
+
+    
