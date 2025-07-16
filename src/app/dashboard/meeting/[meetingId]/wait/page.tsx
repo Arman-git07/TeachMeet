@@ -9,7 +9,7 @@ import Link from "next/link";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAuth } from "@/hooks/useAuth"; 
+import { useAuth } from '@/hooks/useAuth'; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import Image from 'next/image';
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, collection } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
