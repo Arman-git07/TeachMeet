@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from "react";
@@ -128,7 +129,7 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
                     creatorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
                     createdAt: serverTimestamp(),
                     members: [user.uid],
-                    pendingRequests: [], // Explicitly initialize as empty array
+                    pendingRequests: [],
                 });
                 toast({ title: "Teaching Created!", description: "Your new teaching is now available." });
             }
@@ -381,9 +382,9 @@ export default function TeachingsPage() {
 
                 <Tabs defaultValue="created" className="w-full">
                     <TabsList className="grid w-full grid-cols-3 rounded-lg">
-                        <TabsTrigger value="created" className="rounded-l-md">My Created Classes</TabsTrigger>
-                        <TabsTrigger value="enrolled">My Enrolled Classes</TabsTrigger>
-                        <TabsTrigger value="discover" className="rounded-r-md">Join a Class</TabsTrigger>
+                        <TabsTrigger value="created" className="rounded-l-md">My Classes</TabsTrigger>
+                        <TabsTrigger value="enrolled">Enrolled</TabsTrigger>
+                        <TabsTrigger value="discover" className="rounded-r-md">Discover</TabsTrigger>
                     </TabsList>
                     <TabsContent value="created" className="mt-4">
                        {renderGrid(myTeachings, 'creator', (

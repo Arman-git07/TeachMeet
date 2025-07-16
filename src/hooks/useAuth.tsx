@@ -105,13 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         unsubscribers.push(recordingsUnsubscribe);
 
-        // Teachings listener - listen for public teachings, teachings created by user, OR teachings where user is a member
+        // Teachings listener - Fetch ALL teachings and filter on the client.
+        // This is simpler and more reliable for the complex query logic needed.
         const teachingsRef = collection(db, "teachings");
-        const teachingsQuery = query(teachingsRef, or(
-            where("isPublic", "==", true),
-            where("creatorId", "==", currentUser.uid),
-            where("members", "array-contains", currentUser.uid)
-        ), orderBy("createdAt", "desc"));
+        const teachingsQuery = query(teachingsRef, orderBy("createdAt", "desc"));
         const teachingsUnsubscribe = onSnapshot(teachingsQuery,
           (snapshot) => setTeachings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching))),
           (error) => console.error("Error fetching teachings:", error)
