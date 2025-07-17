@@ -274,28 +274,26 @@ export default function TeachingsPage() {
   }, [toast]);
 
   const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
-    if (authLoading) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
+    if (authLoading || !user) {
+      return {
+        myTeachings: [],
+        enrolledTeachings: [],
+        publicTeachings: allTeachings.filter(t => t.isPublic),
+      };
+    }
     const my: Teaching[] = [];
     const enrolled: Teaching[] = [];
     const publicList: Teaching[] = [];
 
-    if (user) {
-      allTeachings.forEach((t) => {
-        if (t.creatorId === user.uid) {
-          my.push(t);
-        } else if (t.members.includes(user.uid)) {
-          enrolled.push(t);
-        } else if (t.isPublic) {
-          publicList.push(t);
-        }
-      });
-    } else {
-        allTeachings.forEach((t) => {
-            if (t.isPublic) {
-                publicList.push(t);
-            }
-        });
-    }
+    allTeachings.forEach((t) => {
+      if (t.creatorId === user.uid) {
+        my.push(t);
+      } else if (t.members.includes(user.uid)) {
+        enrolled.push(t);
+      } else if (t.isPublic) {
+        publicList.push(t);
+      }
+    });
     return { myTeachings: my, enrolledTeachings: enrolled, publicTeachings: publicList };
   }, [allTeachings, user, authLoading]);
 
@@ -466,29 +464,104 @@ export default function TeachingsPage() {
     </div>
   );
 
+  const MyTeachingsTab = () => {
+    if (isLoading || authLoading) return renderSkeleton();
+    if (!user) return <p className="text-muted-foreground">Please sign in to see your classes.</p>;
+    if (myTeachings.length === 0) return <p className="text-muted-foreground">You haven't created any teachings yet.</p>;
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {myTeachings.map((t) => renderTeachingCard(t, 'my'))}
+      </div>
+    );
+  };
+  
+  const EnrolledTeachingsTab = () => {
+    if (isLoading || authLoading) return renderSkeleton();
+    if (!user) return <p className="text-muted-foreground">Please sign in to see your enrolled classes.</p>;
+    if (enrolledTeachings.length === 0) {
+       return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sample: History of Art</CardTitle>
+              <CardDescription>A survey of major art movements.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Created by: Prof. Eleanor Vance</p>
+              <p className="text-sm text-muted-foreground">Members: 32</p>
+            </CardContent>
+            <CardFooter>
+                <Button asChild>
+                    <Link href="#">
+                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {enrolledTeachings.map((t) => renderTeachingCard(t, 'enrolled'))}
+      </div>
+    );
+  };
+
+  const DiscoverTeachingsTab = () => {
+    if (isLoading) return renderSkeleton();
+    if (publicTeachings.length === 0) {
+      return (
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sample: Physics 101</CardTitle>
+              <CardDescription>An intro to classical mechanics.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Created by: Dr. Evelyn Reed</p>
+              <p className="text-sm text-muted-foreground">Members: 24</p>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={() => toast({ title: "Sample Action", description: "This is just a placeholder card." })}>
+                <LogIn className="mr-2 h-4 w-4" /> Request to Join
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      );
+    }
+     return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {publicTeachings.map((t) => renderTeachingCard(t, 'public'))}
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Teachings</h1>
-        <Button onClick={handleCreateNew}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create New
-        </Button>
+        <Dialog
+          open={isCreateDialogOpen}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setTeachingToEdit(null);
+            setIsCreateDialogOpen(isOpen);
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button onClick={handleCreateNew}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create New
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <CreateTeachingDialogContent
+              onSuccess={() => setIsCreateDialogOpen(false)}
+              teachingToEdit={teachingToEdit}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
-
-      <Dialog
-        open={isCreateDialogOpen}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setTeachingToEdit(null);
-          setIsCreateDialogOpen(isOpen);
-        }}
-      >
-        <DialogContent>
-          <CreateTeachingDialogContent
-            onSuccess={() => setIsCreateDialogOpen(false)}
-            teachingToEdit={teachingToEdit}
-          />
-        </DialogContent>
-      </Dialog>
       
        <Dialog
         open={isRequestsDialogOpen}
@@ -555,117 +628,13 @@ export default function TeachingsPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="my-classes" className="mt-4">
-          {authLoading ? renderSkeleton() : (
-            myTeachings.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {myTeachings.map((t) => renderTeachingCard(t, 'my'))}
-                </div>
-              ) : (
-                <p>You haven&apos;t created any teachings yet.</p>
-              )
-          )}
+          <MyTeachingsTab />
         </TabsContent>
         <TabsContent value="enrolled" className="mt-4">
-          {authLoading ? renderSkeleton() : (
-             enrolledTeachings.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {enrolledTeachings.map((t) => renderTeachingCard(t, 'enrolled'))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Sample Enrolled Class: History of Art</CardTitle>
-                      <CardDescription>A survey of major art movements from antiquity to the present day.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created by: Prof. Eleanor Vance
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Members: 32
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                       <Button asChild>
-                          <Link href="#">
-                            Enter Class <ArrowRight className="ml-2 h-4 w-4" />
-                          </Link>
-                       </Button>
-                    </CardFooter>
-                  </Card>
-                   <Card className="opacity-50">
-                    <CardHeader>
-                      <CardTitle>Placeholder Enrolled Class</CardTitle>
-                      <CardDescription>This is a disabled example of an enrolled class.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created by: Another Teacher
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Members: 18
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                       <Button disabled>
-                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                </div>
-              )
-          )}
+          <EnrolledTeachingsTab />
         </TabsContent>
         <TabsContent value="discover" className="mt-4">
-           {authLoading ? renderSkeleton() : (
-             publicTeachings.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {publicTeachings.map((t) => renderTeachingCard(t, 'public'))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Sample Class: Physics 101</CardTitle>
-                      <CardDescription>An introduction to classical mechanics and electromagnetism.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created by: Dr. Evelyn Reed
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Members: 24
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button onClick={() => toast({ title: "Sample Action", description: "This is just a placeholder card." })}>
-                        <LogIn className="mr-2 h-4 w-4" /> Request to Join
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                   <Card className="opacity-50">
-                    <CardHeader>
-                      <CardTitle>Placeholder Class</CardTitle>
-                      <CardDescription>This is a disabled example of another class.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created by: A Teacher
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Members: 15
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button disabled>
-                        <LogIn className="mr-2 h-4 w-4" /> Request to Join
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                </div>
-              )
-           )}
+           <DiscoverTeachingsTab />
         </TabsContent>
       </Tabs>
     </div>
