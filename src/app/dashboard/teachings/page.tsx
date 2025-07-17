@@ -557,7 +557,46 @@ export default function TeachingsPage() {
                   {enrolledTeachings.map((t) => renderTeachingCard(t, 'enrolled'))}
                 </div>
               ) : (
-                <p>You are not enrolled in any teachings.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Sample Enrolled Class: History of Art</CardTitle>
+                      <CardDescription>A survey of major art movements from antiquity to the present day.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Created by: Prof. Eleanor Vance
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Members: 32
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                      <Button disabled>
+                        <Check className="mr-2 h-4 w-4" /> Enrolled
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                   <Card className="opacity-50">
+                    <CardHeader>
+                      <CardTitle>Placeholder Enrolled Class</CardTitle>
+                      <CardDescription>This is a disabled example of an enrolled class.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Created by: Another Teacher
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Members: 18
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                       <Button disabled>
+                        <Check className="mr-2 h-4 w-4" /> Enrolled
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </div>
               )
           )}
         </TabsContent>
