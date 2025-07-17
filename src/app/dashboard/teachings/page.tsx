@@ -67,6 +67,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Link from 'next/link';
 
 export interface Teaching {
   id: string;
@@ -273,6 +274,7 @@ export default function TeachingsPage() {
   }, [toast]);
 
   const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
+    if (authLoading) return { myTeachings: [], enrolledTeachings: [], publicTeachings: [] };
     const my: Teaching[] = [];
     const enrolled: Teaching[] = [];
     const publicList: Teaching[] = [];
@@ -287,9 +289,15 @@ export default function TeachingsPage() {
           publicList.push(t);
         }
       });
+    } else {
+        allTeachings.forEach((t) => {
+            if (t.isPublic) {
+                publicList.push(t);
+            }
+        });
     }
     return { myTeachings: my, enrolledTeachings: enrolled, publicTeachings: publicList };
-  }, [allTeachings, user]);
+  }, [allTeachings, user, authLoading]);
 
   const handleEdit = (teaching: Teaching) => {
     setTeachingToEdit(teaching);
@@ -321,7 +329,10 @@ export default function TeachingsPage() {
   };
 
   const handleRequestToJoin = async (teachingId: string) => {
-    if (!user) return;
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Login Required', description: 'You must be signed in to join a class.' });
+        return;
+    };
     try {
       const teachingRef = doc(db, 'teachings', teachingId);
       await updateDoc(teachingRef, {
@@ -392,32 +403,35 @@ export default function TeachingsPage() {
           </p>
         </CardContent>
         <CardFooter className="flex justify-between">
-          {isMyTeaching ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => handleManageRequests(teaching)}
-              >
-                <Users className="mr-2 h-4 w-4" /> Manage Requests (
-                {teaching.pendingRequests.length})
+          {isMyTeaching || isEnrolled ? (
+            <div className="flex w-full justify-between items-center">
+              <Button asChild>
+                <Link href={`/dashboard/teachings/${teaching.id}`}>
+                  Enter Class <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
               </Button>
-              <div>
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(teaching)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setTeachingToDelete(teaching)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            </>
-          ) : isEnrolled ? (
-            <Button>
-              Enter Class <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+               {isMyTeaching && (
+                <div className="flex items-center">
+                    <Button
+                        variant="ghost"
+                        onClick={() => handleManageRequests(teaching)}
+                        className="text-muted-foreground hover:text-primary"
+                        >
+                        <Users className="mr-2 h-4 w-4" /> ({teaching.pendingRequests.length})
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(teaching)}>
+                        <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setTeachingToDelete(teaching)}
+                    >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                </div>
+               )}
+            </div>
           ) : isPending ? (
              <Button disabled>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Pending Approval
@@ -541,7 +555,7 @@ export default function TeachingsPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="my-classes" className="mt-4">
-          {isLoading ? renderSkeleton() : (
+          {authLoading ? renderSkeleton() : (
             myTeachings.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {myTeachings.map((t) => renderTeachingCard(t, 'my'))}
@@ -552,7 +566,7 @@ export default function TeachingsPage() {
           )}
         </TabsContent>
         <TabsContent value="enrolled" className="mt-4">
-          {isLoading ? renderSkeleton() : (
+          {authLoading ? renderSkeleton() : (
              enrolledTeachings.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {enrolledTeachings.map((t) => renderTeachingCard(t, 'enrolled'))}
@@ -573,9 +587,11 @@ export default function TeachingsPage() {
                       </p>
                     </CardContent>
                     <CardFooter className="flex justify-between">
-                       <Button onClick={() => toast({ title: "Sample Action", description: "This would take you to the class page." })}>
-                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
+                       <Button asChild>
+                          <Link href="#">
+                            Enter Class <ArrowRight className="ml-2 h-4 w-4" />
+                          </Link>
+                       </Button>
                     </CardFooter>
                   </Card>
                    <Card className="opacity-50">
@@ -602,7 +618,7 @@ export default function TeachingsPage() {
           )}
         </TabsContent>
         <TabsContent value="discover" className="mt-4">
-           {isLoading ? renderSkeleton() : (
+           {authLoading ? renderSkeleton() : (
              publicTeachings.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {publicTeachings.map((t) => renderTeachingCard(t, 'public'))}
