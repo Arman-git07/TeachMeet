@@ -256,7 +256,7 @@ export default function MeetingPage() {
             pendingRequests: arrayRemove(userId),
             members: arrayUnion(userId)
         });
-        toast({ title: "Request Approved", description: `${userName} has joined the meeting.` });
+        toast({ title: "Request Approved", description: `${userName} has been allowed to join.` });
     } catch (error) {
         console.error("Failed to approve request:", error);
         toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant.' });

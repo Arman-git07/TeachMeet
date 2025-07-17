@@ -75,40 +75,27 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    const participantsColRef = collection(db, "meetings", meetingId, "participants");
-    const selfInParticipantsRef = doc(participantsColRef, user.uid);
-
-    const unsubscribe = onSnapshot(selfInParticipantsRef, (docSnap) => {
-        if (docSnap.exists()) {
+    // This listener checks if the user's ID has been added to the `members` array by the host.
+    const meetingRef = doc(db, 'meetings', meetingId);
+    const unsub = onSnapshot(meetingRef, (docSnap) => {
+        const data = docSnap.data();
+        if (data?.members?.includes(user.uid)) {
             setJoinStatus('approved');
             toast({ title: "Request Approved!", description: "You are now joining the meeting." });
             const joinNowLinkPath = topic 
               ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
               : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
+        } else if (data && !data.pendingRequests.includes(user.uid) && !data.members.includes(user.uid)) {
+            // If the user is neither pending nor a member, their request might have been denied.
+            if (joinStatus === 'pending') {
+              setJoinStatus('denied');
+            }
         }
     });
 
-    return () => unsubscribe();
-  }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
-
-  useEffect(() => {
-    if (!user || !meetingId) return;
-
-    const meetingRef = doc(db, 'meetings', meetingId);
-    const unsub = onSnapshot(meetingRef, (docSnap) => {
-        const data = docSnap.data();
-        if (data && data.members && data.members.includes(user.uid) && joinStatus === 'pending') {
-            setJoinStatus('approved');
-            toast({ title: "Request Approved!", description: "You are now joining the meeting." });
-            const joinNowLinkPath = topic
-              ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
-              : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
-        }
-    });
     return () => unsub();
-  }, [user, meetingId, joinStatus, router, topic, toast]);
+  }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
 
 
   useEffect(() => {
@@ -254,18 +241,35 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       const disabled = !agreedToTerms;
-      return { text: "Join Now", disabled, showSpinner: false };
+      return { text: "Join Now as Host", disabled, showSpinner: false };
     }
 
-    const disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
+    // Logic for non-hosts
     let text = "Ask to Join";
+    let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
+
     if (joinStatus === 'pending') text = "Waiting for Host...";
     if (joinStatus === 'approved') text = "Joining...";
-    if (joinStatus === 'denied') text = "Request Denied. Try Again?";
-    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved' };
+    if (joinStatus === 'denied') {
+      text = "Request Denied. Ask again?";
+      // Allow re-requesting by enabling the button and resetting status
+      disabled = !agreedToTerms;
+      if (!disabled) {
+        // This is a bit of a hack to reset state on button press if it was denied
+        const originalOnClick = handleJoinAction;
+        return { 
+          text, 
+          disabled, 
+          showSpinner: false, 
+          onClick: () => { setJoinStatus('idle'); originalOnClick(); }
+        };
+      }
+    }
+    
+    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
   };
 
-  const { text: buttonText, disabled: buttonDisabled, showSpinner } = getButtonState();
+  const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
 
   const videoClassNames = cn(
     "w-full h-full object-cover",
@@ -401,7 +405,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             </Label>
           </div>
 
-          <Button onClick={handleJoinAction} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={buttonDisabled}>
+          <Button onClick={buttonOnClick} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={buttonDisabled}>
             {showSpinner && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
             {buttonText}
           </Button>
