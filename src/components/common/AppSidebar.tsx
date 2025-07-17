@@ -235,7 +235,7 @@ export function AppSidebar() {
                   <NavItem href="/dashboard/join-meeting" icon={Video} currentPath={pathname} isGreenTheme>Join Meeting</NavItem>
                 </>
               )}
-               <NavItem href="/dashboard/teachings" icon={School} currentPath={pathname}>Teachings</NavItem>
+               <NavItem href="/" icon={School} currentPath={pathname}>Teachings</NavItem>
                <NavItem href="/dashboard/documents" icon={FileText} currentPath={pathname}>Documents</NavItem>
                <NavItem href="/dashboard/recordings" icon={Clapperboard} currentPath={pathname}>Recordings</NavItem>
             </>

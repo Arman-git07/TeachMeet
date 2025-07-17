@@ -38,26 +38,12 @@ export interface Recording {
   createdAt?: any;
 }
 
-export interface Teaching {
-  id: string;
-  title: string;
-  description: string;
-  creatorId: string;
-  creatorName: string;
-  isPublic: boolean;
-  members: string[]; // List of user IDs
-  pendingRequests: string[]; // List of user IDs
-  createdAt?: any;
-}
-
-
 interface AuthContextType {
   user: FirebaseUser | null;
   loading: boolean;
   isAuthenticated: boolean;
   documents: Document[];
   recordings: Recording[];
-  // Teachings are now fetched directly in the component to simplify logic
   signOut: () => Promise<void>;
 }
 
@@ -68,7 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
-  // Removed teachings state from here
 
   const router = useRouter();
   const pathname = usePathname();
@@ -104,8 +89,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           (error) => console.error("Error fetching recordings:", error)
         );
         unsubscribers.push(recordingsUnsubscribe);
-
-        // Teachings listener is now handled in the TeachingsPage component directly.
 
         // FCM Token
         if (messaging) {
@@ -159,12 +142,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useAuth = (): Omit<AuthContextType, 'teachings'> => { // teachings is removed from the returned type
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
-
-    
