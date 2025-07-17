@@ -479,27 +479,7 @@ export default function TeachingsPage() {
     if (isLoading || authLoading) return renderSkeleton();
     if (!user) return <p className="text-muted-foreground">Please sign in to see your enrolled classes.</p>;
     if (enrolledTeachings.length === 0) {
-       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sample: History of Art</CardTitle>
-              <CardDescription>A survey of major art movements.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Created by: Prof. Eleanor Vance</p>
-              <p className="text-sm text-muted-foreground">Members: 32</p>
-            </CardContent>
-            <CardFooter>
-                <Button asChild>
-                    <Link href="#">
-                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      );
+      return <p className="text-muted-foreground">You are not enrolled in any teachings. Find one in the Discover tab!</p>;
     }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -511,25 +491,12 @@ export default function TeachingsPage() {
   const DiscoverTeachingsTab = () => {
     if (isLoading) return renderSkeleton();
     if (publicTeachings.length === 0) {
-      return (
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sample: Physics 101</CardTitle>
-              <CardDescription>An intro to classical mechanics.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Created by: Dr. Evelyn Reed</p>
-              <p className="text-sm text-muted-foreground">Members: 24</p>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={() => toast({ title: "Sample Action", description: "This is just a placeholder card." })}>
-                <LogIn className="mr-2 h-4 w-4" /> Request to Join
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      );
+       return (
+         <div className="text-center py-10 text-muted-foreground">
+           <p>No public teachings available right now.</p>
+           <p className="text-sm">Why not create the first one?</p>
+         </div>
+       );
     }
      return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
