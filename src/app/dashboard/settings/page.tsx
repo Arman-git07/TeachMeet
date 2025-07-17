@@ -46,7 +46,7 @@ SettingsSection.displayName = "SettingsSection";
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, deleteUserAccount } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const meetingId = searchParams.get('meetingId');
@@ -294,6 +294,17 @@ export default function SettingsPage() {
       title: "Clear History (Simulated)",
       description: "In a real application, this would clear your meeting history data.",
     });
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    try {
+      await deleteUserAccount();
+      // The signOut method in useAuth will handle redirection
+    } catch (error) {
+      // The deleteUserAccount function in useAuth already handles toasts for specific errors
+      console.error("Error from settings page during account deletion:", error);
+    }
   };
   
   const videoClassNames = cn(
@@ -652,8 +663,8 @@ export default function SettingsPage() {
             <AlertDialog>
                 <AlertDialogTrigger asChild><Button variant="destructive" className="w-full sm:w-auto rounded-lg"><Trash2 className="mr-2 h-4 w-4" /> Delete Account</Button></AlertDialogTrigger>
                 <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete your account and remove your data from our servers.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => toast({variant: 'destructive', title: "Feature Inactive", description: "Account deletion is not yet implemented."})}>Delete Account</AlertDialogAction></AlertDialogFooter>
+                    <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete your account and remove your data from our servers. This requires you to sign in again for security.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteAccount}>Delete Account</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>

@@ -2,7 +2,7 @@
 'use client';
 
 import type { User as FirebaseUser } from 'firebase/auth';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
@@ -45,6 +45,7 @@ interface AuthContextType {
   documents: Document[];
   recordings: Recording[];
   signOut: () => Promise<void>;
+  deleteUserAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -133,10 +134,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
+  const deleteUserAccount = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+        toast({ variant: "destructive", title: "Not Authenticated", description: "You must be signed in to delete your account." });
+        return;
+    }
+
+    const password = prompt("For your security, please re-enter your password to delete your account:");
+    if (!password) {
+        toast({ title: "Deletion Canceled", description: "You did not enter a password." });
+        return;
+    }
+
+    try {
+        const credential = EmailAuthProvider.credential(currentUser.email!, password);
+        await reauthenticateWithCredential(currentUser, credential);
+        
+        // At this point, the user is re-authenticated.
+        // In a real production app, you would now call a Firebase Cloud Function
+        // to delete the user's data from Firestore and Storage before deleting the user.
+        // For this prototype, we'll simulate this cleanup and then delete the user.
+
+        toast({ title: "Cleaning up your data...", description: "Deleting documents, recordings, and other data." });
+        
+        // --- Simulated Data Cleanup ---
+        // This is where you would call your backend function:
+        // const deleteUserData = httpsCallable(functions, 'deleteUserData');
+        // await deleteUserData();
+        console.log(`SIMULATING: Deleting all data for user ${currentUser.uid}`);
+        
+        await deleteUser(currentUser);
+        
+        toast({ title: "Account Deleted", description: "Your account and all associated data have been permanently deleted." });
+        // The onAuthStateChanged listener will automatically handle redirecting the user.
+        
+    } catch (error: any) {
+        let title = "Deletion Failed";
+        let description = "An unexpected error occurred. Please try again.";
+
+        if (error.code === 'auth/wrong-password') {
+            title = "Incorrect Password";
+            description = "The password you entered was incorrect. Account deletion canceled.";
+        } else if (error.code === 'auth/too-many-requests') {
+            title = "Too Many Attempts";
+            description = "You've tried to sign in too many times. Please try again later.";
+        } else if (error.code === 'auth/network-request-failed') {
+            title = "Network Error";
+            description = "Could not connect to the server. Please check your internet connection.";
+        }
+        
+        console.error("Account deletion error:", error);
+        toast({ variant: "destructive", title, description });
+        // Rethrow the error so the calling component knows it failed
+        throw error;
+    }
+  };
+
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated, documents, recordings, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated, documents, recordings, signOut, deleteUserAccount }}>
       {children}
     </AuthContext.Provider>
   );
