@@ -568,7 +568,46 @@ export default function TeachingsPage() {
                   {publicTeachings.map((t) => renderTeachingCard(t, 'public'))}
                 </div>
               ) : (
-                <p>No public teachings available to join.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Sample Class: Physics 101</CardTitle>
+                      <CardDescription>An introduction to classical mechanics and electromagnetism.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Created by: Dr. Evelyn Reed
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Members: 24
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                      <Button onClick={() => toast({ title: "Sample Action", description: "This is just a placeholder card." })}>
+                        <LogIn className="mr-2 h-4 w-4" /> Request to Join
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                   <Card className="opacity-50">
+                    <CardHeader>
+                      <CardTitle>Placeholder Class</CardTitle>
+                      <CardDescription>This is a disabled example of another class.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Created by: A Teacher
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Members: 15
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                      <Button disabled>
+                        <LogIn className="mr-2 h-4 w-4" /> Request to Join
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </div>
               )
            )}
         </TabsContent>
