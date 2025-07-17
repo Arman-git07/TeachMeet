@@ -71,14 +71,14 @@ function CreateTeachingDialogContent({ onOpenChange, teachingToEdit }: { onOpenC
                     creatorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
                     createdAt: serverTimestamp(),
                     members: [user.uid],
-                    pendingRequests: [],
+                    pendingRequests: [], // Ensure this is initialized as an empty array
                 });
                 toast({ title: "Teaching Created!" });
             }
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving teaching:", error);
-            toast({ variant: "destructive", title: "Save Failed", description: "Could not save teaching. Please check permissions and network." });
+            toast({ variant: "destructive", title: "Save Failed", description: "Could not save the teaching. Check Firestore rules and network connection." });
         } finally {
             setIsLoading(false);
         }

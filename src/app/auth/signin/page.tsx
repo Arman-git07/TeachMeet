@@ -67,12 +67,11 @@ export default function SignInPage() {
         case 'auth/network-request-failed':
           errorMessage = "Network error. Could not connect to authentication services. Please check your internet connection and ensure Firebase API keys are correctly configured in your .env file.";
           break;
-        case String(error.code.match(/auth\/requests-to-this-api-.*/)):
-            errorMessage = "Authentication is temporarily unavailable. This may be due to an incorrect or restricted API key. Please check your Firebase project configuration.";
-            break;
         default:
-           if (error.message.includes("API key")) {
-              errorMessage = "There is an issue with the API key configuration. Please ensure it is correct and valid in your .env file.";
+           if (error.code && error.code.match(/auth\/requests-to-this-api-.*/)) {
+              errorMessage = "Authentication is temporarily unavailable. This may be due to an incorrect or restricted API key. Please check your Firebase project configuration and ensure the Identity Toolkit API is enabled.";
+           } else if (error.message && error.message.includes("API key")) {
+              errorMessage = "There is an issue with the API key configuration. Please ensure it is correct, valid, and unrestricted in your .env file and Google Cloud Console.";
            }
            break;
       }
