@@ -60,6 +60,7 @@ import {
   BookOpen,
   Eye,
   School,
+  ArrowRight,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -414,8 +415,8 @@ export default function TeachingsPage() {
               </div>
             </>
           ) : isEnrolled ? (
-            <Button disabled>
-              <Check className="mr-2 h-4 w-4" /> Enrolled
+            <Button>
+              Enter Class <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           ) : isPending ? (
              <Button disabled>
@@ -572,8 +573,8 @@ export default function TeachingsPage() {
                       </p>
                     </CardContent>
                     <CardFooter className="flex justify-between">
-                      <Button disabled>
-                        <Check className="mr-2 h-4 w-4" /> Enrolled
+                       <Button onClick={() => toast({ title: "Sample Action", description: "This would take you to the class page." })}>
+                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </CardFooter>
                   </Card>
@@ -592,7 +593,7 @@ export default function TeachingsPage() {
                     </CardContent>
                     <CardFooter className="flex justify-between">
                        <Button disabled>
-                        <Check className="mr-2 h-4 w-4" /> Enrolled
+                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </CardFooter>
                   </Card>
