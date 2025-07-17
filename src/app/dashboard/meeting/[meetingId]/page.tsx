@@ -509,20 +509,12 @@ export default function MeetingPage() {
       try {
         const meetingDocSnap = await getDoc(meetingDocRef);
         if (!meetingDocSnap.exists()) {
-          // This case should be rare now that the meeting doc is created before navigating here
           console.error("[MeetingPage] Meeting document does not exist. This shouldn't happen.");
           setJoinStatus('failed');
           return;
         }
 
         setMeetingCreatorId(meetingDocSnap.data()?.creatorId || null);
-        
-        const isUserMember = meetingDocSnap.data()?.members?.includes(currentUser.uid);
-        if (!isUserMember) {
-            await updateDoc(meetingDocRef, {
-                members: arrayUnion(currentUser.uid)
-            });
-        }
         
         const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
         const participantData = {

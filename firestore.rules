@@ -1,79 +1,56 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    function isUser(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // FCM Tokens: Allow users to write their own token.
-    match /fcmTokens/{userId} {
-      allow read, write: if isUser(userId);
-    }
     
-    // Meetings
+    // Teachings Collection
+    match /teachings/{teachingId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null 
+                    && request.resource.data.creatorId == request.auth.uid
+                    && request.resource.data.creatorName is string
+                    && request.resource.data.title is string
+                    && request.resource.data.members[0] == request.auth.uid
+                    && request.resource.data.members.size() == 1
+                    && request.resource.data.pendingRequests.size() == 0;
+                    
+      allow update: if request.auth != null && resource.data.creatorId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+    }
+
+    // Documents and Recordings Collections
+    match /{collection}/{docId} where collection in ['documents', 'recordings'] {
+      allow read: if request.auth != null && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
+      allow create: if request.auth.uid == request.resource.data.uploaderId;
+      allow delete: if request.auth.uid == resource.data.uploaderId;
+    }
+
+    // FCM Tokens Collection
+    match /fcmTokens/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Meetings Collection
     match /meetings/{meetingId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.creatorId == request.auth.uid;
-      allow update: if isSignedIn() && (
-        resource.data.creatorId == request.auth.uid ||
-        request.auth.uid in resource.data.members ||
-        // Allow adding self to members or pendingRequests
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'pendingRequests']) &&
-         (request.resource.data.members == resource.data.members.concat([request.auth.uid]) ||
-          request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid])))
-      );
+      allow read: if request.auth != null;
       
-      // Participants subcollection
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      
+      // Allow host to update pending/approved members
+      allow update: if request.auth != null && resource.data.creatorId == request.auth.uid;
+      
       match /participants/{userId} {
-        allow read: if isSignedIn();
-        // Allow user to create/update their own participant doc.
-        // Allow host to manage participants (future-proofing).
-        allow write: if isSignedIn() && (isUser(userId) || resource.data.creatorId == request.auth.uid);
-        allow delete: if isSignedIn() && isUser(userId);
+        allow read: if request.auth != null;
+        
+        // Allow any authenticated user to create their OWN participant document
+        allow create: if request.auth != null && request.auth.uid == userId;
+        
+        // Allow users to update or delete only their OWN participant document
+        allow update, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
-
-    // Teachings:
-    // Any authenticated user can read all teachings.
-    // Users can create/update/delete their own teachings.
-    // Any user can request to join.
-    match /teachings/{teachingId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() 
-                    && request.resource.data.creatorId == request.auth.uid
-                    && request.resource.data.isPublic is bool
-                    && request.resource.data.creatorName is string
-                    && request.resource.data.members == [request.auth.uid]
-                    && request.resource.data.pendingRequests == [];
-
-      allow update: if isSignedIn() && resource.data.creatorId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.creatorId == request.auth.uid;
-    }
-
-    // Documents:
-    // Allow read of public documents by any signed-in user.
-    // Allow read of private documents only by the owner.
-    // Allow create, update, delete only by the owner.
-    match /documents/{documentId} {
-      allow read: if isSignedIn() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-      allow write: if isSignedIn() && request.resource.data.uploaderId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.uploaderId == request.auth.uid;
-    }
-
-    // Recordings:
-    // Allow read of public recordings by any signed-in user.
-    // Allow read of private recordings only by the owner.
-    // Allow create, update, delete only by the owner.
-    match /recordings/{recordingId} {
-      allow read: if isSignedIn() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-      allow write: if isSignedIn() && request.resource.data.uploaderId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.uploaderId == request.auth.uid;
-    }
+    
   }
 }
