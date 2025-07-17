@@ -148,7 +148,7 @@ const CreateTeachingDialogContent = ({
           isPublic,
           creatorId: user.uid,
           creatorName: user.displayName || 'Anonymous',
-          members: [user.uid],
+          members: [user.uid], // Creator is automatically a member
           pendingRequests: [],
           createdAt: serverTimestamp(),
         });
@@ -345,7 +345,7 @@ export default function TeachingsPage() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Could not send your join request.',
+        description: 'Could not send your join request. Check permissions.',
       });
     }
   };
@@ -479,7 +479,12 @@ export default function TeachingsPage() {
     if (isLoading || authLoading) return renderSkeleton();
     if (!user) return <p className="text-muted-foreground">Please sign in to see your enrolled classes.</p>;
     if (enrolledTeachings.length === 0) {
-      return <p className="text-muted-foreground">You are not enrolled in any teachings. Find one in the Discover tab!</p>;
+      return (
+        <div className="text-center py-10 text-muted-foreground">
+          <p>You are not enrolled in any teachings.</p>
+          <p className="text-sm">Find one in the "Discover" tab to join!</p>
+        </div>
+      );
     }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

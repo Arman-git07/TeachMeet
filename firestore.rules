@@ -1,92 +1,61 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Allow users to manage their own data
-    match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
-    }
-    
-    // Allow users to manage their FCM tokens
-    match /fcmTokens/{userId} {
-        allow read, write: if request.auth.uid == userId;
-    }
-
-    // Public and Private documents
-    match /documents/{documentId} {
-      // Anyone can read a public document
-      allow read: if resource.data.isPrivate == false;
-      // Authenticated users can read their own private documents
-      allow read: if request.auth != null && request.auth.uid == resource.data.uploaderId && resource.data.isPrivate == true;
-      // Authenticated users can create documents
-      allow create: if request.auth != null;
-      // Only the uploader can delete their own documents
-      allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-    
-    // Public and Private recordings
-    match /recordings/{recordingId} {
-      allow read: if resource.data.isPrivate == false;
-      allow read: if request.auth != null && request.auth.uid == resource.data.uploaderId && resource.data.isPrivate == true;
-      allow create: if request.auth != null;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-    
     match /meetings/{meetingId} {
-      // Any authenticated user can create a meeting room
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.creatorId;
-
-      // The creator can read, update, or delete their own meeting room.
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
-
-      // Any authenticated user can read meeting details (e.g., to see the topic).
       allow read: if request.auth != null;
-
-      // Security rule for updating the meeting document.
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      
       allow update: if request.auth != null && (
-          // Allow the host to update any part of the meeting document.
-          request.auth.uid == resource.data.creatorId ||
-          // Allow any authenticated user to add ONLY their own ID to the pendingRequests array.
-          (request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]) &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']))
+        (resource.data.creatorId == request.auth.uid) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+         request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]))
       );
 
-      // Rules for the participants subcollection
       match /participants/{userId} {
-        // Any authenticated user can create their own participant document.
-        allow create: if request.auth != null && request.auth.uid == userId;
-        
-        // Anyone in the meeting (authenticated) can see who else is there.
         allow read: if request.auth != null;
-        
-        // A user can only update their own participant document.
-        allow update: if request.auth != null && request.auth.uid == userId;
-        
-        // A user can delete their own participant document (i.e., when they leave).
-        // The host can also remove (kick) other participants.
-        allow delete: if request.auth != null && (request.auth.uid == userId || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
+        allow create: if request.auth.uid == userId;
+        allow update, delete: if request.auth.uid == userId;
       }
     }
 
     match /teachings/{teachingId} {
-        // Public teachings can be read by anyone. Private ones only by members.
-        allow read: if resource.data.isPublic == true || (request.auth != null && request.auth.uid in resource.data.members);
-        
-        // Any authenticated user can create a teaching.
-        allow create: if request.auth != null;
-        
-        // The creator can update or delete their teaching.
-        allow update, delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
+      // Allow anyone authenticated to read public teachings or teachings they are a member of
+      allow read: if request.auth != null && (resource.data.isPublic == true || request.auth.uid in resource.data.members);
+      
+      // Allow creation only if the creatorId is the user's own ID
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      
+      // Allow updates by the creator or by a user requesting to join
+      allow update: if request.auth != null && (
+        // Creator can update teaching details (title, description, isPublic)
+        (resource.data.creatorId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'isPublic'])) ||
+        // Creator can manage members and pending requests
+        (resource.data.creatorId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasAny(['members', 'pendingRequests'])) ||
+        // A user can add themselves to the pendingRequests list
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) && request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]))
+      );
+      
+      // Only the creator can delete the teaching
+      allow delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+    }
 
-        // Specific rule for updates made by non-creators (e.g., joining)
-        allow update: if request.auth != null && (
-            // Creator can update anything.
-            request.auth.uid == resource.data.creatorId ||
-            // Any authenticated user can add ONLY their own ID to pendingRequests
-            (request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]) &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']))
-        );
+    match /documents/{documentId} {
+        allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
+        allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+        allow delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
+    }
+
+    match /recordings/{recordingId} {
+        allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
+        allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+        allow delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
+    }
+
+    match /fcmTokens/{userId} {
+      allow read, write: if request.auth.uid == userId;
     }
   }
 }
