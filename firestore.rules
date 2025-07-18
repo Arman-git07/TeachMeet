@@ -12,81 +12,61 @@ service cloud.firestore {
       return isUserAuthenticated() && request.auth.uid == userId;
     }
 
-    function getDoc(path) {
-      return get(/databases/$(database)/documents/$(path));
-    }
-
-    // Helper for teachings, which are called 'classrooms' in these rules.
-    function isClassTeacher(classId, userId) {
-      // Assuming the document in 'teachings' collection has a 'creatorId' field
-      return get(/databases/$(database)/documents/teachings/$(classId)).data.creatorId == userId;
-    }
-
-    // Helper for checking membership in a teaching/classroom
-    function isClassMember(classId, userId) {
-      // Check if user is in the 'members' array of the teaching document
-      return userId in get(/databases/$(database)/documents/teachings/$(classId)).data.members;
-    }
-    
-    // Helper for meetings
-    function isMeetingCreator(meetingId, userId) {
-      return get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == userId;
-    }
-
     // ===== MEETINGS =====
     match /meetings/{meetingId} {
+      // Anyone authenticated can read meeting details to check validity.
       allow read: if isUserAuthenticated();
-      allow create: if isOwner(request.resource.data.creatorId);
-      
-      // Allow updates only by the creator, OR by any user if they are ONLY adding their own UID to pendingRequests
-      allow update: if (isMeetingCreator(meetingId, request.auth.uid)) ||
-                      (isUserAuthenticated() && request.resource.data.diff(request.resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
-                       request.resource.data.pendingRequests == request.resource.data.pendingRequests.push(request.auth.uid));
-                       
-      allow delete: if isMeetingCreator(meetingId, request.auth.uid);
+
+      // Only the user creating the meeting can create it, and they must be the creator.
+      allow create: if isUserAuthenticated() && request.auth.uid == request.resource.data.creatorId;
+
+      // The creator can update/delete the meeting.
+      // Participants can update the list of pending requests (to add themselves).
+      allow update: if (isUserAuthenticated() && request.auth.uid == resource.data.creatorId) ||
+                       (isUserAuthenticated() && request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]));
+
+      allow delete: if isUserAuthenticated() && request.auth.uid == resource.data.creatorId;
 
       match /participants/{participantId} {
-        allow read, write, delete: if isOwner(participantId) || isMeetingCreator(meetingId, request.auth.uid);
-        allow list: if isUserAuthenticated();
+        allow read, list: if isUserAuthenticated();
+        allow create, update: if isOwner(participantId);
+        allow delete: if isOwner(participantId) || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId;
       }
     }
 
     // ===== TEACHINGS (CLASSROOMS) =====
-    match /teachings/{classId} {
-      // Public teachings are readable by anyone authenticated. Private ones only by members.
-      allow read, list: if isUserAuthenticated() && (resource.data.isPublic == true || isClassMember(classId, request.auth.uid));
-
-      // Anyone can create a teaching, but they must be the creator.
-      allow create: if isUserAuthenticated() && isOwner(request.resource.data.creatorId);
+    match /teachings/{teachingId} {
+      allow list, read: if isUserAuthenticated();
       
-      // The creator can update the main details of the teaching.
-      // Other users can only update it to add themselves to pendingRequests.
-      allow update: if isUserAuthenticated() && (
-        (isClassTeacher(classId, request.auth.uid)) ||
-        (request.resource.data.diff(request.resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
-         request.resource.data.pendingRequests == request.resource.data.pendingRequests.push(request.auth.uid))
-      );
-        
-      allow delete: if isUserAuthenticated() && isClassTeacher(classId, request.auth.uid);
+      // Allow creation if the user is authenticated and sets themselves as the creator.
+      allow create: if isUserAuthenticated() && request.auth.uid == request.resource.data.creatorId;
+
+      // Allow updates by the creator OR if a user is adding themselves to pendingRequests.
+      allow update: if (isUserAuthenticated() && request.auth.uid == resource.data.creatorId) ||
+                       (isUserAuthenticated() && request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]));
+
+      // Allow deletion only by the creator.
+      allow delete: if isUserAuthenticated() && request.auth.uid == resource.data.creatorId;
     }
     
-    // ===== FCM TOKENS / NOTIFICATIONS =====
+    // ===== DOCUMENTS & RECORDINGS =====
+    match /documents/{documentId} {
+        allow read: if resource.data.isPrivate == false || (isUserAuthenticated() && resource.data.uploaderId == request.auth.uid);
+        allow list: if isUserAuthenticated();
+        allow create: if isUserAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
+        allow delete: if isUserAuthenticated() && resource.data.uploaderId == request.auth.uid;
+    }
+
+    match /recordings/{recordingId} {
+        allow read: if resource.data.isPrivate == false || (isUserAuthenticated() && resource.data.uploaderId == request.auth.uid);
+        allow list: if isUserAuthenticated();
+        allow create: if isUserAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
+        allow delete: if isUserAuthenticated() && resource.data.uploaderId == request.auth.uid;
+    }
+
+    // ===== FCM TOKENS =====
     match /fcmTokens/{userId} {
       allow read, write: if isOwner(userId);
-    }
-
-    // ===== DOCUMENTS =====
-    match /documents/{documentId} {
-        allow read: if isUserAuthenticated() && (get(path).data.isPrivate == false || isOwner(get(path).data.uploaderId));
-        allow create: if isOwner(request.resource.data.uploaderId);
-        allow delete: if isOwner(get(path).data.uploaderId);
-    }
-
-    // ===== RECORDINGS =====
-    match /recordings/{recordingId} {
-        allow read: if isUserAuthenticated() && (get(path).data.isPrivate == false || isOwner(get(path).data.uploaderId));
-        allow create: if isOwner(request.resource.data.uploaderId);
-        allow delete: if isOwner(get(path).data.uploaderId);
     }
   }
 }
