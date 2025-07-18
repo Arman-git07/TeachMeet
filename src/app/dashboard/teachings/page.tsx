@@ -135,6 +135,9 @@ const CreateTeachingDialogContent = ({
           title,
           description,
           isPublic,
+          // When updating, we must preserve these fields to pass security rules
+          members: teachingToEdit.members,
+          pendingRequests: teachingToEdit.pendingRequests,
         });
         toast({
           title: 'Teaching Updated',
@@ -607,4 +610,3 @@ export default function TeachingsPage() {
     </div>
   );
 }
-    
