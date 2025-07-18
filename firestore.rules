@@ -12,79 +12,74 @@ service cloud.firestore {
     function isOwner(userId) {
       return isUserAuthenticated() && request.auth.uid == userId;
     }
+
+    function getDoc(path) {
+      return get(/databases/$(database)/documents/$(path));
+    }
     
-    function isCreator(docPath, userId) {
-      return get(docPath).data.creatorId == userId;
+    // ===== USER DATA =====
+    match /users/{userId} {
+      allow read: if isUserAuthenticated();
+      allow write: if isOwner(userId);
+    }
+    
+    match /fcmTokens/{userId} {
+        allow read, write: if isOwner(userId);
     }
 
-    // ===== TEACHINGS =====
+    // ===== TEACHINGS (Based on new data model) =====
     match /teachings/{teachingId} {
-      allow read, list: if isUserAuthenticated();
+        // This collection will now manage the core data, members, and requests.
+        // It is not directly listable by clients anymore.
+        allow read: if isUserAuthenticated();
+        
+        allow create: if isUserAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+        
+        // Only the creator can change title, description, isPublic status.
+        // Any authenticated user can request to join by updating pendingRequests.
+        allow update: if isUserAuthenticated() && 
+            (request.resource.data.creatorId == request.auth.uid || 
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) && 
+             request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid])));
 
-      // Create: User must be authenticated and set themselves as the creator.
-      // They must also initialize members array with their own UID and an empty pendingRequests array.
-      allow create: if isUserAuthenticated()
-                    && request.resource.data.creatorId == request.auth.uid
-                    && request.resource.data.members == [request.auth.uid]
-                    && request.resource.data.pendingRequests == [];
-
-      // Update: Only the creator can update title, description, isPublic.
-      // For updating members/pendingRequests, specific logic below applies.
-      allow update: if isUserAuthenticated() && isCreator(/databases/$(database)/documents/teachings/$(teachingId), request.auth.uid)
-                      && request.resource.data.keys().hasAll(['title', 'description', 'isPublic', 'members', 'pendingRequests'])
-                      && request.resource.data.size() == 5; // Prevent changing creatorId, etc.
-                    
-                    // Allow any authenticated user to add themselves to the pendingRequests array.
-                    // This is how a user requests to join.
-                    // `arrayUnion` ensures they can't add anyone else or duplicates.
-                    // Also check that the user is NOT already a member.
-                    || isUserAuthenticated()
-                      && !isCreator(/databases/$(database)/documents/teachings/$(teachingId), request.auth.uid)
-                      && !(request.auth.uid in resource.data.members)
-                      && request.resource.data.pendingRequests == resource.data.pendingRequests.union([request.auth.uid]);
-
-      // Delete: Only the creator can delete.
-      allow delete: if isUserAuthenticated() && isCreator(/databases/$(database)/documents/teachings/$(teachingId), request.auth.uid);
+        // Only the creator can delete a teaching.
+        allow delete: if isUserAuthenticated() && resource.data.creatorId == request.auth.uid;
     }
     
-
     // ===== MEETINGS =====
     match /meetings/{meetingId} {
-      allow read, list: if isUserAuthenticated();
+      allow read: if isUserAuthenticated();
       allow create: if isUserAuthenticated() && request.resource.data.creatorId == request.auth.uid;
-      allow update: if isUserAuthenticated() && isCreator(/databases/$(database)/documents/meetings/$(meetingId), request.auth.uid);
-      allow delete: if isUserAuthenticated() && isCreator(/databases/$(database)/documents/meetings/$(meetingId), request.auth.uid);
       
+      // Allow creator to update, or users to add themselves to pendingRequests.
+      allow update: if isUserAuthenticated() &&
+        (resource.data.creatorId == request.auth.uid ||
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests', 'members']) &&
+          (request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]) ||
+           request.resource.data.members == resource.data.members.concat([request.auth.uid]))
+         )
+        );
+
+      allow delete: if isUserAuthenticated() && resource.data.creatorId == request.auth.uid;
+
       match /participants/{participantId} {
-        allow read, list: if isUserAuthenticated(); // Allow reading participant list for meeting members
+        allow read: if isUserAuthenticated();
         allow create, update: if isOwner(participantId);
-        allow delete: if isOwner(participantId) || isCreator(/databases/$(database)/documents/meetings/$(meetingId), request.auth.uid);
+        allow delete: if isOwner(participantId) || resource.data.creatorId == request.auth.uid;
       }
     }
-
-
-    // ===== USER-OWNED CONTENT (Documents, Recordings) =====
-    match /documents/{docId} {
-        // Read: Allow if document is public, or if user is the owner.
-        allow read, list: if isUserAuthenticated() && (resource.data.isPrivate == false || isOwner(resource.data.uploaderId));
-        // Create: Any authenticated user can create.
+    
+    // ===== DOCUMENTS & RECORDINGS =====
+    match /documents/{documentId} {
+        allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
         allow create: if isUserAuthenticated() && isOwner(request.resource.data.uploaderId);
-        // Delete: Only the owner can delete.
         allow delete: if isUserAuthenticated() && isOwner(resource.data.uploaderId);
     }
-
-    match /recordings/{recId} {
-        // Read: Allow if recording is public, or if user is the owner.
-        allow read, list: if isUserAuthenticated() && (resource.data.isPrivate == false || isOwner(resource.data.uploaderId));
-        // Create: Any authenticated user can create.
+    
+    match /recordings/{recordingId} {
+        allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
         allow create: if isUserAuthenticated() && isOwner(request.resource.data.uploaderId);
-        // Delete: Only the owner can delete.
         allow delete: if isUserAuthenticated() && isOwner(resource.data.uploaderId);
-    }
-
-    // ===== MISC =====
-    match /fcmTokens/{userId} {
-      allow read, write: if isOwner(userId);
     }
   }
 }

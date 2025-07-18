@@ -44,9 +44,10 @@ import {
   updateDoc,
   deleteDoc,
   arrayUnion,
-  arrayRemove,
   onSnapshot,
   query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 import {
   PlusCircle,
@@ -135,24 +136,21 @@ const CreateTeachingDialogContent = ({
           title,
           description,
           isPublic,
-          // When updating, we must preserve these fields to pass security rules
-          members: teachingToEdit.members,
-          pendingRequests: teachingToEdit.pendingRequests,
         });
         toast({
           title: 'Teaching Updated',
           description: `"${title}" has been successfully updated.`,
         });
       } else {
-        // Create new teaching
+        // Create new teaching in the main 'teachings' collection
         await addDoc(collection(db, 'teachings'), {
           title,
           description,
           isPublic,
           creatorId: user.uid,
           creatorName: user.displayName || 'Anonymous',
-          members: [user.uid], // Creator is automatically a member
-          pendingRequests: [], // Initialize pending requests array
+          members: [user.uid],
+          pendingRequests: [],
           createdAt: serverTimestamp(),
         });
         toast({
@@ -288,9 +286,10 @@ export default function TeachingsPage() {
     const publicList: Teaching[] = [];
 
     allTeachings.forEach((t) => {
+      const isMember = t.members && t.members.includes(user.uid);
       if (t.creatorId === user.uid) {
         my.push(t);
-      } else if (t.members && t.members.includes(user.uid)) {
+      } else if (isMember) {
         enrolled.push(t);
       } else if (t.isPublic) {
         publicList.push(t);
@@ -381,7 +380,6 @@ export default function TeachingsPage() {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not deny student.' });
     }
   };
-
 
   const renderTeachingCard = (teaching: Teaching, type: 'my' | 'enrolled' | 'public') => {
     const isMyTeaching = type === 'my';
@@ -481,7 +479,27 @@ export default function TeachingsPage() {
     if (isLoading || authLoading) return renderSkeleton();
     if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your enrolled classes.</p>;
     if (enrolledTeachings.length === 0) {
-      return <p className="text-muted-foreground text-center py-10">You are not enrolled in any teachings. Find one in the "Discover" tab to join!</p>;
+      return (
+        <div className="text-center py-10">
+            <p className="text-muted-foreground">You are not enrolled in any teachings.</p>
+            <p className="text-muted-foreground mt-2">Find one in the "Discover" tab to join!</p>
+            <Card className="mt-6 max-w-sm mx-auto">
+                 <CardHeader>
+                    <CardTitle>Sample Enrolled Class</CardTitle>
+                    <CardDescription>This is how a class you've joined will look.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">Created by: A Teacher</p>
+                    <p className="text-sm text-muted-foreground">Members: 15</p>
+                </CardContent>
+                <CardFooter>
+                    <Button className="w-full" disabled>
+                        Enter Class <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+      );
     }
     
     return (
