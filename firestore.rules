@@ -1,126 +1,111 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
+    
+    // Helper functions
+    function isUserAuthenticated() {
       return request.auth != null;
     }
     
-    // Helper function to check if the incoming request data for a document
-    // contains only the specified keys.
-    function hasOnly(keys) {
-      return request.resource.data.keys().hasOnly(keys);
+    function isUserId(userId) {
+      return isUserAuthenticated() && request.auth.uid == userId;
     }
 
-    // =================================================================
-    // Meetings Collection
-    // =================================================================
-    match /meetings/{meetingId} {
-      // ANY authenticated user can read meeting details (to find the host, topic, etc.)
-      allow read: if isAuthenticated();
+    function isPublicResource() {
+      return resource.data.isPublic == true;
+    }
 
-      // An authenticated user can CREATE a meeting IF:
-      // 1. They are the creator.
-      // 2. The initial document only contains 'creatorId', 'topic', 'createdAt', and an empty 'pendingRequests' array.
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.creatorId
-                      && hasOnly(['creatorId', 'topic', 'createdAt', 'pendingRequests'])
-                      && request.resource.data.pendingRequests == [];
-
-      // An authenticated user can UPDATE a meeting IF:
-      // 1. They are sending a request to join (adding their OWN UID to pendingRequests).
-      // 2. They are the HOST, and are approving a request (moving a UID from pendingRequests to members).
-      // 3. They are the HOST, and are denying a request (removing a UID from pendingRequests).
-      allow update: if isAuthenticated() && (
-        // Case 1: A user requests to join.
-        // They can only add their own UID to the 'pendingRequests' array.
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
-        request.resource.data.pendingRequests == resource.data.pendingRequests.union([request.auth.uid])
-      ) || (
-        // Case 2 & 3: The host manages requests.
-        // The user must be the original creator of the meeting.
-        get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid &&
-        (
-          // Host can modify 'pendingRequests' (denial) or both 'pendingRequests' and 'members' (approval).
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests', 'members']) ||
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests'])
-        )
+    function isPrivateResourceOwner(userId) {
+      return resource.data.isPrivate == true && isUserId(userId);
+    }
+    
+    // --- Teachings ---
+    match /teachings/{teachingId} {
+      // READ:
+      // - Anyone authenticated can read public teachings.
+      // - Members of a teaching can read it, even if private.
+      allow read: if isUserAuthenticated() && 
+                     (isPublicResource() || request.auth.uid in resource.data.members);
+      
+      // CREATE:
+      // - Must be authenticated.
+      // - The creatorId in the new document must be the user's own ID.
+      // - The user must be the only member initially.
+      allow create: if isUserAuthenticated() &&
+                       isUserId(request.resource.data.creatorId) &&
+                       request.resource.data.members == [request.auth.uid];
+                       
+      // UPDATE:
+      // - Update teaching details (title, description, isPublic): Only creator can do this.
+      // - Join a private teaching (adding self to pendingRequests): Any authenticated user can do this for themselves.
+      // - Approve/Deny requests (managing members/pendingRequests): Only the creator can do this.
+      allow update: if isUserAuthenticated() && (
+        // Case 1: Creator updating the teaching details.
+        (isUserId(resource.data.creatorId) &&
+         request.resource.data.keys().hasOnly(['title', 'description', 'isPublic'])) ||
+        // Case 2: Any user requesting to join. Can only add their own UID to pendingRequests.
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+         request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid])) ||
+        // Case 3: Creator approving or denying a request.
+        (isUserId(resource.data.creatorId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests', 'members']))
       );
 
-      // NO user can delete a meeting document directly.
-      // Deletion should be handled by a backend function for cleanup.
+      // DELETE:
+      // - Only the creator can delete their own teaching.
+      allow delete: if isUserAuthenticated() && isUserId(resource.data.creatorId);
+    }
+
+    // --- Meetings ---
+    match /meetings/{meetingId} {
+      // READ: Anyone authenticated can read meeting details to join.
+      allow read: if isUserAuthenticated();
+      
+      // CREATE: An authenticated user can create a meeting room, listing themselves as creator.
+      allow create: if isUserAuthenticated() && isUserId(request.resource.data.creatorId);
+
+      // UPDATE:
+      // - Host can approve/deny by managing members and pendingRequests.
+      // - Any user can request to join by adding themselves to pendingRequests.
+      allow update: if isUserAuthenticated() && (
+        (isUserId(resource.data.creatorId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasAny(['pendingRequests', 'members'])) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+         request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]))
+      );
+      
+      // DELETE: Not typically allowed from client. Meetings expire or are cleared by a backend process.
       allow delete: if false;
 
-      // =================================================================
-      // Participants Sub-collection
-      // =================================================================
+      // Participants can join/leave the subcollection
       match /participants/{userId} {
-        // A participant can CREATE their OWN document within a meeting.
-        allow create: if request.auth.uid == userId;
-        
-        // A participant can READ any participant's document in the meeting.
-        allow read: if isAuthenticated();
-        
-        // A participant can UPDATE their OWN document (e.g., mute, hand raise).
-        allow update: if request.auth.uid == userId;
-        
-        // A participant can DELETE their OWN document when they leave.
-        allow delete: if request.auth.uid == userId;
+        allow read, write: if isUserId(userId);
       }
     }
 
-    // =================================================================
-    // Teachings Collection
-    // =================================================================
-    match /teachings/{teachingId} {
-      // Allow reading a teaching if it's public OR if the user is a member.
-      allow read: if isAuthenticated() && (resource.data.isPublic == true || request.auth.uid in resource.data.members);
-      
-      // Allow creating a teaching if the user is authenticated and sets themselves as the creator.
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.creatorId;
-
-      // Allow updating a teaching IF:
-      // 1. The user is the creator (can update title, description, etc.).
-      // 2. A user is requesting to join (adding their OWN UID to pendingRequests).
-      allow update: if isAuthenticated() && (
-        // Case 1: Creator is updating the teaching details.
-        request.auth.uid == resource.data.creatorId
-      ) || (
-        // Case 2: A user is requesting to join.
-        // The only change allowed is adding their own UID to 'pendingRequests'.
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
-        request.resource.data.pendingRequests == resource.data.pendingRequests.union([request.auth.uid])
-      );
-      
-      // Allow deleting a teaching ONLY if the user is the creator.
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.creatorId;
+    // --- Documents & Recordings ---
+    function isResourceOwner() {
+      return isUserId(resource.data.uploaderId);
     }
 
-    // =================================================================
-    // Documents and Recordings Collections
-    // =================================================================
-    match /{collection}/{docId} where collection in ['documents', 'recordings'] {
-      // Allow reading if the item is public OR the user is the one who uploaded it.
-      allow read: if isAuthenticated() && (resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId);
-
-      // Allow creating an item if the user is authenticated and sets themselves as the uploader.
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uploaderId;
+    match /{collection}/{docId} {
+      // READ: Anyone can read public items. Only owner can read their private items.
+      allow read: if isUserAuthenticated() && (isPublicResource() || isPrivateResourceOwner(request.auth.uid));
       
-      // Allow updating ONLY if the user is the uploader.
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.uploaderId;
+      // CREATE: Authenticated user must be the uploader.
+      allow create: if isUserAuthenticated() && isUserId(request.resource.data.uploaderId);
       
-      // Allow deleting ONLY if the user is the uploader.
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.uploaderId;
+      // DELETE: Only the owner can delete.
+      allow delete: if isUserAuthenticated() && isResourceOwner();
+      
+      // UPDATE: Not allowed from client to prevent tampering.
+      allow update: if false;
     }
-
-    // =================================================================
-    // FCM Tokens Collection (for push notifications)
-    // =================================================================
+    
+    // --- FCM Tokens ---
     match /fcmTokens/{userId} {
-      // A user can only create, read, update, or delete their OWN FCM token document.
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if isUserId(userId);
     }
   }
 }
