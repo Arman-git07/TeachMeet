@@ -149,7 +149,7 @@ const CreateTeachingDialogContent = ({
           creatorId: user.uid,
           creatorName: user.displayName || 'Anonymous',
           members: [user.uid], // Creator is automatically a member
-          pendingRequests: [],
+          pendingRequests: [], // Initialize pending requests array
           createdAt: serverTimestamp(),
         });
         toast({
@@ -163,8 +163,7 @@ const CreateTeachingDialogContent = ({
       toast({
         variant: 'destructive',
         title: 'Save Failed',
-        description:
-          'Could not save the teaching. Check Firestore rules and network connection.',
+        description: 'Could not save the teaching. Check Firestore rules and network connection.',
       });
     } finally {
       setIsLoading(false);
@@ -288,7 +287,7 @@ export default function TeachingsPage() {
     allTeachings.forEach((t) => {
       if (t.creatorId === user.uid) {
         my.push(t);
-      } else if (t.members.includes(user.uid)) {
+      } else if (t.members && t.members.includes(user.uid)) {
         enrolled.push(t);
       } else if (t.isPublic) {
         publicList.push(t);
@@ -384,7 +383,7 @@ export default function TeachingsPage() {
   const renderTeachingCard = (teaching: Teaching, type: 'my' | 'enrolled' | 'public') => {
     const isMyTeaching = type === 'my';
     const isEnrolled = type === 'enrolled';
-    const isPending = user ? teaching.pendingRequests.includes(user.uid) : false;
+    const isPending = user && teaching.pendingRequests ? teaching.pendingRequests.includes(user.uid) : false;
 
     return (
       <Card key={teaching.id}>
@@ -397,7 +396,7 @@ export default function TeachingsPage() {
             Created by: {teaching.creatorName}
           </p>
           <p className="text-sm text-muted-foreground">
-            Members: {teaching.members.length}
+            Members: {teaching.members ? teaching.members.length : 0}
           </p>
         </CardContent>
         <CardFooter className="flex justify-between">
@@ -415,7 +414,7 @@ export default function TeachingsPage() {
                         onClick={() => handleManageRequests(teaching)}
                         className="text-muted-foreground hover:text-primary"
                         >
-                        <Users className="mr-2 h-4 w-4" /> ({teaching.pendingRequests.length})
+                        <Users className="mr-2 h-4 w-4" /> ({teaching.pendingRequests ? teaching.pendingRequests.length : 0})
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(teaching)}>
                         <Edit className="h-4 w-4" />
@@ -479,23 +478,7 @@ export default function TeachingsPage() {
     if (isLoading || authLoading) return renderSkeleton();
     if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your enrolled classes.</p>;
     if (enrolledTeachings.length === 0) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Sample Enrolled Class</CardTitle>
-            <CardDescription>This is an example of what an enrolled class looks like.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Created by: Sample Teacher</p>
-            <p className="text-sm text-muted-foreground">Members: 15</p>
-          </CardContent>
-          <CardFooter>
-            <Button disabled>
-              Enter Class <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
-      );
+      return <p className="text-muted-foreground text-center py-10">You are not enrolled in any teachings. Find one in the "Discover" tab to join!</p>;
     }
     
     return (
