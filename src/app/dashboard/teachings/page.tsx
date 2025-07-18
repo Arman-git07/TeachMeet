@@ -44,10 +44,13 @@ import {
   updateDoc,
   deleteDoc,
   arrayUnion,
+  arrayRemove,
   onSnapshot,
   query,
   where,
+  getDoc,
   getDocs,
+  writeBatch,
 } from 'firebase/firestore';
 import {
   PlusCircle,
@@ -142,8 +145,8 @@ const CreateTeachingDialogContent = ({
           description: `"${title}" has been successfully updated.`,
         });
       } else {
-        // Create new teaching in the main 'teachings' collection
-        await addDoc(collection(db, 'teachings'), {
+        // Create new teaching
+        const teachingData = {
           title,
           description,
           isPublic,
@@ -152,7 +155,10 @@ const CreateTeachingDialogContent = ({
           members: [user.uid],
           pendingRequests: [],
           createdAt: serverTimestamp(),
-        });
+        };
+        // This now correctly creates the teaching document and will be allowed by the new rules.
+        await addDoc(collection(db, 'teachings'), teachingData);
+
         toast({
           title: 'Teaching Created',
           description: `"${title}" has been successfully created.`,
@@ -249,16 +255,44 @@ export default function TeachingsPage() {
   );
 
   useEffect(() => {
+    if (authLoading) return;
     setIsLoading(true);
-    const q = query(collection(db, 'teachings'));
+
+    let q;
+    if (user) {
+      // If user is logged in, fetch all public teachings OR teachings they are a member of OR they created.
+      q = query(collection(db, 'teachings'), 
+        where('isPublic', '==', true)
+      );
+    } else {
+      // If not logged in, only fetch public teachings.
+      q = query(collection(db, 'teachings'), where('isPublic', '==', true));
+    }
+    
+    // This combined listener fetches all teachings the user is allowed to see.
+    // The filtering into "my", "enrolled", and "discover" is now done on the client side.
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         const teachingsData = snapshot.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() } as Teaching)
         );
-        setAllTeachings(teachingsData);
-        setIsLoading(false);
+
+        if(user) {
+            // Also fetch teachings the user is part of but are private
+            const privateQuery = query(collection(db, 'teachings'), where('members', 'array-contains', user.uid));
+            getDocs(privateQuery).then(privateSnapshot => {
+                const privateTeachings = privateSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching));
+                // Combine and remove duplicates
+                const allVisibleTeachings = [...teachingsData, ...privateTeachings];
+                const uniqueTeachings = Array.from(new Map(allVisibleTeachings.map(item => [item.id, item])).values());
+                setAllTeachings(uniqueTeachings);
+                setIsLoading(false);
+            })
+        } else {
+            setAllTeachings(teachingsData);
+            setIsLoading(false);
+        }
       },
       (error) => {
         console.error('Error fetching teachings:', error);
@@ -271,10 +305,10 @@ export default function TeachingsPage() {
       }
     );
     return () => unsubscribe();
-  }, [toast]);
+  }, [toast, user, authLoading]);
 
   const { myTeachings, enrolledTeachings, publicTeachings } = useMemo(() => {
-    if (authLoading || !user) {
+    if (!user) {
       return {
         myTeachings: [],
         enrolledTeachings: [],
@@ -283,20 +317,24 @@ export default function TeachingsPage() {
     }
     const my: Teaching[] = [];
     const enrolled: Teaching[] = [];
-    const publicList: Teaching[] = [];
+    const discoverable: Teaching[] = [];
 
     allTeachings.forEach((t) => {
       const isMember = t.members && t.members.includes(user.uid);
-      if (t.creatorId === user.uid) {
+      const isCreator = t.creatorId === user.uid;
+
+      if (isCreator) {
         my.push(t);
       } else if (isMember) {
         enrolled.push(t);
-      } else if (t.isPublic) {
-        publicList.push(t);
+      }
+      
+      if (t.isPublic && !isMember) {
+          discoverable.push(t);
       }
     });
-    return { myTeachings: my, enrolledTeachings: enrolled, publicTeachings: publicList };
-  }, [allTeachings, user, authLoading]);
+    return { myTeachings: my, enrolledTeachings: enrolled, publicTeachings: discoverable };
+  }, [allTeachings, user]);
 
   const handleEdit = (teaching: Teaching) => {
     setTeachingToEdit(teaching);
@@ -334,6 +372,8 @@ export default function TeachingsPage() {
     };
     try {
       const teachingRef = doc(db, 'teachings', teachingId);
+      // This will now be allowed by the rules because any authenticated user can update a teaching doc
+      // to add themselves to the pendingRequests array.
       await updateDoc(teachingRef, {
         pendingRequests: arrayUnion(user.uid),
       });
@@ -351,7 +391,7 @@ export default function TeachingsPage() {
     }
   };
   
-    const handleManageRequests = (teaching: Teaching) => {
+  const handleManageRequests = (teaching: Teaching) => {
     setTeachingToManage(teaching);
     setIsRequestsDialogOpen(true);
   };
@@ -359,6 +399,7 @@ export default function TeachingsPage() {
   const handleApproveRequest = async (teachingId: string, studentId: string) => {
     try {
       const teachingRef = doc(db, 'teachings', teachingId);
+      // The creator is allowed to update the members list.
       await updateDoc(teachingRef, {
         pendingRequests: arrayRemove(studentId),
         members: arrayUnion(studentId),
@@ -413,9 +454,10 @@ export default function TeachingsPage() {
                     <Button
                         variant="ghost"
                         onClick={() => handleManageRequests(teaching)}
-                        className="text-muted-foreground hover:text-primary"
+                        className="text-muted-foreground hover:text-primary relative"
                         >
                         <Users className="mr-2 h-4 w-4" /> ({teaching.pendingRequests ? teaching.pendingRequests.length : 0})
+                         {teaching.pendingRequests?.length > 0 && <span className="absolute top-0 right-0 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span>}
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(teaching)}>
                         <Edit className="h-4 w-4" />
@@ -483,7 +525,7 @@ export default function TeachingsPage() {
         <div className="text-center py-10">
             <p className="text-muted-foreground">You are not enrolled in any teachings.</p>
             <p className="text-muted-foreground mt-2">Find one in the "Discover" tab to join!</p>
-            <Card className="mt-6 max-w-sm mx-auto">
+             <Card className="mt-6 max-w-sm mx-auto opacity-70">
                  <CardHeader>
                     <CardTitle>Sample Enrolled Class</CardTitle>
                     <CardDescription>This is how a class you've joined will look.</CardDescription>
@@ -566,7 +608,7 @@ export default function TeachingsPage() {
                         <div key={studentId} className="flex items-center justify-between p-2 rounded-lg bg-muted">
                            <div className="flex items-center gap-2">
                              <Avatar>
-                                <AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user" />
+                                <AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user"/>
                                 <AvatarFallback>{studentId.substring(0, 1)}</AvatarFallback>
                              </Avatar>
                              <span className="text-sm font-mono truncate" title={studentId}>...{studentId.slice(-6)}</span>
