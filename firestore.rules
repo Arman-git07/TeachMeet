@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -14,54 +15,48 @@ service cloud.firestore {
 
     // ===== MEETINGS =====
     match /meetings/{meetingId} {
-      // Anyone authenticated can read meeting details to check validity.
       allow read: if isUserAuthenticated();
+      allow create: if isOwner(request.resource.data.creatorId);
 
-      // Only the user creating the meeting can create it, and they must be the creator.
-      allow create: if isUserAuthenticated() && request.auth.uid == request.resource.data.creatorId;
+      // Only the creator can change the topic or officially delete the meeting room.
+      allow update: if isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
+      allow delete: if isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
 
-      // The creator can update/delete the meeting.
-      // Participants can update the list of pending requests (to add themselves).
-      allow update: if (isUserAuthenticated() && request.auth.uid == resource.data.creatorId) ||
-                       (isUserAuthenticated() && request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]));
-
-      allow delete: if isUserAuthenticated() && request.auth.uid == resource.data.creatorId;
-
+      // Rules for participants in a meeting
       match /participants/{participantId} {
         allow read, list: if isUserAuthenticated();
         allow create, update: if isOwner(participantId);
-        allow delete: if isOwner(participantId) || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId;
+        allow delete: if isOwner(participantId) || isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
       }
     }
-
+    
     // ===== TEACHINGS (CLASSROOMS) =====
     match /teachings/{teachingId} {
+      // Allow any authenticated user to see the list of teachings and read public ones.
       allow list, read: if isUserAuthenticated();
       
       // Allow creation if the user is authenticated and sets themselves as the creator.
       allow create: if isUserAuthenticated() && request.auth.uid == request.resource.data.creatorId;
 
-      // Allow updates by the creator OR if a user is adding themselves to pendingRequests.
+      // Allow updates only by the creator, OR for a user to add THEMSELVES to pendingRequests.
       allow update: if (isUserAuthenticated() && request.auth.uid == resource.data.creatorId) ||
-                       (isUserAuthenticated() && request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]));
+                     (isUserAuthenticated() && request.resource.data.pendingRequests == resource.data.pendingRequests.concat([request.auth.uid]));
 
       // Allow deletion only by the creator.
       allow delete: if isUserAuthenticated() && request.auth.uid == resource.data.creatorId;
     }
-    
-    // ===== DOCUMENTS & RECORDINGS =====
-    match /documents/{documentId} {
-        allow read: if resource.data.isPrivate == false || (isUserAuthenticated() && resource.data.uploaderId == request.auth.uid);
-        allow list: if isUserAuthenticated();
-        allow create: if isUserAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if isUserAuthenticated() && resource.data.uploaderId == request.auth.uid;
-    }
 
+    // ===== USER DATA (DOCUMENTS & RECORDINGS) =====
+    match /documents/{documentId} {
+      allow read: if resource.data.isPrivate == false || (isUserAuthenticated() && request.auth.uid == resource.data.uploaderId);
+      allow create: if isUserAuthenticated() && request.auth.uid == request.resource.data.uploaderId;
+      allow delete: if isUserAuthenticated() && request.auth.uid == resource.data.uploaderId;
+    }
+    
     match /recordings/{recordingId} {
-        allow read: if resource.data.isPrivate == false || (isUserAuthenticated() && resource.data.uploaderId == request.auth.uid);
-        allow list: if isUserAuthenticated();
-        allow create: if isUserAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if isUserAuthenticated() && resource.data.uploaderId == request.auth.uid;
+       allow read: if resource.data.isPrivate == false || (isUserAuthenticated() && request.auth.uid == resource.data.uploaderId);
+       allow create: if isUserAuthenticated() && request.auth.uid == request.resource.data.uploaderId;
+       allow delete: if isUserAuthenticated() && request.auth.uid == resource.data.uploaderId;
     }
 
     // ===== FCM TOKENS =====
@@ -70,3 +65,4 @@ service cloud.firestore {
     }
   }
 }
+    

@@ -466,8 +466,8 @@ export default function TeachingsPage() {
 
   const MyTeachingsTab = () => {
     if (isLoading || authLoading) return renderSkeleton();
-    if (!user) return <p className="text-muted-foreground">Please sign in to see your classes.</p>;
-    if (myTeachings.length === 0) return <p className="text-muted-foreground">You haven't created any teachings yet.</p>;
+    if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your classes.</p>;
+    if (myTeachings.length === 0) return <p className="text-muted-foreground text-center py-10">You haven't created any teachings yet.</p>;
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {myTeachings.map((t) => renderTeachingCard(t, 'my'))}
@@ -477,31 +477,12 @@ export default function TeachingsPage() {
   
   const EnrolledTeachingsTab = () => {
     if (isLoading || authLoading) return renderSkeleton();
-    if (!user) return <p className="text-muted-foreground">Please sign in to see your enrolled classes.</p>;
-
-    const allCards = [...enrolledTeachings];
-    if (enrolledTeachings.length === 0) {
-      const sampleTeaching: Teaching = {
-        id: 'sample-enrolled-1',
-        title: 'Sample Enrolled Class',
-        description: 'This is an example of a class you are enrolled in.',
-        creatorId: 'sample-teacher-id',
-        creatorName: 'Sample Teacher',
-        isPublic: false,
-        members: ['you', 'other-student'],
-        pendingRequests: [],
-      };
-      allCards.push(sampleTeaching);
-    }
+    if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your enrolled classes.</p>;
+    if (enrolledTeachings.length === 0) return <p className="text-muted-foreground text-center py-10">You are not enrolled in any teachings. Find one in the "Discover" tab to join!</p>;
     
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {allCards.map((t) => renderTeachingCard(t, 'enrolled'))}
-        {enrolledTeachings.length === 0 && (
-          <div className="md:col-span-2 lg:col-span-3 text-center py-10 text-muted-foreground">
-             <p className="text-sm">This is just a sample. Find real classes in the "Discover" tab to join!</p>
-          </div>
-        )}
+        {enrolledTeachings.map((t) => renderTeachingCard(t, 'enrolled'))}
       </div>
     );
   };
@@ -563,7 +544,7 @@ export default function TeachingsPage() {
                         <div key={studentId} className="flex items-center justify-between p-2 rounded-lg bg-muted">
                            <div className="flex items-center gap-2">
                              <Avatar>
-                                <AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user"/>
+                                <AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user" />
                                 <AvatarFallback>{studentId.substring(0, 1)}</AvatarFallback>
                              </Avatar>
                              <span className="text-sm font-mono truncate" title={studentId}>...{studentId.slice(-6)}</span>
@@ -625,3 +606,4 @@ export default function TeachingsPage() {
     </div>
   );
 }
+    
