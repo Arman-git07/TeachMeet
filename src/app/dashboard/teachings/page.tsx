@@ -478,17 +478,30 @@ export default function TeachingsPage() {
   const EnrolledTeachingsTab = () => {
     if (isLoading || authLoading) return renderSkeleton();
     if (!user) return <p className="text-muted-foreground">Please sign in to see your enrolled classes.</p>;
+
+    const allCards = [...enrolledTeachings];
     if (enrolledTeachings.length === 0) {
-      return (
-        <div className="text-center py-10 text-muted-foreground">
-          <p>You are not enrolled in any teachings.</p>
-          <p className="text-sm">Find one in the "Discover" tab to join!</p>
-        </div>
-      );
+      const sampleTeaching: Teaching = {
+        id: 'sample-enrolled-1',
+        title: 'Sample Enrolled Class',
+        description: 'This is an example of a class you are enrolled in.',
+        creatorId: 'sample-teacher-id',
+        creatorName: 'Sample Teacher',
+        isPublic: false,
+        members: ['you', 'other-student'],
+        pendingRequests: [],
+      };
+      allCards.push(sampleTeaching);
     }
+    
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {enrolledTeachings.map((t) => renderTeachingCard(t, 'enrolled'))}
+        {allCards.map((t) => renderTeachingCard(t, 'enrolled'))}
+        {enrolledTeachings.length === 0 && (
+          <div className="md:col-span-2 lg:col-span-3 text-center py-10 text-muted-foreground">
+             <p className="text-sm">This is just a sample. Find real classes in the "Discover" tab to join!</p>
+          </div>
+        )}
       </div>
     );
   };
