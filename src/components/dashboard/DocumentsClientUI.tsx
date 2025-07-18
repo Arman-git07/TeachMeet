@@ -132,14 +132,32 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
     if (!documentToDelete) return;
     const { id, name, storagePath } = documentToDelete;
     setIsDeleteDialogOpen(false);
-    setDocumentToDelete(null);
+    
     try {
+      // First, delete the Firestore document
       await deleteDoc(doc(db, "documents", id));
+      
+      // Then, delete the file from Storage
       const fileRef = storageRef(storage, storagePath);
       await deleteObject(fileRef);
+      
       toast({ title: "Document Deleted", description: `"${name}" has been successfully deleted.` });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the document. It might have been already removed." });
+      setDocumentToDelete(null); // Clear after successful deletion
+    } catch (error: any) {
+      console.error("Deletion failed:", error);
+      // More specific error handling
+      if (error.code === 'storage/object-not-found') {
+          // If file doesn't exist in storage, but doc does, still try to delete doc.
+          toast({ variant: 'destructive', title: "Deletion Warning", description: "File not found in storage, but removing database entry." });
+          try {
+             await deleteDoc(doc(db, "documents", id));
+          } catch (dbError) {
+             toast({ variant: 'destructive', title: "DB Deletion Failed", description: "Could not remove database entry." });
+          }
+      } else {
+         toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the document. Please check console for details." });
+      }
+      setDocumentToDelete(null);
     }
   };
 

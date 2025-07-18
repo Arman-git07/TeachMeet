@@ -147,15 +147,27 @@ export function RecordingsClientUI({ initialRecordings, currentUserId }: { initi
   const handleConfirmDeleteRecording = async () => {
     if (!recordingToDelete) return;
     setIsDeleteDialogOpen(false);
+    
     try {
       await deleteDoc(doc(db, "recordings", recordingToDelete.id));
       const fileRef = storageRef(storage, recordingToDelete.storagePath);
       await deleteObject(fileRef);
       toast({ title: "Recording Deleted", description: `"${recordingToDelete.name}" has been successfully deleted.` });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the recording." });
+    } catch (error: any) {
+       console.error("Deletion failed:", error);
+      if (error.code === 'storage/object-not-found') {
+          toast({ variant: 'destructive', title: "Deletion Warning", description: "File not found in storage, but removing database entry." });
+          try {
+             await deleteDoc(doc(db, "recordings", recordingToDelete.id));
+          } catch (dbError) {
+             toast({ variant: 'destructive', title: "DB Deletion Failed", description: "Could not remove database entry." });
+          }
+      } else {
+         toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the recording. Please check console for details." });
+      }
+    } finally {
+        setRecordingToDelete(null);
     }
-    setRecordingToDelete(null);
   };
 
   const filteredRecordings = useMemo(() => 

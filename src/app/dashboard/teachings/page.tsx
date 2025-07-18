@@ -478,7 +478,25 @@ export default function TeachingsPage() {
   const EnrolledTeachingsTab = () => {
     if (isLoading || authLoading) return renderSkeleton();
     if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your enrolled classes.</p>;
-    if (enrolledTeachings.length === 0) return <p className="text-muted-foreground text-center py-10">You are not enrolled in any teachings. Find one in the "Discover" tab to join!</p>;
+    if (enrolledTeachings.length === 0) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sample Enrolled Class</CardTitle>
+            <CardDescription>This is an example of what an enrolled class looks like.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Created by: Sample Teacher</p>
+            <p className="text-sm text-muted-foreground">Members: 15</p>
+          </CardContent>
+          <CardFooter>
+            <Button disabled>
+              Enter Class <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
+        </Card>
+      );
+    }
     
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
