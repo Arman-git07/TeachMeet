@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, getDoc, collection, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, collection, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -75,8 +75,19 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+    // Listener for the user's specific join request document
+    const joinRequestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+    const unsubJoinRequest = onSnapshot(joinRequestDocRef, (doc) => {
+      if (!doc.exists()) {
+        // If the document is deleted, it means the host denied the request.
+        if (joinStatus === 'pending') {
+          setJoinStatus('denied');
+        }
+      }
+    });
     
+    // Listener for the user being added to the participants list
+    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
     const unsubParticipant = onSnapshot(participantDocRef, (doc) => {
         if (doc.exists()) {
             setJoinStatus('approved');
@@ -88,23 +99,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         }
     });
 
-    const meetingRef = doc(db, 'meetings', meetingId);
-    const unsubMeeting = onSnapshot(meetingRef, (docSnap) => {
-        const data = docSnap.data();
-        if (data && joinStatus === 'pending' && !data.pendingRequests?.includes(user.uid)) {
-            // If user was pending but is no longer in the list, their request was likely denied.
-            // Check if they are now a participant before declaring 'denied'.
-            getDoc(participantDocRef).then(pDoc => {
-                if (!pDoc.exists()) {
-                    setJoinStatus('denied');
-                }
-            })
-        }
-    });
-
     return () => {
+      unsubJoinRequest();
       unsubParticipant();
-      unsubMeeting();
     };
   }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
 
@@ -224,40 +221,24 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
+    // Direct entry for the host
     if (isHost) {
-      try {
-        const batch = writeBatch(db);
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        batch.set(participantDocRef, {
-            userId: user.uid,
-            name: user.displayName || userName,
-            photoURL: user.photoURL,
-            isMicMuted: !isMicActive,
-            isCameraOff: !isCameraActive,
-            isHandRaised: false,
-            isScreenSharing: false,
-            joinedAt: serverTimestamp(),
-        }, { merge: true });
-
-        await batch.commit();
-        
         const joinNowLinkPath = topic 
             ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
             : `/dashboard/meeting/${meetingId}`;
         router.push(joinNowLinkPath);
-
-      } catch (error) {
-        console.error("Error setting host as participant:", error);
-        toast({ variant: 'destructive', title: 'Join Failed', description: 'Could not register you as host. Please check permissions.' });
-      }
     } else {
+      // Logic for guests requesting to join
       setJoinStatus('pending');
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
       
       try {
-          const meetingRef = doc(db, 'meetings', meetingId);
-          await updateDoc(meetingRef, {
-              pendingRequests: arrayUnion(user.uid)
+          const joinRequestRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+          await setDoc(joinRequestRef, {
+            name: user.displayName || userName,
+            photoURL: user.photoURL,
+            timestamp: serverTimestamp(),
+            status: 'pending'
           });
       } catch (error) {
           console.error("Error sending join request:", error);

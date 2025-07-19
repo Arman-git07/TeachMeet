@@ -78,6 +78,12 @@ interface Participant {
   photoURL?: string | null;
 }
 
+interface JoinRequest {
+  id: string; // userId of the requestor
+  name: string;
+  photoURL?: string | null;
+}
+
 function ParticipantView({
   name,
   isMe = false,
@@ -248,44 +254,44 @@ export default function MeetingPage() {
 
   const isCurrentUserHost = currentUser?.uid === meetingCreatorId;
 
-  const handleApproveRequest = useCallback(async (userId: string, userName: string) => {
+  const handleApproveRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
-    const meetingDocRef = doc(db, "meetings", meetingId);
+    
     try {
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", userId);
-        const userDocSnap = await getDoc(doc(db, 'users', userId)); // In a real app, you would fetch more user details
-        const userData = userDocSnap.data();
-
-        // Perform a batch write to ensure atomicity
         const batch = writeBatch(db);
-        batch.update(meetingDocRef, { pendingRequests: arrayRemove(userId) });
+        
+        // Add to participants subcollection
+        const participantDocRef = doc(db, "meetings", meetingId, "participants", request.id);
         batch.set(participantDocRef, {
-          userId: userId,
-          name: userData?.displayName || userName,
-          photoURL: userData?.photoURL,
+          userId: request.id,
+          name: request.name,
+          photoURL: request.photoURL,
           isMicMuted: true,
           isCameraOff: true,
           isHandRaised: false,
           isScreenSharing: false,
           joinedAt: serverTimestamp(),
         });
+        
+        // Delete from joinRequests subcollection
+        const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        batch.delete(requestDocRef);
+        
         await batch.commit();
 
-        toast({ title: "Request Approved", description: `${userName} has been allowed to join.` });
+        toast({ title: "Request Approved", description: `${request.name} has been allowed to join.` });
     } catch (error) {
         console.error("Failed to approve request:", error);
         toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant.' });
     }
   }, [isCurrentUserHost, meetingId, toast]);
   
-  const handleDenyRequest = useCallback(async (userId: string, userName: string) => {
+  const handleDenyRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
-    const meetingDocRef = doc(db, "meetings", meetingId);
     try {
-        await updateDoc(meetingDocRef, {
-            pendingRequests: arrayRemove(userId)
-        });
-        toast({ title: "Request Denied", description: `${userName}'s request to join has been denied.` });
+        const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        await deleteDoc(requestDocRef);
+        toast({ title: "Request Denied", description: `${request.name}'s request to join has been denied.` });
     } catch (error) {
         console.error("Failed to deny request:", error);
         toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not deny the request.' });
@@ -295,35 +301,29 @@ export default function MeetingPage() {
   useEffect(() => {
     if (!isCurrentUserHost || !meetingId) return;
 
-    const meetingDocRef = doc(db, "meetings", meetingId);
-    const unsubscribe = onSnapshot(meetingDocRef, (docSnap) => {
-        const data = docSnap.data();
-        if (data && data.pendingRequests && data.pendingRequests.length > 0) {
-            data.pendingRequests.forEach(async (requestorId: string) => {
-                const toastId = `join-request-${requestorId}`;
+    const requestsColRef = collection(db, "meetings", meetingId, "joinRequests");
+    const unsubscribe = onSnapshot(requestsColRef, (snapshot) => {
+        snapshot.docs.forEach((doc) => {
+            const request = { id: doc.id, ...doc.data() } as JoinRequest;
+            const toastId = `join-request-${request.id}`;
 
-                // A simple way to get a display name, in a real app you'd fetch this from a 'users' collection
-                // For now, let's just make up a name from ID
-                const userName = `User...${requestorId.slice(-4)}`;
-
-                toast({
-                    id: toastId,
-                    title: 'Join Request',
-                    description: `${userName} wants to join the meeting.`,
-                    duration: Infinity,
-                    action: (
-                      <div className="flex gap-2 mt-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(requestorId, userName); dismiss(toastId); }}>
-                          <Check className="h-4 w-4 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(requestorId, userName); dismiss(toastId); }}>
-                           <X className="h-4 w-4 mr-1" /> Deny
-                        </Button>
-                      </div>
-                    ),
-                });
+            toast({
+                id: toastId,
+                title: 'Join Request',
+                description: `${request.name} wants to join the meeting.`,
+                duration: Infinity,
+                action: (
+                  <div className="flex gap-2 mt-2">
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(request); dismiss(toastId); }}>
+                      <Check className="h-4 w-4 mr-1" /> Approve
+                    </Button>
+                    <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(request); dismiss(toastId); }}>
+                       <X className="h-4 w-4 mr-1" /> Deny
+                    </Button>
+                  </div>
+                ),
             });
-        }
+        });
     });
 
     return () => unsubscribe();
@@ -526,21 +526,26 @@ export default function MeetingPage() {
           return;
         }
 
-        setMeetingCreatorId(meetingDocSnap.data()?.creatorId || null);
-        
-        const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
-        const participantData = {
-          userId: currentUser.uid,
-          name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
-          photoURL: currentUser.photoURL,
-          isMicMuted: initialMicMuted,
-          isCameraOff: initialCameraOff,
-          isHandRaised: false,
-          isScreenSharing: false,
-          joinedAt: serverTimestamp(),
-        };
+        const meetingData = meetingDocSnap.data();
+        setMeetingCreatorId(meetingData?.creatorId || null);
 
-        await setDoc(participantDocRef, participantData, { merge: true });
+        // Only auto-join if user is creator
+        if (currentUser.uid === meetingData?.creatorId) {
+          const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
+          const participantData = {
+            userId: currentUser.uid,
+            name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
+            photoURL: currentUser.photoURL,
+            isMicMuted: initialMicMuted,
+            isCameraOff: initialCameraOff,
+            isHandRaised: false,
+            isScreenSharing: false,
+            joinedAt: serverTimestamp(),
+          };
+
+          await setDoc(participantDocRef, participantData, { merge: true });
+        }
+        
         setJoinStatus('joined');
 
       } catch (error) {
@@ -663,8 +668,11 @@ export default function MeetingPage() {
     try {
       await updateDoc(userDocRef, updates);
     } catch (error) {
-      console.error("[MeetingPage] Error updating user status in Firestore:", error);
-      toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
+      // Don't toast on error if doc doesn't exist, it means they're not a participant yet.
+      if ((error as any).code !== 'not-found') {
+        console.error("[MeetingPage] Error updating user status in Firestore:", error);
+        toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
+      }
     }
   };
 
