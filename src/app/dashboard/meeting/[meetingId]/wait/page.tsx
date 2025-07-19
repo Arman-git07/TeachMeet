@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, getDoc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, onSnapshot, Unsubscribe, DocumentData, getDoc, collection, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -77,7 +77,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
     
-    const unsub = onSnapshot(participantDocRef, (doc) => {
+    const unsubParticipant = onSnapshot(participantDocRef, (doc) => {
         if (doc.exists()) {
             setJoinStatus('approved');
             toast({ title: "Request Approved!", description: "You are now joining the meeting." });
@@ -92,7 +92,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     const unsubMeeting = onSnapshot(meetingRef, (docSnap) => {
         const data = docSnap.data();
         if (data && joinStatus === 'pending' && !data.pendingRequests?.includes(user.uid)) {
-            // Check if not approved before marking as denied.
+            // If user was pending but is no longer in the list, their request was likely denied.
+            // Check if they are now a participant before declaring 'denied'.
             getDoc(participantDocRef).then(pDoc => {
                 if (!pDoc.exists()) {
                     setJoinStatus('denied');
@@ -102,7 +103,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     });
 
     return () => {
-      unsub();
+      unsubParticipant();
       unsubMeeting();
     };
   }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
@@ -225,9 +226,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       try {
-        // Ensure host is added as a participant before navigating
+        const batch = writeBatch(db);
         const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        await setDoc(participantDocRef, {
+        batch.set(participantDocRef, {
             userId: user.uid,
             name: user.displayName || userName,
             photoURL: user.photoURL,
@@ -237,6 +238,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             isScreenSharing: false,
             joinedAt: serverTimestamp(),
         }, { merge: true });
+
+        await batch.commit();
         
         const joinNowLinkPath = topic 
             ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
@@ -258,7 +261,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
           });
       } catch (error) {
           console.error("Error sending join request:", error);
-          toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Please check the meeting ID and your connection.'});
+          toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Please check the meeting ID, your connection, and Firestore rules.'});
           setJoinStatus('idle');
       }
     }

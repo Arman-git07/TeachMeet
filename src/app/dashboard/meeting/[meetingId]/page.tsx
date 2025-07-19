@@ -61,7 +61,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, storage } from '@/lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc, addDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc, addDoc, arrayRemove, arrayUnion, writeBatch } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
