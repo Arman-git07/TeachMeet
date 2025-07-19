@@ -210,7 +210,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
   const userFallback = userName.charAt(0).toUpperCase();
 
-  const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
+  const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
   const handleJoinAction = async () => {
     localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');

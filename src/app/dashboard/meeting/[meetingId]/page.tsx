@@ -240,7 +240,7 @@ export default function MeetingPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   
-  const displayTitle = topic ? `${topic} (ID: ${meetingId})` : `Meeting ID: ${meetingId}`;
+  const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
   
   const selfView = realtimeParticipants.find(p => p.id === currentUser?.uid);
