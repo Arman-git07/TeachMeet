@@ -75,11 +75,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    const meetingRef = doc(db, 'meetings', meetingId);
-    let unsub: Unsubscribe | null = null;
+    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
     
-    unsub = onSnapshot(collection(db, 'meetings', meetingId, 'participants'), (snapshot) => {
-        if (snapshot.docs.some(doc => doc.id === user.uid)) {
+    const unsub = onSnapshot(participantDocRef, (doc) => {
+        if (doc.exists()) {
             setJoinStatus('approved');
             toast({ title: "Request Approved!", description: "You are now joining the meeting." });
             const joinNowLinkPath = topic 
@@ -89,15 +88,21 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         }
     });
 
+    const meetingRef = doc(db, 'meetings', meetingId);
     const unsubMeeting = onSnapshot(meetingRef, (docSnap) => {
         const data = docSnap.data();
         if (data && joinStatus === 'pending' && !data.pendingRequests?.includes(user.uid)) {
-            setJoinStatus('denied');
+            // Check if not approved before marking as denied.
+            getDoc(participantDocRef).then(pDoc => {
+                if (!pDoc.exists()) {
+                    setJoinStatus('denied');
+                }
+            })
         }
     });
 
     return () => {
-      if (unsub) unsub();
+      unsub();
       unsubMeeting();
     };
   }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
@@ -219,28 +224,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-      try {
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        await setDoc(participantDocRef, {
-            userId: user.uid,
-            name: user.displayName || userName,
-            photoURL: user.photoURL,
-            isMicMuted: !isMicActive,
-            isCameraOff: !isCameraActive,
-            isHandRaised: false,
-            isScreenSharing: false,
-            joinedAt: serverTimestamp(),
-        }, { merge: true });
-
-        const joinNowLinkPath = topic 
-            ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-            : `/dashboard/meeting/${meetingId}`;
-        router.push(joinNowLinkPath);
-
-      } catch (error) {
-        console.error("Error setting host as participant:", error);
-        toast({ variant: 'destructive', title: 'Join Failed', description: 'Could not register you in the meeting room. Please try again.' });
-      }
+      const joinNowLinkPath = topic 
+          ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+          : `/dashboard/meeting/${meetingId}`;
+      router.push(joinNowLinkPath);
     } else {
       setJoinStatus('pending');
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
@@ -444,3 +431,5 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
+
+    

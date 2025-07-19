@@ -146,7 +146,7 @@ function ParticipantView({
             ) : (
                 <>
                     <Avatar className="w-20 h-20 md:w-24 md:h-24 mb-3 border-2 border-background shadow-md">
-                        <AvatarImage src={avatarSrc} alt={name} data-ai-hint="avatar user" />
+                        <AvatarImage src={avatarSrc} alt={name} data-ai-hint="user avatar" />
                         <AvatarFallback className="text-3xl md:text-4xl">{avatarFallbackName}</AvatarFallback>
                     </Avatar>
                     <p className="text-base font-medium text-foreground truncate max-w-full px-2">{name}</p>
@@ -301,8 +301,8 @@ export default function MeetingPage() {
             data.pendingRequests.forEach(async (requestorId: string) => {
                 const toastId = `join-request-${requestorId}`;
 
-                const userDoc = await getDoc(doc(db, "users", requestorId));
-                const userName = userDoc.exists() ? userDoc.data().displayName : `User...${requestorId.slice(-4)}`;
+                // A simple way to get a display name, in a real app you'd fetch this from a 'users' collection
+                const userName = `User...${requestorId.slice(-4)}`;
 
                 toast({
                     id: toastId,
@@ -1018,3 +1018,5 @@ export default function MeetingPage() {
     </div>
   );
 }
+
+    
