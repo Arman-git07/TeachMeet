@@ -252,23 +252,24 @@ export default function MeetingPage() {
     if (!isCurrentUserHost) return;
     const meetingDocRef = doc(db, "meetings", meetingId);
     try {
-        await updateDoc(meetingDocRef, {
-            pendingRequests: arrayRemove(userId)
-        });
         const participantDocRef = doc(db, "meetings", meetingId, "participants", userId);
-        const userDocSnap = await getDoc(doc(db, 'users', userId)); // Fetch user details if they exist
+        const userDocSnap = await getDoc(doc(db, 'users', userId)); // In a real app, you would fetch more user details
         const userData = userDocSnap.data();
 
-        await setDoc(participantDocRef, {
+        // Perform a batch write to ensure atomicity
+        const batch = writeBatch(db);
+        batch.update(meetingDocRef, { pendingRequests: arrayRemove(userId) });
+        batch.set(participantDocRef, {
           userId: userId,
           name: userData?.displayName || userName,
           photoURL: userData?.photoURL,
-          isMicMuted: true, // Default states
+          isMicMuted: true,
           isCameraOff: true,
           isHandRaised: false,
           isScreenSharing: false,
           joinedAt: serverTimestamp(),
         });
+        await batch.commit();
 
         toast({ title: "Request Approved", description: `${userName} has been allowed to join.` });
     } catch (error) {
@@ -302,6 +303,7 @@ export default function MeetingPage() {
                 const toastId = `join-request-${requestorId}`;
 
                 // A simple way to get a display name, in a real app you'd fetch this from a 'users' collection
+                // For now, let's just make up a name from ID
                 const userName = `User...${requestorId.slice(-4)}`;
 
                 toast({
@@ -1018,5 +1020,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
-    

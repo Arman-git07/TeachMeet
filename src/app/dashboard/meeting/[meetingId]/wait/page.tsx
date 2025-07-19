@@ -224,10 +224,29 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-      const joinNowLinkPath = topic 
-          ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-          : `/dashboard/meeting/${meetingId}`;
-      router.push(joinNowLinkPath);
+      try {
+        // Ensure host is added as a participant before navigating
+        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
+        await setDoc(participantDocRef, {
+            userId: user.uid,
+            name: user.displayName || userName,
+            photoURL: user.photoURL,
+            isMicMuted: !isMicActive,
+            isCameraOff: !isCameraActive,
+            isHandRaised: false,
+            isScreenSharing: false,
+            joinedAt: serverTimestamp(),
+        }, { merge: true });
+        
+        const joinNowLinkPath = topic 
+            ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+            : `/dashboard/meeting/${meetingId}`;
+        router.push(joinNowLinkPath);
+
+      } catch (error) {
+        console.error("Error setting host as participant:", error);
+        toast({ variant: 'destructive', title: 'Join Failed', description: 'Could not register you as host. Please check permissions.' });
+      }
     } else {
       setJoinStatus('pending');
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
@@ -431,5 +450,3 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
-
-    

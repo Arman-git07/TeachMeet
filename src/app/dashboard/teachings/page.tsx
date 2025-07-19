@@ -218,7 +218,6 @@ export default function TeachingsPage() {
       setIsLoadingEnrolled(false);
       setMyTeachings([]);
       setEnrolledTeachings([]);
-      // Still might want to see public teachings even if not logged in
     } else {
         // My Teachings
         const myQuery = query(collection(db, 'teachings'), where('creatorId', '==', user.uid));
@@ -315,6 +314,7 @@ export default function TeachingsPage() {
         
         toast({ title: 'Success', description: 'Student approved.' });
         
+        // This will update automatically via the snapshot listener, but for immediate feedback:
         setTeachingToManage(prev => prev ? ({ ...prev, pendingRequests: prev.pendingRequests.filter(id => id !== studentId), allowedStudents: [...prev.allowedStudents, studentId] }) : null);
 
     } catch (error) {
@@ -328,6 +328,7 @@ export default function TeachingsPage() {
       const teachingRef = doc(db, 'teachings', teachingToManage.id);
       await updateDoc(teachingRef, { pendingRequests: arrayRemove(studentId) });
       toast({ title: 'Success', description: 'Student denied.' });
+       // This will update automatically via the snapshot listener, but for immediate feedback:
       setTeachingToManage(prev => prev ? ({ ...prev, pendingRequests: prev.pendingRequests.filter(id => id !== studentId) }) : null);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not deny student.' });
@@ -507,5 +508,3 @@ export default function TeachingsPage() {
     </div>
   );
 }
-
-    
