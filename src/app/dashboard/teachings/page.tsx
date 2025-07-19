@@ -74,7 +74,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 
-// Updated interface to reflect the new data structure
 export interface Teaching {
   id: string;
   title: string;
@@ -88,7 +87,7 @@ export interface Teaching {
 }
 
 export interface EnrolledTeachingInfo {
-  id: string; // The ID of the teaching document itself
+  id: string;
   title: string;
   description: string;
   creatorName: string;
@@ -139,7 +138,6 @@ const CreateTeachingDialogContent = ({
         const teachingRef = doc(db, 'teachings', teachingToEdit.id);
         batch.update(teachingRef, { title, description, isPublic });
 
-        // Update the reference in the user's myTeachings subcollection
         const userTeachingRef = doc(db, 'users', user.uid, 'myTeachings', teachingToEdit.id);
         batch.update(userTeachingRef, { title, description, isPublic });
 
@@ -153,11 +151,10 @@ const CreateTeachingDialogContent = ({
           creatorId: user.uid,
           creatorName: user.displayName || 'Anonymous',
           isPublic,
-          allowedStudents: [user.uid], // Creator is always a member
+          allowedStudents: [user.uid],
           pendingRequests: [],
           createdAt: serverTimestamp(),
         };
-
         batch.set(teachingRef, teachingData);
 
         const userTeachingRef = doc(db, 'users', user.uid, 'myTeachings', teachingRef.id);
@@ -165,7 +162,7 @@ const CreateTeachingDialogContent = ({
             title: teachingData.title,
             description: teachingData.description,
             isPublic: teachingData.isPublic,
-            ref: teachingRef, // Store a reference to the main document
+            ref: teachingRef,
             createdAt: serverTimestamp(),
         });
       }
@@ -231,7 +228,6 @@ export default function TeachingsPage() {
   const [teachingToDelete, setTeachingToDelete] = useState<Teaching | null>(null);
   const [teachingToManage, setTeachingToManage] = useState<Teaching | null>(null);
 
-  // Fetch all user-related teachings
   useEffect(() => {
     if (!user) {
       setIsLoadingMy(false);
@@ -241,7 +237,6 @@ export default function TeachingsPage() {
       return;
     }
     
-    // Listener for My Teachings
     const myTeachingsQuery = query(collection(db, 'users', user.uid, 'myTeachings'));
     const unsubMyTeachings = onSnapshot(myTeachingsQuery, async (snapshot) => {
         const teachingsPromises = snapshot.docs.map(d => getDoc(d.data().ref as DocumentReference));
@@ -253,19 +248,19 @@ export default function TeachingsPage() {
         setIsLoadingMy(false);
     }, (error) => { console.error(error); setIsLoadingMy(false); });
 
-    // Listener for Enrolled Teachings
     const enrolledQuery = query(collection(db, 'users', user.uid, 'enrolledTeachings'));
     const unsubEnrolled = onSnapshot(enrolledQuery, async (snapshot) => {
-        const enrolledRefs = snapshot.docs.map(d => d.data().ref as DocumentReference);
-        if (enrolledRefs.length > 0) {
-            const teachingDocs = await Promise.all(enrolledRefs.map(ref => getDoc(ref)));
-            const teachingInfos = teachingDocs
-                .filter(doc => doc.exists())
-                .map(doc => ({ id: doc.id, ...doc.data() } as EnrolledTeachingInfo));
-            setEnrolledTeachingsInfo(teachingInfos);
-        } else {
-            setEnrolledTeachingsInfo([]);
+        if (snapshot.empty) {
+          setEnrolledTeachingsInfo([]);
+          setIsLoadingEnrolled(false);
+          return;
         }
+        const enrolledRefs = snapshot.docs.map(d => d.data().ref as DocumentReference);
+        const teachingDocs = await Promise.all(enrolledRefs.map(ref => getDoc(ref)));
+        const teachingInfos = teachingDocs
+            .filter(doc => doc.exists())
+            .map(doc => ({ id: doc.id, ...doc.data() } as EnrolledTeachingInfo));
+        setEnrolledTeachingsInfo(teachingInfos);
         setIsLoadingEnrolled(false);
     }, (error) => { console.error(error); setIsLoadingEnrolled(false); });
 
@@ -275,7 +270,6 @@ export default function TeachingsPage() {
     };
   }, [user]);
 
-  // Fetch public teachings for discovery
   useEffect(() => {
     setIsLoadingDiscover(true);
     const discoverQuery = query(collection(db, 'teachings'), where('isPublic', '==', true));
@@ -291,7 +285,6 @@ export default function TeachingsPage() {
 
     return () => unsubDiscover();
   }, [toast]);
-
 
   const handleEdit = (teaching: Teaching) => {
     setTeachingToEdit(teaching);
@@ -420,7 +413,7 @@ export default function TeachingsPage() {
     const isPending = teaching.pendingRequests?.includes(user.uid);
     const isMember = teaching.allowedStudents?.includes(user.uid);
 
-    if (isMember) return null; // Don't show if already a member
+    if (isMember) return null;
 
     return (
       <Card key={teaching.id}>
@@ -438,7 +431,7 @@ export default function TeachingsPage() {
               <Button onClick={() => handleRequestToJoin(teaching.id)}><LogIn className="mr-2 h-4 w-4" /> Request to Join</Button>
             )}
           </CardFooter>
-      </Card>
+    </Card>
     )
   };
 

@@ -75,26 +75,31 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    // This listener checks if the user's ID has been added to the `members` array by the host.
     const meetingRef = doc(db, 'meetings', meetingId);
-    const unsub = onSnapshot(meetingRef, (docSnap) => {
-        const data = docSnap.data();
-        if (data?.members?.includes(user.uid)) {
+    let unsub: Unsubscribe | null = null;
+    
+    unsub = onSnapshot(collection(db, 'meetings', meetingId, 'participants'), (snapshot) => {
+        if (snapshot.docs.some(doc => doc.id === user.uid)) {
             setJoinStatus('approved');
             toast({ title: "Request Approved!", description: "You are now joining the meeting." });
             const joinNowLinkPath = topic 
               ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
               : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
-        } else if (data && !data.pendingRequests.includes(user.uid) && !data.members.includes(user.uid)) {
-            // If the user is neither pending nor a member, their request might have been denied.
-            if (joinStatus === 'pending') {
-              setJoinStatus('denied');
-            }
         }
     });
 
-    return () => unsub();
+    const unsubMeeting = onSnapshot(meetingRef, (docSnap) => {
+        const data = docSnap.data();
+        if (data && joinStatus === 'pending' && !data.pendingRequests?.includes(user.uid)) {
+            setJoinStatus('denied');
+        }
+    });
+
+    return () => {
+      if (unsub) unsub();
+      unsubMeeting();
+    };
   }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
 
 
@@ -215,7 +220,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       try {
-        // The host must also be added as a participant before entering the meeting.
         const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
         await setDoc(participantDocRef, {
             userId: user.uid,
@@ -264,7 +268,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
 
-    // Logic for non-hosts
     let text = "Ask to Join";
     let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
 
@@ -272,18 +275,14 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     if (joinStatus === 'approved') text = "Joining...";
     if (joinStatus === 'denied') {
       text = "Request Denied. Ask again?";
-      // Allow re-requesting by enabling the button and resetting status
       disabled = !agreedToTerms;
-      if (!disabled) {
-        // This is a bit of a hack to reset state on button press if it was denied
-        const originalOnClick = handleJoinAction;
-        return { 
-          text, 
-          disabled, 
-          showSpinner: false, 
-          onClick: () => { setJoinStatus('idle'); originalOnClick(); }
-        };
-      }
+      const originalOnClick = handleJoinAction;
+      return { 
+        text, 
+        disabled, 
+        showSpinner: false, 
+        onClick: () => { setJoinStatus('idle'); originalOnClick(); }
+      };
     }
     
     return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };

@@ -253,9 +253,23 @@ export default function MeetingPage() {
     const meetingDocRef = doc(db, "meetings", meetingId);
     try {
         await updateDoc(meetingDocRef, {
-            pendingRequests: arrayRemove(userId),
-            members: arrayUnion(userId)
+            pendingRequests: arrayRemove(userId)
         });
+        const participantDocRef = doc(db, "meetings", meetingId, "participants", userId);
+        const userDocSnap = await getDoc(doc(db, 'users', userId)); // Fetch user details if they exist
+        const userData = userDocSnap.data();
+
+        await setDoc(participantDocRef, {
+          userId: userId,
+          name: userData?.displayName || userName,
+          photoURL: userData?.photoURL,
+          isMicMuted: true, // Default states
+          isCameraOff: true,
+          isHandRaised: false,
+          isScreenSharing: false,
+          joinedAt: serverTimestamp(),
+        });
+
         toast({ title: "Request Approved", description: `${userName} has been allowed to join.` });
     } catch (error) {
         console.error("Failed to approve request:", error);
@@ -287,21 +301,20 @@ export default function MeetingPage() {
             data.pendingRequests.forEach(async (requestorId: string) => {
                 const toastId = `join-request-${requestorId}`;
 
-                // Ideally, fetch user's name from a 'users' collection.
-                // For now, we use a placeholder. This part can be improved.
-                const placeholderName = `User...${requestorId.slice(-4)}`;
+                const userDoc = await getDoc(doc(db, "users", requestorId));
+                const userName = userDoc.exists() ? userDoc.data().displayName : `User...${requestorId.slice(-4)}`;
 
                 toast({
                     id: toastId,
                     title: 'Join Request',
-                    description: `${placeholderName} wants to join the meeting.`,
+                    description: `${userName} wants to join the meeting.`,
                     duration: Infinity,
                     action: (
                       <div className="flex gap-2 mt-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(requestorId, placeholderName); dismiss(toastId); }}>
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(requestorId, userName); dismiss(toastId); }}>
                           <Check className="h-4 w-4 mr-1" /> Approve
                         </Button>
-                        <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(requestorId, placeholderName); dismiss(toastId); }}>
+                        <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(requestorId, userName); dismiss(toastId); }}>
                            <X className="h-4 w-4 mr-1" /> Deny
                         </Button>
                       </div>
@@ -375,12 +388,10 @@ export default function MeetingPage() {
       const recordingName = `${topic || 'TeachMeet Recording'} - ${new Date().toLocaleDateString()}`;
       const recordingSize = (Math.random() * 200 + 50).toFixed(2); // Mock size in MB
       
-      // Simulate saving to storage and creating firestore entry
       try {
         const userId = currentUser.uid;
         const storagePath = `recordings/${userId}/public/${Date.now()}-${recordingName.replace(/\s+/g, '_')}.mp4`;
         
-        // This simulates uploading a tiny placeholder file. In a real app, you'd upload the actual video data.
         const placeholderBlob = new Blob(["mock recording data"], { type: 'video/mp4' });
         const fileRef = storageRef(storage, storagePath);
         await uploadBytes(fileRef, placeholderBlob);
@@ -392,7 +403,7 @@ export default function MeetingPage() {
           duration: durationString,
           size: `${recordingSize}MB`,
           uploaderId: userId,
-          isPrivate: false, // Or make this a choice, for now public for demo
+          isPrivate: false, 
           downloadURL,
           storagePath,
           createdAt: serverTimestamp(),
@@ -405,7 +416,6 @@ export default function MeetingPage() {
         toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the recording file.' });
       }
     } else {
-      // Start recording
       setIsRecording(true);
       setRecordingStartTime(Date.now());
       toast({ title: "Recording Started", description: "The meeting is now being recorded." });
@@ -609,7 +619,6 @@ export default function MeetingPage() {
         if (audioTrack) {
           audioTrack.enabled = !localMicMuted;
         }
-        // Force a re-render to update the self-view with the new stream
         setRealtimeParticipants(prev => [...prev]);
 
       } catch (err) {
@@ -625,7 +634,6 @@ export default function MeetingPage() {
       }
     };
 
-    // Only initialize media if we aren't screen sharing.
     if (!isScreenSharingActive) {
       initializeMedia();
     }
@@ -682,7 +690,6 @@ export default function MeetingPage() {
     setIsScreenSharingActive(false);
     await updateUserStatusInFirestore({ isScreenSharing: false, isCameraOff: localCameraOff });
 
-    // Restore camera view if it was on before sharing
     if (localStreamRef.current) {
         const videoTrack = localStreamRef.current.getVideoTracks()[0];
         if (videoTrack) {
@@ -693,7 +700,7 @@ export default function MeetingPage() {
     if (showToast) {
         toast({ title: "Screen Sharing Stopped" });
     }
-    setRealtimeParticipants(prev => [...prev]); // Force update
+    setRealtimeParticipants(prev => [...prev]);
   }, [isScreenSharingActive, localCameraOff, toast, updateUserStatusInFirestore]);
 
   const toggleCamera = async () => {
@@ -769,7 +776,6 @@ export default function MeetingPage() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
 
-      // Disable the camera track while screen sharing
       if (localStreamRef.current) {
         const videoTrack = localStreamRef.current.getVideoTracks()[0];
         if (videoTrack) videoTrack.enabled = false;
@@ -782,7 +788,7 @@ export default function MeetingPage() {
       toast({ title: "Screen Sharing Started" });
 
       stream.getVideoTracks()[0].onended = () => stopScreenShare();
-      setRealtimeParticipants(prev => [...prev]); // Force update
+      setRealtimeParticipants(prev => [...prev]);
 
     } catch (err) {
       console.error("[MeetingPage] Error starting screen share:", err);
@@ -829,7 +835,6 @@ export default function MeetingPage() {
       <div className={cn("flex flex-1 overflow-hidden transition-all duration-300 ease-in-out", isParticipantsPanelOpen ? "mr-[300px]" : "mr-0")}>
         <main className="flex-1 p-2 sm:p-4">
             {(() => {
-            // No remote participants, just show self view
             if (remoteParticipants.length === 0) {
                 return (
                 <div className="h-full w-full">
@@ -845,7 +850,6 @@ export default function MeetingPage() {
                 </div>
                 );
             }
-            // 1 remote participant: Full screen
             if (remoteParticipants.length === 1) {
                 return (
                 <div className="h-full w-full">
@@ -853,7 +857,6 @@ export default function MeetingPage() {
                 </div>
                 );
             }
-            // 2 remote participants: Vertical split
             if (remoteParticipants.length === 2) {
                 return (
                 <div className="h-full w-full flex flex-col gap-2 sm:gap-4">
@@ -865,7 +868,6 @@ export default function MeetingPage() {
                 </div>
                 );
             }
-            // 3 remote participants: 1 on top, two below
             if (remoteParticipants.length === 3) {
                 const topParticipant = host || remoteParticipants[0];
                 const bottomParticipants = remoteParticipants.filter(p => p.id !== topParticipant.id);
@@ -884,7 +886,6 @@ export default function MeetingPage() {
                 </div>
                 );
             }
-            // 4 or more participants: 2x2 grid (host prioritized)
             return (
                 <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4">
                 {mainGridParticipants.map(participant => (

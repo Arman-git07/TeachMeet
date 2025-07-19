@@ -1,73 +1,81 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
+    // ===== HELPER FUNCTIONS =====
+    function isUserAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isUserAuthenticated() && request.auth.uid == userId;
     }
+    
+    // ===== USERS =====
+    match /users/{userId} {
+      // Users can read/write their own document, e.g. for profile updates
+      allow read, write: if isOwner(userId);
 
-    // Teachings: Main collection for all classes
-    match /teachings/{teachingId} {
-      // Allow reading public teachings, or if user is the creator, or if they are in the allowedStudents list
-      allow read: if resource.data.isPublic == true || (isSignedIn() && (resource.data.creatorId == request.auth.uid || request.auth.uid in resource.data.allowedStudents));
-
-      // Allow creation if signed in and creatorId matches the user
-      allow create: if isSignedIn() && request.resource.data.creatorId == request.auth.uid;
-      
-      // Allow updates if user is the creator
-      // This includes adding/removing from pendingRequests and allowedStudents
-      allow update: if isSignedIn() && resource.data.creatorId == request.auth.uid;
-      
-      // Allow deletion only by the creator
-      allow delete: if isSignedIn() && resource.data.creatorId == request.auth.uid;
+      // --- USER SUBCOLLECTIONS ---
+      // These rules secure the lists of teachings a user has created or enrolled in.
+      // Only the user themselves can read or modify these lists.
+      match /myTeachings/{teachingId} {
+        allow read, write, delete: if isOwner(userId);
+      }
+      match /enrolledTeachings/{teachingId} {
+        allow read, write, delete: if isOwner(userId);
+      }
     }
-
-    // User-specific subcollections
-    match /users/{userId}/{collection}/{docId} {
-      allow read, write, delete: if isOwner(userId);
-    }
-
-    // Meetings
+    
+    // ===== MEETINGS =====
     match /meetings/{meetingId} {
-      allow read: if isSignedIn();
+      allow read: if isUserAuthenticated();
       allow create: if isOwner(request.resource.data.creatorId);
-      // Only the creator can update the main meeting document (e.g., topic, pendingRequests)
-      allow update: if isSignedIn() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
-      allow delete: if isSignedIn() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
+      // Allow update for adding pendingRequests by any authenticated user
+      allow update: if isUserAuthenticated(); 
+      allow delete: if isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
 
       match /participants/{participantId} {
-        allow read: if isSignedIn();
-        // A user can add themselves as a participant
-        allow create: if isOwner(participantId);
-        // A user can update their own status (mute, camera, etc.)
-        allow update: if isOwner(participantId);
-        // A user can remove themselves, or the host can remove them
-        allow delete: if isOwner(participantId) || get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
+        allow read, list: if isUserAuthenticated();
+        allow create, update: if isOwner(participantId);
+        allow delete: if isOwner(participantId) || isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
       }
     }
 
-    // Documents
-    match /documents/{documentId} {
-      // Read public docs, or if user is owner
-      allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
-      // Create if signed in and uploaderId is correct
-      allow create: if isSignedIn() && request.resource.data.uploaderId == request.auth.uid;
-      // Delete if owner
-      allow delete: if isSignedIn() && get(/databases/$(database)/documents/documents/$(documentId)).data.uploaderId == request.auth.uid;
-    }
+    // ===== TEACHINGS =====
+    // This is the global collection where all teaching documents are stored.
+    match /teachings/{teachingId} {
+      // Allow read if the teaching is public OR if the user is the creator OR if they are in the allowedStudents list.
+      allow read: if resource.data.isPublic == true ||
+                    isOwner(resource.data.creatorId) ||
+                    (resource.data.allowedStudents != null && request.auth.uid in resource.data.allowedStudents);
+      
+      // Allow any authenticated user to create a teaching, as long as they set themselves as the creator.
+      allow create: if isUserAuthenticated() && request.resource.data.creatorId == request.auth.uid;
 
-    // Recordings
-    match /recordings/{recordingId} {
-      allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
-      allow create: if isSignedIn() && request.resource.data.uploaderId == request.auth.uid;
-      allow delete: if isSignedIn() && get(/databases/$(database)/documents/recordings/$(recordingId)).data.uploaderId == request.auth.uid;
+      // Allow updates only by the creator. This includes adding students to `allowedStudents` and changing `pendingRequests`.
+      allow update: if isOwner(resource.data.creatorId);
+
+      // Allow deletion only by the creator.
+      allow delete: if isOwner(resource.data.creatorId);
     }
     
-    // FCM Tokens for notifications
+    // ===== DOCUMENTS & RECORDINGS =====
+    // These rules are for user-uploaded files.
+    match /{collection}/{docId} {
+      // Allow read if the document is not private, or if the user is the one who uploaded it.
+      allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
+      
+      // Allow creation by any authenticated user, as long as they set themselves as the uploader.
+      allow create: if isUserAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
+      
+      // Allow updates and deletes only by the uploader.
+      allow update, delete: if isOwner(resource.data.uploaderId);
+    }
+
+    // ===== FCM TOKENS =====
+    // For push notifications
     match /fcmTokens/{userId} {
       allow read, write: if isOwner(userId);
     }
