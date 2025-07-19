@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -11,98 +12,91 @@ service cloud.firestore {
     function isOwner(userId) {
       return isUserAuthenticated() && request.auth.uid == userId;
     }
-    
+
     function getDoc(path) {
       return get(/databases/$(database)/documents/$(path));
     }
     
     function isMeetingCreator(meetingId, userId) {
-      let meetingDoc = getDoc('meetings/' + meetingId);
-      return meetingDoc != null && meetingDoc.data.creatorId == userId;
+      return getDoc('meetings/' + meetingId).data.creatorId == userId;
     }
-
-    function isMeetingParticipant(meetingId, userId) {
-      return exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(userId));
-    }
-    
-    function isTeachingCreator(teachingId) {
-      return getDoc('teachings/' + teachingId).data.creatorId == request.auth.uid;
-    }
-    
-    function isStudent(teachingId) {
-      return getDoc('teachings/' + teachingId).data.allowedStudents.hasAny([request.auth.uid]);
-    }
-
 
     // ===== MEETINGS =====
     match /meetings/{meetingId} {
       allow read: if isUserAuthenticated();
       allow create: if isOwner(request.resource.data.creatorId);
-      allow update, delete: if isUserAuthenticated() && isMeetingCreator(meetingId, request.auth.uid);
+      allow update, delete: if isMeetingCreator(meetingId, request.auth.uid);
 
       // --- Participants ---
       match /participants/{participantId} {
-        allow list, read: if isUserAuthenticated();
+        allow read, list: if isUserAuthenticated();
         allow create, update: if isOwner(participantId);
         allow delete: if isOwner(participantId) || isMeetingCreator(meetingId, request.auth.uid);
       }
 
-      // --- Join Requests ---
+      // --- Join Requests (NEW & CORRECTED) ---
       match /joinRequests/{userId} {
-        allow create: if isUserAuthenticated() && isOwner(userId);
-        allow read: if isMeetingCreator(meetingId, request.auth.uid) || isOwner(userId);
-        allow delete: if isMeetingCreator(meetingId, request.auth.uid) || isOwner(userId);
+        // A user can create their own join request document.
+        allow create: if isOwner(userId);
+        
+        // A user can read their own request, and the host can read all requests.
+        allow read: if isOwner(userId) || isMeetingCreator(meetingId, request.auth.uid);
+        
+        // Only the host can delete (approve/deny) a request.
+        allow delete: if isMeetingCreator(meetingId, request.auth.uid);
       }
     }
-
-
-    // ===== TEACHINGS =====
-    // This model uses a single 'teachings' collection and user subcollections for relationships.
+    
+    // ===== TEACHINGS & USERS (NEW & CORRECTED) =====
+    // This new structure aligns with the user's specification for a robust teaching model.
+    
+    // This is the global collection of all teachings, public or private.
     match /teachings/{teachingId} {
-      // Allow reads if the teaching is public OR the user is the creator OR is in the allowedStudents list.
-      allow read: if resource.data.isPublic == true || (isUserAuthenticated() && (resource.data.creatorId == request.auth.uid || resource.data.allowedStudents.hasAny([request.auth.uid])));
-      
-      // Allow creation only if the creatorId in the new document matches the user making the request.
-      allow create: if isUserAuthenticated() && request.resource.data.creatorId == request.auth.uid;
-      
-      // Allow updates/deletes only by the original creator.
-      // This also covers a teacher adding/removing students from `allowedStudents`.
-      // It also covers a student adding/removing themselves from `pendingRequests`.
-      allow update: if isUserAuthenticated() && (
-        (resource.data.creatorId == request.auth.uid) || 
-        (request.resource.data.pendingRequests.hasAll(resource.data.pendingRequests) && request.resource.data.pendingRequests.size() == resource.data.pendingRequests.size() + 1)
-      );
+        // Anyone can discover public teachings.
+        // A user can read a private teaching if they are the creator or in the `allowedStudents` list.
+        allow read: if resource.data.isPublic == true 
+                    || (isUserAuthenticated() && (
+                        resource.data.creatorId == request.auth.uid 
+                        || resource.data.allowedStudents.hasAny([request.auth.uid])
+                    ));
 
-      allow delete: if isUserAuthenticated() && resource.data.creatorId == request.auth.uid;
+        // Anyone authenticated can create a teaching, as long as they set themselves as the creator.
+        allow create: if isUserAuthenticated() 
+                      && request.resource.data.creatorId == request.auth.uid;
+        
+        // Only the creator can update or delete a teaching.
+        // The update rule allows adding students to `allowedStudents` by the creator.
+        allow update, delete: if isUserAuthenticated() 
+                              && resource.data.creatorId == request.auth.uid;
     }
-
-    // ===== USERS =====
-    // User-specific subcollections for tracking their created/enrolled teachings.
+    
+    // This protects user-specific data.
     match /users/{userId} {
-      allow read, write: if isOwner(userId); // Protect user document itself.
+      // Allow a user to read/write to their own user document.
+      allow read, write: if isOwner(userId);
 
+      // --- My Teachings Subcollection (Classes created by the user) ---
       match /myTeachings/{teachingId} {
         allow read, list, write, delete: if isOwner(userId);
       }
-      
+
+      // --- Enrolled Teachings Subcollection (Classes the user has joined) ---
       match /enrolledTeachings/{teachingId} {
         allow read, list, write, delete: if isOwner(userId);
       }
     }
 
-
-    // ===== DOCUMENTS & RECORDINGS =====
-    // Generic rules for user-uploaded content in Storage-mirroring collections.
+    // ===== FILE STORAGE METADATA =====
     match /documents/{docId} {
-        allow read: if isUserAuthenticated() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-        allow create: if isUserAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if isUserAuthenticated() && resource.data.uploaderId == request.auth.uid;
+      allow read: if resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid;
+      allow create: if isOwner(request.resource.data.uploaderId);
+      allow delete: if isOwner(resource.data.uploaderId);
     }
-
+    
     match /recordings/{recId} {
-        allow read: if isUserAuthenticated() && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-        allow create: if isUserAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if isUserAuthenticated() && resource.data.uploaderId == request.auth.uid;
+      allow read: if resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid;
+      allow create: if isOwner(request.resource.data.uploaderId);
+      allow delete: if isOwner(resource.data.uploaderId);
     }
   }
 }

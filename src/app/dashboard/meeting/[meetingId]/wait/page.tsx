@@ -221,12 +221,30 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
-    // Direct entry for the host
     if (isHost) {
-        const joinNowLinkPath = topic 
-            ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-            : `/dashboard/meeting/${meetingId}`;
-        router.push(joinNowLinkPath);
+        try {
+            // Even if host, we create the participant document here to ensure they exist.
+            const participantRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+            await setDoc(participantRef, {
+                userId: user.uid,
+                name: user.displayName || userName,
+                photoURL: user.photoURL,
+                isMicMuted: !isMicActive,
+                isCameraOff: !isCameraActive,
+                isHandRaised: false,
+                isScreenSharing: false,
+                joinedAt: serverTimestamp(),
+            }, { merge: true }); // Merge to not overwrite if somehow already there
+
+            const joinNowLinkPath = topic 
+                ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+                : `/dashboard/meeting/${meetingId}`;
+            router.push(joinNowLinkPath);
+
+        } catch (error) {
+            console.error("Error setting host as participant:", error);
+            toast({ variant: 'destructive', title: 'Join Failed', description: 'Could not register you as a participant. Check console and Firestore rules.' });
+        }
     } else {
       // Logic for guests requesting to join
       setJoinStatus('pending');

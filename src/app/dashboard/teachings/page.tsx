@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -88,11 +88,13 @@ export interface Teaching {
 }
 
 export interface EnrolledTeachingInfo {
-  id: string;
-  title: string;
-  description: string;
-  creatorName: string;
+    id: string;
+    title: string;
+    description: string;
+    creatorName: string;
+    teachingRef: DocumentReference;
 }
+
 
 const CreateTeachingDialogContent = ({
   onSuccess,
@@ -126,18 +128,25 @@ const CreateTeachingDialogContent = ({
       return;
     }
     if (!title.trim()) {
-      toast({ variant: 'destructive', title: 'Title Required' });
+      toast({ variant: 'destructive', title: 'Title is required' });
       return;
     }
     setIsLoading(true);
 
     try {
+      const batch = writeBatch(db);
+
       if (teachingToEdit) {
         // --- UPDATE EXISTING TEACHING ---
         const teachingRef = doc(db, 'teachings', teachingToEdit.id);
-        await updateDoc(teachingRef, { title, description, isPublic });
+        batch.update(teachingRef, { title, description, isPublic });
+
+        const myTeachingRef = doc(db, 'users', user.uid, 'myTeachings', teachingToEdit.id);
+        batch.update(myTeachingRef, { title, description, isPublic });
+
       } else {
         // --- CREATE NEW TEACHING ---
+        const teachingRef = doc(collection(db, 'teachings'));
         const teachingData = {
           title: title.trim(),
           description: description.trim(),
@@ -148,9 +157,17 @@ const CreateTeachingDialogContent = ({
           pendingRequests: [],
           createdAt: serverTimestamp(),
         };
-        await addDoc(collection(db, 'teachings'), teachingData);
+        batch.set(teachingRef, teachingData);
+
+        // Also add to user's "myTeachings" list
+        const myTeachingRef = doc(db, 'users', user.uid, 'myTeachings', teachingRef.id);
+        batch.set(myTeachingRef, {
+            ...teachingData,
+            teachingRef: teachingRef
+        });
       }
       
+      await batch.commit();
       toast({ title: teachingToEdit ? 'Teaching Updated' : 'Teaching Created', description: `"${title}" has been successfully saved.` });
       onSuccess();
 
@@ -166,7 +183,7 @@ const CreateTeachingDialogContent = ({
     <>
       <DialogHeader>
         <DialogTitle>{teachingToEdit ? 'Edit Teaching' : 'Create New Teaching'}</DialogTitle>
-        <DialogDescription>{teachingToEdit ? 'Update the details.' : 'Fill out the details to create a new class.'}</DialogDescription>
+        <DialogDescription>{teachingToEdit ? 'Update the details.' : 'Fill out the details for your new class.'}</DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4">
         <div className="grid grid-cols-4 items-center gap-4">
@@ -198,7 +215,7 @@ export default function TeachingsPage() {
   const { toast } = useToast();
   
   const [myTeachings, setMyTeachings] = useState<Teaching[]>([]);
-  const [enrolledTeachings, setEnrolledTeachings] = useState<Teaching[]>([]);
+  const [enrolledTeachingsInfo, setEnrolledTeachingsInfo] = useState<EnrolledTeachingInfo[]>([]);
   const [discoverTeachings, setDiscoverTeachings] = useState<Teaching[]>([]);
   
   const [isLoadingMy, setIsLoadingMy] = useState(true);
@@ -211,37 +228,52 @@ export default function TeachingsPage() {
   const [teachingToDelete, setTeachingToDelete] = useState<Teaching | null>(null);
   const [teachingToManage, setTeachingToManage] = useState<Teaching | null>(null);
 
-  // Fetch all teachings based on user's role
+  // Fetch My Teachings
   useEffect(() => {
     if (!user) {
-      setIsLoadingMy(false);
-      setIsLoadingEnrolled(false);
-      setMyTeachings([]);
-      setEnrolledTeachings([]);
-    } else {
-        // My Teachings
-        const myQuery = query(collection(db, 'teachings'), where('creatorId', '==', user.uid));
-        const unsubMy = onSnapshot(myQuery, (snapshot) => {
-            const teachingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching));
-            setMyTeachings(teachingsData);
-            setIsLoadingMy(false);
-        }, (error) => { console.error("My Teachings fetch error:", error); setIsLoadingMy(false); });
-
-        // Enrolled Teachings
-        const enrolledQuery = query(collection(db, 'teachings'), where('allowedStudents', 'array-contains', user.uid));
-        const unsubEnrolled = onSnapshot(enrolledQuery, (snapshot) => {
-            const teachingsData = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Teaching))
-                .filter(t => t.creatorId !== user.uid); // Exclude their own teachings
-            setEnrolledTeachings(teachingsData);
-            setIsLoadingEnrolled(false);
-        }, (error) => { console.error("Enrolled Teachings fetch error:", error); setIsLoadingEnrolled(false); });
-
-        return () => {
-            unsubMy();
-            unsubEnrolled();
-        };
+        setIsLoadingMy(false);
+        setMyTeachings([]);
+        return;
     }
+    const myQuery = query(collection(db, 'users', user.uid, 'myTeachings'));
+    const unsubMy = onSnapshot(myQuery, (snapshot) => {
+        const teachingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching));
+        setMyTeachings(teachingsData);
+        setIsLoadingMy(false);
+    }, (error) => { console.error("My Teachings fetch error:", error); setIsLoadingMy(false); });
+    return () => unsubMy();
+  }, [user]);
+
+  // Fetch Enrolled Teachings
+  useEffect(() => {
+    if (!user) {
+        setIsLoadingEnrolled(false);
+        setEnrolledTeachingsInfo([]);
+        return;
+    }
+    const enrolledQuery = query(collection(db, 'users', user.uid, 'enrolledTeachings'));
+    const unsubEnrolled = onSnapshot(enrolledQuery, async (snapshot) => {
+        const enrolledDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EnrolledTeachingInfo));
+        const teachingsPromises = enrolledDocs.map(async (info) => {
+            if (info.teachingRef) {
+                const teachingSnap = await getDoc(info.teachingRef);
+                if (teachingSnap.exists()) {
+                    return { id: teachingSnap.id, ...teachingSnap.data() } as Teaching;
+                }
+            }
+            return null;
+        });
+        const resolvedTeachings = (await Promise.all(teachingsPromises)).filter(t => t !== null) as Teaching[];
+        setEnrolledTeachingsInfo(resolvedTeachings.map(t => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            creatorName: t.creatorName,
+            teachingRef: doc(db, 'teachings', t.id)
+        })));
+        setIsLoadingEnrolled(false);
+    }, (error) => { console.error("Enrolled Teachings fetch error:", error); setIsLoadingEnrolled(false); });
+    return () => unsubEnrolled();
   }, [user]);
 
   // Fetch public teachings for discovery
@@ -257,7 +289,6 @@ export default function TeachingsPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch public teachings.' });
         setIsLoadingDiscover(false);
     });
-
     return () => unsubDiscover();
   }, [toast]);
 
@@ -274,7 +305,13 @@ export default function TeachingsPage() {
   const handleDelete = async () => {
     if (!teachingToDelete || !user) return;
     try {
-        await deleteDoc(doc(db, 'teachings', teachingToDelete.id));
+        const batch = writeBatch(db);
+        const teachingRef = doc(db, 'teachings', teachingToDelete.id);
+        const myTeachingRef = doc(db, 'users', user.uid, 'myTeachings', teachingToDelete.id);
+        batch.delete(teachingRef);
+        batch.delete(myTeachingRef);
+        await batch.commit();
+
         toast({ title: 'Success', description: `Teaching "${teachingToDelete.title}" deleted.` });
         setTeachingToDelete(null);
     } catch (error) {
@@ -306,15 +343,26 @@ export default function TeachingsPage() {
   const handleApproveRequest = async (studentId: string) => {
     if (!teachingToManage || !user) return;
     try {
+        const batch = writeBatch(db);
+        
         const teachingRef = doc(db, 'teachings', teachingToManage.id);
-        await updateDoc(teachingRef, {
+        batch.update(teachingRef, {
             pendingRequests: arrayRemove(studentId),
             allowedStudents: arrayUnion(studentId),
         });
+
+        const studentEnrolledRef = doc(db, 'users', studentId, 'enrolledTeachings', teachingToManage.id);
+        batch.set(studentEnrolledRef, {
+            title: teachingToManage.title,
+            description: teachingToManage.description,
+            creatorName: teachingToManage.creatorName,
+            teachingRef: teachingRef,
+            joinedAt: serverTimestamp(),
+        });
         
-        toast({ title: 'Success', description: 'Student approved.' });
+        await batch.commit();
+        toast({ title: 'Success', description: 'Student approved and enrolled.' });
         
-        // This will update automatically via the snapshot listener, but for immediate feedback:
         setTeachingToManage(prev => prev ? ({ ...prev, pendingRequests: prev.pendingRequests.filter(id => id !== studentId), allowedStudents: [...prev.allowedStudents, studentId] }) : null);
 
     } catch (error) {
@@ -328,7 +376,6 @@ export default function TeachingsPage() {
       const teachingRef = doc(db, 'teachings', teachingToManage.id);
       await updateDoc(teachingRef, { pendingRequests: arrayRemove(studentId) });
       toast({ title: 'Success', description: 'Student denied.' });
-       // This will update automatically via the snapshot listener, but for immediate feedback:
       setTeachingToManage(prev => prev ? ({ ...prev, pendingRequests: prev.pendingRequests.filter(id => id !== studentId) }) : null);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not deny student.' });
@@ -360,17 +407,17 @@ export default function TeachingsPage() {
     </Card>
   );
   
-  const renderEnrolledTeachingCard = (teaching: Teaching) => (
-      <Card key={teaching.id}>
+  const renderEnrolledTeachingCard = (teachingInfo: EnrolledTeachingInfo) => (
+      <Card key={teachingInfo.id}>
           <CardHeader>
-              <CardTitle>{teaching.title}</CardTitle>
-              <CardDescription>{teaching.description || "No description."}</CardDescription>
+              <CardTitle>{teachingInfo.title}</CardTitle>
+              <CardDescription>{teachingInfo.description || "No description."}</CardDescription>
           </CardHeader>
           <CardContent>
-              <p className="text-sm text-muted-foreground">Created by: {teaching.creatorName}</p>
+              <p className="text-sm text-muted-foreground">Created by: {teachingInfo.creatorName}</p>
           </CardContent>
           <CardFooter>
-              <Button asChild className="w-full"><Link href={`/dashboard/teachings/${teaching.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+              <Button asChild className="w-full"><Link href={`/dashboard/teachings/${teachingInfo.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
           </CardFooter>
       </Card>
   );
@@ -380,7 +427,7 @@ export default function TeachingsPage() {
     const isPending = teaching.pendingRequests?.includes(user.uid);
     const isMember = teaching.allowedStudents?.includes(user.uid);
 
-    if (isMember) return null; // Don't show if they are already a member (creator or enrolled)
+    if (isMember) return null;
 
     return (
       <Card key={teaching.id}>
@@ -424,7 +471,7 @@ export default function TeachingsPage() {
   const EnrolledTeachingsTab = () => {
     if (isLoadingEnrolled || authLoading) return renderSkeleton();
     if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your enrolled classes.</p>;
-    if (enrolledTeachings.length === 0) {
+    if (enrolledTeachingsInfo.length === 0) {
        return (
         <div className="text-center py-10">
           <p className="text-muted-foreground">You are not enrolled in any teachings.</p>
@@ -434,7 +481,7 @@ export default function TeachingsPage() {
     }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {enrolledTeachings.map(renderEnrolledTeachingCard)}
+        {enrolledTeachingsInfo.map(renderEnrolledTeachingCard)}
       </div>
     );
   };
@@ -442,8 +489,7 @@ export default function TeachingsPage() {
   const DiscoverTeachingsTab = () => {
     if (isLoadingDiscover) return renderSkeleton();
     
-    // Filter out teachings the user has already joined or created.
-    const enrolledIds = new Set(enrolledTeachings.map(t => t.id).concat(myTeachings.map(t => t.id)));
+    const enrolledIds = new Set(enrolledTeachingsInfo.map(t => t.id).concat(myTeachings.map(t => t.id)));
     const discoverable = discoverTeachings.filter(t => !enrolledIds.has(t.id));
 
     if (discoverable.length === 0) return <p className="text-muted-foreground text-center py-10">No public teachings to discover right now.</p>;
@@ -476,7 +522,7 @@ export default function TeachingsPage() {
                     {teachingToManage?.pendingRequests?.length ? teachingToManage.pendingRequests.map(studentId => (
                         <div key={studentId} className="flex items-center justify-between p-2 rounded-lg bg-muted">
                            <div className="flex items-center gap-2">
-                             <Avatar><AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user"/><AvatarFallback>{studentId.substring(0, 1)}</AvatarFallback></Avatar>
+                             <Avatar><AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user" /><AvatarFallback>{studentId.substring(0, 1)}</AvatarFallback></Avatar>
                              <span className="text-sm font-mono truncate" title={studentId}>...{studentId.slice(-6)}</span>
                            </div>
                            <div className="flex gap-1">

@@ -11,7 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -528,23 +527,6 @@ export default function MeetingPage() {
 
         const meetingData = meetingDocSnap.data();
         setMeetingCreatorId(meetingData?.creatorId || null);
-
-        // Only auto-join if user is creator
-        if (currentUser.uid === meetingData?.creatorId) {
-          const participantDocRef = doc(meetingDocRef, "participants", currentUser.uid);
-          const participantData = {
-            userId: currentUser.uid,
-            name: currentUser.displayName || currentUser.email?.split('@')[0] || "Anonymous",
-            photoURL: currentUser.photoURL,
-            isMicMuted: initialMicMuted,
-            isCameraOff: initialCameraOff,
-            isHandRaised: false,
-            isScreenSharing: false,
-            joinedAt: serverTimestamp(),
-          };
-
-          await setDoc(participantDocRef, participantData, { merge: true });
-        }
         
         setJoinStatus('joined');
 
