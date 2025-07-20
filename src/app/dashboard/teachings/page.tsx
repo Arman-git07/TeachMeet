@@ -141,9 +141,6 @@ const CreateTeachingDialogContent = ({
         const teachingRef = doc(db, 'teachings', teachingToEdit.id);
         batch.update(teachingRef, { title, description, isPublic });
 
-        const myTeachingRef = doc(db, 'users', user.uid, 'myTeachings', teachingToEdit.id);
-        batch.update(myTeachingRef, { title, description, isPublic });
-
       } else {
         // --- CREATE NEW TEACHING ---
         const teachingRef = doc(collection(db, 'teachings'));
@@ -162,8 +159,10 @@ const CreateTeachingDialogContent = ({
         // Also add to user's "myTeachings" list
         const myTeachingRef = doc(db, 'users', user.uid, 'myTeachings', teachingRef.id);
         batch.set(myTeachingRef, {
-            ...teachingData,
-            teachingRef: teachingRef
+            title: teachingData.title,
+            description: teachingData.description,
+            creatorName: teachingData.creatorName,
+            teachingRef: teachingRef,
         });
       }
       
@@ -228,14 +227,14 @@ export default function TeachingsPage() {
   const [teachingToDelete, setTeachingToDelete] = useState<Teaching | null>(null);
   const [teachingToManage, setTeachingToManage] = useState<Teaching | null>(null);
 
-  // Fetch My Teachings
+  // Fetch My Teachings - now listens to the main `teachings` collection
   useEffect(() => {
     if (!user) {
         setIsLoadingMy(false);
         setMyTeachings([]);
         return;
     }
-    const myQuery = query(collection(db, 'users', user.uid, 'myTeachings'));
+    const myQuery = query(collection(db, 'teachings'), where('creatorId', '==', user.uid));
     const unsubMy = onSnapshot(myQuery, (snapshot) => {
         const teachingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teaching));
         setMyTeachings(teachingsData);
