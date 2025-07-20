@@ -1,0 +1,76 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== HELPER FUNCTIONS =====
+    function isUserAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isUserAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getDoc(path) {
+      return get(/databases/$(database)/documents/$(path));
+    }
+    
+    function isMeetingCreator(meetingId, userId) {
+      let meetingDoc = getDoc('meetings/' + meetingId);
+      return meetingDoc != null && meetingDoc.data.creatorId == userId;
+    }
+    
+    // ===== USERS =====
+    match /users/{userId}/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // ===== MEETINGS =====
+    match /meetings/{meetingId} {
+      allow read: if isUserAuthenticated();
+      allow create: if isOwner(request.resource.data.creatorId);
+      allow update, delete: if isMeetingCreator(meetingId, request.auth.uid);
+
+      // --- Participants ---
+      match /participants/{participantId} {
+        allow list, read: if isUserAuthenticated();
+        allow create: if isOwner(participantId) || isMeetingCreator(meetingId, request.auth.uid);
+        allow update: if isOwner(participantId);
+        allow delete: if isOwner(participantId) || isMeetingCreator(meetingId, request.auth.uid);
+      }
+
+      // --- Join Requests ---
+      match /joinRequests/{requestUserId} {
+        allow create: if isOwner(requestUserId);
+        allow list, read, delete: if isMeetingCreator(meetingId, request.auth.uid);
+      }
+    }
+    
+    // ===== TEACHINGS =====
+    match /teachings/{teachingId} {
+      // Allow public read, or read if user is in allowedStudents array
+      allow read: if resource.data.isPublic == true || (isUserAuthenticated() && resource.data.allowedStudents.hasAny([request.auth.uid]));
+      allow list: if isUserAuthenticated();
+      allow create: if isUserAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+      // Only the creator can update or delete
+      allow update, delete: if isUserAuthenticated() && resource.data.creatorId == request.auth.uid;
+    }
+    
+    // ===== DOCUMENTS & RECORDINGS =====
+    // These rules are simplified. They allow reading if public, or if the user is the owner.
+    // They allow writing only by the owner.
+    match /documents/{docId} {
+        allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
+        allow create: if isOwner(request.resource.data.uploaderId);
+        allow update, delete: if isOwner(resource.data.uploaderId);
+    }
+    
+    match /recordings/{recId} {
+        allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
+        allow create: if isOwner(request.resource.data.uploaderId);
+        allow update, delete: if isOwner(resource.data.uploaderId);
+    }
+  }
+}
