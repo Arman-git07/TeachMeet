@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, collection, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -75,34 +75,28 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    // Listener for the user's specific join request document being deleted (denied)
-    const joinRequestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-    const unsubJoinRequest = onSnapshot(joinRequestDocRef, (doc) => {
-      if (!doc.exists()) {
+    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+    const unsubscribe = onSnapshot(participantDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.status === 'accepted') {
+          setJoinStatus('approved');
+          toast({ title: "Request Approved!", description: "You are now joining the meeting." });
+          const joinNowLinkPath = topic 
+            ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+            : `/dashboard/meeting/${meetingId}`;
+          router.push(joinNowLinkPath);
+        }
+      } else {
+        // If doc is deleted, it means the request was denied
         if (joinStatus === 'pending') {
           setJoinStatus('denied');
         }
       }
     });
-    
-    // Listener for the user being added to the participants list (approved)
-    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
-    const unsubParticipant = onSnapshot(participantDocRef, (doc) => {
-        if (doc.exists()) {
-            setJoinStatus('approved');
-            toast({ title: "Request Approved!", description: "You are now joining the meeting." });
-            const joinNowLinkPath = topic 
-              ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-              : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
-        }
-    });
 
-    return () => {
-      unsubJoinRequest();
-      unsubParticipant();
-    };
-  }, [user, meetingId, joinStatus, router, topic, toast, isHost]);
+    return () => unsubscribe();
+  }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
 
 
   useEffect(() => {
@@ -220,48 +214,40 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
-    if (isHost) {
-        try {
-            // Even if host, we create the participant document here to ensure they exist.
-            const participantRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
-            await setDoc(participantRef, {
-                userId: user.uid,
-                name: user.displayName || userName,
-                photoURL: user.photoURL,
-                isMicMuted: !isMicActive,
-                isCameraOff: !isCameraActive,
-                isHandRaised: false,
-                isScreenSharing: false,
-                joinedAt: serverTimestamp(),
-            }, { merge: true }); // Merge to not overwrite if somehow already there
+    const participantId = user.uid;
+    const participantRef = doc(db, 'meetings', meetingId, 'participants', participantId);
+    
+    // For both host and guest, we create the participant document.
+    // The status field will differentiate them.
+    const participantData = {
+      userId: participantId,
+      name: user.displayName || userName,
+      photoURL: user.photoURL,
+      isMicMuted: !isMicActive,
+      isCameraOff: !isCameraActive,
+      isHandRaised: false,
+      isScreenSharing: false,
+      joinedAt: serverTimestamp(),
+      status: isHost ? 'accepted' : 'pending',
+    };
 
-            const joinNowLinkPath = topic 
-                ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-                : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
+    try {
+      await setDoc(participantRef, participantData, { merge: true });
 
-        } catch (error) {
-            console.error("Error setting host as participant:", error);
-            toast({ variant: 'destructive', title: 'Join Failed', description: 'Could not register you as a participant. Check console and Firestore rules.' });
-        }
-    } else {
-      // Logic for guests requesting to join
-      setJoinStatus('pending');
-      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
-      
-      try {
-          const joinRequestRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-          await setDoc(joinRequestRef, {
-            name: user.displayName || userName,
-            photoURL: user.photoURL,
-            timestamp: serverTimestamp(),
-            status: 'pending'
-          });
-      } catch (error) {
-          console.error("Error sending join request:", error);
-          toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Please check the meeting ID, your connection, and Firestore rules.'});
-          setJoinStatus('idle');
+      if (isHost) {
+        const joinNowLinkPath = topic 
+          ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+          : `/dashboard/meeting/${meetingId}`;
+        router.push(joinNowLinkPath);
+      } else {
+        setJoinStatus('pending');
+        toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
       }
+
+    } catch (error: any) {
+        console.error("Error sending join request:", error);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
+        setJoinStatus('idle');
     }
   };
 

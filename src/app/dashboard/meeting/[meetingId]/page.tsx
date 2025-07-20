@@ -60,7 +60,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, storage } from '@/lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc, addDoc, arrayRemove, arrayUnion, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp, query, DocumentData, getDoc, addDoc, arrayRemove, arrayUnion, writeBatch, where } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
@@ -75,6 +75,7 @@ interface Participant {
   isHandRaisedForView?: boolean;
   isScreenSharing?: boolean;
   photoURL?: string | null;
+  status: 'pending' | 'accepted';
 }
 
 interface JoinRequest {
@@ -105,8 +106,6 @@ function ParticipantView({
 
   useEffect(() => {
     if (videoRef.current) {
-      // For remote participants (not implemented with WebRTC yet), you might show a placeholder.
-      // For the local user, we directly assign their stream.
       videoRef.current.srcObject = stream || null;
     }
   }, [stream]);
@@ -243,8 +242,9 @@ export default function MeetingPage() {
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
   
-  const selfView = realtimeParticipants.find(p => p.id === currentUser?.uid);
-  const remoteParticipants = realtimeParticipants.filter(p => p.id !== currentUser?.uid);
+  const acceptedParticipants = realtimeParticipants.filter(p => p.status === 'accepted');
+  const selfView = acceptedParticipants.find(p => p.id === currentUser?.uid);
+  const remoteParticipants = acceptedParticipants.filter(p => p.id !== currentUser?.uid);
 
   const host = remoteParticipants.find(p => p.id === meetingCreatorId);
   const otherParticipants = remoteParticipants.filter(p => p.id !== meetingCreatorId);
@@ -257,28 +257,9 @@ export default function MeetingPage() {
     if (!isCurrentUserHost) return;
     
     try {
-        const batch = writeBatch(db);
-        
-        // Add to participants subcollection
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", request.id);
-        batch.set(participantDocRef, {
-          userId: request.id,
-          name: request.name,
-          photoURL: request.photoURL,
-          isMicMuted: true,
-          isCameraOff: true,
-          isHandRaised: false,
-          isScreenSharing: false,
-          joinedAt: serverTimestamp(),
-        });
-        
-        // Delete from joinRequests subcollection
-        const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
-        batch.delete(requestDocRef);
-        
-        await batch.commit();
-
-        toast({ title: "Request Approved", description: `${request.name} has been allowed to join.` });
+      const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+      await updateDoc(participantRef, { status: 'accepted' });
+      toast({ title: "Request Approved", description: `${request.name} has been allowed to join.` });
     } catch (error) {
         console.error("Failed to approve request:", error);
         toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant.' });
@@ -288,8 +269,8 @@ export default function MeetingPage() {
   const handleDenyRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
     try {
-        const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
-        await deleteDoc(requestDocRef);
+        const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+        await deleteDoc(participantRef);
         toast({ title: "Request Denied", description: `${request.name}'s request to join has been denied.` });
     } catch (error) {
         console.error("Failed to deny request:", error);
@@ -300,8 +281,9 @@ export default function MeetingPage() {
   useEffect(() => {
     if (!isCurrentUserHost || !meetingId) return;
 
-    const requestsColRef = collection(db, "meetings", meetingId, "joinRequests");
-    const unsubscribe = onSnapshot(requestsColRef, (snapshot) => {
+    const participantsColRef = collection(db, "meetings", meetingId, "participants");
+    const q = query(participantsColRef, where("status", "==", "pending"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         snapshot.docs.forEach((doc) => {
             const request = { id: doc.id, ...doc.data() } as JoinRequest;
             const toastId = `join-request-${request.id}`;
@@ -438,9 +420,9 @@ export default function MeetingPage() {
             <h2 className="text-base sm:text-lg font-semibold text-foreground truncate" title={displayTitle}>
               {displayTitle}
             </h2>
-            {realtimeParticipants.length > 0 && (
+            {acceptedParticipants.length > 0 && (
               <span className="text-xs sm:text-sm text-muted-foreground">
-                {realtimeParticipants.length} Participant{realtimeParticipants.length === 1 ? '' : 's'}
+                {acceptedParticipants.length} Participant{acceptedParticipants.length === 1 ? '' : 's'}
               </span>
             )}
           </div>
@@ -492,7 +474,7 @@ export default function MeetingPage() {
   }, [
       setHeaderContent, 
       displayTitle, 
-      realtimeParticipants.length, 
+      acceptedParticipants.length, 
       isScreenSharingActive, 
       router, 
       isCurrentUserHost,
@@ -569,6 +551,7 @@ export default function MeetingPage() {
           isScreenSharing: data.isScreenSharing,
           isMe: isCurrentUser,
           stream: isCurrentUser ? (isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current) : null,
+          status: data.status,
         });
       });
       setRealtimeParticipants(fetchedParticipants);
@@ -900,14 +883,14 @@ export default function MeetingPage() {
       >
         <div className="h-full flex flex-col">
             <div className="flex items-center justify-between p-3 border-b">
-                <h3 className="font-semibold text-foreground">Participants ({realtimeParticipants.length})</h3>
+                <h3 className="font-semibold text-foreground">Participants ({acceptedParticipants.length})</h3>
                 <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setIsParticipantsPanelOpen(false)}>
                     <PanelRightClose className="h-5 w-5"/>
                 </Button>
             </div>
             <ScrollArea className="flex-1">
                 <div className="p-2 space-y-1">
-                    {realtimeParticipants.map(p => (
+                    {acceptedParticipants.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
                             <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">

@@ -47,7 +47,6 @@ import {
   query,
   where,
   writeBatch,
-  DocumentReference,
 } from 'firebase/firestore';
 import {
   PlusCircle,
@@ -131,6 +130,7 @@ const CreateClassroomDialogContent = ({
         // --- UPDATE EXISTING CLASSROOM ---
         const classroomRef = doc(db, 'classrooms', classroomToEdit.id);
         await updateDoc(classroomRef, { title, description, isPublic });
+        toast({ title: 'Classroom Updated', description: `"${title}" has been successfully updated.` });
       } else {
         // --- CREATE NEW CLASSROOM ---
         const classroomData = {
@@ -139,13 +139,14 @@ const CreateClassroomDialogContent = ({
           teacherId: user.uid,
           teacherName: user.displayName || 'Anonymous Teacher',
           isPublic,
-          students: [user.uid], // Teacher is always a member
+          students: [], // No one is enrolled initially except the teacher conceptually
           createdAt: serverTimestamp(),
         };
+        // The rules now handle the teacherId check
         await addDoc(collection(db, 'classrooms'), classroomData);
+        toast({ title: 'Classroom Created', description: `"${title}" has been successfully created.` });
       }
       
-      toast({ title: classroomToEdit ? 'Classroom Updated' : 'Classroom Created', description: `"${title}" has been successfully saved.` });
       onSuccess();
 
     } catch (error) {
@@ -408,4 +409,3 @@ export default function ClassroomsPage() {
     </div>
   );
 }
-

@@ -4,11 +4,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, collection, query, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, updateDoc, writeBatch, where, arrayUnion, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Megaphone, BookCopy, FileQuestion, MessageSquare, Loader2, Check, UserPlus } from 'lucide-react';
+import { ArrowLeft, Megaphone, BookCopy, FileQuestion, MessageSquare, Loader2, Check, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
 import type { Classroom } from '../page';
 import { useAuth } from '@/hooks/useAuth';
@@ -77,11 +77,11 @@ export default function ClassroomPage() {
       try {
         const batch = writeBatch(db);
 
-        // Update the request status
+        // Delete the request
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, studentId);
-        batch.update(requestRef, { status: 'accepted' });
+        batch.delete(requestRef);
 
-        // Add student to the classroom's student list
+        // Add student to the classroom's student list (optional, can be inferred)
         const classroomRef = doc(db, 'classrooms', classroomId);
         batch.update(classroomRef, {
             students: arrayUnion(studentId)
@@ -113,7 +113,7 @@ export default function ClassroomPage() {
       if (!isTeacher || !classroomId) return;
        try {
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, studentId);
-        await updateDoc(requestRef, { status: 'denied' });
+        await deleteDoc(requestRef);
         toast({ title: 'Request Denied' });
       } catch (error) {
         console.error("Error denying request:", error);

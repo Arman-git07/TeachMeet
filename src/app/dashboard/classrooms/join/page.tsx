@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -85,7 +85,7 @@ export default function JoinClassroomPage() {
             router.push('/dashboard/classrooms');
         } catch (error) {
             console.error("Error sending join request:", error);
-            toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request.' });
+            toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Check console for permissions errors.' });
         } finally {
             setIsJoining(false);
         }
