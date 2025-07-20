@@ -627,7 +627,7 @@ export default function MeetingPage() {
       initializeMedia();
     }
     
-  }, [joinStatus]);
+  }, [joinStatus, isScreenSharingActive, localCameraOff, localMicMuted, toast]);
 
    useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {

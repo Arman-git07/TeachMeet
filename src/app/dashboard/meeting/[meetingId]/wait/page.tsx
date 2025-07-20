@@ -75,18 +75,17 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    // Listener for the user's specific join request document
+    // Listener for the user's specific join request document being deleted (denied)
     const joinRequestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const unsubJoinRequest = onSnapshot(joinRequestDocRef, (doc) => {
       if (!doc.exists()) {
-        // If the document is deleted, it means the host denied the request.
         if (joinStatus === 'pending') {
           setJoinStatus('denied');
         }
       }
     });
     
-    // Listener for the user being added to the participants list
+    // Listener for the user being added to the participants list (approved)
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
     const unsubParticipant = onSnapshot(participantDocRef, (doc) => {
         if (doc.exists()) {
