@@ -8,7 +8,7 @@ import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   DialogDescription, 
   DialogFooter, 
@@ -22,38 +22,64 @@ import { db } from '@/lib/firebase';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
+// Helper function to generate a random string, defined outside the component
+const generateRandomId = (length: number) => Math.random().toString(36).substring(2, 2 + length);
+
 export function StartMeetingDialogContent() {
-  const [meetingLink, setMeetingLink] = useState("");
-  const [meetingCode, setMeetingCode] = useState("");
-  const [meetingId, setMeetingId] = useState("");
   const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+
+  // Generate meeting details ONCE and store them in state.
+  // Using useState with a function initializer ensures this runs only on the initial render.
+  const [meetingDetails, setMeetingDetails] = useState(() => {
+    const newMeetingId = generateRandomId(8);
+    const codePart1 = generateRandomId(3);
+    const codePart2 = generateRandomId(3);
+    const codePart3 = generateRandomId(3);
+    const newMeetingCode = `${codePart1}-${codePart2}-${codePart3}`;
+    
+    let newMeetingLink = '';
+    if (typeof window !== "undefined") {
+      newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
+    } else {
+      newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
+    }
+
+    return {
+      id: newMeetingId,
+      link: newMeetingLink,
+      code: newMeetingCode,
+    };
+  });
+
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
-  const [isJoining, setIsJoining] = useState(false);
+  
+  const generateNewMeetingDetails = useCallback(() => {
+    setMeetingDetails(() => {
+      const newMeetingId = generateRandomId(8);
+      const codePart1 = generateRandomId(3);
+      const codePart2 = generateRandomId(3);
+      const codePart3 = generateRandomId(3);
+      const newMeetingCode = `${codePart1}-${codePart2}-${codePart3}`;
+      
+      let newMeetingLink = '';
+      if (typeof window !== "undefined") {
+        newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
+      } else {
+        newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
+      }
 
-  const generateMeetingDetails = useCallback(() => {
-    const randomString = (length: number) => Math.random().toString(36).substring(2, 2 + length);
-    
-    const newMeetingId = randomString(8);
-    setMeetingId(newMeetingId);
-
-    if (typeof window !== "undefined") {
-        setMeetingLink(`${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`);
-    } else {
-        setMeetingLink(`/dashboard/meeting/${newMeetingId}/wait`); 
-    }
-    
-    const codePart1 = randomString(3);
-    const codePart2 = randomString(3);
-    const codePart3 = randomString(3);
-    setMeetingCode(`${codePart1}-${codePart2}-${codePart3}`);
+      return {
+        id: newMeetingId,
+        link: newMeetingLink,
+        code: newMeetingCode,
+      };
+    });
   }, []);
 
-  useEffect(() => {
-    generateMeetingDetails();
-  }, [generateMeetingDetails]);
 
   const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
     if (!textToCopy) {
@@ -71,7 +97,7 @@ export function StartMeetingDialogContent() {
   };
 
   const handleShareInvite = () => {
-    if (!meetingLink || !meetingCode) {
+    if (!meetingDetails.link || !meetingDetails.code) {
       toast({ variant: "destructive", title: "Cannot Share", description: "Meeting details are not yet generated." });
       return;
     }
@@ -79,7 +105,7 @@ export function StartMeetingDialogContent() {
   };
   
   const handleStartAndJoinMeeting = async () => {
-    if (!meetingId || !meetingTitle.trim()) {
+    if (!meetingDetails.id || !meetingTitle.trim()) {
       toast({ variant: "destructive", title: "Missing Details", description: "Please ensure a meeting topic is set." });
       return;
     }
@@ -92,7 +118,7 @@ export function StartMeetingDialogContent() {
     const trimmedMeetingTitle = meetingTitle.trim();
     
     // Create the meeting document in Firestore immediately
-    const meetingDocRef = doc(db, "meetings", meetingId);
+    const meetingDocRef = doc(db, "meetings", meetingDetails.id);
     try {
       await setDoc(meetingDocRef, {
         creatorId: user.uid,
@@ -107,13 +133,13 @@ export function StartMeetingDialogContent() {
       if (!Array.isArray(startedMeetings)) startedMeetings = [];
       
       const newMeeting = {
-        id: meetingId,
+        id: meetingDetails.id,
         title: trimmedMeetingTitle,
         startedAt: Date.now(),
       };
 
       // Remove any existing meeting with the same ID and add the new one
-      startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingId);
+      startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
       startedMeetings.unshift(newMeeting); // Add to the beginning
       
       localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10))); // Keep max 10
@@ -121,7 +147,7 @@ export function StartMeetingDialogContent() {
       // Dispatch an event to notify the homepage to update
       window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
 
-      const joinNowLinkPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
+      const joinNowLinkPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       router.push(joinNowLinkPath);
     } catch (error) {
       console.error("Error creating meeting document:", error);
@@ -171,11 +197,11 @@ export function StartMeetingDialogContent() {
                   id="meetingLinkDialog"
                   type="text"
                   readOnly
-                  value={meetingLink || "Generating..."}
+                  value={meetingDetails.link || "Generating..."}
                   className="pl-10 rounded-lg"
                   />
               </div>
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingLink, "Link")} aria-label="Copy link" disabled={!meetingLink || isJoining} className="rounded-lg">
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingDetails.link, "Link")} aria-label="Copy link" disabled={!meetingDetails.link || isJoining} className="rounded-lg">
                 <Copy className="h-5 w-5" />
               </Button>
             </div>
@@ -192,22 +218,22 @@ export function StartMeetingDialogContent() {
                   id="meetingCodeDialog"
                   type="text"
                   readOnly
-                  value={meetingCode || "Generating..."}
+                  value={meetingDetails.code || "Generating..."}
                   className="pl-10 rounded-lg"
                 />
               </div>
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingCode, "Code")} aria-label="Copy code" disabled={!meetingCode || isJoining} className="rounded-lg">
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingDetails.code, "Code")} aria-label="Copy code" disabled={!meetingDetails.code || isJoining} className="rounded-lg">
                 <Copy className="h-5 w-5" />
               </Button>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="flex-grow rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingLink || !meetingCode || isJoining}>
+            <Button variant="outline" className="flex-grow rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingDetails.link || !meetingDetails.code || isJoining}>
               <Share2 className="mr-2 h-5 w-5" />
               Share Invite
             </Button>
-            <Button variant="ghost" size="icon" onClick={generateMeetingDetails} aria-label="Generate new link and code" disabled={isJoining} className="rounded-lg text-muted-foreground">
+            <Button variant="ghost" size="icon" onClick={generateNewMeetingDetails} aria-label="Generate new link and code" disabled={isJoining} className="rounded-lg text-muted-foreground">
               <RefreshCw className="h-5 w-5"/>
             </Button>
           </div>
@@ -222,7 +248,7 @@ export function StartMeetingDialogContent() {
             type="button" 
             onClick={handleStartAndJoinMeeting} 
             className="btn-gel rounded-lg" 
-            disabled={!meetingId || !meetingTitle.trim() || isJoining || !user}
+            disabled={!meetingDetails.id || !meetingTitle.trim() || isJoining || !user}
           >
             {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
             {isJoining ? "Starting..." : "Start and Join Meeting"}
@@ -231,8 +257,8 @@ export function StartMeetingDialogContent() {
         <ShareOptionsPanel
           isOpen={isSharePanelOpen}
           onClose={() => setIsSharePanelOpen(false)}
-          meetingLink={meetingLink}
-          meetingCode={meetingCode}
+          meetingLink={meetingDetails.link}
+          meetingCode={meetingDetails.code}
           meetingTitle={meetingTitle.trim()} 
         />
     </>
