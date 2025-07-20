@@ -8,7 +8,7 @@ import { doc, getDoc, onSnapshot, collection, query, updateDoc, writeBatch, wher
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Megaphone, BookCopy, FileQuestion, MessageSquare, Loader2, Check, UserPlus, X } from 'lucide-react';
+import { ArrowLeft, Megaphone, BookCopy, FileQuestion, MessageSquare, Loader2, Check, UserPlus, X, ClipboardList, FileText } from 'lucide-react';
 import Link from 'next/link';
 import type { Classroom } from '../page';
 import { useAuth } from '@/hooks/useAuth';
@@ -185,10 +185,12 @@ export default function ClassroomPage() {
       </div>
 
       <Tabs defaultValue="announcements" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4"/>Announcements</TabsTrigger>
           <TabsTrigger value="materials"><BookCopy className="mr-2 h-4 w-4"/>Materials</TabsTrigger>
           <TabsTrigger value="assignments"><FileQuestion className="mr-2 h-4 w-4"/>Assignments</TabsTrigger>
+          <TabsTrigger value="subjects"><ClipboardList className="mr-2 h-4 w-4"/>Subjects</TabsTrigger>
+          <TabsTrigger value="exams"><FileText className="mr-2 h-4 w-4"/>Exams</TabsTrigger>
           <TabsTrigger value="chat"><MessageSquare className="mr-2 h-4 w-4"/>Chat</TabsTrigger>
         </TabsList>
         <Card className="mt-4 rounded-xl">
@@ -221,6 +223,26 @@ export default function ClassroomPage() {
                      <div className="text-center text-muted-foreground py-16">
                         <FileQuestion className="h-12 w-12 mx-auto mb-4" />
                         <p>No assignments posted yet.</p>
+                    </div>
+                </TabsContent>
+                 <TabsContent value="subjects">
+                    <CardHeader>
+                        <CardTitle>Subjects & Teachers</CardTitle>
+                        <CardDescription>Manage subjects and assigned teachers for this classroom.</CardDescription>
+                    </CardHeader>
+                     <div className="text-center text-muted-foreground py-16">
+                        <ClipboardList className="h-12 w-12 mx-auto mb-4" />
+                        <p>No subjects assigned yet.</p>
+                    </div>
+                </TabsContent>
+                 <TabsContent value="exams">
+                    <CardHeader>
+                        <CardTitle>Exam Papers</CardTitle>
+                        <CardDescription>Upload and view exam papers and related materials.</CardDescription>
+                    </CardHeader>
+                     <div className="text-center text-muted-foreground py-16">
+                        <FileText className="h-12 w-12 mx-auto mb-4" />
+                        <p>No exam papers uploaded yet.</p>
                     </div>
                 </TabsContent>
                 <TabsContent value="chat">
