@@ -308,7 +308,8 @@ export default function ClassroomsPage() {
   );
 
   const renderDiscoverClassroomCard = (classroom: Classroom) => {
-    if (!user || classroom.teacherId === user.uid) return null;
+    // This card is only for classrooms the user hasn't created or joined.
+    // The filtering happens in the DiscoverClassesTab component.
     return (
       <Card key={classroom.id}>
           <CardHeader>
@@ -367,10 +368,23 @@ export default function ClassroomsPage() {
   };
 
   const DiscoverClassesTab = () => {
-    if (isLoadingDiscover) return renderSkeleton();
-    const enrolledIds = new Set(enrolledClasses.map(c => c.classroomId));
-    const discoverable = discoverClasses.filter(c => c.teacherId !== user?.uid && !enrolledIds.has(c.id));
-    if (discoverable.length === 0) return <p className="text-muted-foreground text-center py-10">No public classrooms to discover right now.</p>;
+    if (isLoadingDiscover || authLoading) return renderSkeleton();
+
+    // Create sets of IDs for efficient lookup
+    const myClassIds = new Set(myClasses.map(c => c.id));
+    const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
+
+    // Filter discoverable classes: must be public, not created by user, and not enrolled in by user
+    const discoverable = discoverClasses.filter(c => 
+        c.isPublic &&
+        !myClassIds.has(c.id) &&
+        !enrolledClassIds.has(c.id)
+    );
+
+    if (discoverable.length === 0) {
+        return <p className="text-muted-foreground text-center py-10">No public classrooms to discover right now.</p>;
+    }
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {discoverable.map(renderDiscoverClassroomCard)}
