@@ -253,23 +253,7 @@ export default function TeachingsPage() {
     const enrolledQuery = query(collection(db, 'users', user.uid, 'enrolledTeachings'));
     const unsubEnrolled = onSnapshot(enrolledQuery, async (snapshot) => {
         const enrolledDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EnrolledTeachingInfo));
-        const teachingsPromises = enrolledDocs.map(async (info) => {
-            if (info.teachingRef) {
-                const teachingSnap = await getDoc(info.teachingRef);
-                if (teachingSnap.exists()) {
-                    return { id: teachingSnap.id, ...teachingSnap.data() } as Teaching;
-                }
-            }
-            return null;
-        });
-        const resolvedTeachings = (await Promise.all(teachingsPromises)).filter(t => t !== null) as Teaching[];
-        setEnrolledTeachingsInfo(resolvedTeachings.map(t => ({
-            id: t.id,
-            title: t.title,
-            description: t.description,
-            creatorName: t.creatorName,
-            teachingRef: doc(db, 'teachings', t.id)
-        })));
+        setEnrolledTeachingsInfo(enrolledDocs);
         setIsLoadingEnrolled(false);
     }, (error) => { console.error("Enrolled Teachings fetch error:", error); setIsLoadingEnrolled(false); });
     return () => unsubEnrolled();
@@ -488,8 +472,9 @@ export default function TeachingsPage() {
   const DiscoverTeachingsTab = () => {
     if (isLoadingDiscover) return renderSkeleton();
     
-    const enrolledIds = new Set(enrolledTeachingsInfo.map(t => t.id).concat(myTeachings.map(t => t.id)));
-    const discoverable = discoverTeachings.filter(t => !enrolledIds.has(t.id));
+    const myTeachingIds = new Set(myTeachings.map(t => t.id));
+    const enrolledIds = new Set(enrolledTeachingsInfo.map(t => t.id));
+    const discoverable = discoverTeachings.filter(t => !myTeachingIds.has(t.id) && !enrolledIds.has(t.id));
 
     if (discoverable.length === 0) return <p className="text-muted-foreground text-center py-10">No public teachings to discover right now.</p>;
     
@@ -521,7 +506,7 @@ export default function TeachingsPage() {
                     {teachingToManage?.pendingRequests?.length ? teachingToManage.pendingRequests.map(studentId => (
                         <div key={studentId} className="flex items-center justify-between p-2 rounded-lg bg-muted">
                            <div className="flex items-center gap-2">
-                             <Avatar><AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user" /><AvatarFallback>{studentId.substring(0, 1)}</AvatarFallback></Avatar>
+                             <Avatar><AvatarImage src={`https://placehold.co/40x40.png?text=${studentId.substring(0,1)}`} data-ai-hint="avatar user"/><AvatarFallback>{studentId.substring(0, 1)}</AvatarFallback></Avatar>
                              <span className="text-sm font-mono truncate" title={studentId}>...{studentId.slice(-6)}</span>
                            </div>
                            <div className="flex gap-1">
