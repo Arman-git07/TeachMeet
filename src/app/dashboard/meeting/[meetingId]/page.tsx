@@ -280,31 +280,34 @@ export default function MeetingPage() {
 
   useEffect(() => {
     if (!isCurrentUserHost || !meetingId) return;
+  
+    const participantsRef = collection(db, `meetings/${meetingId}/participants`);
+    const q = query(participantsRef, where("status", "==", "pending"));
 
-    const participantsColRef = collection(db, "meetings", meetingId, "participants");
-    const q = query(participantsColRef, where("status", "==", "pending"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        snapshot.docs.forEach((doc) => {
-            const request = { id: doc.id, ...doc.data() } as JoinRequest;
-            const toastId = `join-request-${request.id}`;
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "added") {
+          const request = { id: change.doc.id, ...change.doc.data() } as JoinRequest;
+          const toastId = `join-request-${request.id}`;
 
-            toast({
-                id: toastId,
-                title: 'Join Request',
-                description: `${request.name} wants to join the meeting.`,
-                duration: Infinity,
-                action: (
-                  <div className="flex gap-2 mt-2">
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(request); dismiss(toastId); }}>
-                      <Check className="h-4 w-4 mr-1" /> Approve
-                    </Button>
-                    <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(request); dismiss(toastId); }}>
-                       <X className="h-4 w-4 mr-1" /> Deny
-                    </Button>
-                  </div>
-                ),
-            });
-        });
+          toast({
+              id: toastId,
+              title: 'Join Request',
+              description: `${request.name || 'A user'} wants to join the meeting.`,
+              duration: Infinity,
+              action: (
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(request); dismiss(toastId); }}>
+                    <Check className="h-4 w-4 mr-1" /> Approve
+                  </Button>
+                  <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(request); dismiss(toastId); }}>
+                     <X className="h-4 w-4 mr-1" /> Deny
+                  </Button>
+                </div>
+              ),
+          });
+        }
+      });
     });
 
     return () => unsubscribe();

@@ -16,7 +16,7 @@ import Image from 'next/image';
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 
@@ -215,10 +215,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     const participantId = user.uid;
-    const participantRef = doc(db, 'meetings', meetingId, 'participants', participantId);
+    const docPath = `meetings/${meetingId}/participants/${participantId}`;
     
-    // For both host and guest, we create the participant document.
-    // The status field will differentiate them.
     const participantData = {
       userId: participantId,
       name: user.displayName || userName,
@@ -232,7 +230,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     };
 
     try {
-      await setDoc(participantRef, participantData, { merge: true });
+      await setDoc(doc(db, docPath), participantData);
 
       if (isHost) {
         const joinNowLinkPath = topic 
@@ -245,7 +243,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       }
 
     } catch (error: any) {
-        console.error("Error sending join request:", error);
+        console.error("Join request failed:", error.code, error.message);
         toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
         setJoinStatus('idle');
     }

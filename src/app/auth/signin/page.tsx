@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { HelpCircle, Mail, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -42,50 +42,57 @@ export default function SignInPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({
-        title: "Sign In Successful",
-        description: "Welcome back!",
+    
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        // After setting persistence, perform sign-in
+        return signInWithEmailAndPassword(auth, values.email, values.password);
+      })
+      .then((userCredential) => {
+        toast({
+          title: "Sign In Successful",
+          description: "Welcome back!",
+        });
+        router.push('/');
+      })
+      .catch((error: any) => {
+        console.error("Auth persistence or sign-in failed:", error);
+  
+        let errorMessage = "An unexpected error occurred. Please try again.";
+        switch (error.code) {
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+          case 'auth/invalid-credential':
+            errorMessage = "Invalid email or password. Please try again.";
+            break;
+          case 'auth/invalid-email':
+            errorMessage = "The email address is not valid.";
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
+            break;
+          case 'auth/network-request-failed':
+            errorMessage = "Network error. Could not connect to authentication services. Please check your internet connection and ensure Firebase API keys are correctly configured in your .env file.";
+            break;
+          default:
+             if (error.code && error.code.match(/auth\/requests-to-this-api-.*/)) {
+                errorMessage = "Authentication is temporarily unavailable. This may be due to an incorrect or restricted API key. Please check your Firebase project configuration and ensure the Identity Toolkit API is enabled.";
+             } else if (error.message && error.message.includes("API key")) {
+                errorMessage = "There is an issue with the API key configuration. Please ensure it is correct, valid, and unrestricted in your .env file and Google Cloud Console.";
+             }
+             break;
+        }
+        
+        toast({
+          variant: "destructive",
+          title: "Sign In Failed",
+          description: errorMessage,
+          duration: 7000
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      router.push('/');
-    } catch (error: any) {
-      console.error("Sign In Error:", error);
-
-      let errorMessage = "An unexpected error occurred. Please try again.";
-      switch (error.code) {
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          errorMessage = "Invalid email or password. Please try again.";
-          break;
-        case 'auth/invalid-email':
-          errorMessage = "The email address is not valid.";
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = "Too many failed login attempts. Please try again later or reset your password.";
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = "Network error. Could not connect to authentication services. Please check your internet connection and ensure Firebase API keys are correctly configured in your .env file.";
-          break;
-        default:
-           if (error.code && error.code.match(/auth\/requests-to-this-api-.*/)) {
-              errorMessage = "Authentication is temporarily unavailable. This may be due to an incorrect or restricted API key. Please check your Firebase project configuration and ensure the Identity Toolkit API is enabled.";
-           } else if (error.message && error.message.includes("API key")) {
-              errorMessage = "There is an issue with the API key configuration. Please ensure it is correct, valid, and unrestricted in your .env file and Google Cloud Console.";
-           }
-           break;
-      }
-      
-      toast({
-        variant: "destructive",
-        title: "Sign In Failed",
-        description: errorMessage,
-        duration: 7000
-      });
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   return (
