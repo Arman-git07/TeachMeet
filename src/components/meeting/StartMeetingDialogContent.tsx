@@ -23,26 +23,29 @@ import { db } from '@/lib/firebase';
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 // Helper function to generate a random string, defined outside the component
-const generateRandomId = (length: number) => Math.random().toString(36).substring(2, 2 + length);
+const generateRandomId = (length: number) => {
+    // This is a simple, non-cryptographically secure random string generator.
+    // It's sufficient for unique meeting IDs in this context.
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
 
-export function StartMeetingDialogContent() {
-  const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
-  const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
-
-  // Generate meeting details ONCE and store them in state.
-  // Using useState with a function initializer ensures this runs only on the initial render.
-  const [meetingDetails, setMeetingDetails] = useState(() => {
-    const newMeetingId = generateRandomId(8);
-    const codePart1 = generateRandomId(3);
-    const codePart2 = generateRandomId(3);
-    const codePart3 = generateRandomId(3);
+const generateMeetingDetails = () => {
+    const newMeetingId = generateRandomId(9);
+    const codePart1 = newMeetingId.substring(0, 3);
+    const codePart2 = newMeetingId.substring(3, 6);
+    const codePart3 = newMeetingId.substring(6, 9);
     const newMeetingCode = `${codePart1}-${codePart2}-${codePart3}`;
     
     let newMeetingLink = '';
     if (typeof window !== "undefined") {
       newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
     } else {
+      // Fallback for server-side rendering, though this component is client-side.
       newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
     }
 
@@ -51,34 +54,27 @@ export function StartMeetingDialogContent() {
       link: newMeetingLink,
       code: newMeetingCode,
     };
-  });
+};
+
+
+export function StartMeetingDialogContent() {
+  const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
+  const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+
+  // CRITICAL FIX: Generate meeting details ONCE using useState initializer.
+  // This prevents the ID from changing on every re-render.
+  const [meetingDetails, setMeetingDetails] = useState(generateMeetingDetails);
 
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
   
-  const generateNewMeetingDetails = useCallback(() => {
-    setMeetingDetails(() => {
-      const newMeetingId = generateRandomId(8);
-      const codePart1 = generateRandomId(3);
-      const codePart2 = generateRandomId(3);
-      const codePart3 = generateRandomId(3);
-      const newMeetingCode = `${codePart1}-${codePart2}-${codePart3}`;
-      
-      let newMeetingLink = '';
-      if (typeof window !== "undefined") {
-        newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
-      } else {
-        newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
-      }
-
-      return {
-        id: newMeetingId,
-        link: newMeetingLink,
-        code: newMeetingCode,
-      };
-    });
-  }, []);
+  // This function allows the user to manually generate a new link if they wish.
+  const regenerateMeetingDetails = useCallback(() => {
+    setMeetingDetails(generateMeetingDetails());
+    toast({ title: "New Link Generated", description: "A new meeting link and code have been created." });
+  }, [toast]);
 
 
   const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
@@ -124,7 +120,6 @@ export function StartMeetingDialogContent() {
         creatorId: user.uid,
         topic: trimmedMeetingTitle,
         createdAt: serverTimestamp(),
-        pendingRequests: [],
       });
 
       // Save meeting to localStorage for the activity feed
@@ -233,7 +228,7 @@ export function StartMeetingDialogContent() {
               <Share2 className="mr-2 h-5 w-5" />
               Share Invite
             </Button>
-            <Button variant="ghost" size="icon" onClick={generateNewMeetingDetails} aria-label="Generate new link and code" disabled={isJoining} className="rounded-lg text-muted-foreground">
+            <Button variant="ghost" size="icon" onClick={regenerateMeetingDetails} aria-label="Generate new link and code" disabled={isJoining} className="rounded-lg text-muted-foreground">
               <RefreshCw className="h-5 w-5"/>
             </Button>
           </div>
