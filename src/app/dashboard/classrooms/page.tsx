@@ -251,12 +251,14 @@ export default function ClassroomsPage() {
   const handleDelete = async () => {
     if (!classroomToDelete) return;
     try {
-        await deleteDoc(doc(db, 'classrooms', classroomToDelete.id));
+        const classroomRef = doc(db, 'classrooms', classroomToDelete.id);
+        await deleteDoc(classroomRef);
         toast({ title: 'Success', description: `Classroom "${classroomToDelete.title}" deleted.` });
-        setClassroomToDelete(null);
     } catch (error) {
       console.error('Error deleting classroom:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the classroom.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the classroom. Check Firestore rules and permissions.' });
+    } finally {
+      setClassroomToDelete(null);
     }
   };
   
@@ -308,8 +310,6 @@ export default function ClassroomsPage() {
   );
 
   const renderDiscoverClassroomCard = (classroom: Classroom) => {
-    // This card is only for classrooms the user hasn't created or joined.
-    // The filtering happens in the DiscoverClassesTab component.
     return (
       <Card key={classroom.id}>
           <CardHeader>
