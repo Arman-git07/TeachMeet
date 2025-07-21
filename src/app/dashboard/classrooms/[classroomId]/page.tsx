@@ -279,24 +279,39 @@ export default function ClassroomPage() {
                             <CardTitle className="flex items-center gap-2"><CreditCard className="text-primary"/>Fee Payments</CardTitle>
                             <CardDescription>Manage tuition fees and payments for this classroom.</CardDescription>
                         </CardHeader>
-                        <CardContent className="min-h-[400px] grid md:grid-cols-2 gap-8 items-start pt-6">
-                            <div className="space-y-4">
-                                <h3 className="font-semibold text-lg">Payment Details</h3>
-                                <Card className="p-6 border-primary/20 bg-primary/5">
-                                    <p className="text-muted-foreground">Next Payment</p>
-                                    <p className="text-3xl font-bold text-primary">$150.00</p>
-                                    <p className="text-muted-foreground text-sm">Due by: August 31, 2024</p>
-                                    <Button className="w-full mt-4 btn-gel">Pay with Card</Button>
-                                </Card>
-                            </div>
-                             <div className="space-y-4">
-                                <h3 className="font-semibold text-lg">Payment History</h3>
-                                 <div className="text-center text-muted-foreground py-16 border rounded-lg bg-background">
-                                    <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                    <p className="font-semibold">No payment history</p>
-                                    <p className="text-sm">Your past payments will appear here.</p>
-                                </div>
-                            </div>
+                        <CardContent className="min-h-[400px] grid grid-cols-1 md:grid-cols-2 gap-8 items-start pt-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Next Payment</CardTitle>
+                                    <CardDescription>Your upcoming fee payment details.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                     <div className="border bg-primary/5 p-6 rounded-lg text-center">
+                                        <p className="text-muted-foreground">Amount Due</p>
+                                        <p className="text-4xl font-bold text-primary">$150.00</p>
+                                        <p className="text-muted-foreground text-sm">Due by: August 31, 2024</p>
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button className="w-full btn-gel">
+                                        <Wallet className="mr-2 h-4 w-4"/>
+                                        Pay with Card
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Payment History</CardTitle>
+                                    <CardDescription>A record of your past payments.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="flex items-center justify-center h-full">
+                                    <div className="text-center text-muted-foreground py-10">
+                                        <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                        <p className="font-semibold">No payment history</p>
+                                        <p className="text-sm">Your past payments will appear here.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -321,5 +336,3 @@ export default function ClassroomPage() {
     </div>
   );
 }
-
-    
