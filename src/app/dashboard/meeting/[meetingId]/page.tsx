@@ -309,6 +309,8 @@ export default function MeetingPage() {
           });
         }
       });
+    }, (error) => {
+        console.error("Error listening for join requests:", error);
     });
 
     return () => unsubscribe();
@@ -967,7 +969,7 @@ export default function MeetingPage() {
           </Button>
           
           <Button variant="destructive" size="lg" className="rounded-full px-4 sm:px-6 h-10 sm:h-12" onClick={leaveMeeting} aria-label="Leave Meeting">
-            <PhoneOff className="h-5 w-5 sm:h-6 sm:w-6" />
+            <PhoneOff className="h-5 w-5 sm:h-6 sm:h-6" />
           </Button>
         </div>
       </div>
