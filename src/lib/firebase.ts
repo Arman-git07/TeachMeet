@@ -29,9 +29,8 @@ if (
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize services
-const auth = initializeAuth(app, {
-  persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
-});
+// The persistence is now set explicitly in the sign-in flow to ensure it's applied correctly.
+const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 let messaging: Messaging | null = null;
