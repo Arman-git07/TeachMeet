@@ -284,13 +284,15 @@ export default function MeetingPage() {
     if (!isCurrentUserHost || !meetingId) return;
   
     const participantsRef = collection(db, `meetings/${meetingId}/participants`);
-    const q = query(participantsRef, where("status", "==", "pending"));
+    const q = query(participantsRef);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const pending: JoinRequest[] = [];
         snapshot.forEach((doc) => {
             const data = doc.data();
-            pending.push({ id: doc.id, name: data.name || "A user", photoURL: data.photoURL });
+            if (data.status === "pending") {
+              pending.push({ id: doc.id, name: data.name || "A user", photoURL: data.photoURL });
+            }
         });
         setJoinRequests(pending);
     }, (error) => {
