@@ -419,11 +419,11 @@ export default function ClassroomsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs defaultValue="my-classes" className="w-full">
-        <TabsList><TabsTrigger value="my-classes"><School className="mr-2 h-4 w-4" /> My Classes</TabsTrigger><TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger><TabsTrigger value="discover"><Eye className="mr-2 h-4 w-4" /> Discover</TabsTrigger></TabsList>
+      <Tabs defaultValue="discover" className="w-full">
+        <TabsList><TabsTrigger value="discover"><Eye className="mr-2 h-4 w-4" /> Discover</TabsTrigger><TabsTrigger value="my-classes"><School className="mr-2 h-4 w-4" /> My Classes</TabsTrigger><TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger></TabsList>
+        <TabsContent value="discover" className="mt-4"><DiscoverClassesTab /></TabsContent>
         <TabsContent value="my-classes" className="mt-4"><MyClassesTab /></TabsContent>
         <TabsContent value="enrolled" className="mt-4"><EnrolledClassesTab /></TabsContent>
-        <TabsContent value="discover" className="mt-4"><DiscoverClassesTab /></TabsContent>
       </Tabs>
     </div>
   );
