@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, onSnapshot, collection, query, updateDoc, writeBatch, where, arrayUnion, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -37,6 +37,8 @@ export default function ClassroomPage() {
   const [loading, setLoading] = useState(true);
 
   const isTeacher = user?.uid === classroom?.teacherId;
+  const joinRequestsScrollAreaRef = useRef<HTMLDivElement>(null);
+
 
   // Fetch classroom details
   useEffect(() => {
@@ -155,7 +157,7 @@ export default function ClassroomPage() {
           {isTeacher && joinRequests.length > 0 && (
             <Card className="p-2 bg-primary/10 border-primary/20">
               <h3 className="text-sm font-semibold mb-2 text-primary flex items-center gap-2"><UserPlus className="h-4 w-4"/> Join Requests ({joinRequests.length})</h3>
-              <ScrollArea className="max-h-40">
+              <ScrollArea className="max-h-40" viewportRef={joinRequestsScrollAreaRef}>
                 <div className="space-y-2">
                   {joinRequests.map(req => (
                     <div key={req.id} className="flex items-center justify-between p-2 rounded-md bg-background">
