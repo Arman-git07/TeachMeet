@@ -225,6 +225,7 @@ export default function MeetingPage() {
   const [localCameraOff, setLocalCameraOff] = useState(true);
   const [localHandRaised, setLocalHandRaised] = useState(false);
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [joinStatus, setJoinStatus] = useState<'pending' | 'joining' | 'joined' | 'failed'>('pending');
 
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -278,6 +279,7 @@ export default function MeetingPage() {
     }
   }, [isCurrentUserHost, meetingId, toast]);
 
+  // STABLE LISTENER FOR JOIN REQUESTS (FIXED)
   useEffect(() => {
     if (!isCurrentUserHost || !meetingId) return;
   
@@ -285,11 +287,26 @@ export default function MeetingPage() {
     const q = query(participantsRef, where("status", "==", "pending"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === "added") {
-          const requestData = change.doc.data();
-          const request: JoinRequest = { id: change.doc.id, name: requestData.name, photoURL: requestData.photoURL };
+        const pending: JoinRequest[] = [];
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            pending.push({ id: doc.id, name: data.name || "A user", photoURL: data.photoURL });
+        });
+        setJoinRequests(pending);
+    }, (error) => {
+        console.error("Error listening for join requests:", error);
+    });
+
+    return () => unsubscribe();
+  }, [isCurrentUserHost, meetingId]);
+
+  // STABLE EFFECT FOR DISPLAYING TOASTS (FIXED)
+  useEffect(() => {
+      const displayedToasts = new Set<string>();
+
+      joinRequests.forEach(request => {
           const toastId = `join-request-${request.id}`;
+          if (displayedToasts.has(toastId)) return;
 
           toast({
               id: toastId,
@@ -307,14 +324,10 @@ export default function MeetingPage() {
                 </div>
               ),
           });
-        }
+          displayedToasts.add(toastId);
       });
-    }, (error) => {
-        console.error("Error listening for join requests:", error);
-    });
 
-    return () => unsubscribe();
-  }, [isCurrentUserHost, meetingId, toast, dismiss, handleApproveRequest, handleDenyRequest]);
+  }, [joinRequests, toast, dismiss, handleApproveRequest, handleDenyRequest]);
 
 
   const handleReportIssue = () => {
