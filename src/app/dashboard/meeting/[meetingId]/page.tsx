@@ -287,7 +287,8 @@ export default function MeetingPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       snapshot.docChanges().forEach(change => {
         if (change.type === "added") {
-          const request = { id: change.doc.id, ...change.doc.data() } as JoinRequest;
+          const requestData = change.doc.data();
+          const request: JoinRequest = { id: change.doc.id, name: requestData.name, photoURL: requestData.photoURL };
           const toastId = `join-request-${request.id}`;
 
           toast({

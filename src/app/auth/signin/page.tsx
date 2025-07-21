@@ -43,6 +43,7 @@ export default function SignInPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     
+    // Set persistence before signing in to ensure session is saved.
     setPersistence(auth, browserLocalPersistence)
       .then(() => {
         // After setting persistence, perform sign-in
