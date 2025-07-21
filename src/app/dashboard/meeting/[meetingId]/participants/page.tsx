@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -145,6 +145,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const [isLoading, setIsLoading] = useState(true);
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const currentUserId = auth.currentUser?.uid;
+  const scrollAreaRef = useRef<HTMLDivElement>(null); // Stable ref for ScrollArea
 
   useEffect(() => {
     if (!meetingId || !db) return;
@@ -234,7 +235,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
             <CardDescription>Manage participants and their settings.</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow p-0 overflow-hidden">
-            <ScrollArea className="h-full p-2 md:p-4">
+            <ScrollArea className="h-full p-2 md:p-4" viewportRef={scrollAreaRef}>
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
