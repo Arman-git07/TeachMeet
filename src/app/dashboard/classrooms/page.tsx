@@ -249,7 +249,11 @@ export default function ClassroomsPage() {
   };
 
   const handleDelete = async () => {
-    if (!classroomToDelete) return;
+    if (!classroomToDelete || !user) return;
+    if (user.uid !== classroomToDelete.teacherId) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete your own classrooms.' });
+        return;
+    }
     try {
         const classroomRef = doc(db, 'classrooms', classroomToDelete.id);
         await deleteDoc(classroomRef);
@@ -378,7 +382,8 @@ export default function ClassroomsPage() {
     const discoverable = discoverClasses.filter(c => 
         c.isPublic &&
         !myClassIds.has(c.id) &&
-        !enrolledClassIds.has(c.id)
+        !enrolledClassIds.has(c.id) &&
+        c.teacherId !== user?.uid // Explicitly exclude own classes again
     );
 
     if (discoverable.length === 0) {
