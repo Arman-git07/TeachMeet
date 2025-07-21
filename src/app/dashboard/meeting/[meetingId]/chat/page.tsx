@@ -115,46 +115,48 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
-            <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <MessageSquare className="w-16 h-16 mb-4" />
-                  <p className="text-lg">No messages yet.</p>
-                  <p>Be the first to send a message!</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
-                      {!msg.isMe && (
-                        <Avatar className="h-8 w-8 self-start">
-                          <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
-                          <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div
-                        className={cn(
-                          "max-w-[70%] p-3 rounded-xl shadow",
-                          msg.isMe
-                            ? "bg-primary text-primary-foreground rounded-br-none"
-                            : "bg-card text-card-foreground rounded-bl-none"
-                        )}
-                      >
-                        {!msg.isMe && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
-                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                        <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                      </div>
-                      {msg.isMe && (
-                        <Avatar className="h-8 w-8 self-start">
-                           <AvatarImage src={`https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
-                          <AvatarFallback>Y</AvatarFallback>
-                        </Avatar>
-                      )}
+            <ScrollArea className="h-full" viewportRef={scrollAreaRef}>
+                <div className="p-4 md:p-6 space-y-4">
+                  {messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground pt-16">
+                      <MessageSquare className="w-16 h-16 mb-4" />
+                      <p className="text-lg">No messages yet.</p>
+                      <p>Be the first to send a message!</p>
                     </div>
-                  ))}
+                  ) : (
+                    <>
+                      {messages.map((msg) => (
+                        <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
+                          {!msg.isMe && (
+                            <Avatar className="h-8 w-8 self-start">
+                              <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                              <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div
+                            className={cn(
+                              "max-w-[70%] p-3 rounded-xl shadow",
+                              msg.isMe
+                                ? "bg-primary text-primary-foreground rounded-br-none"
+                                : "bg-card text-card-foreground rounded-bl-none"
+                            )}
+                          >
+                            {!msg.isMe && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                            <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                          {msg.isMe && (
+                            <Avatar className="h-8 w-8 self-start">
+                               <AvatarImage src={`https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
+                              <AvatarFallback>Y</AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
-              )}
-            </ScrollArea>
+              </ScrollArea>
           </CardContent>
           <CardFooter className="p-4 border-t bg-background">
             <form
