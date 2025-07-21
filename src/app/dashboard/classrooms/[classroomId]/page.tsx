@@ -4,11 +4,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, collection, query, updateDoc, writeBatch, where, arrayUnion, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, updateDoc, writeBatch, where, arrayUnion, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Megaphone, BookCopy, FileQuestion, MessageSquare, Loader2, Check, UserPlus, X, ClipboardList, FileText } from 'lucide-react';
+import { ArrowLeft, Megaphone, BookCopy, FileQuestion, MessageSquare, Loader2, Check, UserPlus, X, ClipboardList, FileText, CreditCard, Wallet, Receipt } from 'lucide-react';
 import Link from 'next/link';
 import type { Classroom } from '../page';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,13 +83,11 @@ export default function ClassroomPage() {
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, studentId);
         batch.delete(requestRef);
 
-        // Add student to the classroom's student list (optional, can be inferred)
         const classroomRef = doc(db, 'classrooms', classroomId);
         batch.update(classroomRef, {
             students: arrayUnion(studentId)
         });
 
-        // Add the classroom to the student's enrolled list
         const enrolledRef = doc(db, `users/${studentId}/enrolled`, classroomId);
         batch.set(enrolledRef, {
             classroomId: classroomId,
@@ -147,119 +145,181 @@ export default function ClassroomPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <div className="flex justify-between items-start mb-6 gap-4">
-        <div>
-            <h1 className="text-3xl font-bold">{classroom.title}</h1>
-            <p className="text-muted-foreground">{classroom.description}</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 items-end flex-shrink-0">
-          {isTeacher && joinRequests.length > 0 && (
-            <Card className="p-2 bg-primary/10 border-primary/20">
-              <h3 className="text-sm font-semibold mb-2 text-primary flex items-center gap-2"><UserPlus className="h-4 w-4"/> Join Requests ({joinRequests.length})</h3>
-              <ScrollArea className="max-h-40" viewportRef={joinRequestsScrollAreaRef}>
-                <div className="space-y-2">
-                  {joinRequests.map(req => (
-                    <div key={req.id} className="flex items-center justify-between p-2 rounded-md bg-background">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={req.studentPhotoURL} alt={req.studentName} data-ai-hint="avatar user"/>
-                          <AvatarFallback>{req.studentName?.charAt(0) || '?'}</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium">{req.studentName || 'A new student'}</span>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:text-green-700" onClick={() => handleApproveRequest(req)}><Check/></Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:text-red-700" onClick={() => handleDenyRequest(req.id)}><X/></Button>
-                      </div>
+    <div className="flex-1 bg-muted/30">
+        <div className="bg-card shadow-sm pb-8">
+            <div className="container mx-auto px-4 md:px-8 pt-6">
+                <Button asChild variant="ghost" className="mb-4 -ml-4 text-muted-foreground">
+                    <Link href="/dashboard/classrooms">
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Classrooms
+                    </Link>
+                </Button>
+                <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+                    <div>
+                        <h1 className="text-4xl font-bold tracking-tight text-foreground">{classroom.title}</h1>
+                        <p className="text-lg text-muted-foreground mt-1">{classroom.description}</p>
+                        <p className="text-sm text-muted-foreground mt-2">Taught by: {classroom.teacherName}</p>
                     </div>
-                  ))}
+                     {isTeacher && joinRequests.length > 0 && (
+                        <Card className="p-3 bg-background border-primary/20 w-full max-w-sm shrink-0">
+                        <h3 className="text-sm font-semibold mb-2 text-primary flex items-center gap-2"><UserPlus className="h-4 w-4"/> Join Requests ({joinRequests.length})</h3>
+                        <ScrollArea className="max-h-40" viewportRef={joinRequestsScrollAreaRef}>
+                            <div className="space-y-2">
+                            {joinRequests.map(req => (
+                                <div key={req.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                                <div className="flex items-center gap-2">
+                                    <Avatar className="h-8 w-8">
+                                    <AvatarImage src={req.studentPhotoURL} alt={req.studentName} data-ai-hint="avatar user"/>
+                                    <AvatarFallback>{req.studentName?.charAt(0) || '?'}</AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-sm font-medium">{req.studentName || 'A new student'}</span>
+                                </div>
+                                <div className="flex gap-1">
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10" onClick={() => handleApproveRequest(req)}><Check/></Button>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-500/10" onClick={() => handleDenyRequest(req.id)}><X/></Button>
+                                </div>
+                                </div>
+                            ))}
+                            </div>
+                        </ScrollArea>
+                        </Card>
+                    )}
                 </div>
-              </ScrollArea>
-            </Card>
-          )}
-          <Button asChild variant="outline">
-            <Link href="/dashboard/classrooms">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back
-            </Link>
-          </Button>
+            </div>
         </div>
-      </div>
-
+      <div className="container mx-auto p-4 md:p-8">
       <Tabs defaultValue="announcements" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
           <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4"/>Announcements</TabsTrigger>
           <TabsTrigger value="materials"><BookCopy className="mr-2 h-4 w-4"/>Materials</TabsTrigger>
           <TabsTrigger value="assignments"><FileQuestion className="mr-2 h-4 w-4"/>Assignments</TabsTrigger>
           <TabsTrigger value="subjects"><ClipboardList className="mr-2 h-4 w-4"/>Subjects</TabsTrigger>
           <TabsTrigger value="exams"><FileText className="mr-2 h-4 w-4"/>Exams</TabsTrigger>
+          <TabsTrigger value="fees"><CreditCard className="mr-2 h-4 w-4"/>Fees</TabsTrigger>
           <TabsTrigger value="chat"><MessageSquare className="mr-2 h-4 w-4"/>Chat</TabsTrigger>
         </TabsList>
-        <Card className="mt-4 rounded-xl">
-            <CardContent className="p-6 min-h-[400px]">
+        <div className="mt-6">
                 <TabsContent value="announcements">
-                    <CardHeader>
-                        <CardTitle>Announcements</CardTitle>
-                        <CardDescription>Latest updates and announcements from the teacher.</CardDescription>
-                    </CardHeader>
-                    <div className="text-center text-muted-foreground py-16">
-                        <Megaphone className="h-12 w-12 mx-auto mb-4" />
-                        <p>No announcements yet.</p>
-                    </div>
+                    <Card className="shadow-lg rounded-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Megaphone className="text-primary"/>Announcements</CardTitle>
+                            <CardDescription>Latest updates and announcements from the teacher.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="min-h-[400px] flex items-center justify-center">
+                             <div className="text-center text-muted-foreground py-16">
+                                <Megaphone className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                <p className="font-semibold">No announcements yet</p>
+                                <p className="text-sm">Check back later for updates.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
                 <TabsContent value="materials">
-                    <CardHeader>
-                        <CardTitle>Class Materials</CardTitle>
-                        <CardDescription>Find lecture notes, presentations, and other resources here.</CardDescription>
-                    </CardHeader>
-                     <div className="text-center text-muted-foreground py-16">
-                        <BookCopy className="h-12 w-12 mx-auto mb-4" />
-                        <p>No materials uploaded yet.</p>
-                    </div>
+                     <Card className="shadow-lg rounded-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><BookCopy className="text-primary"/>Class Materials</CardTitle>
+                            <CardDescription>Find lecture notes, presentations, and other resources here.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="min-h-[400px] flex items-center justify-center">
+                            <div className="text-center text-muted-foreground py-16">
+                                <BookCopy className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                <p className="font-semibold">No materials uploaded</p>
+                                <p className="text-sm">Your teacher hasn't uploaded any materials yet.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
                 <TabsContent value="assignments">
-                    <CardHeader>
-                        <CardTitle>Assignments & Tests</CardTitle>
-                        <CardDescription>View upcoming and past assignments, quizzes, and exams.</CardDescription>
-                    </CardHeader>
-                     <div className="text-center text-muted-foreground py-16">
-                        <FileQuestion className="h-12 w-12 mx-auto mb-4" />
-                        <p>No assignments posted yet.</p>
-                    </div>
+                    <Card className="shadow-lg rounded-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><FileQuestion className="text-primary"/>Assignments & Tests</CardTitle>
+                            <CardDescription>View upcoming and past assignments, quizzes, and exams.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="min-h-[400px] flex items-center justify-center">
+                             <div className="text-center text-muted-foreground py-16">
+                                <FileQuestion className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                <p className="font-semibold">No assignments posted</p>
+                                 <p className="text-sm">Keep an eye out for upcoming assignments.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
                  <TabsContent value="subjects">
-                    <CardHeader>
-                        <CardTitle>Subjects & Teachers</CardTitle>
-                        <CardDescription>Manage subjects and assigned teachers for this classroom.</CardDescription>
-                    </CardHeader>
-                     <div className="text-center text-muted-foreground py-16">
-                        <ClipboardList className="h-12 w-12 mx-auto mb-4" />
-                        <p>No subjects assigned yet.</p>
-                    </div>
+                    <Card className="shadow-lg rounded-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><ClipboardList className="text-primary"/>Subjects & Teachers</CardTitle>
+                            <CardDescription>Manage subjects and assigned teachers for this classroom.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="min-h-[400px] flex items-center justify-center">
+                            <div className="text-center text-muted-foreground py-16">
+                                <ClipboardList className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                <p className="font-semibold">No subjects assigned</p>
+                                 <p className="text-sm">Your teacher will assign subjects soon.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
                  <TabsContent value="exams">
-                    <CardHeader>
-                        <CardTitle>Exam Papers</CardTitle>
-                        <CardDescription>Upload and view exam papers and related materials.</CardDescription>
-                    </CardHeader>
-                     <div className="text-center text-muted-foreground py-16">
-                        <FileText className="h-12 w-12 mx-auto mb-4" />
-                        <p>No exam papers uploaded yet.</p>
-                    </div>
+                     <Card className="shadow-lg rounded-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><FileText className="text-primary"/>Exam Papers</CardTitle>
+                            <CardDescription>Upload and view exam papers and related materials.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="min-h-[400px] flex items-center justify-center">
+                            <div className="text-center text-muted-foreground py-16">
+                                <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                <p className="font-semibold">No exam papers found</p>
+                                <p className="text-sm">Exam materials will appear here.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="fees">
+                     <Card className="shadow-lg rounded-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><CreditCard className="text-primary"/>Fee Payments</CardTitle>
+                            <CardDescription>Manage tuition fees and payments for this classroom.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="min-h-[400px] grid md:grid-cols-2 gap-8 items-start pt-6">
+                            <div className="space-y-4">
+                                <h3 className="font-semibold text-lg">Payment Details</h3>
+                                <Card className="p-6 border-primary/20 bg-primary/5">
+                                    <p className="text-muted-foreground">Next Payment</p>
+                                    <p className="text-3xl font-bold text-primary">$150.00</p>
+                                    <p className="text-muted-foreground text-sm">Due by: August 31, 2024</p>
+                                    <Button className="w-full mt-4 btn-gel">Pay with Card</Button>
+                                </Card>
+                            </div>
+                             <div className="space-y-4">
+                                <h3 className="font-semibold text-lg">Payment History</h3>
+                                 <div className="text-center text-muted-foreground py-16 border rounded-lg bg-background">
+                                    <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                    <p className="font-semibold">No payment history</p>
+                                    <p className="text-sm">Your past payments will appear here.</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
                 <TabsContent value="chat">
-                    <CardHeader>
-                        <CardTitle>Class Chat</CardTitle>
-                        <CardDescription>Discuss topics with your teacher and classmates.</CardDescription>
-                    </CardHeader>
-                    <div className="text-center text-muted-foreground py-16">
-                        <MessageSquare className="h-12 w-12 mx-auto mb-4" />
-                        <p>Chat feature coming soon!</p>
-                    </div>
+                    <Card className="shadow-lg rounded-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><MessageSquare className="text-primary"/>Class Chat</CardTitle>
+                            <CardDescription>Discuss topics with your teacher and classmates.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="min-h-[400px] flex items-center justify-center">
+                            <div className="text-center text-muted-foreground py-16">
+                                <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                <p className="font-semibold">Chat feature coming soon!</p>
+                                <p className="text-sm">Get ready to collaborate with your class.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
-            </CardContent>
-        </Card>
+        </div>
       </Tabs>
+    </div>
     </div>
   );
 }
+
+    
