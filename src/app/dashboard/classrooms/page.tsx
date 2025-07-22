@@ -47,6 +47,7 @@ import {
   query,
   where,
   writeBatch,
+  setDoc,
 } from 'firebase/firestore';
 import {
   PlusCircle,
@@ -61,6 +62,7 @@ import {
   ArrowRight,
   Clipboard,
   ClipboardCheck,
+  UserPlus,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -205,6 +207,8 @@ export default function ClassroomsPage() {
   const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [requestingToJoin, setRequestingToJoin] = useState<string | null>(null);
+
 
   // Fetch My Classes
   useEffect(() => {
@@ -266,6 +270,30 @@ export default function ClassroomsPage() {
     }
   };
   
+  const handleRequestToJoin = async (classroomId: string) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: "Authentication required" });
+        return;
+    }
+    setRequestingToJoin(classroomId);
+    try {
+        const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
+        await setDoc(requestRef, {
+            studentId: user.uid,
+            studentName: user.displayName || 'Anonymous Student',
+            studentPhotoURL: user.photoURL || '',
+            status: 'pending',
+            requestedAt: serverTimestamp()
+        });
+        toast({ title: 'Request Sent!', description: 'Your request to join has been sent to the teacher.' });
+    } catch (error) {
+        console.error("Error sending join request:", error);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request.' });
+    } finally {
+        // We don't reset requestingToJoin state here, so the button remains "Pending"
+    }
+};
+
   const copyClassId = (id: string) => {
     navigator.clipboard.writeText(id);
     setCopiedId(id);
@@ -314,6 +342,7 @@ export default function ClassroomsPage() {
   );
 
   const renderDiscoverClassroomCard = (classroom: Classroom) => {
+    const isRequesting = requestingToJoin === classroom.id;
     return (
       <Card key={classroom.id}>
           <CardHeader>
@@ -324,10 +353,8 @@ export default function ClassroomsPage() {
               <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
           </CardContent>
           <CardFooter>
-            <Button asChild className="w-full">
-                <Link href="/dashboard/classrooms/join">
-                    <LogIn className="mr-2 h-4 w-4" /> Join with Code
-                </Link>
+            <Button className="w-full" onClick={() => handleRequestToJoin(classroom.id)} disabled={isRequesting}>
+                {isRequesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...</> : <><UserPlus className="mr-2 h-4 w-4" />Request to Join</>}
             </Button>
           </CardFooter>
     </Card>
