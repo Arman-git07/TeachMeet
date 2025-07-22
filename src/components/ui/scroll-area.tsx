@@ -3,7 +3,6 @@
 
 import * as React from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
-import { composeRefs } from "@radix-ui/react-compose-refs"
 
 import { cn } from "@/lib/utils"
 
