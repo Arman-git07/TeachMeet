@@ -387,7 +387,7 @@ export default function ClassroomsPage() {
        return (
         <div className="text-center py-10">
           <p className="text-muted-foreground">You are not enrolled in any classrooms.</p>
-          <p className="text-muted-foreground mt-2">Find one in the "Discover" tab to join!</p>
+          <p className="text-muted-foreground mt-2">Find one in the "Discover" tab or join one with a code!</p>
         </div>
       );
     }
@@ -405,12 +405,9 @@ export default function ClassroomsPage() {
     const myClassIds = new Set(myClasses.map(c => c.id));
     const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
 
-    // Filter discoverable classes: must be public, not created by user, and not enrolled in by user
     const discoverable = discoverClasses.filter(c => 
-        c.isPublic &&
         !myClassIds.has(c.id) &&
-        !enrolledClassIds.has(c.id) &&
-        c.teacherId !== user?.uid // Explicitly exclude own classes again
+        !enrolledClassIds.has(c.id)
     );
 
     if (discoverable.length === 0) {
