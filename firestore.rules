@@ -2,74 +2,77 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // All users can update their own profile
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // Users can manage their own enrolled classrooms list
-      match /enrolled/{classroomId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-
-    // Allow authenticated users to read/write their own documents and recordings, and view public ones
-    match /documents/{documentId} {
-      allow read: if request.auth != null && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-    
-    match /recordings/{recordingId} {
-      allow read: if request.auth != null && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-
-    // Rules for classrooms and their subcollections
+    // Classroom Rules
     match /classrooms/{classroomId} {
-      // Any authenticated user can read public classrooms, but only enrolled students/teacher can read private ones.
-      allow read: if request.auth != null && (resource.data.isPublic == true || request.auth.uid == resource.data.teacherId || request.auth.uid in resource.data.students);
-      // Only authenticated users can create classrooms
-      allow create: if request.auth != null;
-      // Only the teacher can update or delete the classroom
+      // Allow read access to public classrooms for any authenticated user.
+      allow read: if request.auth != null && resource.data.isPublic == true;
+      
+      // Allow create only if the teacherId matches the user creating it.
+      allow create: if request.auth != null && request.resource.data.teacherId == request.auth.uid;
+      
+      // Allow update/delete only by the teacher who owns the classroom.
       allow update, delete: if request.auth != null && request.auth.uid == resource.data.teacherId;
 
-      // Join requests for a classroom
+      // Join Requests subcollection
       match /joinRequests/{userId} {
-        // Any authenticated user can create a join request for themselves.
+        // Any authenticated user can create a request for themselves.
         allow create: if request.auth != null && request.auth.uid == userId;
-        // Only the teacher of the classroom can read or delete requests.
+        // Only the teacher of the classroom can read/delete requests.
         allow read, delete: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId;
       }
     }
 
-    // Rules for meetings and their subcollections
-    match /meetings/{meetingId} {
-      // Any authenticated user can read or create a meeting document
-      allow read, write: if request.auth != null;
+    // User Data Rules
+    match /users/{userId} {
+      // Users can only read/write their own data.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Join requests for a meeting
-      match /joinRequests/{userId} {
-        // Any authenticated user can create a join request
-        allow create: if request.auth != null;
-        // The host can read and delete requests
-        allow read, delete: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId;
+      // Enrolled subcollection
+      match /enrolled/{classroomId} {
+        // Users can only manage their own enrollment documents.
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
+    }
 
-      // Participants in a meeting
+    // Meeting Rules
+    match /meetings/{meetingId} {
+      // Any authenticated user can create or read a meeting document.
+      allow read, create: if request.auth != null;
+      // Only the meeting creator can update/delete it.
+      allow update, delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+
+      // Meeting Participants subcollection
       match /participants/{userId} {
-        // Any authenticated user can read the participants list
-        allow read: if request.auth != null;
-        // A user can only write to their own participant document
-        allow write: if request.auth != null && request.auth.uid == userId;
-        // The host can also remove (delete) participants
-        allow delete: if request.auth != null && (request.auth.uid == userId || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
+        // Authenticated users can join (write) or leave (delete) a meeting.
+        // Anyone in the meeting can see other participants.
+        allow read, write, delete: if request.auth != null;
       }
     }
     
-    // Rules for FCM tokens used for push notifications
+    // Documents Rules
+    match /documents/{documentId} {
+        // Read is allowed if the document is not private, or if the user is the uploader.
+        allow read: if request.auth != null && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
+        // Create is allowed for any authenticated user.
+        allow create: if request.auth != null;
+        // Update/delete is only allowed for the original uploader.
+        allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
+    }
+
+    // Recordings Rules
+    match /recordings/{recordingId} {
+        // Read is allowed if the recording is not private, or if the user is the uploader.
+        allow read: if request.auth != null && (resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid);
+        // Create is allowed for any authenticated user.
+        allow create: if request.auth != null;
+        // Update/delete is only allowed for the original uploader.
+        allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
+    }
+
+    // FCM Tokens Rules
     match /fcmTokens/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Users can only manage their own FCM token.
+        allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
