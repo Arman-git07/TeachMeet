@@ -75,7 +75,6 @@ interface Participant {
   isHandRaisedForView?: boolean;
   isScreenSharing?: boolean;
   photoURL?: string | null;
-  status: 'pending' | 'accepted';
 }
 
 interface JoinRequest {
@@ -243,7 +242,7 @@ export default function MeetingPage() {
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   const meetingLinkForShare = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait${topic ? `?topic=${encodeURIComponent(topic)}` : ''}` : '';
   
-  const acceptedParticipants = realtimeParticipants.filter(p => p.status === 'accepted');
+  const acceptedParticipants = realtimeParticipants;
   const selfView = acceptedParticipants.find(p => p.id === currentUser?.uid);
   const remoteParticipants = acceptedParticipants.filter(p => p.id !== currentUser?.uid);
 
@@ -258,20 +257,41 @@ export default function MeetingPage() {
     if (!isCurrentUserHost) return;
     
     try {
-      const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
-      await updateDoc(participantRef, { status: 'accepted' });
-      toast({ title: "Request Approved", description: `${request.name} has been allowed to join.` });
+        const batch = writeBatch(db);
+        
+        // Add user to the main participants collection
+        const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+        const requestData = (await getDoc(doc(db, "meetings", meetingId, "joinRequests", request.id))).data();
+        
+        if (requestData) {
+            batch.set(participantRef, {
+                ...requestData, // copy name, photoURL etc.
+                isMicMuted: true,
+                isCameraOff: true,
+                isHandRaised: false,
+                isScreenSharing: false,
+                joinedAt: serverTimestamp(),
+            });
+        }
+        
+        // Delete the request from the joinRequests subcollection
+        const requestRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        batch.delete(requestRef);
+        
+        await batch.commit();
+
+        toast({ title: "Request Approved", description: `${request.name} has been allowed to join.` });
     } catch (error) {
         console.error("Failed to approve request:", error);
-        toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant.' });
+        toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant. Check Firestore rules.' });
     }
   }, [isCurrentUserHost, meetingId, toast]);
   
   const handleDenyRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
     try {
-        const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
-        await deleteDoc(participantRef);
+        const requestRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        await deleteDoc(requestRef);
         toast({ title: "Request Denied", description: `${request.name}'s request to join has been denied.` });
     } catch (error) {
         console.error("Failed to deny request:", error);
@@ -279,30 +299,26 @@ export default function MeetingPage() {
     }
   }, [isCurrentUserHost, meetingId, toast]);
 
-  // STABLE LISTENER FOR JOIN REQUESTS (FIXED)
   useEffect(() => {
     if (!isCurrentUserHost || !meetingId) return;
   
-    const participantsRef = collection(db, `meetings/${meetingId}/participants`);
-    const q = query(participantsRef);
+    const requestsRef = collection(db, `meetings/${meetingId}/joinRequests`);
+    const q = query(requestsRef);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const pending: JoinRequest[] = [];
-        snapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.status === "pending") {
-              pending.push({ id: doc.id, name: data.name || "A user", photoURL: data.photoURL });
-            }
-        });
+        const pending = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as JoinRequest));
         setJoinRequests(pending);
     }, (error) => {
         console.error("Error listening for join requests:", error);
+        toast({ variant: "destructive", title: "Join Request Error", description: "Could not listen for join requests. Check Firestore rules."})
     });
 
     return () => unsubscribe();
-  }, [isCurrentUserHost, meetingId]);
+  }, [isCurrentUserHost, meetingId, toast]);
 
-  // STABLE EFFECT FOR DISPLAYING TOASTS (FIXED)
   useEffect(() => {
       const displayedToasts = new Set<string>();
 
@@ -572,7 +588,6 @@ export default function MeetingPage() {
           isScreenSharing: data.isScreenSharing,
           isMe: isCurrentUser,
           stream: isCurrentUser ? (isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current) : null,
-          status: data.status,
         });
       });
       setRealtimeParticipants(fetchedParticipants);
