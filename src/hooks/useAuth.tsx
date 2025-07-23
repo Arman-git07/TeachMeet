@@ -6,10 +6,9 @@ import { onAuthStateChanged, signOut as firebaseSignOut, reauthenticateWithCrede
 import { useRouter, usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { auth, messaging, db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useToast } from './use-toast';
-import { getToken } from 'firebase/messaging';
-import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, or, orderBy, Unsubscribe } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 
 export interface Document {
@@ -42,7 +41,6 @@ interface AuthContextType {
   user: FirebaseUser | null;
   loading: boolean;
   isAuthenticated: boolean;
-  // REMOVED: documents and recordings are now fetched on their respective pages
   signOut: () => Promise<void>;
   deleteUserAccount: () => Promise<void>;
 }
@@ -60,22 +58,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const authUnsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      
-      if (currentUser && messaging) {
-          try {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-              const fcmToken = await getToken(messaging, { vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY });
-              if (fcmToken) {
-                const tokenRef = doc(db, 'fcmTokens', currentUser.uid);
-                await setDoc(tokenRef, { token: fcmToken, userId: currentUser.uid, updatedAt: serverTimestamp() }, { merge: true });
-                console.log('FCM token saved for user:', currentUser.uid);
-              }
-            }
-          } catch (error) {
-            console.error('An error occurred while retrieving FCM token.', error);
-          }
-      }
       setLoading(false);
     });
 

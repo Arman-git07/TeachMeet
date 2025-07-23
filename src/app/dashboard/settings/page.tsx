@@ -13,12 +13,13 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { updateProfile } from "firebase/auth";
-import { auth, messaging } from '@/lib/firebase';
+import { auth, messaging, db } from '@/lib/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { getToken } from 'firebase/messaging';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -246,8 +247,8 @@ export default function SettingsPage() {
 
   const handleEnableNotifications = async () => {
     setIsEnablingNotifications(true);
-    if (!messaging || typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-        toast({ variant: 'destructive', title: 'Unsupported', description: 'Push notifications are not supported in this browser.' });
+    if (!messaging || typeof window === 'undefined' || !('serviceWorker' in navigator) || !user) {
+        toast({ variant: 'destructive', title: 'Unsupported', description: 'Push notifications are not supported in this browser or you are not logged in.' });
         setNotificationPermission('unsupported');
         setIsEnablingNotifications(false);
         return;
@@ -262,9 +263,8 @@ export default function SettingsPage() {
             const fcmToken = await getToken(messaging, { vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY, serviceWorkerRegistration: swRegistration });
             
             if (fcmToken) {
-                // In a real app, you would send this token to your server to associate it with the user.
-                // For this prototype, we'll just log it and show a success message.
-                console.log('FCM Token:', fcmToken);
+                const tokenRef = doc(db, 'fcmTokens', user.uid);
+                await setDoc(tokenRef, { token: fcmToken, userId: user.uid, updatedAt: serverTimestamp() }, { merge: true });
                 toast({ title: 'Notifications Enabled', description: 'You will now receive notifications from TeachMeet.' });
             } else {
                  toast({ variant: 'destructive', title: 'Token Error', description: 'Could not retrieve a push notification token.' });
