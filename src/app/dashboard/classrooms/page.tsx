@@ -403,13 +403,12 @@ export default function ClassroomsPage() {
 
     const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
 
-    // Correct filtering logic:
-    // Show classes that are public, which the user does not teach, and is not already enrolled in.
-    const discoverable = discoverClasses.filter(c => 
-        c.isPublic && // Ensure it's public (redundant if query is correct, but safe)
-        c.teacherId !== user?.uid &&
-        !enrolledClassIds.has(c.id)
-    );
+    const discoverable = discoverClasses.filter(c => {
+        // A class is discoverable if it's public, the user is not the teacher, and the user is not already enrolled.
+        const isNotMyClass = c.teacherId !== user?.uid;
+        const isNotEnrolled = !enrolledClassIds.has(c.id);
+        return c.isPublic && isNotMyClass && isNotEnrolled;
+    });
 
     if (discoverable.length === 0) {
         return <p className="text-muted-foreground text-center py-10">No public classrooms to discover right now.</p>;
