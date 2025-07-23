@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { HelpCircle, Mail, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -43,12 +43,8 @@ export default function SignInPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     
-    // Set persistence before signing in to ensure session is saved.
-    setPersistence(auth, browserLocalPersistence)
-      .then(() => {
-        // After setting persistence, perform sign-in
-        return signInWithEmailAndPassword(auth, values.email, values.password);
-      })
+    // Persistence is now handled in firebase.ts, so we can directly sign in.
+    signInWithEmailAndPassword(auth, values.email, values.password)
       .then((userCredential) => {
         toast({
           title: "Sign In Successful",

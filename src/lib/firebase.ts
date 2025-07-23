@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence, getAuth } from 'firebase/auth';
+import { initializeAuth, browserLocalPersistence } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
@@ -29,8 +29,11 @@ if (
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize services
-// The persistence is now set explicitly in the sign-in flow to ensure it's applied correctly.
-const auth = getAuth(app);
+// ✅ FIX: Set persistence on Auth initialization for app-wide effect.
+const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence,
+});
+
 const db = getFirestore(app);
 const storage = getStorage(app);
 let messaging: Messaging | null = null;
