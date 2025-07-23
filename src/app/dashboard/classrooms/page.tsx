@@ -406,6 +406,7 @@ export default function ClassroomsPage() {
     // Correct filtering logic:
     // Show classes that are public, which the user does not teach, and is not already enrolled in.
     const discoverable = discoverClasses.filter(c => 
+        c.isPublic && // Ensure it's public (redundant if query is correct, but safe)
         c.teacherId !== user?.uid &&
         !enrolledClassIds.has(c.id)
     );
