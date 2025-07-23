@@ -16,6 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Recording } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+
 
 const RecordingCard = ({ rec, onDelete, currentUserId }: { rec: Recording; onDelete: (id: string, name: string, storagePath: string) => void; currentUserId: string | null }) => {
   const { toast } = useToast();
@@ -64,11 +66,12 @@ const RecordingCard = ({ rec, onDelete, currentUserId }: { rec: Recording; onDel
   );
 };
 
-export function RecordingsClientUI({ initialRecordings, currentUserId }: { initialRecordings: Recording[], currentUserId: string | null }) {
+export function RecordingsClientUI() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { user: currentUserId } = useAuth();
   
-  const [recordings, setRecordings] = useState<Recording[]>(initialRecordings);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
@@ -78,9 +81,36 @@ export function RecordingsClientUI({ initialRecordings, currentUserId }: { initi
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    setRecordings(initialRecordings);
-    setIsLoading(false);
-  }, [initialRecordings]);
+    if (!currentUserId) {
+      setIsLoading(false);
+      setRecordings([]);
+      return;
+    }
+
+    setIsLoading(true);
+    const recRef = collection(db, "recordings");
+    const q = query(recRef, 
+      or(
+        where("isPrivate", "==", false), 
+        where("uploaderId", "==", currentUserId.uid)
+      ), 
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording)));
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching recordings:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Could not fetch recordings." });
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUserId, toast]);
   
   const handleUploadClick = () => {
     if (!currentUserId) {
@@ -105,7 +135,7 @@ export function RecordingsClientUI({ initialRecordings, currentUserId }: { initi
     const toastId = `upload-rec-${Date.now()}`;
     toast({ id: toastId, title: "Uploading Recording...", description: "Please wait...", duration: Infinity });
 
-    const storagePath = `recordings/${currentUserId}/${destination}/${Date.now()}-${file.name}`;
+    const storagePath = `recordings/${currentUserId.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
     const uploadTask = uploadBytesResumable(fileRef, file);
 
@@ -120,9 +150,9 @@ export function RecordingsClientUI({ initialRecordings, currentUserId }: { initi
           await addDoc(collection(db, "recordings"), {
             name: file.name,
             date: new Date().toLocaleDateString(),
-            duration: "N/A", // Duration would need to be extracted from the video file
+            duration: "N/A", 
             size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
-            uploaderId: currentUserId,
+            uploaderId: currentUserId.uid,
             isPrivate: destination === 'private',
             downloadURL,
             storagePath,
@@ -190,7 +220,7 @@ export function RecordingsClientUI({ initialRecordings, currentUserId }: { initi
     }
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {recs.map(rec => <RecordingCard key={rec.id} rec={rec} onDelete={handleOpenDeleteDialog} currentUserId={currentUserId} />)}
+        {recs.map(rec => <RecordingCard key={rec.id} rec={rec} onDelete={handleOpenDeleteDialog} currentUserId={currentUserId?.uid || null} />)}
       </div>
     );
   };

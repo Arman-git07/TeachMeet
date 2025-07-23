@@ -49,11 +49,12 @@ const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete
   );
 };
 
-export function DocumentsClientUI({ initialDocuments, currentUserId }: { initialDocuments: Document[], currentUserId: string | null }) {
+export function DocumentsClientUI() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   
-  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
@@ -63,13 +64,40 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
   const [searchQuery, setSearchQuery] = useState('');
   
   useEffect(() => {
-    setDocuments(initialDocuments);
-    setIsLoading(false);
-  }, [initialDocuments]);
+    if (!currentUser) {
+      setIsLoading(false);
+      setDocuments([]);
+      return;
+    }
+
+    setIsLoading(true);
+    const docsRef = collection(db, "documents");
+    const q = query(docsRef, 
+      or(
+        where("isPrivate", "==", false), 
+        where("uploaderId", "==", currentUser.uid)
+      ), 
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document)));
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching documents:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents." });
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser, toast]);
 
 
   const handleUploadClick = () => {
-    if (!currentUserId) {
+    if (!currentUser) {
       toast({ variant: "destructive", title: "Authentication Required", description: "Please sign in to upload documents." });
       return;
     }
@@ -86,12 +114,12 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
     const file = event.target.files?.[0];
     const destination = event.currentTarget.getAttribute('data-destination') as 'private' | 'public' | null;
 
-    if (!file || !destination || !currentUserId) return;
+    if (!file || !destination || !currentUser) return;
 
     const toastId = `upload-${Date.now()}`;
     toast({ id: toastId, title: "Uploading Document...", description: "Please wait...", duration: Infinity });
 
-    const storagePath = `documents/${currentUserId}/${destination}/${Date.now()}-${file.name}`;
+    const storagePath = `documents/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
     const uploadTask = uploadBytesResumable(fileRef, file);
 
@@ -107,7 +135,7 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
             name: file.name,
             lastModified: new Date().toISOString(),
             size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
-            uploaderId: currentUserId,
+            uploaderId: currentUser.uid,
             isPrivate: destination === 'private',
             downloadURL,
             storagePath,
@@ -134,20 +162,15 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
     setIsDeleteDialogOpen(false);
     
     try {
-      // First, delete the Firestore document
       await deleteDoc(doc(db, "documents", id));
-      
-      // Then, delete the file from Storage
       const fileRef = storageRef(storage, storagePath);
       await deleteObject(fileRef);
       
       toast({ title: "Document Deleted", description: `"${name}" has been successfully deleted.` });
-      setDocumentToDelete(null); // Clear after successful deletion
+      setDocumentToDelete(null); 
     } catch (error: any) {
       console.error("Deletion failed:", error);
-      // More specific error handling
       if (error.code === 'storage/object-not-found') {
-          // If file doesn't exist in storage, but doc does, still try to delete doc.
           toast({ variant: 'destructive', title: "Deletion Warning", description: "File not found in storage, but removing database entry." });
           try {
              await deleteDoc(doc(db, "documents", id));
@@ -177,7 +200,7 @@ export function DocumentsClientUI({ initialDocuments, currentUserId }: { initial
     }
     return (
       <div className="space-y-2">
-        {docs.map(doc => <DocumentRow key={doc.id} doc={doc} onDelete={handleOpenDeleteDialog} currentUserId={currentUserId} />)}
+        {docs.map(doc => <DocumentRow key={doc.id} doc={doc} onDelete={handleOpenDeleteDialog} currentUserId={currentUser?.uid || null} />)}
       </div>
     );
   };

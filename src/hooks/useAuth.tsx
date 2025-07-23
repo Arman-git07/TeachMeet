@@ -42,8 +42,7 @@ interface AuthContextType {
   user: FirebaseUser | null;
   loading: boolean;
   isAuthenticated: boolean;
-  documents: Document[];
-  recordings: Recording[];
+  // REMOVED: documents and recordings are now fetched on their respective pages
   signOut: () => Promise<void>;
   deleteUserAccount: () => Promise<void>;
 }
@@ -53,46 +52,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [recordings, setRecordings] = useState<Recording[]>([]);
-
+  
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
 
   useEffect(() => {
-    let unsubscribers: Unsubscribe[] = [];
-
     const authUnsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      // Clear previous listeners to prevent duplicates on auth state change
-      unsubscribers.forEach(unsub => unsub());
-      unsubscribers = [];
-      
       setUser(currentUser);
       
-      if (currentUser) {
-        // User is signed in, fetch their data and listen for updates
-        
-        // Documents listener
-        const docsRef = collection(db, "documents");
-        const docsQuery = query(docsRef, or(where("isPrivate", "==", false), where("uploaderId", "==", currentUser.uid)), orderBy("createdAt", "desc"));
-        const docsUnsubscribe = onSnapshot(docsQuery, 
-          (snapshot) => setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document))),
-          (error) => console.error("Error fetching documents:", error)
-        );
-        unsubscribers.push(docsUnsubscribe);
-
-        // Recordings listener
-        const recordingsRef = collection(db, "recordings");
-        const recordingsQuery = query(recordingsRef, or(where("isPrivate", "==", false), where("uploaderId", "==", currentUser.uid)), orderBy("createdAt", "desc"));
-        const recordingsUnsubscribe = onSnapshot(recordingsQuery, 
-          (snapshot) => setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording))),
-          (error) => console.error("Error fetching recordings:", error)
-        );
-        unsubscribers.push(recordingsUnsubscribe);
-
-        // FCM Token
-        if (messaging) {
+      if (currentUser && messaging) {
           try {
             const permission = await Notification.requestPermission();
             if (permission === 'granted') {
@@ -106,18 +75,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } catch (error) {
             console.error('An error occurred while retrieving FCM token.', error);
           }
-        }
-      } else {
-        // User is signed out, clear data
-        setDocuments([]);
-        setRecordings([]);
       }
       setLoading(false);
     });
 
     return () => {
       authUnsubscribe();
-      unsubscribers.forEach(unsub => unsub());
     };
   }, []);
 
@@ -151,23 +114,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const credential = EmailAuthProvider.credential(currentUser.email!, password);
         await reauthenticateWithCredential(currentUser, credential);
         
-        // At this point, the user is re-authenticated.
-        // In a real production app, you would now call a Firebase Cloud Function
-        // to delete the user's data from Firestore and Storage before deleting the user.
-        // For this prototype, we'll simulate this cleanup and then delete the user.
-
         toast({ title: "Cleaning up your data...", description: "Deleting documents, recordings, and other data." });
         
-        // --- Simulated Data Cleanup ---
-        // This is where you would call your backend function:
-        // const deleteUserData = httpsCallable(functions, 'deleteUserData');
-        // await deleteUserData();
         console.log(`SIMULATING: Deleting all data for user ${currentUser.uid}`);
         
         await deleteUser(currentUser);
         
         toast({ title: "Account Deleted", description: "Your account and all associated data have been permanently deleted." });
-        // The onAuthStateChanged listener will automatically handle redirecting the user.
         
     } catch (error: any) {
         let title = "Deletion Failed";
@@ -186,7 +139,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         console.error("Account deletion error:", error);
         toast({ variant: "destructive", title, description });
-        // Rethrow the error so the calling component knows it failed
         throw error;
     }
   };
@@ -194,7 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated, documents, recordings, signOut, deleteUserAccount }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated, signOut, deleteUserAccount }}>
       {children}
     </AuthContext.Provider>
   );

@@ -64,10 +64,14 @@ export default function HomePage() {
   const [animationLock, setAnimationLock] = useState(false);
 
   const { toast } = useToast();
-  const { user, documents, recordings, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
+  // NOTE: This component no longer fetches documents/recordings directly.
+  // It only reads ongoing meetings from localStorage.
+  // Documents and recordings are now loaded on their respective pages.
   useEffect(() => {
     const loadActivities = () => {
+      if (authLoading) return;
       setIsLoading(true);
   
       const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
@@ -106,36 +110,15 @@ export default function HomePage() {
       }
       localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedItemIds));
   
-      const documentActivities: DocumentActivityItem[] = documents.map(doc => ({
-        id: `document-${doc.id}`,
-        type: 'document',
-        title: doc.name || 'Untitled Document',
-        timestamp: (doc.createdAt as any)?.toDate().getTime() || new Date(doc.lastModified).getTime(),
-        isPrivate: doc.isPrivate,
-      }));
-
-      const recordingActivities: RecordingActivityItem[] = recordings.map(rec => ({
-        id: `recording-${rec.id}`,
-        type: 'recording',
-        title: rec.name || 'Untitled Recording',
-        timestamp: (rec.createdAt as any)?.toDate().getTime() || new Date(rec.date).getTime(),
-        isPrivate: rec.isPrivate,
-        thumbnailUrl: rec.thumbnailUrl,
-      }));
-
-      const combined = [...ongoingMeetings, ...documentActivities, ...recordingActivities]
+      const combined = [...ongoingMeetings]
         .filter(item => !dismissedItemIds.includes(item.id))
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 10); // Limit to 10 most recent items
+        .sort((a, b) => b.timestamp - a.timestamp);
 
       setAllActivity(combined);
       setIsLoading(false);
     };
   
-    // Load activities whenever the auth state or the data from the auth hook changes.
-    if (!authLoading) {
-      loadActivities();
-    }
+    loadActivities();
   
     const handleMeetingStarted = () => loadActivities();
     window.addEventListener('teachmeet_meeting_started', handleMeetingStarted);
@@ -143,7 +126,7 @@ export default function HomePage() {
     return () => {
       window.removeEventListener('teachmeet_meeting_started', handleMeetingStarted);
     };
-  }, [user, documents, recordings, authLoading]);
+  }, [user, authLoading]);
 
 
   const tmVisibleDuration = 350;
@@ -270,7 +253,7 @@ export default function HomePage() {
             ) : (
               <div className="text-center py-4 text-muted-foreground">
                 <p className="mb-2">No recent activity.</p>
-                <p className="text-sm">Start a new meeting or upload a file to get started!</p>
+                <p className="text-sm">Start a new meeting to get started!</p>
               </div>
             )}
           </div>
