@@ -401,12 +401,12 @@ export default function ClassroomsPage() {
   const DiscoverClassesTab = () => {
     if (isLoadingDiscover || authLoading) return renderSkeleton();
 
-    // Create sets of IDs for efficient lookup
-    const myClassIds = new Set(myClasses.map(c => c.id));
     const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
 
+    // Correct filtering logic:
+    // Show classes that are public, which the user does not teach, and is not already enrolled in.
     const discoverable = discoverClasses.filter(c => 
-        !myClassIds.has(c.id) &&
+        c.teacherId !== user?.uid &&
         !enrolledClassIds.has(c.id)
     );
 
