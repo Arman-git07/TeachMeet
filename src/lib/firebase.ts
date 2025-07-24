@@ -38,11 +38,11 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 let messaging: Messaging | null = null;
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     try {
         messaging = getMessaging(app);
     } catch (error) {
-        console.warn("Could not initialize Firebase Messaging. This may be due to an unsupported environment.");
+        console.warn("Could not initialize Firebase Messaging. This may be due to an unsupported environment (e.g., non-HTTPS).");
         messaging = null;
     }
 }

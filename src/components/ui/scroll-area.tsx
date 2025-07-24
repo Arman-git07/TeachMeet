@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -12,8 +13,10 @@ const ScrollArea = React.forwardRef<
     viewportRef?: React.Ref<HTMLDivElement>
   }
 >(({ className, children, viewportRef, ...props }, ref) => {
+  // ✅ FIX: Use a regular ref, not state, to avoid infinite re-render loops.
   const internalRef = React.useRef<HTMLDivElement | null>(null)
 
+  // ✅ FIX: Correctly compose the internal and external refs.
   const composedViewportRef = viewportRef
     ? composeRefs(viewportRef, internalRef)
     : internalRef
