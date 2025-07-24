@@ -403,11 +403,12 @@ export default function ClassroomsPage() {
 
     const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
 
+    // ✅ FIX: Correctly filter public classes.
     const discoverable = discoverClasses.filter(c => {
-        // A class is discoverable if it's public, the user is not the teacher, and the user is not already enrolled.
+        // A class is discoverable if the user is not the teacher AND the user is not already enrolled.
         const isNotMyClass = c.teacherId !== user?.uid;
         const isNotEnrolled = !enrolledClassIds.has(c.id);
-        return c.isPublic && isNotMyClass && isNotEnrolled;
+        return isNotMyClass && isNotEnrolled;
     });
 
     if (discoverable.length === 0) {
