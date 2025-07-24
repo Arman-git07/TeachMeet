@@ -53,7 +53,7 @@ export default function SignInPage() {
         router.push('/');
       })
       .catch((error: any) => {
-        console.error("Auth persistence or sign-in failed:", error);
+        console.error("Auth sign-in failed:", error);
   
         let errorMessage = "An unexpected error occurred. Please try again.";
         switch (error.code) {
