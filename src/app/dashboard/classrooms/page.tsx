@@ -235,6 +235,7 @@ export default function ClassroomsPage() {
   useEffect(() => {
     const q = query(collection(db, 'classrooms'), where('isPublic', '==', true));
     const unsub = onSnapshot(q, (snapshot) => {
+        console.log("Fetched public classes:", snapshot.size);
         setDiscoverClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
         setIsLoadingDiscover(false);
     }, (error) => { 
@@ -410,14 +411,15 @@ export default function ClassroomsPage() {
 
     const discoverableClasses = discoverClasses.filter(publicClass => {
       // If user is not logged in, show all public classes.
-      if (!user) {
-        return true;
-      }
+      if (!user) return true;
       // If user is logged in, don't show if they are the teacher or already enrolled.
       const isTeacher = publicClass.teacherId === user.uid;
       const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
       return !isTeacher && !isEnrolled;
     });
+    
+    console.log("Filtered discoverable classes:", discoverableClasses.length);
+
 
     if (discoverableClasses.length === 0) {
         return <p className="text-muted-foreground text-center py-10">No public classrooms to discover right now.</p>;
