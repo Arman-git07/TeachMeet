@@ -408,19 +408,15 @@ export default function ClassroomsPage() {
   const DiscoverClassesTab = () => {
     if (isLoadingDiscover) return renderSkeleton();
 
-    // The 'discoverClasses' state already contains only public classes from the Firestore query.
-    // Now, we just need to filter out classes the user teaches or is enrolled in.
     const discoverableClasses = discoverClasses.filter(publicClass => {
-      // Don't show if the user is the teacher.
-      if (user && publicClass.teacherId === user.uid) {
-        return false;
+      // If user is not logged in, show all public classes.
+      if (!user) {
+        return true;
       }
-      // Don't show if the user is already enrolled.
+      // If user is logged in, don't show if they are the teacher or already enrolled.
+      const isTeacher = publicClass.teacherId === user.uid;
       const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
-      if (isEnrolled) {
-        return false;
-      }
-      return true;
+      return !isTeacher && !isEnrolled;
     });
 
     if (discoverableClasses.length === 0) {
