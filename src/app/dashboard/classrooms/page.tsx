@@ -141,10 +141,9 @@ const CreateClassroomDialogContent = ({
           teacherId: user.uid,
           teacherName: user.displayName || 'Anonymous Teacher',
           isPublic,
-          students: [], // No one is enrolled initially except the teacher conceptually
+          students: [], 
           createdAt: serverTimestamp(),
         };
-        // The rules now handle the teacherId check
         await addDoc(collection(db, 'classrooms'), classroomData);
         toast({ title: 'Classroom Created', description: `"${title}" has been successfully created.` });
       }
@@ -168,19 +167,19 @@ const CreateClassroomDialogContent = ({
       <div className="grid gap-4 py-4">
         <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="title" className="text-right">Title</Label>
-          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., Introduction to React" />
+          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., Introduction to React" disabled={isLoading}/>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="description" className="text-right">Description</Label>
-          <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="A brief summary" />
+          <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="A brief summary" disabled={isLoading}/>
         </div>
         <div className="flex items-center space-x-2 justify-end">
           <Label htmlFor="is-public">Make Public</Label>
-          <Switch id="is-public" checked={isPublic} onCheckedChange={setIsPublic} />
+          <Switch id="is-public" checked={isPublic} onCheckedChange={setIsPublic} disabled={isLoading}/>
         </div>
       </div>
       <DialogFooter>
-        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+        <DialogClose asChild><Button type="button" variant="secondary" disabled={isLoading}>Cancel</Button></DialogClose>
         <Button onClick={handleSubmit} disabled={isLoading}>
           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           {classroomToEdit ? 'Save Changes' : 'Create Classroom'}
@@ -330,8 +329,8 @@ export default function ClassroomsPage() {
       <Card key={classroomInfo.id}>
           <CardHeader>
               <CardTitle>{classroomInfo.title}</CardTitle>
-              <CardDescription>{classroomInfo.description || "No description."}</CardDescription>
-          </CardHeader>
+              <CardDescription>{classroomInfo.description || "No description."}</CardHeader>
+          </CardContent>
           <CardContent>
               <p className="text-sm text-muted-foreground">Taught by: {classroomInfo.teacherName}</p>
           </CardContent>
@@ -347,8 +346,8 @@ export default function ClassroomsPage() {
       <Card key={classroom.id}>
           <CardHeader>
               <CardTitle>{classroom.title}</CardTitle>
-              <CardDescription>{classroom.description || "No description."}</CardDescription>
-          </CardHeader>
+              <CardDescription>{classroom.description || "No description."}</CardHeader>
+          </CardContent>
           <CardContent>
               <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
           </CardContent>
@@ -403,7 +402,6 @@ export default function ClassroomsPage() {
 
     const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
 
-    // ✅ FIX: Correctly filter public classes.
     const discoverable = discoverClasses.filter(c => {
         // A class is discoverable if the user is not the teacher AND the user is not already enrolled.
         const isNotMyClass = c.teacherId !== user?.uid;
@@ -453,3 +451,5 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
+    
