@@ -212,6 +212,7 @@ export default function ClassroomsPage() {
   // Fetch My Classes
   useEffect(() => {
     if (!user) { setIsLoadingMy(false); setMyClasses([]); return; }
+    setIsLoadingMy(true);
     const q = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
         setMyClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
@@ -223,6 +224,7 @@ export default function ClassroomsPage() {
   // Fetch Enrolled Classes
   useEffect(() => {
     if (!user) { setIsLoadingEnrolled(false); setEnrolledClasses([]); return; }
+    setIsLoadingEnrolled(true);
     const q = query(collection(db, 'users', user.uid, 'enrolled'));
     const unsub = onSnapshot(q, (snapshot) => {
         setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EnrolledClassroomInfo)));
@@ -233,6 +235,7 @@ export default function ClassroomsPage() {
 
   // Fetch public classes for discovery
   useEffect(() => {
+    setIsLoadingDiscover(true);
     const q = query(collection(db, 'classrooms'), where('isPublic', '==', true));
     const unsub = onSnapshot(q, (snapshot) => {
         setDiscoverClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
