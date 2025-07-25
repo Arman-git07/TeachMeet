@@ -237,9 +237,13 @@ export default function ClassroomsPage() {
     const unsub = onSnapshot(q, (snapshot) => {
         setDiscoverClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
         setIsLoadingDiscover(false);
-    }, (error) => { console.error('Discover fetch error:', error); setIsLoadingDiscover(false); });
+    }, (error) => { 
+        console.error('Discover fetch error:', error); 
+        toast({ variant: 'destructive', title: 'Error', description: "Could not fetch public classes. Check Firestore rules."});
+        setIsLoadingDiscover(false); 
+    });
     return () => unsub();
-  }, []);
+  }, [toast]);
 
   const handleEdit = (classroom: Classroom) => {
     setClassroomToEdit(classroom);
@@ -271,7 +275,7 @@ export default function ClassroomsPage() {
   
   const handleRequestToJoin = async (classroomId: string) => {
     if (!user) {
-        toast({ variant: 'destructive', title: "Authentication required" });
+        toast({ variant: 'destructive', title: "Authentication required", description: "You must be signed in to join a class." });
         return;
     }
     setRequestingToJoin(classroomId);
@@ -287,9 +291,8 @@ export default function ClassroomsPage() {
         toast({ title: 'Request Sent!', description: 'Your request to join has been sent to the teacher.' });
     } catch (error) {
         console.error("Error sending join request:", error);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request.' });
-    } finally {
-        // We don't reset requestingToJoin state here, so the button remains "Pending"
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Check Firestore Rules for write permissions.' });
+        setRequestingToJoin(null); // Allow user to try again on failure
     }
 };
 
@@ -342,6 +345,11 @@ export default function ClassroomsPage() {
 
   const renderDiscoverClassroomCard = (classroom: Classroom) => {
     const isRequesting = requestingToJoin === classroom.id;
+    const isMyClass = user?.uid === classroom.teacherId;
+    const isEnrolled = enrolledClasses.some(c => c.classroomId === classroom.id);
+
+    if (isMyClass || isEnrolled) return null; // Don't show own or enrolled classes in discover
+
     return (
       <Card key={classroom.id}>
           <CardHeader>
@@ -352,9 +360,13 @@ export default function ClassroomsPage() {
               <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => handleRequestToJoin(classroom.id)} disabled={isRequesting}>
-                {isRequesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...</> : <><UserPlus className="mr-2 h-4 w-4" />Request to Join</>}
-            </Button>
+            {user ? (
+                <Button className="w-full" onClick={() => handleRequestToJoin(classroom.id)} disabled={isRequesting}>
+                    {isRequesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...</> : <><UserPlus className="mr-2 h-4 w-4" />Request to Join</>}
+                </Button>
+            ) : (
+                 <Button asChild className="w-full"><Link href="/auth/signin">Sign In to Join</Link></Button>
+            )}
           </CardFooter>
     </Card>
     );
@@ -398,24 +410,24 @@ export default function ClassroomsPage() {
   };
 
   const DiscoverClassesTab = () => {
-    if (isLoadingDiscover || authLoading) return renderSkeleton();
+    if (isLoadingDiscover) return renderSkeleton();
 
     const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
-
-    const discoverable = discoverClasses.filter(c => {
-        // A class is discoverable if the user is not the teacher AND the user is not already enrolled.
-        const isNotMyClass = c.teacherId !== user?.uid;
-        const isNotEnrolled = !enrolledClassIds.has(c.id);
-        return isNotMyClass && isNotEnrolled;
+    
+    // Filter out classes taught by the user or classes they are already enrolled in
+    const discoverableClasses = discoverClasses.filter(c => {
+        const isMyClass = c.teacherId === user?.uid;
+        const isEnrolled = enrolledClassIds.has(c.id);
+        return !isMyClass && !isEnrolled;
     });
 
-    if (discoverable.length === 0) {
+    if (discoverableClasses.length === 0) {
         return <p className="text-muted-foreground text-center py-10">No public classrooms to discover right now.</p>;
     }
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {discoverable.map(renderDiscoverClassroomCard)}
+        {discoverableClasses.map(renderDiscoverClassroomCard)}
       </div>
     );
   };
@@ -424,15 +436,17 @@ export default function ClassroomsPage() {
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Classrooms</h1>
-        <div>
-            <Button asChild variant="outline" className="mr-2">
-                <Link href="/dashboard/classrooms/join">Join a Class</Link>
-            </Button>
-            <Dialog open={isCreateDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setClassroomToEdit(null); setIsCreateDialogOpen(isOpen); }}>
-              <DialogTrigger asChild><Button onClick={handleCreateNew}><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
-              <DialogContent><CreateClassroomDialogContent onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
-            </Dialog>
-        </div>
+        { user && (
+            <div>
+                <Button asChild variant="outline" className="mr-2">
+                    <Link href="/dashboard/classrooms/join">Join a Class</Link>
+                </Button>
+                <Dialog open={isCreateDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setClassroomToEdit(null); setIsCreateDialogOpen(isOpen); }}>
+                  <DialogTrigger asChild><Button onClick={handleCreateNew}><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
+                  <DialogContent><CreateClassroomDialogContent onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
+                </Dialog>
+            </div>
+        )}
       </div>
 
       <AlertDialog open={!!classroomToDelete} onOpenChange={(isOpen) => !isOpen && setClassroomToDelete(null)}>
@@ -451,5 +465,3 @@ export default function ClassroomsPage() {
     </div>
   );
 }
-
-    
