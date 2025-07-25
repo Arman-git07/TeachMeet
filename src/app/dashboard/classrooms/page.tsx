@@ -410,7 +410,7 @@ export default function ClassroomsPage() {
   };
 
   const DiscoverClassesTab = () => {
-    if (isLoadingDiscover) return renderSkeleton();
+    if (isLoadingDiscover || authLoading) return renderSkeleton();
 
     const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
     
