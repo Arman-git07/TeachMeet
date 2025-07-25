@@ -1,61 +1,56 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users: Allow users to read/write their own data.
-    match /users/{userId} {
+    
+    // Rules for user-specific data
+    match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // Enrolled Subcollection: Allow users to read their own enrolled classes.
-      match /enrolled/{classroomId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        // Creation of enrolled docs is handled by the classroom teacher in a batch write.
-        allow write: if false; 
-      }
     }
-
-    // Classrooms: Define rules for creating, reading, and managing classrooms.
+    
+    // Rules for classrooms
     match /classrooms/{classroomId} {
-      // Allow read access if the classroom is public OR if the user is the teacher.
-      allow get: if resource.data.isPublic == true || (request.auth != null && request.auth.uid == resource.data.teacherId);
-      
-      // Allow listing of classrooms ONLY if the query is for public classrooms.
+      // Allow anyone to read a classroom document if it is public.
+      // Allow the teacher to read it regardless of public status.
+      allow get: if (resource.data.isPublic == true || (request.auth != null && request.auth.uid == resource.data.teacherId));
+
+      // Allow anyone to list (query for) public classrooms.
       allow list: if resource.data.isPublic == true;
-
-      // Allow authenticated users to create a classroom, ensuring they set themselves as the teacher.
+      
+      // Allow authenticated users to create a classroom if they are the teacher.
       allow create: if request.auth != null && request.resource.data.teacherId == request.auth.uid;
-      
-      // Only the teacher who created the classroom can update or delete it.
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.teacherId;
 
-      // Join Requests Subcollection
-      match /joinRequests/{studentId} {
-        // Allow an authenticated user to create a join request for themselves.
-        allow create: if request.auth != null && request.auth.uid == studentId;
-        
-        // Only the user who made the request or the classroom teacher can read/delete it.
-        allow read, delete: if request.auth != null && (request.auth.uid == studentId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
-      }
-      
-      // Participants Subcollection (Managed by host)
-      match /participants/{participantId} {
-        allow read: if true; // Allow all participants to see each other
-        allow write: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId;
+      // Allow the teacher to update or delete their own classroom.
+      allow update, delete: if request.auth != null && resource.data.teacherId == request.auth.uid;
+
+      // Rules for classroom subcollections
+      match /{subcollection}/{docId} {
+        // Allow enrolled students and the teacher to read/write.
+        // Specific create/update/delete can be refined here later if needed.
+        allow read, write: if request.auth != null && (request.auth.uid == resource.data.teacherId || request.auth.uid in resource.data.students);
       }
     }
 
-    // Recordings & Documents: Users can manage their own, and view public ones.
-    match /recordings/{recordingId} {
-      allow get: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-      allow list: if request.auth != null; // Allow logged-in users to query their own/public items
-      allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+    // Rules for meetings
+    match /meetings/{meetingId}/{document=**} {
+      // Allow any authenticated user to interact with meetings.
+      // In a production app, this would be locked down to meeting members.
+      allow read, write: if request.auth != null;
     }
 
-    match /documents/{documentId} {
-      allow get: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-      allow list: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+    // Rules for documents and recordings
+    match /documents/{docId} {
+        allow get: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
+        allow list: if request.auth != null; // Allow authenticated users to list documents they have access to
+        allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+        allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
+    }
+
+    match /recordings/{recId} {
+        allow get: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
+        allow list: if request.auth != null;
+        allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+        allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
     }
   }
 }
