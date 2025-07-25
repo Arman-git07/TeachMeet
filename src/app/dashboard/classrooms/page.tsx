@@ -326,18 +326,18 @@ export default function ClassroomsPage() {
   );
   
   const renderEnrolledClassroomCard = (classroomInfo: EnrolledClassroomInfo) => (
-      <Card key={classroomInfo.id}>
-          <CardHeader>
-              <CardTitle>{classroomInfo.title}</CardTitle>
-              <CardDescription>{classroomInfo.description || "No description."}</CardHeader>
-          </CardContent>
-          <CardContent>
-              <p className="text-sm text-muted-foreground">Taught by: {classroomInfo.teacherName}</p>
-          </CardContent>
-          <CardFooter>
-              <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroomInfo.classroomId}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-          </CardFooter>
-      </Card>
+    <Card key={classroomInfo.id}>
+      <CardHeader>
+        <CardTitle>{classroomInfo.title}</CardTitle>
+        <CardDescription>{classroomInfo.description || "No description."}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Taught by: {classroomInfo.teacherName}</p>
+      </CardContent>
+      <CardFooter>
+        <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroomInfo.classroomId}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+      </CardFooter>
+    </Card>
   );
 
   const renderDiscoverClassroomCard = (classroom: Classroom) => {
@@ -346,8 +346,8 @@ export default function ClassroomsPage() {
       <Card key={classroom.id}>
           <CardHeader>
               <CardTitle>{classroom.title}</CardTitle>
-              <CardDescription>{classroom.description || "No description."}</CardHeader>
-          </CardContent>
+              <CardDescription>{classroom.description || "No description."}</CardDescription>
+          </CardHeader>
           <CardContent>
               <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
           </CardContent>
