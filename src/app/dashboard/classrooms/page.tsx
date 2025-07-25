@@ -345,10 +345,6 @@ export default function ClassroomsPage() {
 
   const renderDiscoverClassroomCard = (classroom: Classroom) => {
     const isRequesting = requestingToJoin === classroom.id;
-    const isMyClass = user?.uid === classroom.teacherId;
-    const isEnrolled = enrolledClasses.some(c => c.classroomId === classroom.id);
-
-    if (isMyClass || isEnrolled) return null; // Don't show own or enrolled classes in discover
 
     return (
       <Card key={classroom.id}>
@@ -410,15 +406,21 @@ export default function ClassroomsPage() {
   };
 
   const DiscoverClassesTab = () => {
-    if (isLoadingDiscover || authLoading) return renderSkeleton();
+    if (isLoadingDiscover) return renderSkeleton();
 
-    const enrolledClassIds = new Set(enrolledClasses.map(c => c.classroomId));
-    
-    // Filter out classes taught by the user or classes they are already enrolled in
-    const discoverableClasses = discoverClasses.filter(c => {
-        const isMyClass = c.teacherId === user?.uid;
-        const isEnrolled = enrolledClassIds.has(c.id);
-        return !isMyClass && !isEnrolled;
+    // The 'discoverClasses' state already contains only public classes from the Firestore query.
+    // Now, we just need to filter out classes the user teaches or is enrolled in.
+    const discoverableClasses = discoverClasses.filter(publicClass => {
+      // Don't show if the user is the teacher.
+      if (user && publicClass.teacherId === user.uid) {
+        return false;
+      }
+      // Don't show if the user is already enrolled.
+      const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
+      if (isEnrolled) {
+        return false;
+      }
+      return true;
     });
 
     if (discoverableClasses.length === 0) {
