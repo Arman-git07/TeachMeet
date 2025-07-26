@@ -113,32 +113,14 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // Create the meeting document and the host's participant document atomically
+    // Create the meeting document. The participant document is now created on the meeting page itself.
     try {
-      const batch = writeBatch(db);
-
-      // 1. Create the main meeting document
       const meetingDocRef = doc(db, "meetings", meetingDetails.id);
-      batch.set(meetingDocRef, {
+      await setDoc(meetingDocRef, {
         creatorId: user.uid,
         topic: trimmedMeetingTitle,
         createdAt: serverTimestamp(),
       });
-
-      // 2. Create the host's participant document
-      const participantDocRef = doc(db, "meetings", meetingDetails.id, "participants", user.uid);
-      batch.set(participantDocRef, {
-        name: user.displayName || user.email?.split('@')[0] || "Host",
-        photoURL: user.photoURL,
-        isMicMuted: true,
-        isCameraOff: true,
-        isHandRaised: false,
-        isScreenSharing: false,
-        joinedAt: serverTimestamp(),
-      });
-
-      // Commit the batch
-      await batch.commit();
 
       // Save meeting to localStorage for the activity feed
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);

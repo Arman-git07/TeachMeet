@@ -545,7 +545,24 @@ export default function MeetingPage() {
         }
 
         const meetingData = meetingDocSnap.data();
-        setMeetingCreatorId(meetingData?.creatorId || null);
+        const creatorId = meetingData?.creatorId || null;
+        setMeetingCreatorId(creatorId);
+        
+        // Ensure participant document exists
+        const participantDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+        const participantDocSnap = await getDoc(participantDocRef);
+
+        if (!participantDocSnap.exists()) {
+            await setDoc(participantDocRef, {
+                name: currentUser.displayName || currentUser.email?.split('@')[0] || "User",
+                photoURL: currentUser.photoURL,
+                isMicMuted: initialMicMuted,
+                isCameraOff: initialCameraOff,
+                isHandRaised: false,
+                isScreenSharing: false,
+                joinedAt: serverTimestamp(),
+            });
+        }
         
         setJoinStatus('joined');
 
