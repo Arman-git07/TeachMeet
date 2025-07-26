@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Paperclip, Send, MessageSquare, AlertTriangle } from 'lucide-react';
-import { aiHelpAssistant, AiHelpAssistantInput, AiHelpAssistantOutput } from '@/ai/flows/ai-help-assistant';
+// Removed direct import of aiHelpAssistantFlow
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
@@ -68,10 +68,24 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
     setError(null);
 
     try {
-      const aiInput: AiHelpAssistantInput = { question };
-      const aiResponse: AiHelpAssistantOutput = await aiHelpAssistant(aiInput);
-      const aiMessage: Message = { id: (Date.now() + 1).toString(), text: aiResponse.answer, sender: 'ai', timestamp: new Date() };
+      // Call the API route instead of the flow directly
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch from API');
+      }
+
+      const aiMessage: Message = { id: (Date.now() + 1).toString(), text: data.answer, sender: 'ai', timestamp: new Date() };
       setMessages(prev => [...prev, aiMessage]);
+
     } catch (err) {
       console.error("AI Help Assistant Error:", err);
       let displayMessage = "Sorry, I encountered an error trying to respond. Please try again.";
@@ -82,6 +96,9 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
         if (errorMessageLower.includes('failed to fetch') || errorMessageLower.includes('network error') || errorMessageLower.includes('disconnected')) {
           displayMessage += " This could be due to a network issue, the AI service being temporarily unavailable, or missing API configuration. Please ensure your API key for the AI service is correctly set up in your .env file (e.g., GOOGLE_API_KEY) and check your internet connection.";
           detailErrorState = "Network or connection error. Check console, API key, and internet.";
+        } else if (errorMessageLower.includes('failed to fetch from api')) {
+           displayMessage = "An error occurred with the AI service. This might be a server-side issue. Please check the server logs for more details.";
+           detailErrorState = "API route error. Check server logs.";
         }
       }
       
@@ -141,6 +158,12 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
                 }`}>
                   <p className="whitespace-pre-wrap">{msg.text}</p>
                   {msg.sender !== 'system' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString()}</p>}
+                }
+
+                {msg.sender !== 'system' && msg.sender !== 'user' && (
+                  <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString()}</p>
+                )}
+
                 </div>
                 {msg.sender === 'user' && (
                   <Avatar className="h-10 w-10 border-2 border-accent/50">
