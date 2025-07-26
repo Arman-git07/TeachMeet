@@ -1,40 +1,31 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
     match /classrooms/{classroomId} {
-      // Allow read if public or if the user is the teacher.
-      allow read: if resource.data.isPublic == true 
-                  || (request.auth != null && request.auth.uid == resource.data.teacherId);
-
-      // Allow write/delete only by the teacher.
-      allow write, delete: if request.auth != null && request.auth.uid == resource.data.teacherId;
-      
-      // Allow listing of public classes by anyone.
-      allow list: if resource.data.isPublic == true;
+      allow read: if resource.data.isPublic == true ||
+        request.auth != null && request.auth.uid == resource.data.teacherId;
+      allow write: if request.auth != null &&
+        request.auth.uid == request.resource.data.teacherId;
+      allow delete: if request.auth != null &&
+        request.auth.uid == resource.data.teacherId;
 
       // Rules for the joinRequests subcollection
       match /joinRequests/{userId} {
-        // Teacher can read requests, or user can read their own.
-        allow read: if request.auth != null && (
-          request.auth.uid == userId ||
-          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId
-        );
         // Any authenticated user can create a request for themselves.
-        allow create: if request.auth != null && request.auth.uid == userId;
-        // Teacher can delete (deny) requests.
-        allow delete: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId;
+        allow create: if request.auth.uid == userId;
+
+        // Only the teacher of the classroom can read or delete requests.
+        allow read, delete: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId;
       }
     }
 
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Rules for the 'enrolled' subcollection within a user
+      // Allow a user to manage their own enrolled classrooms list
       match /enrolled/{classroomId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
   }
