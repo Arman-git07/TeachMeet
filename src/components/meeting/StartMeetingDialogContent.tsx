@@ -17,7 +17,7 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
@@ -113,14 +113,32 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // Create the meeting document in Firestore immediately
-    const meetingDocRef = doc(db, "meetings", meetingDetails.id);
+    // Create the meeting document and the host's participant document atomically
     try {
-      await setDoc(meetingDocRef, {
+      const batch = writeBatch(db);
+
+      // 1. Create the main meeting document
+      const meetingDocRef = doc(db, "meetings", meetingDetails.id);
+      batch.set(meetingDocRef, {
         creatorId: user.uid,
         topic: trimmedMeetingTitle,
         createdAt: serverTimestamp(),
       });
+
+      // 2. Create the host's participant document
+      const participantDocRef = doc(db, "meetings", meetingDetails.id, "participants", user.uid);
+      batch.set(participantDocRef, {
+        name: user.displayName || user.email?.split('@')[0] || "Host",
+        photoURL: user.photoURL,
+        isMicMuted: true,
+        isCameraOff: true,
+        isHandRaised: false,
+        isScreenSharing: false,
+        joinedAt: serverTimestamp(),
+      });
+
+      // Commit the batch
+      await batch.commit();
 
       // Save meeting to localStorage for the activity feed
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
@@ -133,23 +151,23 @@ export function StartMeetingDialogContent() {
         startedAt: Date.now(),
       };
 
-      // Remove any existing meeting with the same ID and add the new one
       startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
-      startedMeetings.unshift(newMeeting); // Add to the beginning
+      startedMeetings.unshift(newMeeting); 
       
-      localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10))); // Keep max 10
+      localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
       
-      // Dispatch an event to notify the homepage to update
       window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
 
-      const joinNowLinkPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
+      // The waiting room is for guests. The host should go directly to the meeting.
+      const joinNowLinkPath = `/dashboard/meeting/${meetingDetails.id}?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
       router.push(joinNowLinkPath);
+
     } catch (error) {
       console.error("Error creating meeting document:", error);
       toast({
         variant: "destructive",
         title: "Creation Failed",
-        description: "Could not create the meeting room. Please check your connection and try again.",
+        description: "Could not create the meeting room. Please check your connection and Firestore rules, then try again.",
       });
       setIsJoining(false);
     }

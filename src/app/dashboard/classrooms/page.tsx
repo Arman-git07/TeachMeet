@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -411,14 +410,16 @@ export default function ClassroomsPage() {
   const DiscoverClassesTab = () => {
     if (isLoadingDiscover) return renderSkeleton();
 
-    const discoverableClasses = discoverClasses.filter(publicClass => {
-      // If user is not logged in, show all public classes.
-      if (!user) return true;
-      // If user is logged in, don't show if they are the teacher or already enrolled.
-      const isTeacher = publicClass.teacherId === user.uid;
-      const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
-      return !isTeacher && !isEnrolled;
-    });
+    // const discoverableClasses = discoverClasses.filter(publicClass => {
+    //   // If user is not logged in, show all public classes.
+    //   if (!user) return true;
+    //   // If user is logged in, don't show if they are the teacher or already enrolled.
+    //   const isTeacher = publicClass.teacherId === user.uid;
+    //   const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
+    //   return !isTeacher && !isEnrolled;
+    // });
+    // Use all discoverClasses directly without filtering
+    const discoverableClasses = discoverClasses;
 
     if (discoverableClasses.length === 0) {
         return <p className="text-muted-foreground text-center py-10">No public classrooms to discover right now.</p>;
