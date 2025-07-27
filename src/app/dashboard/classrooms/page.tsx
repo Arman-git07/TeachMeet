@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -347,6 +348,7 @@ export default function ClassroomsPage() {
 
   const renderDiscoverClassroomCard = (classroom: Classroom) => {
     const isRequesting = requestingToJoin === classroom.id;
+    const isMyClass = user?.uid === classroom.teacherId;
 
     return (
       <Card key={classroom.id}>
@@ -358,7 +360,9 @@ export default function ClassroomsPage() {
               <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
           </CardContent>
           <CardFooter>
-            {user ? (
+            {isMyClass ? (
+              <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+            ) : user ? (
                 <Button className="w-full" onClick={() => handleRequestToJoin(classroom.id)} disabled={isRequesting}>
                     {isRequesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...</> : <><UserPlus className="mr-2 h-4 w-4" />Request to Join</>}
                 </Button>
@@ -410,19 +414,17 @@ export default function ClassroomsPage() {
   const DiscoverClassesTab = () => {
     if (isLoadingDiscover) return renderSkeleton();
 
-    // const discoverableClasses = discoverClasses.filter(publicClass => {
-    //   // If user is not logged in, show all public classes.
-    //   if (!user) return true;
-    //   // If user is logged in, don't show if they are the teacher or already enrolled.
-    //   const isTeacher = publicClass.teacherId === user.uid;
-    //   const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
-    //   return !isTeacher && !isEnrolled;
-    // });
-    // Use all discoverClasses directly without filtering
-    const discoverableClasses = discoverClasses;
+    // Filter out classes the user is already enrolled in or teaches
+    const discoverableClasses = discoverClasses.filter(publicClass => {
+      if (!user) return true; // Show all public classes if not logged in
+      
+      const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
+      
+      return !isEnrolled;
+    });
 
     if (discoverableClasses.length === 0) {
-        return <p className="text-muted-foreground text-center py-10">No public classrooms to discover right now.</p>;
+        return <p className="text-muted-foreground text-center py-10">No new public classrooms to discover right now.</p>;
     }
 
     return (
