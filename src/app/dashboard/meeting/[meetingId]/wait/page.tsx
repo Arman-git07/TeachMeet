@@ -228,17 +228,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        // If host, just create their own participant document and join
-        const hostParticipantRef = doc(db, `meetings/${meetingId}/participants/${user.uid}`);
-        await setDoc(hostParticipantRef, {
-            name: user.displayName || userName,
-            photoURL: user.photoURL,
-            isMicMuted: !isMicActive,
-            isCameraOff: !isCameraActive,
-            isHandRaised: false,
-            isScreenSharing: false,
-            joinedAt: serverTimestamp(),
-        });
+        // If host, go directly to the meeting page. The meeting page itself will handle creating the participant document.
         const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
         router.push(joinNowLinkPath);
         return;
