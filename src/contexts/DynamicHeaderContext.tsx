@@ -5,23 +5,27 @@ import React, { createContext, useContext, useState, ReactNode, useCallback } fr
 interface DynamicHeaderContextType {
   headerContent: ReactNode | null;
   setHeaderContent: (content: ReactNode | null) => void;
-  // Could add a slot for right-aligned content in the future if needed
-  // headerActions: ReactNode | null;
-  // setHeaderActions: (actions: ReactNode | null) => void;
+  headerAction: ReactNode | null;
+  setHeaderAction: (action: ReactNode | null) => void;
 }
 
 const DynamicHeaderContext = createContext<DynamicHeaderContextType | undefined>(undefined);
 
 export const DynamicHeaderProvider = ({ children }: { children: ReactNode }) => {
   const [headerContent, setHeaderContent] = useState<ReactNode | null>(null);
-  // const [headerActions, setHeaderActions] = useState<ReactNode | null>(null);
+  const [headerAction, setHeaderAction] = useState<ReactNode | null>(null);
 
   const setHeaderContentCallback = useCallback((content: ReactNode | null) => {
     setHeaderContent(content);
   }, []);
 
+  const setHeaderActionCallback = useCallback((action: ReactNode | null) => {
+    setHeaderAction(action);
+  }, []);
+
+
   return (
-    <DynamicHeaderContext.Provider value={{ headerContent, setHeaderContent: setHeaderContentCallback /*, headerActions, setHeaderActions */ }}>
+    <DynamicHeaderContext.Provider value={{ headerContent, setHeaderContent: setHeaderContentCallback, headerAction, setHeaderAction: setHeaderActionCallback }}>
       {children}
     </DynamicHeaderContext.Provider>
   );

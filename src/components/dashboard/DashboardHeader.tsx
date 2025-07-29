@@ -4,12 +4,9 @@
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { PanelLeftOpen } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { MoreVertical } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export function DashboardHeader() {
-  const { headerContent } = useDynamicHeader();
+  const { headerContent, headerAction } = useDynamicHeader();
 
   // If there's no dynamic content, render a minimal header.
   if (!headerContent) {
@@ -43,7 +40,7 @@ export function DashboardHeader() {
           {headerContent}
         </div>
         <div className="w-auto flex-shrink-0">
-          {/* This is a placeholder for any right-aligned actions that might be passed in the future */}
+          {headerAction}
         </div>
       </div>
     </header>

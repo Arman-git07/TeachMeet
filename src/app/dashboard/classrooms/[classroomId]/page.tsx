@@ -6,7 +6,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, collection, query, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, writeBatch } from 'firebase/firestore';
+import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +24,6 @@ import {
   MessageSquare,
   Users,
   AlertTriangle,
-  Loader2,
   Check,
   X,
   FileText,
@@ -70,12 +70,43 @@ export default function ClassroomPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { setHeaderContent, setHeaderAction } = useDynamicHeader();
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const isTeacher = user?.uid === classroom?.teacherId;
+
+  useEffect(() => {
+    if (!classroom) {
+      setHeaderContent(null);
+      setHeaderAction(null);
+      return;
+    }
+
+    setHeaderContent(
+      <div className="min-w-0 flex-1">
+        <h2 className="text-xl font-bold leading-7 text-foreground sm:truncate sm:text-2xl sm:tracking-tight">
+          {classroom.title}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1 truncate">Taught by: {classroom.teacherName}</p>
+      </div>
+    );
+    setHeaderAction(
+      <Button asChild variant="outline" className="rounded-lg">
+        <Link href="/dashboard/classrooms">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Classrooms
+        </Link>
+      </Button>
+    );
+
+    return () => {
+      setHeaderContent(null);
+      setHeaderAction(null);
+    };
+  }, [classroom, setHeaderContent, setHeaderAction]);
 
   useEffect(() => {
     if (!classroomId) return;
@@ -135,7 +166,7 @@ export default function ClassroomPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8">
+      <div className="space-y-4">
         <Skeleton className="h-10 w-1/4 mb-4" />
         <Skeleton className="h-6 w-1/2 mb-8" />
         <div className="space-y-4">
@@ -148,7 +179,7 @@ export default function ClassroomPage() {
 
   if (!classroom) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+      <div className="flex flex-col items-center justify-center h-full text-center">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
         <h2 className="text-2xl font-bold">Classroom Not Found</h2>
         <p className="text-muted-foreground">The classroom you are looking for does not exist or has been deleted.</p>
@@ -160,47 +191,37 @@ export default function ClassroomPage() {
   }
 
   return (
-    <div className="flex-1 bg-muted/30">
-      <header className="bg-card shadow-sm">
-        <div className="container mx-auto p-6">
-          <Button asChild variant="ghost" className="mb-4 text-muted-foreground">
-            <Link href="/dashboard/classrooms"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Classrooms</Link>
-          </Button>
-          <h1 className="text-4xl font-bold tracking-tight">{classroom.title}</h1>
-          <p className="text-lg text-muted-foreground mt-1">{classroom.description}</p>
-          <p className="text-sm text-accent mt-2 font-medium">Taught by: {classroom.teacherName}</p>
-        </div>
-        {isTeacher && joinRequests.length > 0 && (
-            <div className="container mx-auto px-6 pb-4">
-                <Card className="bg-primary/10 border-primary/20">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/>Join Requests ({joinRequests.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                        {joinRequests.map(req => (
-                            <div key={req.id} className="flex items-center justify-between bg-background p-2 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                    <Avatar className="h-8 w-8">
-                                        <AvatarImage src={req.studentPhotoURL} data-ai-hint="avatar user"/>
-                                        <AvatarFallback>{req.studentName?.charAt(0) || '?'}</AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-sm font-medium">{req.studentName}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-700 hover:bg-green-500/20" onClick={() => handleRequestAction(req.id, true)}><Check className="h-4 w-4"/></Button>
-                                    <Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-700 hover:bg-red-500/20" onClick={() => handleRequestAction(req.id, false)}><X className="h-4 w-4"/></Button>
-                                </div>
-                            </div>
-                        ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        )}
-      </header>
+    <div className="flex-1 bg-muted/30 p-4 md:p-8">
+      {isTeacher && joinRequests.length > 0 && (
+          <div className="container mx-auto px-0 pb-4">
+              <Card className="bg-primary/10 border-primary/20">
+                  <CardHeader>
+                      <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/>Join Requests ({joinRequests.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="space-y-2">
+                      {joinRequests.map(req => (
+                          <div key={req.id} className="flex items-center justify-between bg-background p-2 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                  <Avatar className="h-8 w-8">
+                                      <AvatarImage src={req.studentPhotoURL} data-ai-hint="avatar user"/>
+                                      <AvatarFallback>{req.studentName?.charAt(0) || '?'}</AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-sm font-medium">{req.studentName}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                  <Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-700 hover:bg-green-500/20" onClick={() => handleRequestAction(req.id, true)}><Check className="h-4 w-4"/></Button>
+                                  <Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-700 hover:bg-red-500/20" onClick={() => handleRequestAction(req.id, false)}><X className="h-4 w-4"/></Button>
+                              </div>
+                          </div>
+                      ))}
+                      </div>
+                  </CardContent>
+              </Card>
+          </div>
+      )}
 
-      <main className="container mx-auto py-8">
+      <main className="container mx-auto px-0">
         <Tabs defaultValue="announcements" className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 mb-6">
             <TabsTrigger value="announcements"><Bell className="h-4 w-4 mr-2"/>Announcements</TabsTrigger>
@@ -248,7 +269,7 @@ export default function ClassroomPage() {
           </TabsContent>
 
           <TabsContent value="subjects" className="mt-6">
-            <Card>
+            <Card className="mt-6">
                 <CardHeader>
                     <CardTitle>Subjects</CardTitle>
                     <CardDescription>Overview of subjects covered in this classroom.</CardDescription>
@@ -301,7 +322,7 @@ export default function ClassroomPage() {
           </TabsContent>
 
            <TabsContent value="chat" className="mt-6">
-            <Card className="h-[400px] flex flex-col">
+            <Card className="h-[400px] flex flex-col mt-6">
                 <CardHeader>
                     <CardTitle>Class Chat</CardTitle>
                     <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
