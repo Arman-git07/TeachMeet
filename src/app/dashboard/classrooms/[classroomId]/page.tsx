@@ -301,7 +301,7 @@ export default function ClassroomPage() {
           </TabsContent>
 
            <TabsContent value="chat">
-            <Card className="h-[400px] flex flex-col">
+            <Card className="h-[400px] flex flex-col mt-4">
                 <CardHeader>
                     <CardTitle>Class Chat</CardTitle>
                     <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
@@ -323,5 +323,3 @@ export default function ClassroomPage() {
     </div>
   );
 }
-
-    
