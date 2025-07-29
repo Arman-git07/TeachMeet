@@ -269,7 +269,7 @@ export default function ClassroomPage() {
           </TabsContent>
 
           <TabsContent value="subjects" className="mt-6">
-            <Card className="mt-6">
+            <Card>
                 <CardHeader>
                     <CardTitle>Subjects</CardTitle>
                     <CardDescription>Overview of subjects covered in this classroom.</CardDescription>
@@ -322,7 +322,7 @@ export default function ClassroomPage() {
           </TabsContent>
 
            <TabsContent value="chat" className="mt-6">
-            <Card className="h-[400px] flex flex-col mt-6">
+            <Card className="h-[400px] flex flex-col">
                 <CardHeader>
                     <CardTitle>Class Chat</CardTitle>
                     <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
