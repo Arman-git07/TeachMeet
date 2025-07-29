@@ -31,6 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -63,6 +69,8 @@ import {
   Clipboard,
   ClipboardCheck,
   UserPlus,
+  GraduationCap,
+  Briefcase,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -276,7 +284,7 @@ export default function ClassroomsPage() {
     }
   };
   
-  const handleRequestToJoin = async (classroomId: string) => {
+  const handleRequestToJoin = async (classroomId: string, role: 'student' | 'teacher') => {
     if (!user) {
         toast({ variant: 'destructive', title: "Authentication required", description: "You must be signed in to join a class." });
         return;
@@ -286,18 +294,21 @@ export default function ClassroomsPage() {
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
         await setDoc(requestRef, {
             studentId: user.uid,
-            studentName: user.displayName || 'Anonymous Student',
+            studentName: user.displayName || 'Anonymous User',
             studentPhotoURL: user.photoURL || '',
             status: 'pending',
+            role: role,
             requestedAt: serverTimestamp()
         });
-        toast({ title: 'Request Sent!', description: 'Your request to join has been sent to the teacher.' });
+        toast({ title: 'Request Sent!', description: `Your request to join as a ${role} has been sent.` });
     } catch (error) {
         console.error("Error sending join request:", error);
         toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Check Firestore Rules for write permissions.' });
-        setRequestingToJoin(null); // Allow user to try again on failure
+    } finally {
+        // We might not want to reset this immediately to show a pending state
+        // setRequestingToJoin(null);
     }
-};
+  };
 
   const copyClassId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -363,9 +374,23 @@ export default function ClassroomsPage() {
             {isMyClass ? (
               <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
             ) : user ? (
-                <Button className="w-full" onClick={() => handleRequestToJoin(classroom.id)} disabled={isRequesting}>
-                    {isRequesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...</> : <><UserPlus className="mr-2 h-4 w-4" />Request to Join</>}
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button className="w-full" disabled={isRequesting}>
+                            {isRequesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...</> : <><UserPlus className="mr-2 h-4 w-4" />Request to Join</>}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56">
+                        <DropdownMenuItem onSelect={() => handleRequestToJoin(classroom.id, 'student')}>
+                            <GraduationCap className="mr-2 h-4 w-4"/>
+                            <span>Join as Student</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleRequestToJoin(classroom.id, 'teacher')}>
+                            <Briefcase className="mr-2 h-4 w-4"/>
+                            <span>Join as Teacher</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             ) : (
                  <Button asChild className="w-full"><Link href="/auth/signin">Sign In to Join</Link></Button>
             )}
