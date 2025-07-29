@@ -212,7 +212,7 @@ export default function ClassroomPage() {
             <TabsTrigger value="chat"><MessageSquare className="h-4 w-4 mr-2"/>Chat</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="announcements">
+          <TabsContent value="announcements" className="mt-6">
             <Card>
                 <CardHeader>
                     <CardTitle>Announcements</CardTitle>
@@ -226,7 +226,7 @@ export default function ClassroomPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="materials">
+          <TabsContent value="materials" className="mt-6">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <ClassroomFeatureCard icon={Book} title="Course Syllabus" description="The complete overview of the course structure, schedule, and grading." actionText="Download Syllabus" />
                 <ClassroomFeatureCard icon={FileText} title="Lecture Notes" description="All notes and slides from the lectures are available here." actionText="View Notes" />
@@ -234,7 +234,7 @@ export default function ClassroomPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="assignments">
+          <TabsContent value="assignments" className="mt-6">
              <Card>
                 <CardHeader>
                     <CardTitle>Assignments</CardTitle>
@@ -247,7 +247,7 @@ export default function ClassroomPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="subjects">
+          <TabsContent value="subjects" className="mt-6">
             <Card>
                 <CardHeader>
                     <CardTitle>Subjects</CardTitle>
@@ -260,7 +260,7 @@ export default function ClassroomPage() {
             </Card>
           </TabsContent>
           
-          <TabsContent value="exams">
+          <TabsContent value="exams" className="mt-6">
             <Card>
                 <CardHeader>
                     <CardTitle>Exams</CardTitle>
@@ -273,7 +273,7 @@ export default function ClassroomPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="fees">
+          <TabsContent value="fees" className="mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                     <CardHeader>
@@ -300,8 +300,8 @@ export default function ClassroomPage() {
             </div>
           </TabsContent>
 
-           <TabsContent value="chat">
-            <Card className="h-[400px] flex flex-col mt-4">
+           <TabsContent value="chat" className="mt-6">
+            <Card className="h-[400px] flex flex-col">
                 <CardHeader>
                     <CardTitle>Class Chat</CardTitle>
                     <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
