@@ -191,7 +191,7 @@ export default function ClassroomPage() {
   }
 
   return (
-    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
         {isTeacher && joinRequests.length > 0 && (
           <div className="mb-6">
               <Card className="bg-primary/10 border-primary/20">
