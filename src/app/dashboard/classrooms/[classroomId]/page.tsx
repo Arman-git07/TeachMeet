@@ -1,7 +1,8 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, 'use-client';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -239,7 +240,7 @@ export default function ClassroomPage() {
                     <CardTitle>Announcements</CardTitle>
                     <CardDescription>Latest updates and announcements from the teacher.</CardDescription>
                 </CardHeader>
-                <CardContent className="text-center text-muted-foreground py-12">
+                <CardContent className="text-center text-muted-foreground py-20">
                     <Bell className="h-12 w-12 mx-auto mb-2" />
                     <p>No announcements yet</p>
                     <p className="text-sm">Check back later for updates.</p>
