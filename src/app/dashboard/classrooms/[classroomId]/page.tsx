@@ -30,6 +30,7 @@ import {
   BadgeDollarSign
 } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 interface Classroom {
   id: string;
@@ -166,7 +167,7 @@ export default function ClassroomPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 p-4 md:p-8">
         <Skeleton className="h-10 w-1/4 mb-4" />
         <Skeleton className="h-6 w-1/2 mb-8" />
         <div className="space-y-4">
@@ -179,7 +180,7 @@ export default function ClassroomPage() {
 
   if (!classroom) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center">
+      <div className="flex flex-col items-center justify-center h-full text-center p-4 md:p-8">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
         <h2 className="text-2xl font-bold">Classroom Not Found</h2>
         <p className="text-muted-foreground">The classroom you are looking for does not exist or has been deleted.</p>
@@ -190,10 +191,20 @@ export default function ClassroomPage() {
     );
   }
 
+  const tabItems = [
+    { value: "announcements", label: "Announcements", icon: Bell },
+    { value: "materials", label: "Materials", icon: Book },
+    { value: "assignments", label: "Assignments", icon: ClipboardList },
+    { value: "subjects", label: "Subjects", icon: GraduationCap },
+    { value: "exams", label: "Exams", icon: FileText },
+    { value: "fees", label: "Fees", icon: CreditCard },
+    { value: "chat", label: "Chat", icon: MessageSquare },
+  ];
+
   return (
-    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
-        {isTeacher && joinRequests.length > 0 && (
-          <div className="mb-6">
+    <div className="flex flex-col gap-4 pb-24">
+      {isTeacher && joinRequests.length > 0 && (
+          <div className="px-4 md:px-8 pt-4">
               <Card className="bg-primary/10 border-primary/20">
                   <CardHeader>
                       <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/>Join Requests ({joinRequests.length})</CardTitle>
@@ -220,115 +231,123 @@ export default function ClassroomPage() {
               </Card>
           </div>
         )}
-
-        <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 mb-6">
-            <TabsTrigger value="announcements"><Bell className="h-4 w-4 mr-2"/>Announcements</TabsTrigger>
-            <TabsTrigger value="materials"><Book className="h-4 w-4 mr-2"/>Materials</TabsTrigger>
-            <TabsTrigger value="assignments"><ClipboardList className="h-4 w-4 mr-2"/>Assignments</TabsTrigger>
-            <TabsTrigger value="subjects"><GraduationCap className="h-4 w-4 mr-2"/>Subjects</TabsTrigger>
-            <TabsTrigger value="exams"><FileText className="h-4 w-4 mr-2"/>Exams</TabsTrigger>
-            <TabsTrigger value="fees"><CreditCard className="h-4 w-4 mr-2"/>Fees</TabsTrigger>
-            <TabsTrigger value="chat"><MessageSquare className="h-4 w-4 mr-2"/>Chat</TabsTrigger>
+        
+        <Tabs defaultValue="announcements" orientation="vertical" className="grid grid-cols-1 md:grid-cols-4 gap-6 px-4 md:px-8">
+          <TabsList className="md:col-span-1 flex md:flex-col md:h-auto items-start gap-2 bg-transparent p-0">
+            {tabItems.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger 
+                  key={value}
+                  value={value} 
+                  className={cn(
+                    "w-full justify-start text-base py-3 px-4 rounded-lg",
+                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
+                    "hover:bg-muted"
+                  )}
+                >
+                  <Icon className="mr-3 h-5 w-5" />
+                  {label}
+                </TabsTrigger>
+            ))}
           </TabsList>
           
-          <TabsContent value="announcements" className="mt-6">
-          
-          </TabsContent>
+          <div className="md:col-span-3">
+              <TabsContent value="announcements" className="mt-0">
+                {/* Content will go here */}
+              </TabsContent>
 
-          <TabsContent value="materials" className="mt-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <ClassroomFeatureCard icon={Book} title="Course Syllabus" description="The complete overview of the course structure, schedule, and grading." actionText="Download Syllabus" />
-                <ClassroomFeatureCard icon={FileText} title="Lecture Notes" description="All notes and slides from the lectures are available here." actionText="View Notes" />
-                <ClassroomFeatureCard icon={GraduationCap} title="Reading List" description="List of required and recommended readings for the course." actionText="Open Reading List" />
-            </div>
-          </TabsContent>
+              <TabsContent value="materials" className="mt-0">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <ClassroomFeatureCard icon={Book} title="Course Syllabus" description="The complete overview of the course structure, schedule, and grading." actionText="Download Syllabus" />
+                    <ClassroomFeatureCard icon={FileText} title="Lecture Notes" description="All notes and slides from the lectures are available here." actionText="View Notes" />
+                    <ClassroomFeatureCard icon={GraduationCap} title="Reading List" description="List of required and recommended readings for the course." actionText="Open Reading List" />
+                </div>
+              </TabsContent>
 
-          <TabsContent value="assignments" className="mt-6">
-             <Card>
-                <CardHeader>
-                    <CardTitle>Assignments</CardTitle>
-                    <CardDescription>View upcoming and past assignments.</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center text-muted-foreground py-12">
-                    <ClipboardList className="h-12 w-12 mx-auto mb-2" />
-                    <p>No assignments posted yet.</p>
-                </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="subjects" className="mt-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Subjects</CardTitle>
-                    <CardDescription>Overview of subjects covered in this classroom.</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center text-muted-foreground py-12">
-                    <GraduationCap className="h-12 w-12 mx-auto mb-2" />
-                    <p>No subjects listed yet.</p>
-                </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="exams" className="mt-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Exams</CardTitle>
-                    <CardDescription>Schedule and details for upcoming exams.</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center text-muted-foreground py-12">
-                    <FileText className="h-12 w-12 mx-auto mb-2" />
-                    <p>No exams scheduled yet.</p>
-                </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="fees" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
+              <TabsContent value="assignments" className="mt-0">
+                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5"/>Make a Payment</CardTitle>
-                        <CardDescription>Pay your tuition and other fees securely.</CardDescription>
+                        <CardTitle>Assignments</CardTitle>
+                        <CardDescription>View upcoming and past assignments.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <p className="font-bold text-3xl">$500.00</p>
-                            <p className="text-sm text-muted-foreground">Due by: Dec 31, 2024</p>
-                        </div>
-                        <Button className="w-full btn-gel">Pay Now</Button>
+                    <CardContent className="text-center text-muted-foreground py-12">
+                        <ClipboardList className="h-12 w-12 mx-auto mb-2" />
+                        <p>No assignments posted yet.</p>
                     </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="subjects" className="mt-0">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BadgeDollarSign className="h-5 w-5"/>Payment History</CardTitle>
-                        <CardDescription>View your past transactions.</CardDescription>
+                        <CardTitle>Subjects</CardTitle>
+                        <CardDescription>Overview of subjects covered in this classroom.</CardDescription>
                     </CardHeader>
-                    <CardContent className="text-center text-muted-foreground py-8">
-                         <p>No transaction history found.</p>
+                    <CardContent className="text-center text-muted-foreground py-12">
+                        <GraduationCap className="h-12 w-12 mx-auto mb-2" />
+                        <p>No subjects listed yet.</p>
                     </CardContent>
                 </Card>
-            </div>
-          </TabsContent>
+              </TabsContent>
+              
+              <TabsContent value="exams" className="mt-0">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Exams</CardTitle>
+                        <CardDescription>Schedule and details for upcoming exams.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center text-muted-foreground py-12">
+                        <FileText className="h-12 w-12 mx-auto mb-2" />
+                        <p>No exams scheduled yet.</p>
+                    </CardContent>
+                </Card>
+              </TabsContent>
 
-           <TabsContent value="chat" className="mt-6">
-            <Card className="h-[400px] flex flex-col mt-6">
-                <CardHeader>
-                    <CardTitle>Class Chat</CardTitle>
-                    <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow flex items-center justify-center text-center text-muted-foreground">
-                     <div>
-                        <MessageSquare className="h-12 w-12 mx-auto mb-2" />
-                        <p>Chat feature is coming soon!</p>
-                     </div>
-                </CardContent>
-                <CardFooter>
-                    <Button className="w-full" disabled>Open Chat (Unavailable)</Button>
-                </CardFooter>
-            </Card>
-          </TabsContent>
+              <TabsContent value="fees" className="mt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5"/>Make a Payment</CardTitle>
+                            <CardDescription>Pay your tuition and other fees securely.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <p className="font-bold text-3xl">$500.00</p>
+                                <p className="text-sm text-muted-foreground">Due by: Dec 31, 2024</p>
+                            </div>
+                            <Button className="w-full btn-gel">Pay Now</Button>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><BadgeDollarSign className="h-5 w-5"/>Payment History</CardTitle>
+                            <CardDescription>View your past transactions.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="text-center text-muted-foreground py-8">
+                             <p>No transaction history found.</p>
+                        </CardContent>
+                    </Card>
+                </div>
+              </TabsContent>
 
+               <TabsContent value="chat" className="mt-0">
+                <Card className="h-[400px] flex flex-col">
+                    <CardHeader>
+                        <CardTitle>Class Chat</CardTitle>
+                        <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow flex items-center justify-center text-center text-muted-foreground">
+                         <div>
+                            <MessageSquare className="h-12 w-12 mx-auto mb-2" />
+                            <p>Chat feature is coming soon!</p>
+                         </div>
+                    </CardContent>
+                    <CardFooter>
+                        <Button className="w-full" disabled>Open Chat (Unavailable)</Button>
+                    </CardFooter>
+                </Card>
+              </TabsContent>
+          </div>
         </Tabs>
-    </main>
+    </div>
   );
 }
