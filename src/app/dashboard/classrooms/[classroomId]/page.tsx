@@ -1,8 +1,7 @@
 
 'use client';
 
-import React, 'use-client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -192,9 +191,9 @@ export default function ClassroomPage() {
   }
 
   return (
-    <div className="flex-1 bg-muted/30">
-      {isTeacher && joinRequests.length > 0 && (
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {isTeacher && joinRequests.length > 0 && (
+          <div className="mb-6">
               <Card className="bg-primary/10 border-primary/20">
                   <CardHeader>
                       <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/>Join Requests ({joinRequests.length})</CardTitle>
@@ -220,9 +219,8 @@ export default function ClassroomPage() {
                   </CardContent>
               </Card>
           </div>
-      )}
+        )}
 
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="announcements" className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 mb-6">
             <TabsTrigger value="announcements"><Bell className="h-4 w-4 mr-2"/>Announcements</TabsTrigger>
@@ -323,7 +321,7 @@ export default function ClassroomPage() {
           </TabsContent>
 
            <TabsContent value="chat" className="mt-6">
-            <Card className="h-[400px] flex flex-col">
+            <Card className="h-[400px] flex flex-col mt-6">
                 <CardHeader>
                     <CardTitle>Class Chat</CardTitle>
                     <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
@@ -341,7 +339,6 @@ export default function ClassroomPage() {
           </TabsContent>
 
         </Tabs>
-      </main>
-    </div>
+    </main>
   );
 }
