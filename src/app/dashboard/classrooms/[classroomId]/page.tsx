@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, collection, query, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import {
   ArrowLeft,
   Bell,
@@ -28,10 +29,12 @@ import {
   Check,
   X,
   FileText,
-  BadgeDollarSign
+  BadgeDollarSign,
+  Send
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Classroom {
   id: string;
@@ -46,6 +49,17 @@ interface JoinRequest {
   studentName: string;
   studentPhotoURL?: string;
 }
+
+interface Announcement {
+    id: string;
+    content: string;
+    authorName: string;
+    createdAt: {
+        seconds: number;
+        nanoseconds: number;
+    };
+}
+
 
 const ClassroomFeatureCard = ({ icon: Icon, title, description, actionText, onAction }: { icon: React.ElementType, title: string, description: string, actionText: string, onAction?: () => void }) => (
     <Card className="hover:shadow-lg transition-shadow">
@@ -76,6 +90,9 @@ export default function ClassroomPage() {
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [newAnnouncement, setNewAnnouncement] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
   const isTeacher = user?.uid === classroom?.teacherId;
@@ -137,6 +154,17 @@ export default function ClassroomPage() {
     }
   }, [isTeacher, classroomId]);
   
+   useEffect(() => {
+    if (classroomId) {
+      const announcementsRef = collection(db, 'classrooms', classroomId, 'announcements');
+      const q = query(announcementsRef, orderBy('createdAt', 'desc'));
+      const unsubAnnouncements = onSnapshot(q, (snapshot) => {
+        setAnnouncements(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
+      });
+      return () => unsubAnnouncements();
+    }
+  }, [classroomId]);
+
   const handleRequestAction = async (requestId: string, approve: boolean) => {
     if (!isTeacher || !classroomId) return;
     
@@ -165,6 +193,27 @@ export default function ClassroomPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not process the request.' });
     }
   };
+  
+  const handlePostAnnouncement = async () => {
+    if (!newAnnouncement.trim() || !user || !isTeacher) return;
+    setIsPosting(true);
+    try {
+      await addDoc(collection(db, `classrooms/${classroomId}/announcements`), {
+        content: newAnnouncement.trim(),
+        authorName: user.displayName || 'Teacher',
+        authorId: user.uid,
+        createdAt: serverTimestamp(),
+      });
+      setNewAnnouncement('');
+      toast({ title: "Announcement Posted!" });
+    } catch (error) {
+      console.error("Error posting announcement:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not post announcement." });
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -262,10 +311,48 @@ export default function ClassroomPage() {
                         <CardTitle>Announcements</CardTitle>
                         <CardDescription>Latest updates and announcements from the teacher.</CardDescription>
                     </CardHeader>
-                    <CardContent className="text-center text-muted-foreground py-20">
-                        <Bell className="h-12 w-12 mx-auto mb-2" />
-                        <p>No announcements yet.</p>
-                        <p className="text-xs">Check back later for updates.</p>
+                     <CardContent className="space-y-4">
+                        {isTeacher && (
+                            <div className="flex gap-2 items-start">
+                                <Avatar className="mt-1">
+                                    <AvatarImage src={user?.photoURL ?? ''} data-ai-hint="avatar user"/>
+                                    <AvatarFallback>{user?.displayName?.charAt(0) || 'T'}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-grow space-y-2">
+                                    <Textarea
+                                        placeholder="Write an announcement..."
+                                        value={newAnnouncement}
+                                        onChange={(e) => setNewAnnouncement(e.target.value)}
+                                        className="rounded-lg"
+                                        disabled={isPosting}
+                                    />
+                                    <div className="flex justify-end">
+                                      <Button onClick={handlePostAnnouncement} disabled={!newAnnouncement.trim() || isPosting} size="sm" className="rounded-lg">
+                                        <Send className="mr-2 h-4 w-4"/>
+                                        {isPosting ? 'Posting...' : 'Post'}
+                                      </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {announcements.length > 0 ? (
+                           <div className="space-y-4">
+                                {announcements.map(ann => (
+                                    <div key={ann.id} className="p-4 bg-muted/50 rounded-lg">
+                                        <p className="text-sm text-foreground whitespace-pre-wrap">{ann.content}</p>
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                            Posted by {ann.authorName} - {ann.createdAt ? formatDistanceToNow(new Date(ann.createdAt.seconds * 1000), { addSuffix: true }) : 'just now'}
+                                        </p>
+                                    </div>
+                                ))}
+                           </div>
+                        ) : (
+                           <div className="text-center text-muted-foreground py-10">
+                                <Bell className="h-12 w-12 mx-auto mb-2" />
+                                <p>No announcements yet.</p>
+                                <p className="text-xs">Check back later for updates.</p>
+                           </div>
+                        )}
                     </CardContent>
                 </Card>
               </TabsContent>
