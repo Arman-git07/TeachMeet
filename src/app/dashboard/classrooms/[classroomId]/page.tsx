@@ -191,9 +191,9 @@ export default function ClassroomPage() {
   }
 
   return (
-    <div className="flex-1 bg-muted/30 p-4 md:p-8">
+    <div className="flex-1 bg-muted/30">
       {isTeacher && joinRequests.length > 0 && (
-          <div className="container mx-auto px-0 pb-4">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
               <Card className="bg-primary/10 border-primary/20">
                   <CardHeader>
                       <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/>Join Requests ({joinRequests.length})</CardTitle>
@@ -221,7 +221,7 @@ export default function ClassroomPage() {
           </div>
       )}
 
-      <main className="container mx-auto px-0">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="announcements" className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 mb-6">
             <TabsTrigger value="announcements"><Bell className="h-4 w-4 mr-2"/>Announcements</TabsTrigger>
