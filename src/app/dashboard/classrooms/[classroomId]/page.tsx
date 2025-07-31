@@ -203,9 +203,9 @@ export default function ClassroomPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-4 pb-24">
+    <div className="flex flex-col gap-4 pb-24 px-4 md:px-8">
       {isTeacher && joinRequests.length > 0 && (
-          <div className="px-4 md:px-8 pt-4">
+          <div className="pt-4">
               <Card className="bg-primary/10 border-primary/20">
                   <CardHeader>
                       <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/>Join Requests ({joinRequests.length})</CardTitle>
@@ -233,29 +233,41 @@ export default function ClassroomPage() {
           </div>
         )}
         
-        <Tabs defaultValue="announcements" orientation="vertical" className="grid grid-cols-1 md:grid-cols-4 gap-6 px-4 md:px-8">
-          <ScrollArea className="md:col-span-1 md:h-auto whitespace-nowrap">
-            <TabsList className="md:flex-col md:h-auto items-start gap-2 bg-transparent p-0 w-full">
-              {tabItems.map(({ value, label, icon: Icon }) => (
-                  <TabsTrigger 
-                    key={value}
-                    value={value} 
-                    className={cn(
-                      "w-full justify-start text-base py-3 px-4 rounded-lg",
-                      "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
-                      "hover:bg-muted"
-                    )}
-                  >
-                    <Icon className="mr-3 h-5 w-5" />
-                    {label}
-                  </TabsTrigger>
-              ))}
-            </TabsList>
-          </ScrollArea>
+        <Tabs defaultValue="announcements" className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6 mt-4">
+          <div className="w-full">
+            <ScrollArea className="md:h-auto whitespace-nowrap">
+              <TabsList className="flex-col h-auto items-start gap-2 bg-transparent p-0 w-full">
+                {tabItems.map(({ value, label, icon: Icon }) => (
+                    <TabsTrigger 
+                      key={value}
+                      value={value} 
+                      className={cn(
+                        "w-full justify-start text-base py-3 px-4 rounded-lg",
+                        "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
+                        "hover:bg-muted"
+                      )}
+                    >
+                      <Icon className="mr-3 h-5 w-5" />
+                      {label}
+                    </TabsTrigger>
+                ))}
+              </TabsList>
+            </ScrollArea>
+          </div>
           
-          <div className="md:col-span-3">
+          <div className="md:col-start-2">
               <TabsContent value="announcements" className="mt-0">
-                {/* Content will go here */}
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Announcements</CardTitle>
+                        <CardDescription>Latest updates and announcements from the teacher.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center text-muted-foreground py-20">
+                        <Bell className="h-12 w-12 mx-auto mb-2" />
+                        <p>No announcements yet.</p>
+                        <p className="text-xs">Check back later for updates.</p>
+                    </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="materials" className="mt-0">
