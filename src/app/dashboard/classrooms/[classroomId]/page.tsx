@@ -233,11 +233,7 @@ export default function ClassroomPage() {
           </TabsList>
           
           <TabsContent value="announcements" className="mt-6">
-          <div className="text-center text-muted-foreground py-20">
-              <Bell className="h-12 w-12 mx-auto mb-2" />
-              <p>No announcements yet</p>
-              <p className="text-sm">Check back later for updates.</p>
-            </div>
+          
           </TabsContent>
 
           <TabsContent value="materials" className="mt-6">
