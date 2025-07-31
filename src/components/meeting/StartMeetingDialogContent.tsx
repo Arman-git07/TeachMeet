@@ -17,8 +17,6 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
-import { doc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
