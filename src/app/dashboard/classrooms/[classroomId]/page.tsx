@@ -233,7 +233,7 @@ export default function ClassroomPage() {
           </TabsList>
           
           <TabsContent value="announcements" className="mt-6">
-            <Card>
+            <Card className="mt-12">
                 <CardHeader>
                     <CardTitle>Announcements</CardTitle>
                     <CardDescription>Latest updates and announcements from the teacher.</CardDescription>
