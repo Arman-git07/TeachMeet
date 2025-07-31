@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   ArrowLeft,
   Bell,
@@ -233,22 +234,24 @@ export default function ClassroomPage() {
         )}
         
         <Tabs defaultValue="announcements" orientation="vertical" className="grid grid-cols-1 md:grid-cols-4 gap-6 px-4 md:px-8">
-          <TabsList className="md:col-span-1 flex md:flex-col md:h-auto items-start gap-2 bg-transparent p-0">
-            {tabItems.map(({ value, label, icon: Icon }) => (
-                <TabsTrigger 
-                  key={value}
-                  value={value} 
-                  className={cn(
-                    "w-full justify-start text-base py-3 px-4 rounded-lg",
-                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
-                    "hover:bg-muted"
-                  )}
-                >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {label}
-                </TabsTrigger>
-            ))}
-          </TabsList>
+          <ScrollArea className="md:col-span-1 md:h-auto whitespace-nowrap">
+            <TabsList className="md:flex-col md:h-auto items-start gap-2 bg-transparent p-0 w-full">
+              {tabItems.map(({ value, label, icon: Icon }) => (
+                  <TabsTrigger 
+                    key={value}
+                    value={value} 
+                    className={cn(
+                      "w-full justify-start text-base py-3 px-4 rounded-lg",
+                      "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
+                      "hover:bg-muted"
+                    )}
+                  >
+                    <Icon className="mr-3 h-5 w-5" />
+                    {label}
+                  </TabsTrigger>
+              ))}
+            </TabsList>
+          </ScrollArea>
           
           <div className="md:col-span-3">
               <TabsContent value="announcements" className="mt-0">
