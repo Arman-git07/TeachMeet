@@ -113,46 +113,30 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // Create the meeting document. The participant document is now created on the meeting page itself.
-    try {
-      const meetingDocRef = doc(db, "meetings", meetingDetails.id);
-      await setDoc(meetingDocRef, {
-        creatorId: user.uid,
-        topic: trimmedMeetingTitle,
-        createdAt: serverTimestamp(),
-      });
+    // The waiting room will now be responsible for creating the meeting document.
+    // This component's only job is to navigate the host there.
+    
+    // Save meeting to localStorage for the activity feed
+    const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+    let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+    if (!Array.isArray(startedMeetings)) startedMeetings = [];
+    
+    const newMeeting = {
+      id: meetingDetails.id,
+      title: trimmedMeetingTitle,
+      startedAt: Date.now(),
+    };
 
-      // Save meeting to localStorage for the activity feed
-      const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-      let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
-      if (!Array.isArray(startedMeetings)) startedMeetings = [];
-      
-      const newMeeting = {
-        id: meetingDetails.id,
-        title: trimmedMeetingTitle,
-        startedAt: Date.now(),
-      };
+    startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
+    startedMeetings.unshift(newMeeting); 
+    
+    localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
+    
+    window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
 
-      startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
-      startedMeetings.unshift(newMeeting); 
-      
-      localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
-      
-      window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
-
-      // The waiting room is for guests. The host should go directly to the meeting.
-      const joinNowLinkPath = `/dashboard/meeting/${meetingDetails.id}?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
-      router.push(joinNowLinkPath);
-
-    } catch (error) {
-      console.error("Error creating meeting document:", error);
-      toast({
-        variant: "destructive",
-        title: "Creation Failed",
-        description: "Could not create the meeting room. Please check your connection and Firestore rules, then try again.",
-      });
-      setIsJoining(false);
-    }
+    // Navigate to the waiting room for the host.
+    const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
+    router.push(waitRoomPath);
   };
 
   return (
@@ -246,7 +230,7 @@ export function StartMeetingDialogContent() {
             disabled={!meetingDetails.id || !meetingTitle.trim() || isJoining || !user}
           >
             {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isJoining ? "Starting..." : "Start and Join Meeting"}
+            {isJoining ? "Redirecting..." : "Start and Join Meeting"}
           </Button>
         </DialogFooter>
         <ShareOptionsPanel

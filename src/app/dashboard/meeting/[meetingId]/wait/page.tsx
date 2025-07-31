@@ -61,8 +61,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       if (docSnap.exists()) {
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
-        toast({ variant: 'destructive', title: 'Meeting not found', description: 'This meeting does not seem to exist.'});
-        router.push('/');
+        // If the doc doesn't exist, it might be a host joining for the first time.
+        // We'll allow the page to load and let the join logic handle it.
+        // If it's a guest, they'll get an error when they try to request to join.
+        setMeetingCreatorId(null); 
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -228,9 +230,20 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        // If host, go directly to the meeting page. The meeting page itself will handle creating the participant document.
-        const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-        router.push(joinNowLinkPath);
+        // If host, create the meeting document and go directly to the meeting page.
+        const meetingDocRef = doc(db, "meetings", meetingId);
+        try {
+            await setDoc(meetingDocRef, {
+                creatorId: user.uid,
+                topic: topic || "Untitled Meeting",
+                createdAt: serverTimestamp(),
+            });
+            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+            router.push(joinNowLinkPath);
+        } catch (error) {
+            console.error("Host failed to create meeting document:", error);
+            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
+        }
         return;
     }
 
