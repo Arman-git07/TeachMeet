@@ -17,6 +17,8 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
+import { db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
@@ -111,8 +113,20 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // The waiting room will now be responsible for creating the meeting document.
-    // This component's only job is to navigate the host there.
+    // Create the meeting document in Firestore first.
+    const meetingDocRef = doc(db, "meetings", meetingDetails.id);
+    try {
+        await setDoc(meetingDocRef, {
+            creatorId: user.uid,
+            topic: trimmedMeetingTitle,
+            createdAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error("Host failed to create meeting document:", error);
+        toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
+        setIsJoining(false);
+        return;
+    }
     
     // Save meeting to localStorage for the activity feed
     const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
