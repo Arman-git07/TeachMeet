@@ -6,8 +6,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy, deleteDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject as deleteFile } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   ArrowLeft,
   Bell,
@@ -46,11 +48,16 @@ import {
   StopCircle,
   Play,
   Trash2,
-  Loader2
+  Loader2,
+  UploadCloud,
+  Link as LinkIcon,
+  Download,
+  PlusCircle,
+  ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 
 interface Teaching {
   id: string;
@@ -77,26 +84,15 @@ interface Announcement {
     audioURL?: string;
 }
 
-const TeachingFeatureCard = React.memo(({ icon: Icon, title, description, actionText, onAction }: { icon: React.ElementType, title: string, description: string, actionText: string, onAction?: () => void }) => (
-    <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-2">
-            <div className="bg-primary/10 p-3 rounded-full">
-                <Icon className="h-6 w-6 text-primary" />
-            </div>
-            <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <p className="text-sm text-muted-foreground">{description}</p>
-        </CardContent>
-        {onAction && (
-            <CardFooter>
-                <Button onClick={onAction} variant="outline" className="w-full">{actionText}</Button>
-            </CardFooter>
-        )}
-    </Card>
-));
-TeachingFeatureCard.displayName = 'TeachingFeatureCard';
-
+interface Material {
+  id: string;
+  type: 'link' | 'file';
+  title: string;
+  url: string;
+  fileName?: string;
+  fileSize?: string;
+  createdAt: { seconds: number };
+}
 
 const AudioRecordingDialog = ({ onAudioRecorded }: { onAudioRecorded: (blob: Blob) => void }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -193,6 +189,113 @@ const AudioRecordingDialog = ({ onAudioRecorded }: { onAudioRecorded: (blob: Blo
 };
 
 
+const AddMaterialDialog = ({ teachingId, onMaterialAdded }: { teachingId: string; onMaterialAdded: () => void }) => {
+    const [materialType, setMaterialType] = useState<'file' | 'link'>('file');
+    const [title, setTitle] = useState('');
+    const [url, setUrl] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const { toast } = useToast();
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setFile(e.target.files[0]);
+            setTitle(e.target.files[0].name); // Pre-fill title with file name
+        }
+    };
+    
+    const handleSubmit = async () => {
+        if (!title.trim()) {
+            toast({ variant: 'destructive', title: 'Title is required' });
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            if (materialType === 'file') {
+                if (!file) {
+                    toast({ variant: 'destructive', title: 'File is required' });
+                    setIsUploading(false);
+                    return;
+                }
+                const fileRef = storageRef(storage, `teachings/${teachingId}/materials/${Date.now()}-${file.name}`);
+                const snapshot = await uploadBytes(fileRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+
+                await addDoc(collection(db, `teachings/${teachingId}/materials`), {
+                    type: 'file',
+                    title: title.trim(),
+                    url: downloadURL,
+                    fileName: file.name,
+                    fileSize: `${(file.size / (1024*1024)).toFixed(2)} MB`,
+                    createdAt: serverTimestamp(),
+                });
+            } else { // Link
+                if (!url.trim()) {
+                    toast({ variant: 'destructive', title: 'URL is required' });
+                    setIsUploading(false);
+                    return;
+                }
+                await addDoc(collection(db, `teachings/${teachingId}/materials`), {
+                    type: 'link',
+                    title: title.trim(),
+                    url: url.trim(),
+                    createdAt: serverTimestamp(),
+                });
+            }
+            toast({ title: 'Material Added!', description: `"${title.trim()}" has been added.` });
+            onMaterialAdded();
+        } catch (error) {
+            console.error('Error adding material:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not add material.' });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    return (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Add New Material</DialogTitle>
+                <DialogDescription>Upload a file or add a web link for your students.</DialogDescription>
+            </DialogHeader>
+            <Tabs value={materialType} onValueChange={(value) => setMaterialType(value as 'file' | 'link')} className="pt-4">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="file"><UploadCloud className="mr-2 h-4 w-4"/>Upload File</TabsTrigger>
+                    <TabsTrigger value="link"><LinkIcon className="mr-2 h-4 w-4"/>Add Link</TabsTrigger>
+                </TabsList>
+                <TabsContent value="file" className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="file-title">Title</Label>
+                        <Input id="file-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Lecture 1 Slides" />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="file-upload">File</Label>
+                        <Input id="file-upload" type="file" onChange={handleFileChange} />
+                    </div>
+                </TabsContent>
+                <TabsContent value="link" className="space-y-4 pt-4">
+                     <div className="space-y-2">
+                        <Label htmlFor="link-title">Title</Label>
+                        <Input id="link-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Required Reading Article" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="link-url">URL</Label>
+                        <Input id="link-url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com" />
+                    </div>
+                </TabsContent>
+            </Tabs>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="outline" disabled={isUploading}>Cancel</Button></DialogClose>
+                <Button onClick={handleSubmit} disabled={isUploading}>
+                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                    {isUploading ? 'Adding...' : 'Add Material'}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+};
+
 export default function TeachingPage() {
   const params = useParams();
   const teachingId = params.teachingId as string;
@@ -204,10 +307,12 @@ export default function TeachingPage() {
   const [teaching, setTeaching] = useState<Teaching | null>(null);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [audioAttachment, setAudioAttachment] = useState<Blob | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
   
   const isTeacher = user?.uid === teaching?.teacherId;
 
@@ -244,8 +349,7 @@ export default function TeachingPage() {
   useEffect(() => {
     if (!teachingId) return;
     
-    const docRef = doc(db, 'teachings', teachingId);
-    const unsubTeaching = onSnapshot(docRef, (docSnap) => {
+    const unsubTeaching = onSnapshot(doc(db, 'teachings', teachingId), (docSnap) => {
       if (docSnap.exists()) {
         setTeaching({ id: docSnap.id, ...docSnap.data() } as Teaching);
       } else {
@@ -255,29 +359,29 @@ export default function TeachingPage() {
       setIsLoading(false);
     });
 
-    return () => unsubTeaching();
+    const unsubAnnouncements = onSnapshot(query(collection(db, 'teachings', teachingId, 'announcements'), orderBy('createdAt', 'desc')), (snapshot) => {
+        setAnnouncements(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
+    });
+
+    const unsubMaterials = onSnapshot(query(collection(db, 'teachings', teachingId, 'materials'), orderBy('createdAt', 'desc')), (snapshot) => {
+        setMaterials(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Material)));
+    });
+
+    return () => { 
+        unsubTeaching();
+        unsubAnnouncements();
+        unsubMaterials();
+     };
   }, [teachingId, router, toast]);
   
   useEffect(() => {
     if (isTeacher && teachingId) {
-      const requestsRef = collection(db, 'teachings', teachingId, 'joinRequests');
-      const unsubRequests = onSnapshot(query(requestsRef), (snapshot) => {
+      const unsubRequests = onSnapshot(query(collection(db, 'teachings', teachingId, 'joinRequests')), (snapshot) => {
         setJoinRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest)));
       });
       return () => unsubRequests();
     }
   }, [isTeacher, teachingId]);
-  
-   useEffect(() => {
-    if (teachingId) {
-      const announcementsRef = collection(db, 'teachings', teachingId, 'announcements');
-      const q = query(announcementsRef, orderBy('createdAt', 'desc'));
-      const unsubAnnouncements = onSnapshot(q, (snapshot) => {
-        setAnnouncements(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
-      });
-      return () => unsubAnnouncements();
-    }
-  }, [teachingId]);
 
   const handleRequestAction = useCallback(async (requestId: string, approve: boolean) => {
     if (!isTeacher || !teachingId) return;
@@ -348,6 +452,21 @@ export default function TeachingPage() {
   const handleAudioRecorded = (blob: Blob) => {
       setAudioAttachment(blob);
       toast({ title: "Audio Attached", description: "Your recording is ready to be posted with the announcement." });
+  };
+  
+  const handleDeleteMaterial = async (material: Material) => {
+    if (!isTeacher) return;
+    try {
+        await deleteDoc(doc(db, 'teachings', teachingId, 'materials', material.id));
+        if (material.type === 'file') {
+            const fileRef = storageRef(storage, material.url);
+            await deleteFile(fileRef);
+        }
+        toast({title: 'Material Deleted', description: `"${material.title}" has been removed.`});
+    } catch (error) {
+        console.error("Error deleting material:", error);
+        toast({variant: 'destructive', title: 'Error', description: 'Could not delete the material.'});
+    }
   };
 
 
@@ -509,11 +628,60 @@ export default function TeachingPage() {
               </TabsContent>
 
               <TabsContent value="materials" className="mt-0">
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <TeachingFeatureCard icon={Book} title="Course Syllabus" description="The complete overview of the course structure, schedule, and grading." actionText="Download Syllabus" />
-                    <TeachingFeatureCard icon={FileText} title="Lecture Notes" description="All notes and slides from the lectures are available here." actionText="View Notes" />
-                    <TeachingFeatureCard icon={GraduationCap} title="Reading List" description="List of required and recommended readings for the course." actionText="Open Reading List" />
-                </div>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>Course Materials</CardTitle>
+                            <CardDescription>All shared files and links for this teaching.</CardDescription>
+                        </div>
+                        {isTeacher && (
+                          <Dialog open={isAddMaterialOpen} onOpenChange={setIsAddMaterialOpen}>
+                            <DialogTrigger asChild>
+                                <Button><PlusCircle className="mr-2 h-4 w-4"/>Add Material</Button>
+                            </DialogTrigger>
+                            <AddMaterialDialog teachingId={teachingId} onMaterialAdded={() => setIsAddMaterialOpen(false)} />
+                          </Dialog>
+                        )}
+                    </CardHeader>
+                    <CardContent>
+                        {materials.length > 0 ? (
+                            <div className="space-y-2">
+                                {materials.map(material => (
+                                    <div key={material.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted group">
+                                        <div className="flex items-center gap-3">
+                                            {material.type === 'file' ? <FileText className="h-5 w-5 text-primary"/> : <LinkIcon className="h-5 w-5 text-accent"/>}
+                                            <div>
+                                                <p className="font-medium text-foreground">{material.title}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                  Added on {format(new Date(material.createdAt.seconds * 1000), 'MMM d, yyyy')}
+                                                  {material.fileSize && ` - ${material.fileSize}`}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button asChild variant="outline" size="sm">
+                                                <a href={material.url} target="_blank" rel="noopener noreferrer">
+                                                    {material.type === 'file' ? <Download className="mr-2 h-4 w-4"/> : <ExternalLink className="mr-2 h-4 w-4"/>}
+                                                    {material.type === 'file' ? 'Download' : 'Open Link'}
+                                                </a>
+                                            </Button>
+                                            {isTeacher && (
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => handleDeleteMaterial(material)}>
+                                                    <Trash2 className="h-4 w-4"/>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                             <div className="text-center text-muted-foreground py-12">
+                                <Book className="h-12 w-12 mx-auto mb-2" />
+                                <p>No materials have been added yet.</p>
+                             </div>
+                        )}
+                    </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="assignments" className="mt-0">
