@@ -362,35 +362,34 @@ export default function ClassroomsPage() {
     const isMyClass = user?.uid === classroom.teacherId;
 
     return (
-      <Card key={classroom.id}>
+      <Card key={classroom.id} className="flex flex-col">
           <CardHeader>
               <CardTitle>{classroom.title}</CardTitle>
               <CardDescription>{classroom.description || "No description."}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-grow">
               <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex-col items-stretch gap-2 pt-4">
             {isMyClass ? (
               <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
             ) : user ? (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button className="w-full" disabled={isRequesting}>
-                            {isRequesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...</> : <><UserPlus className="mr-2 h-4 w-4" />Request to Join</>}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56">
-                        <DropdownMenuItem onSelect={() => handleRequestToJoin(classroom.id, 'student')}>
+                 isRequesting ? (
+                    <Button className="w-full" disabled>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...
+                    </Button>
+                ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" onClick={() => handleRequestToJoin(classroom.id, 'student')}>
                             <GraduationCap className="mr-2 h-4 w-4"/>
-                            <span>Join as Student</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => handleRequestToJoin(classroom.id, 'teacher')}>
+                            Join as Student
+                        </Button>
+                        <Button variant="outline" onClick={() => handleRequestToJoin(classroom.id, 'teacher')}>
                             <Briefcase className="mr-2 h-4 w-4"/>
-                            <span>Join as Teacher</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                             Join as Teacher
+                        </Button>
+                    </div>
+                )
             ) : (
                  <Button asChild className="w-full"><Link href="/auth/signin">Sign In to Join</Link></Button>
             )}
