@@ -173,24 +173,34 @@ export default function ClassroomPage() {
         const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', requestId);
         
         if (approve) {
-            const studentData = (await getDoc(requestRef)).data();
-            const enrollmentRef = doc(db, 'users', requestId, 'enrolled', classroomId);
+            // Get student data from the join request to create the enrollment record
+            const studentRequestSnap = await getDoc(requestRef);
+            if (!studentRequestSnap.exists()) {
+                throw new Error("Join request not found.");
+            }
+            const studentData = studentRequestSnap.data();
+
+            // Create a document in the student's "enrolled" subcollection
+            const enrollmentRef = doc(db, 'users', studentData.studentId, 'enrolled', classroomId);
             batch.set(enrollmentRef, {
                 classroomId: classroomId,
                 title: classroom?.title,
                 description: classroom?.description,
                 teacherName: classroom?.teacherName,
-                enrolledAt: new Date(),
+                enrolledAt: serverTimestamp(),
             });
         }
         
+        // Always delete the request from the classroom's joinRequests subcollection
         batch.delete(requestRef);
+        
+        // Commit all batched writes
         await batch.commit();
 
         toast({ title: `Request ${approve ? 'Approved' : 'Denied'}`, description: `The student has been ${approve ? 'added to the class' : 'denied entry'}.` });
     } catch (error) {
         console.error("Error handling join request:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not process the request.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not process the request. Check Firestore rules.' });
     }
   };
   
@@ -307,11 +317,7 @@ export default function ClassroomPage() {
           <div className="md:col-start-2">
               <TabsContent value="announcements" className="mt-0">
                  <Card>
-                    <CardHeader>
-                        <CardTitle>Announcements</CardTitle>
-                        <CardDescription>Latest updates and announcements from the teacher.</CardDescription>
-                    </CardHeader>
-                     <CardContent className="space-y-4">
+                     <CardContent className="space-y-4 pt-6">
                         {isTeacher && (
                             <div className="flex gap-2 items-start">
                                 <Avatar className="mt-1">
@@ -346,13 +352,13 @@ export default function ClassroomPage() {
                                     </div>
                                 ))}
                            </div>
-                        ) : (
+                        ) : !isTeacher ? (
                            <div className="text-center text-muted-foreground py-10">
                                 <Bell className="h-12 w-12 mx-auto mb-2" />
                                 <p>No announcements yet.</p>
                                 <p className="text-xs">Check back later for updates.</p>
                            </div>
-                        )}
+                        ) : null}
                     </CardContent>
                 </Card>
               </TabsContent>
