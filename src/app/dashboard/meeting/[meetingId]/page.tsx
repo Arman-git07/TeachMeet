@@ -83,7 +83,7 @@ interface JoinRequest {
   photoURL?: string | null;
 }
 
-function ParticipantView({
+const ParticipantView = React.memo(({
   name,
   isMe = false,
   isMicMuted = false,
@@ -92,7 +92,7 @@ function ParticipantView({
   isHandRaisedForView,
   isScreenSharing,
   photoURL,
-}: Participant) {
+}: Participant) => {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mirrorVideo, setMirrorVideo] = useState(false);
@@ -185,9 +185,10 @@ function ParticipantView({
       </div>
     </Card>
   );
-}
+});
+ParticipantView.displayName = 'ParticipantView';
 
-function RecordingTimer({ startTime }: { startTime: number }) {
+const RecordingTimer = React.memo(({ startTime }: { startTime: number }) => {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -206,7 +207,8 @@ function RecordingTimer({ startTime }: { startTime: number }) {
   };
 
   return <span className="text-xs font-mono tabular-nums">{formatTime(elapsed)}</span>;
-}
+});
+RecordingTimer.displayName = 'RecordingTimer';
 
 
 export default function MeetingPage() {

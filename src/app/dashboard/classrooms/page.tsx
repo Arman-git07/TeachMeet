@@ -284,7 +284,7 @@ export default function ClassroomsPage() {
     }
   };
   
-  const handleRequestToJoin = async (classroomId: string, role: 'student' | 'teacher') => {
+  const handleRequestToJoin = useCallback(async (classroomId: string, role: 'student' | 'teacher') => {
     if (!user) {
         toast({ variant: 'destructive', title: "Authentication required", description: "You must be signed in to join a class." });
         return;
@@ -308,7 +308,7 @@ export default function ClassroomsPage() {
         // We might not want to reset this immediately to show a pending state
         // setRequestingToJoin(null);
     }
-  };
+  }, [user, toast]);
 
   const copyClassId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -317,7 +317,7 @@ export default function ClassroomsPage() {
     toast({ title: 'Class code copied!' });
   };
 
-  const renderMyClassroomCard = (classroom: Classroom) => (
+  const renderMyClassroomCard = useCallback((classroom: Classroom) => (
     <Card key={classroom.id}>
         <CardHeader>
             <CardTitle>{classroom.title}</CardTitle>
@@ -340,9 +340,9 @@ export default function ClassroomsPage() {
             </div>
         </CardFooter>
     </Card>
-  );
+  ), [copiedId]);
   
-  const renderEnrolledClassroomCard = (classroomInfo: EnrolledClassroomInfo) => (
+  const renderEnrolledClassroomCard = useCallback((classroomInfo: EnrolledClassroomInfo) => (
     <Card key={classroomInfo.id}>
       <CardHeader>
         <CardTitle>{classroomInfo.title}</CardTitle>
@@ -355,9 +355,9 @@ export default function ClassroomsPage() {
         <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroomInfo.classroomId}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
       </CardFooter>
     </Card>
-  );
+  ), []);
 
-  const renderDiscoverClassroomCard = (classroom: Classroom) => {
+  const renderDiscoverClassroomCard = useCallback((classroom: Classroom) => {
     const isRequesting = requestingToJoin === classroom.id;
     const isMyClass = user?.uid === classroom.teacherId;
 
@@ -396,7 +396,7 @@ export default function ClassroomsPage() {
           </CardFooter>
     </Card>
     );
-  };
+  }, [user, requestingToJoin, handleRequestToJoin]);
 
   const renderSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

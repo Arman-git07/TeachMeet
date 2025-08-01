@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -77,7 +77,7 @@ interface Announcement {
     audioURL?: string;
 }
 
-const ClassroomFeatureCard = ({ icon: Icon, title, description, actionText, onAction }: { icon: React.ElementType, title: string, description: string, actionText: string, onAction?: () => void }) => (
+const ClassroomFeatureCard = React.memo(({ icon: Icon, title, description, actionText, onAction }: { icon: React.ElementType, title: string, description: string, actionText: string, onAction?: () => void }) => (
     <Card className="hover:shadow-lg transition-shadow">
         <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-2">
             <div className="bg-primary/10 p-3 rounded-full">
@@ -94,7 +94,9 @@ const ClassroomFeatureCard = ({ icon: Icon, title, description, actionText, onAc
             </CardFooter>
         )}
     </Card>
-);
+));
+ClassroomFeatureCard.displayName = 'ClassroomFeatureCard';
+
 
 const AudioRecordingDialog = ({ onAudioRecorded }: { onAudioRecorded: (blob: Blob) => void }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -277,7 +279,7 @@ export default function ClassroomPage() {
     }
   }, [classroomId]);
 
-  const handleRequestAction = async (requestId: string, approve: boolean) => {
+  const handleRequestAction = useCallback(async (requestId: string, approve: boolean) => {
     if (!isTeacher || !classroomId) return;
     
     try {
@@ -310,7 +312,7 @@ export default function ClassroomPage() {
         console.error("Error handling join request:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not process the request. Check Firestore rules.' });
     }
-  };
+  }, [isTeacher, classroomId, classroom?.title, classroom?.description, classroom?.teacherName, toast]);
   
   const handlePostAnnouncement = async () => {
     if ((!newAnnouncement.trim() && !audioAttachment) || !user || !isTeacher) return;

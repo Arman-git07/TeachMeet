@@ -45,7 +45,7 @@ interface Participant {
   isCameraOff?: boolean;
 }
 
-const ParticipantItem = React.memo(function ParticipantItem({
+const ParticipantItem = React.memo(({
   participant, 
   isCurrentUserHost, 
   isThisParticipantTheHost 
@@ -53,7 +53,7 @@ const ParticipantItem = React.memo(function ParticipantItem({
   participant: Participant, 
   isCurrentUserHost: boolean,
   isThisParticipantTheHost: boolean
-}) {
+}) => {
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
 
@@ -145,7 +145,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const [isLoading, setIsLoading] = useState(true);
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const currentUserId = auth.currentUser?.uid;
-  const scrollAreaRef = useRef<HTMLDivElement>(null); // Stable ref for ScrollArea
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!meetingId || !db) return;
