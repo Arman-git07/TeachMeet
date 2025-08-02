@@ -1,14 +1,25 @@
+
 "use client"
 
 import * as React from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
+import { composeRefs } from "@radix-ui/react-compose-refs"
+
 import { cn } from "@/lib/utils"
 
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
->(({ className, children, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
+    viewportRef?: React.Ref<HTMLDivElement>
+  }
+>(({ className, children, viewportRef, ...props }, ref) => {
   const internalRef = React.useRef<HTMLDivElement | null>(null)
+
+  // Remove use of setState or any state logic entirely to prevent update loop
+  const composedViewportRef = React.useMemo(
+    () => (viewportRef ? composeRefs(viewportRef, internalRef) : internalRef),
+    [viewportRef]
+  )
 
   return (
     <ScrollAreaPrimitive.Root
@@ -17,7 +28,7 @@ const ScrollArea = React.forwardRef<
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
-        ref={internalRef}
+        ref={composedViewportRef}
         className="h-full w-full rounded-[inherit]"
       >
         {children}
