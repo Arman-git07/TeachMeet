@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject as deleteFile } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
@@ -53,11 +53,18 @@ import {
   Link as LinkIcon,
   Download,
   PlusCircle,
-  ExternalLink
+  ExternalLink,
+  Calendar as CalendarIcon,
+  Edit,
+  FileUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Switch } from '@/components/ui/switch';
+
 
 interface Classroom {
   id: string;
@@ -93,6 +100,18 @@ interface Material {
   fileSize?: string;
   createdAt: { seconds: number };
 }
+
+interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: { seconds: number };
+  status: 'draft' | 'published';
+  fileURL?: string;
+  fileName?: string;
+  createdAt: { seconds: number };
+}
+
 
 const AudioRecordingDialog = React.memo(({ onAudioRecorded }: { onAudioRecorded: (blob: Blob) => void }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -299,6 +318,132 @@ const AddMaterialDialog = React.memo(({ teachingId, onMaterialAdded }: { teachin
 });
 AddMaterialDialog.displayName = 'AddMaterialDialog';
 
+const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignmentToEdit }: { classroomId: string; onAssignmentAction: () => void, assignmentToEdit: Assignment | null }) => {
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+    const [file, setFile] = useState<File | null>(null);
+    const [isPublished, setIsPublished] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (assignmentToEdit) {
+            setTitle(assignmentToEdit.title);
+            setDescription(assignmentToEdit.description);
+            setDueDate(new Date(assignmentToEdit.dueDate.seconds * 1000));
+            setIsPublished(assignmentToEdit.status === 'published');
+        } else {
+            setTitle('');
+            setDescription('');
+            setDueDate(undefined);
+            setIsPublished(false);
+        }
+    }, [assignmentToEdit]);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setFile(e.target.files[0]);
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!title.trim() || !dueDate) {
+            toast({ variant: 'destructive', title: 'Missing Fields', description: 'Title and due date are required.' });
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            let fileURL: string | undefined = assignmentToEdit?.fileURL;
+            let fileName: string | undefined = assignmentToEdit?.fileName;
+
+            if (file) {
+                const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${Date.now()}-${file.name}`);
+                const snapshot = await uploadBytes(fileRef, file);
+                fileURL = await getDownloadURL(snapshot.ref);
+                fileName = file.name;
+            }
+
+            const assignmentData = {
+                title: title.trim(),
+                description: description.trim(),
+                dueDate,
+                status: isPublished ? 'published' : 'draft',
+                fileURL,
+                fileName,
+            };
+
+            if (assignmentToEdit) {
+                const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentToEdit.id);
+                await updateDoc(assignmentRef, assignmentData);
+                toast({ title: 'Assignment Updated', description: `"${title.trim()}" has been updated.` });
+            } else {
+                await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), {
+                    ...assignmentData,
+                    createdAt: serverTimestamp(),
+                });
+                toast({ title: 'Assignment Created', description: `"${title.trim()}" has been created as a ${isPublished ? 'published' : 'draft'} assignment.` });
+            }
+            onAssignmentAction();
+
+        } catch (error) {
+            console.error('Error saving assignment:', error);
+            toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the assignment.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle>{assignmentToEdit ? 'Edit Assignment' : 'Create New Assignment'}</DialogTitle>
+                <DialogDescription>{assignmentToEdit ? 'Update details for this assignment.' : 'Fill out the details for the new assignment.'}</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="title" className="text-right">Title</Label>
+                    <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., Essay on Photosynthesis"/>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="description" className="text-right">Description</Label>
+                    <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="(Optional) Instructions or details"/>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">Due Date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !dueDate && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus /></PopoverContent>
+                    </Popover>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="file" className="text-right">File</Label>
+                    <Input id="file" type="file" onChange={handleFileChange} className="col-span-3"/>
+                </div>
+                 {file && <p className="col-span-4 text-sm text-muted-foreground text-center">Attaching: {file.name}</p>}
+                {assignmentToEdit && assignmentToEdit.fileName && !file && <p className="col-span-4 text-sm text-muted-foreground text-center">Current file: {assignmentToEdit.fileName}</p>}
+                <div className="flex items-center justify-end space-x-2 pt-4 border-t">
+                    <Label htmlFor="publish-switch">Publish to Students</Label>
+                    <Switch id="publish-switch" checked={isPublished} onCheckedChange={setIsPublished}/>
+                </div>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                <Button onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : assignmentToEdit ? "Save Changes" : "Create"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+});
+AssignmentDialog.displayName = 'AssignmentDialog';
+
 
 export default function ClassroomPage() {
   const params = useParams();
@@ -312,11 +457,15 @@ export default function ClassroomPage() {
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [audioAttachment, setAudioAttachment] = useState<Blob | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   
   const isTeacher = user?.uid === classroom?.teacherId;
 
@@ -371,10 +520,15 @@ export default function ClassroomPage() {
         setMaterials(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Material)));
     });
 
+    const unsubAssignments = onSnapshot(query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('createdAt', 'desc')), (snapshot) => {
+        setAssignments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Assignment)));
+    });
+
     return () => { 
         unsubClassroom();
         unsubAnnouncements();
         unsubMaterials();
+        unsubAssignments();
      };
   }, [classroomId, router, toast]);
   
@@ -473,6 +627,26 @@ export default function ClassroomPage() {
     }
   };
 
+  const handleOpenAssignmentDialog = (assignment: Assignment | null) => {
+    setEditingAssignment(assignment);
+    setIsAssignmentDialogOpen(true);
+  };
+  
+  const handleDeleteAssignment = async (assignment: Assignment) => {
+    if (!isTeacher) return;
+    try {
+      await deleteDoc(doc(db, 'classrooms', classroomId, 'assignments', assignment.id));
+      if (assignment.fileURL) {
+        const fileRef = storageRef(storage, assignment.fileURL);
+        await deleteFile(fileRef).catch(err => console.warn("Could not delete assignment file, it might not exist:", err));
+      }
+      toast({ title: 'Assignment Deleted', description: `"${assignment.title}" has been removed.` });
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the assignment.' });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -509,6 +683,9 @@ export default function ClassroomPage() {
     { value: "fees", label: "Fees", icon: CreditCard },
     { value: "chat", label: "Chat", icon: MessageSquare },
   ];
+  
+  const displayedAssignments = isTeacher ? assignments : assignments.filter(a => a.status === 'published');
+
 
   return (
     <div className="flex flex-col gap-4 pb-24 px-4 md:px-8">
@@ -691,16 +868,92 @@ export default function ClassroomPage() {
               </TabsContent>
 
               <TabsContent value="assignments" className="mt-0">
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Assignments</CardTitle>
-                        <CardDescription>View upcoming and past assignments.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center text-muted-foreground py-12">
-                        <ClipboardList className="h-12 w-12 mx-auto mb-2" />
-                        <p>No assignments posted yet.</p>
-                    </CardContent>
-                </Card>
+                {selectedAssignment ? (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Button variant="ghost" size="sm" onClick={() => setSelectedAssignment(null)} className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4"/> Back to list</Button>
+                                    <CardTitle className="mt-2">{selectedAssignment.title}</CardTitle>
+                                    <CardDescription>Due: {format(new Date(selectedAssignment.dueDate.seconds * 1000), "PPP")}</CardDescription>
+                                </div>
+                                {isTeacher && (
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenAssignmentDialog(selectedAssignment)}><Edit className="mr-2 h-4 w-4"/> Edit</Button>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {selectedAssignment.description && <p className="mb-4 text-sm whitespace-pre-wrap">{selectedAssignment.description}</p>}
+                             {selectedAssignment.fileURL && (
+                                <Button asChild variant="secondary" className="mb-6"><a href={selectedAssignment.fileURL} target="_blank" rel="noopener noreferrer"><Download className="mr-2 h-4 w-4"/>Download Assignment File</a></Button>
+                             )}
+
+                            <div className="border-t pt-4">
+                                <h3 className="font-semibold text-lg mb-2">{isTeacher ? "Student Submissions" : "Your Submission"}</h3>
+                                 <Card className="bg-muted/50 p-6 text-center">
+                                    {isTeacher ? (
+                                        <p>Submissions will appear here.</p>
+                                    ) : (
+                                        <div>
+                                            <p className="mb-4">You have not submitted this assignment yet.</p>
+                                            <Button><FileUp className="mr-2 h-4 w-4"/> Upload Your Work</Button>
+                                        </div>
+                                    )}
+                                 </Card>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Assignments</CardTitle>
+                                <CardDescription>View upcoming and past assignments.</CardDescription>
+                            </div>
+                            {isTeacher && (
+                                <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button onClick={() => handleOpenAssignmentDialog(null)}><PlusCircle className="mr-2 h-4 w-4"/>New Assignment</Button>
+                                    </DialogTrigger>
+                                    <AssignmentDialog classroomId={classroomId} onAssignmentAction={() => setIsAssignmentDialogOpen(false)} assignmentToEdit={editingAssignment} />
+                                </Dialog>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            {displayedAssignments.length > 0 ? (
+                                <div className="space-y-2">
+                                    {displayedAssignments.map(assignment => (
+                                        <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted group">
+                                            <div className="flex items-center gap-3">
+                                                <ClipboardList className="h-5 w-5 text-primary" />
+                                                <div>
+                                                    <a onClick={() => setSelectedAssignment(assignment)} className="font-medium text-foreground cursor-pointer hover:underline">{assignment.title}</a>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Due on {format(new Date(assignment.dueDate.seconds * 1000), 'MMM d, yyyy')}
+                                                        {isTeacher && <span className={cn("ml-2 px-2 py-0.5 rounded-full text-xs", assignment.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>{assignment.status}</span>}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                 <Button variant="secondary" size="sm" onClick={() => setSelectedAssignment(assignment)}>View</Button>
+                                                {isTeacher && (
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => handleDeleteAssignment(assignment)}>
+                                                        <Trash2 className="h-4 w-4"/>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center text-muted-foreground py-12">
+                                    <ClipboardList className="h-12 w-12 mx-auto mb-2" />
+                                    <p>No assignments posted yet.</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="subjects" className="mt-0">
