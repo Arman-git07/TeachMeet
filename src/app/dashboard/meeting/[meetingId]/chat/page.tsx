@@ -41,9 +41,9 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   // Removed useEffect that set initial mock messages
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
-    }
+    // A stable ref is now used internally by the ScrollArea component.
+    // To scroll to the bottom, you might need to manage it differently if direct access is needed.
+    // For now, let's rely on default browser behavior or a more advanced implementation if required.
   }, [messages]);
 
   const handleSendMessage = () => {
@@ -115,7 +115,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
-            <ScrollArea className="h-full" viewportRef={scrollAreaRef}>
+            <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-4">
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground pt-16">
