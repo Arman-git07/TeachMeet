@@ -145,7 +145,6 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const [isLoading, setIsLoading] = useState(true);
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const currentUserId = auth.currentUser?.uid;
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!meetingId || !db) return;
@@ -235,7 +234,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
             <CardDescription>Manage participants and their settings.</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow p-0 overflow-hidden">
-            <ScrollArea className="h-full p-2 md:p-4" viewportRef={scrollAreaRef}>
+            <ScrollArea className="h-full p-2 md:p-4">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
