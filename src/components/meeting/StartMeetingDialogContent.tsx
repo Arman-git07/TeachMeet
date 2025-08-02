@@ -17,15 +17,12 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+// Firestore imports are no longer needed here, they are moved to the wait page.
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 // Helper function to generate a random string, defined outside the component
 const generateRandomId = (length: number) => {
-    // This is a simple, non-cryptographically secure random string generator.
-    // It's sufficient for unique meeting IDs in this context.
     const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
     for (let i = 0; i < length; i++) {
@@ -43,10 +40,9 @@ const generateMeetingDetails = () => {
     
     let newMeetingLink = '';
     if (typeof window !== "undefined") {
-      newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
+      newMeetingLink = `${window.location.origin}/dashboard/join-meeting?code=${newMeetingId}`;
     } else {
-      // Fallback for server-side rendering, though this component is client-side.
-      newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
+      newMeetingLink = `/dashboard/join-meeting?code=${newMeetingId}`;
     }
 
     return {
@@ -62,15 +58,12 @@ export function StartMeetingDialogContent() {
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
-  // CRITICAL FIX: Generate meeting details ONCE using useState initializer.
-  // This prevents the ID from changing on every re-render.
   const [meetingDetails, setMeetingDetails] = useState(generateMeetingDetails);
 
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
   
-  // This function allows the user to manually generate a new link if they wish.
   const regenerateMeetingDetails = useCallback(() => {
     setMeetingDetails(generateMeetingDetails());
     toast({ title: "New Link Generated", description: "A new meeting link and code have been created." });
@@ -113,21 +106,6 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // Create the meeting document in Firestore first.
-    const meetingDocRef = doc(db, "meetings", meetingDetails.id);
-    try {
-        await setDoc(meetingDocRef, {
-            creatorId: user.uid,
-            topic: trimmedMeetingTitle,
-            createdAt: serverTimestamp(),
-        });
-    } catch (error) {
-        console.error("Host failed to create meeting document:", error);
-        toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
-        setIsJoining(false);
-        return;
-    }
-    
     // Save meeting to localStorage for the activity feed
     const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
     let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
@@ -146,7 +124,8 @@ export function StartMeetingDialogContent() {
     
     window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
 
-    // Navigate to the waiting room for the host.
+    // Navigate to the waiting room immediately.
+    // The waiting room will handle creating the meeting document in Firestore.
     const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
     router.push(waitRoomPath);
   };

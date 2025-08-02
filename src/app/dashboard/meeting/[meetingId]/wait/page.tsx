@@ -51,18 +51,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   
   const isHost = user?.uid === meetingCreatorId;
 
+  // This effect determines if the current user is the host.
+  // It runs once to fetch initial meeting data.
   useEffect(() => {
-    if (!meetingId || authLoading) return;
+    if (!meetingId || authLoading || !user) return;
     
     setIsLoadingMeetingData(true);
     const meetingDocRef = doc(db, 'meetings', meetingId);
 
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
-        setMeetingCreatorId(docSnap.data().creatorId || null);
+        // If doc exists, someone has created it. Check if it's me.
+        const creator = docSnap.data().creatorId || null;
+        setMeetingCreatorId(creator);
+        if (user.uid !== creator) {
+          // I am a guest, not the host.
+        }
       } else {
-        toast({ variant: 'destructive', title: 'Meeting Not Found', description: 'This meeting does not exist or may have been deleted.'});
-        router.push('/');
+        // Doc doesn't exist, so I am the host creating it for the first time.
+        setMeetingCreatorId(user.uid);
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -70,8 +77,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast, router]);
+  }, [meetingId, authLoading, user, toast]);
 
+
+  // This effect handles the real-time status updates for guests.
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
@@ -82,11 +91,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     const unsubscribeRequest = onSnapshot(requestDocRef, (docSnap) => {
       if (!docSnap.exists() && joinStatus === 'pending') {
-        // Document was deleted, so request was denied or approved.
-        // We rely on the participant listener to handle the 'approved' case.
-        // If participant doc isn't created shortly, we assume denied.
         setTimeout(() => {
-            if (joinStatus === 'pending') { // Check again in case approved listener fired
+            if (joinStatus === 'pending') { 
                  setJoinStatus('denied');
             }
         }, 1000);
@@ -228,9 +234,21 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-      const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-      router.push(joinNowLinkPath);
-      return;
+        // If host, create the meeting document and go directly to the meeting page.
+        const meetingDocRef = doc(db, "meetings", meetingId);
+        try {
+            await setDoc(meetingDocRef, {
+                creatorId: user.uid,
+                topic: topic || "Untitled Meeting",
+                createdAt: serverTimestamp(),
+            });
+            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+            router.push(joinNowLinkPath);
+        } catch (error) {
+            console.error("Host failed to create meeting document:", error);
+            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
+        }
+        return;
     }
 
     // If not host, create a join request
