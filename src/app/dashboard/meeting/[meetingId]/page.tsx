@@ -231,6 +231,7 @@ export default function MeetingPage() {
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
+  const participantsPanelScrollRef = useRef<HTMLDivElement>(null);
 
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
   const [isShareScreenDialogVisible, setIsShareScreenDialogVisible] = useState(false);
@@ -939,7 +940,7 @@ export default function MeetingPage() {
                     <PanelRightClose className="h-5 w-5"/>
                 </Button>
             </div>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1" viewportRef={participantsPanelScrollRef}>
                 <div className="p-2 space-y-1">
                     {acceptedParticipants.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
