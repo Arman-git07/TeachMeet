@@ -106,28 +106,35 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // Save meeting to localStorage for the activity feed
-    const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-    let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
-    if (!Array.isArray(startedMeetings)) startedMeetings = [];
-    
-    const newMeeting = {
-      id: meetingDetails.id,
-      title: trimmedMeetingTitle,
-      startedAt: Date.now(),
-    };
-
-    startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
-    startedMeetings.unshift(newMeeting); 
-    
-    localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
-    
-    window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
-
-    // Navigate to the waiting room immediately.
-    // The waiting room will handle creating the meeting document in Firestore.
+    // Immediately navigate to make the UI feel fast
     const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
     router.push(waitRoomPath);
+
+    // Perform non-critical background tasks after navigation has been initiated
+    setTimeout(() => {
+      try {
+        // Save meeting to localStorage for the activity feed
+        const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+        let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+        if (!Array.isArray(startedMeetings)) startedMeetings = [];
+        
+        const newMeeting = {
+          id: meetingDetails.id,
+          title: trimmedMeetingTitle,
+          startedAt: Date.now(),
+        };
+
+        startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
+        startedMeetings.unshift(newMeeting); 
+        
+        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
+        
+        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+      } catch (error) {
+        console.error("Failed to update local meeting records:", error);
+        // This is a non-critical error, so we don't need to bother the user with a toast.
+      }
+    }, 100);
   };
 
   return (
