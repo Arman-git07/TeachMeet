@@ -52,19 +52,23 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const isHost = user?.uid === meetingCreatorId;
 
   useEffect(() => {
-    if (!meetingId || authLoading) return;
+    if (!meetingId || authLoading || !user) return;
     
     setIsLoadingMeetingData(true);
     const meetingDocRef = doc(db, 'meetings', meetingId);
 
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
-        setMeetingCreatorId(docSnap.data().creatorId || null);
+        const creator = docSnap.data().creatorId;
+        // This is the correct place to determine host status.
+        setMeetingCreatorId(creator);
+        if (user.uid === creator) {
+          // If I am the host, I shouldn't be in a pending state.
+          setJoinStatus('idle');
+        }
       } else {
-        // If the doc doesn't exist, it might be a host joining for the first time.
-        // We'll allow the page to load and let the join logic handle it.
-        // If it's a guest, they'll get an error when they try to request to join.
-        setMeetingCreatorId(null); 
+        // If the doc doesn't exist, the current user MUST be the host trying to create it.
+        setMeetingCreatorId(user.uid);
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -72,7 +76,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast, router]);
+  }, [meetingId, authLoading, toast, user]);
 
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
@@ -237,12 +241,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            });
+            }, { merge: true }); // Use merge:true to avoid overwriting if doc already exists from another tab
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
-            console.error("Host failed to create meeting document:", error);
-            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
+            console.error("Host failed to create/update meeting document:", error);
+            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create/update the meeting room. Check Firestore rules.'});
         }
         return;
     }
@@ -261,7 +265,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
     } catch (error: any) {
         console.error("Join request failed:", error.code, error.message);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. The meeting may not exist or there may be a permissions issue.'});
         setJoinStatus('idle');
     }
   };
@@ -331,25 +335,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
-            {(!isCameraActive || hasCameraPermission === false) && (
-               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                 {authLoading ? (
-                      <p>Loading user info...</p>
-                    ) : (
-                      <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
-                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                        <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
-                      </Avatar>
-                    )}
-                {hasCameraPermission === false && (
-                  <>
-                    <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
-                    <p className="font-semibold">Camera permission denied</p>
-                    <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
-                  </>
-                )}
-              </div>
-            )}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-30">
               <Button
                 variant={isMicActive ? "default" : "destructive"}
@@ -370,6 +355,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 {isCameraActive ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </Button>
             </div>
+            {(!isCameraActive || hasCameraPermission === false) && (
+               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                 {authLoading ? (
+                      <p>Loading user info...</p>
+                    ) : (
+                      <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
+                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                        <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
+                      </Avatar>
+                    )}
+                {hasCameraPermission === false && (
+                  <>
+                    <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
+                    <p className="font-semibold">Camera permission denied</p>
+                    <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {hasCameraPermission === false && (
