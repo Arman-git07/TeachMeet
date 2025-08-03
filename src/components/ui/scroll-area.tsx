@@ -8,27 +8,19 @@ import { composeRefs } from "@radix-ui/react-compose-refs"
 import { cn } from "@/lib/utils"
 
 const ScrollArea = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
-    viewportRef?: React.Ref<HTMLDivElement>
-  }
->(({ className, children, viewportRef, ...props }, ref) => {
-  const internalRef = React.useRef<HTMLDivElement | null>(null)
+ React.ElementRef<typeof ScrollAreaPrimitive.Root>,
+ React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
+>(({ className, children, ...props }, ref) => (
 
-  // Remove use of setState or any state logic entirely to prevent update loop
-  const composedViewportRef = React.useMemo(
-    () => (viewportRef ? composeRefs(viewportRef, internalRef) : internalRef),
-    [viewportRef]
-  )
-
-  return (
-    <ScrollAreaPrimitive.Root
-      ref={ref}
-      className={cn("relative overflow-hidden", className)}
-      {...props}
-    >
+ <ScrollAreaPrimitive.Root
+ ref={ref}
+ className={cn("relative overflow-hidden", className)}
+ {...props}
+ >
       <ScrollAreaPrimitive.Viewport
-        ref={composedViewportRef}
+        // Explicitly cast to HTMLDivElement as required by radix-ui scroll-area
+        // @ts-ignore
+ ref={ref}
         className="h-full w-full rounded-[inherit]"
       >
         {children}
@@ -37,7 +29,7 @@ const ScrollArea = React.forwardRef<
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   )
-})
+);
 ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName
 
 const ScrollBar = React.forwardRef<
