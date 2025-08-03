@@ -23,8 +23,6 @@ interface ChatMessage {
   isMe: boolean;
 }
 
-// Mock participants removed
-
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
   const router = useRouter();
@@ -37,8 +35,6 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const [privateChatTarget, setPrivateChatTarget] = useState<{id: string, name: string} | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  // Removed useEffect that set initial mock messages
 
   useEffect(() => {
     // A stable ref is now used internally by the ScrollArea component.
