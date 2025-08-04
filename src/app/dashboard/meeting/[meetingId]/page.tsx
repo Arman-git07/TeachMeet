@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import useSound from 'use-sound';
 
 import {
   Mic,
@@ -256,8 +255,16 @@ export default function MeetingPage() {
 
   const isCurrentUserHost = currentUser?.uid === meetingCreatorId;
 
-  const [playNotificationSound] = useSound('/sounds/notification.mp3', { volume: 0.5 });
   const prevRequestCountRef = useRef(0);
+
+  const playNotificationSound = useCallback(() => {
+    const audio = new Audio('/sounds/notification.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(error => {
+      console.error("Failed to play notification sound:", error);
+      // This can happen if the user hasn't interacted with the page yet.
+    });
+  }, []);
 
   const handleApproveRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
