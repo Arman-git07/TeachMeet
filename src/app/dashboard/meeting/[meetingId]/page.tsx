@@ -794,6 +794,18 @@ export default function MeetingPage() {
         if (isCurrentUserHost) {
           // If host leaves, delete the entire meeting document
           await deleteDoc(doc(db, "meetings", meetingId));
+
+          // Also remove from localStorage
+          const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+          const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+          if (startedMeetingsRaw) {
+              let startedMeetings = JSON.parse(startedMeetingsRaw);
+              if (Array.isArray(startedMeetings)) {
+                  startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingId);
+                  localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings));
+              }
+          }
+
           toast({ title: "Meeting Ended", description: "As the host, you have ended the meeting for all participants." });
         } else {
           // If participant leaves, just delete their own document

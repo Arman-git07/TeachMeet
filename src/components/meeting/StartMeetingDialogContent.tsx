@@ -40,9 +40,9 @@ const generateMeetingDetails = () => {
     
     let newMeetingLink = '';
     if (typeof window !== "undefined") {
-      newMeetingLink = `${window.location.origin}/dashboard/join-meeting?code=${newMeetingId}`;
+      newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
     } else {
-      newMeetingLink = `/dashboard/join-meeting?code=${newMeetingId}`;
+      newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
     }
 
     return {

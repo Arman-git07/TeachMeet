@@ -73,43 +73,33 @@ export default function HomePage() {
     const loadActivities = () => {
       if (authLoading) return;
       setIsLoading(true);
-  
+
       const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
-      let dismissedItemIds: string[] = [];
-      try {
-        dismissedItemIds = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
-      } catch (e) {
-        console.error("Error parsing dismissed items:", e);
-        dismissedItemIds = [];
-      }
-      
+      const dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
+
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
       let ongoingMeetings: MeetingActivityItem[] = [];
+
       if (startedMeetingsRaw) {
-          const storedMeetings = JSON.parse(startedMeetingsRaw);
-          if (Array.isArray(storedMeetings)) {
-              const now = Date.now();
-              ongoingMeetings = storedMeetings
-                  .filter(meeting => {
-                      if (meeting.startedAt && (now - meeting.startedAt > THIRTY_MINUTES_IN_MS)) {
-                          const meetingId = `meeting-${meeting.id}`;
-                          if (!dismissedItemIds.includes(meetingId)) {
-                              dismissedItemIds.push(meetingId);
-                          }
-                          return false;
-                      }
-                      return true;
-                  })
-                  .map(m => ({
-                      ...m,
-                      type: 'meeting',
-                      id: `meeting-${m.id}`,
-                      timestamp: m.startedAt || now
-                  }));
+        let storedMeetings = JSON.parse(startedMeetingsRaw);
+        if (Array.isArray(storedMeetings)) {
+          const now = Date.now();
+          // Filter out old or invalid meetings and update storage
+          const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < THIRTY_MINUTES_IN_MS));
+          
+          if(validMeetings.length < storedMeetings.length) {
+            localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(validMeetings));
           }
+
+          ongoingMeetings = validMeetings.map((m: any) => ({
+            ...m,
+            type: 'meeting',
+            id: `meeting-${m.id}`,
+            timestamp: m.startedAt,
+          }));
+        }
       }
-      localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedItemIds));
-  
+
       const combined = [...ongoingMeetings]
         .filter(item => !dismissedItemIds.includes(item.id))
         .sort((a, b) => b.timestamp - a.timestamp);
@@ -117,14 +107,25 @@ export default function HomePage() {
       setAllActivity(combined);
       setIsLoading(false);
     };
-  
+
     loadActivities();
-  
-    const handleMeetingStarted = () => loadActivities();
-    window.addEventListener('teachmeet_meeting_started', handleMeetingStarted);
-  
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === STARTED_MEETINGS_KEY || event.key === DISMISSED_ITEMS_KEY) {
+        loadActivities();
+      }
+    };
+    
+    // Listen for changes from other tabs
+    window.addEventListener('storage', handleStorageChange);
+    // Also listen for custom events dispatched from within the app
+    window.addEventListener('teachmeet_meeting_started', loadActivities);
+    window.addEventListener('teachmeet_meeting_ended', loadActivities);
+
     return () => {
-      window.removeEventListener('teachmeet_meeting_started', handleMeetingStarted);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('teachmeet_meeting_started', loadActivities);
+      window.removeEventListener('teachmeet_meeting_ended', loadActivities);
     };
   }, [user, authLoading]);
 
@@ -190,7 +191,7 @@ export default function HomePage() {
           className="absolute inset-0 opacity-10"
           style={{
             backgroundImage: "radial-gradient(hsl(var(--primary)) 1px, transparent 1px), radial-gradient(hsl(var(--accent)) 1px, transparent 1px)",
-            backgroundSize: "30px 30px, 30px 30px",
+            backgroundSize: "30px 30px, 30px 15px",
             backgroundPosition: "0 0, 15px 15px",
             maskImage: "radial-gradient(circle at center, white, transparent 70%)"
           }}
