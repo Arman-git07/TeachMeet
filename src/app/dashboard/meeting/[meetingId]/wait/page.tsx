@@ -62,8 +62,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creator = docSnap.data().creatorId;
         setMeetingCreatorId(creator);
       } else {
-        // If the doc doesn't exist, it means the current user is the host creating it.
-        // This is a simplifying assumption; in a real app, you might want more robust validation.
+        // If the doc doesn't exist, it means the current user is likely the host creating it.
+        // We set the creatorId to the current user's UID to enable the "Join as Host" button.
         setMeetingCreatorId(user.uid);
       }
     }).catch(err => {
@@ -251,10 +251,23 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
     
-    // If not the host, simply navigate to the meeting page.
-    // The explicit "ask to join" request is removed.
-    // The user will appear in the meeting, and the host can admit/remove them from there.
-    router.push(joinNowLinkPath);
+    // If not host, create a join request
+    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
+    const requestData = {
+        name: user.displayName || userName,
+        photoURL: user.photoURL,
+        requestedAt: serverTimestamp(),
+    };
+
+    try {
+      await setDoc(requestRef, requestData);
+      setJoinStatus('pending');
+      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
+    } catch (error: any) {
+        console.error("Join request failed:", error.code, error.message);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
+        setJoinStatus('idle');
+    }
   };
 
   const getButtonState = () => {
@@ -267,11 +280,21 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
   
-    // Guest flow simplified
     let text = "Ask to Join";
-    let disabled = !agreedToTerms;
+    let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
+    let showSpinner = joinStatus === 'pending' || joinStatus === 'approved';
+    let onClick = handleJoinAction;
+
+    if (joinStatus === 'pending') text = "Waiting for Host...";
+    if (joinStatus === 'approved') text = "Joining...";
+    if (joinStatus === 'denied') {
+      text = "Request Denied. Ask again?";
+      disabled = !agreedToTerms;
+      showSpinner = false;
+      onClick = () => { setJoinStatus('idle'); handleJoinAction(); };
+    }
     
-    return { text, disabled, showSpinner: false, onClick: handleJoinAction };
+    return { text, disabled, showSpinner, onClick };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();

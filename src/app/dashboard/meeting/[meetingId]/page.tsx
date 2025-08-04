@@ -107,11 +107,8 @@ const ParticipantView = React.memo(({
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.srcObject = stream || null;
-      if (!isMe) {
-          videoRef.current.muted = false; // Ensure remote streams are audible
-      }
     }
-  }, [stream, isMe]);
+  }, [stream]);
 
   const handleFullScreenClick = () => {
     const targetElement = videoRef.current;
@@ -320,7 +317,7 @@ export default function MeetingPage() {
         } as JoinRequest));
         setJoinRequests(pending);
 
-        if (pending.length > prevRequestCountRef.current) {
+        if (pending.length > prevRequestCountRef.current && pending.length > 0) {
             playNotificationSound();
         }
         prevRequestCountRef.current = pending.length;
