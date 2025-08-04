@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -32,11 +33,12 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const [inputValue, setInputValue] = useState("");
   const [activeTab, setActiveTab] = useState<string>("public");
   const [privateChatTarget, setPrivateChatTarget] = useState<{id: string, name: string} | null>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    if (viewportRef.current) {
+        viewportRef.current.scrollTo({ top: viewportRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
 
@@ -109,8 +111,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
-            <ScrollArea className="h-full" ref={scrollAreaRef}>
-                <div className="p-4 md:p-6 space-y-4">
+            <ScrollArea className="h-full">
+                <div className="p-4 md:p-6 space-y-4" ref={viewportRef}>
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground pt-16">
                       <MessageSquare className="w-16 h-16 mb-4" />
