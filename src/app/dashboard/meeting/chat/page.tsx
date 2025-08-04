@@ -34,12 +34,9 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const [activeTab, setActiveTab] = useState<string>("public");
   const [privateChatTarget, setPrivateChatTarget] = useState<{id: string, name: string} | null>(null);
 
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    // A stable ref is now used internally by the ScrollArea component.
-    // To scroll to the bottom, you might need to manage it differently if direct access is needed.
-    // For now, let's rely on default browser behavior or a more advanced implementation if required.
+    // The ScrollArea component no longer requires a ref to scroll to the bottom.
+    // Modern browser behavior or CSS can handle this in many cases.
   }, [messages]);
 
   const handleSendMessage = () => {
