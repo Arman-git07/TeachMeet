@@ -251,23 +251,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
     
-    // If not the host, send a join request
-    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
-    const requestData = {
-        name: user.displayName || userName,
-        photoURL: user.photoURL,
-        requestedAt: serverTimestamp(),
-    };
-
-    try {
-      await setDoc(requestRef, requestData);
-      setJoinStatus('pending');
-      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
-    } catch (error: any) {
-        console.error("Join request failed:", error.code, error.message);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
-        setJoinStatus('idle');
-    }
+    // If not the host, simply navigate to the meeting page.
+    // The explicit "ask to join" request is removed.
+    // The user will appear in the meeting, and the host can admit/remove them from there.
+    router.push(joinNowLinkPath);
   };
 
   const getButtonState = () => {
@@ -280,23 +267,11 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
   
+    // Guest flow simplified
     let text = "Ask to Join";
-    let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
-    let onClick = handleJoinAction;
-  
-    if (joinStatus === 'pending') {
-      text = "Waiting for Host...";
-    }
-    if (joinStatus === 'approved') {
-      text = "Joining...";
-    }
-    if (joinStatus === 'denied') {
-      text = "Request Denied. Ask again?";
-      disabled = !agreedToTerms;
-      onClick = () => { setJoinStatus('idle'); handleJoinAction(); };
-    }
+    let disabled = !agreedToTerms;
     
-    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick };
+    return { text, disabled, showSpinner: false, onClick: handleJoinAction };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
@@ -334,7 +309,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
-            {(!isCameraActive || hasCameraPermission === false) && (
+            {!isCameraActive && (
                <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                  {authLoading ? (
                       <p>Loading user info...</p>
@@ -344,12 +319,23 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                         <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
                       </Avatar>
                     )}
-                {hasCameraPermission === false && (
+                {hasCameraPermission === false ? (
                   <>
                     <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
                     <p className="font-semibold">Camera permission denied</p>
                     <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
                   </>
+                ): (
+                   <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                     {authLoading ? (
+                          <p>Loading user info...</p>
+                        ) : (
+                          <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
+                            <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                            <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
+                          </Avatar>
+                        )}
+                    </div>
                 )}
               </div>
             )}
