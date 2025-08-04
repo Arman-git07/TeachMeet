@@ -133,7 +133,7 @@ const ParticipantView = React.memo(({
     <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
       <video
         ref={videoRef}
-        muted={isMe || isMicMuted}
+        muted={isMe}
         autoPlay
         playsInline
         className={cn("w-full h-full object-cover bg-black", !showVideo && "hidden", isMe && mirrorVideo && "video-mirror")}
@@ -597,7 +597,7 @@ export default function MeetingPage() {
           id: participantId,
           name: data.name || "Guest",
           photoURL: data.photoURL,
-          isMicMuted: isCurrentUser ? localMicMuted : data.isMicMuted,
+          isMicMuted: data.isMicMuted,
           isCameraOff: isCurrentUser ? (isScreenSharingActive ? true : localCameraOff) : data.isCameraOff,
           isHandRaisedForView: data.isHandRaised,
           isScreenSharing: data.isScreenSharing,
@@ -619,7 +619,7 @@ export default function MeetingPage() {
     return () => {
       unsubscribeParticipants();
     };
-  }, [meetingId, toast, joinStatus, currentUser, localMicMuted, localCameraOff, isScreenSharingActive]);
+  }, [meetingId, toast, joinStatus, currentUser, localCameraOff, isScreenSharingActive]);
 
 
   useEffect(() => {
