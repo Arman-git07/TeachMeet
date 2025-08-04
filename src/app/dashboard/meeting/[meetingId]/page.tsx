@@ -262,7 +262,6 @@ export default function MeetingPage() {
     audio.volume = 0.5;
     audio.play().catch(error => {
       console.error("Failed to play notification sound:", error);
-      // This can happen if the user hasn't interacted with the page yet.
     });
   }, []);
 
@@ -278,7 +277,7 @@ export default function MeetingPage() {
         if (requestDataSnap.exists()) {
              const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
              batch.set(participantRef, {
-                ...requestDataSnap.data(), // carries over name, photoURL
+                ...requestDataSnap.data(),
                 isMicMuted: true,
                 isCameraOff: true,
                 isHandRaised: false,
@@ -575,7 +574,7 @@ export default function MeetingPage() {
             isHandRaised: false,
             isScreenSharing: false,
             joinedAt: serverTimestamp(),
-        }, { merge: true }); // Use merge:true to avoid overwriting if doc exists
+        }, { merge: true });
         
         setJoinStatus('joined');
 
@@ -631,10 +630,23 @@ export default function MeetingPage() {
         });
     });
 
+    const meetingDocRef = doc(db, 'meetings', meetingId);
+    const unsubscribeMeeting = onSnapshot(meetingDocRef, (docSnap) => {
+        if (!docSnap.exists()) {
+            toast({
+                title: "Meeting Ended",
+                description: "The host has ended the meeting.",
+                duration: 5000,
+            });
+            router.push('/');
+        }
+    });
+
     return () => {
       unsubscribeParticipants();
+      unsubscribeMeeting();
     };
-  }, [meetingId, toast, joinStatus, currentUser, localCameraOff, isScreenSharingActive]);
+  }, [meetingId, toast, joinStatus, currentUser, localCameraOff, isScreenSharingActive, router]);
 
 
   useEffect(() => {
@@ -681,7 +693,7 @@ export default function MeetingPage() {
    useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
       if (auth.currentUser && meetingId && db) {
-        await deleteDoc(doc(db, "meetings", meetingId, "participants", auth.currentUser.uid));
+        await leaveMeeting(false); // Call leaveMeeting on unload, without redirect
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -699,7 +711,6 @@ export default function MeetingPage() {
     try {
       await updateDoc(userDocRef, updates);
     } catch (error) {
-      // Don't toast on error if doc doesn't exist, it means they're not a participant yet.
       if ((error as any).code !== 'not-found') {
         console.error("[MeetingPage] Error updating user status in Firestore:", error);
         toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
@@ -772,7 +783,7 @@ export default function MeetingPage() {
     }
   };
 
-  const leaveMeeting = async () => {
+  const leaveMeeting = async (shouldRedirect = true) => {
     if(isScreenSharingActive) {
         await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
     }
@@ -780,24 +791,22 @@ export default function MeetingPage() {
 
     if (currentUser && meetingId && db) {
       try {
-        await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
-        
-        const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
-        const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
-        let dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
-        const activityFeedMeetingId = `meeting-${meetingId}`;
-        if (!dismissedItemIds.includes(activityFeedMeetingId)) {
-          dismissedItemIds.push(activityFeedMeetingId);
-          localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedItemIds));
+        if (isCurrentUserHost) {
+          // If host leaves, delete the entire meeting document
+          await deleteDoc(doc(db, "meetings", meetingId));
+          toast({ title: "Meeting Ended", description: "As the host, you have ended the meeting for all participants." });
+        } else {
+          // If participant leaves, just delete their own document
+          await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
         }
-
       } catch (error) {
-        console.error("[MeetingPage] Error removing participant from Firestore on leave:", error);
+        console.error("[MeetingPage] Error on leave:", error);
       }
     }
     
-    toast({ title: "Leaving Meeting", description: "You have left the meeting." });
-    router.push('/');
+    if (shouldRedirect) {
+      router.push('/');
+    }
   };
 
   const handleConfirmShareScreen = async () => {
@@ -1028,7 +1037,7 @@ export default function MeetingPage() {
             <Hand className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
           
-          <Button variant="destructive" size="lg" className="rounded-full px-4 sm:px-6 h-10 sm:h-12" onClick={leaveMeeting} aria-label="Leave Meeting">
+          <Button variant="destructive" size="lg" className="rounded-full px-4 sm:px-6 h-10 sm:h-12" onClick={() => leaveMeeting()} aria-label="Leave Meeting">
             <PhoneOff className="h-5 w-5 sm:h-6 sm:h-6" />
           </Button>
         </div>
