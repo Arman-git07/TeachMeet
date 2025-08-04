@@ -251,23 +251,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
     
-    // If not host, create a join request
-    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
-    const requestData = {
-        name: user.displayName || userName,
-        photoURL: user.photoURL,
-        requestedAt: serverTimestamp(),
-    };
-
-    try {
-      await setDoc(requestRef, requestData);
-      setJoinStatus('pending');
-      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
-    } catch (error: any) {
-        console.error("Join request failed:", error.code, error.message);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
-        setJoinStatus('idle');
-    }
+    // If not host, just navigate to the meeting page directly.
+    // The host will admit the user from the participant list.
+    router.push(joinNowLinkPath);
   };
 
   const getButtonState = () => {
