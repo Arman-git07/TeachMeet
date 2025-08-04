@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import useSound from 'use-sound';
 
 import {
   Mic,
@@ -106,8 +107,11 @@ const ParticipantView = React.memo(({
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.srcObject = stream || null;
+      if (!isMe) {
+          videoRef.current.muted = false; // Ensure remote streams are audible
+      }
     }
-  }, [stream]);
+  }, [stream, isMe]);
 
   const handleFullScreenClick = () => {
     const targetElement = videoRef.current;
@@ -133,7 +137,7 @@ const ParticipantView = React.memo(({
     <Card className="rounded-xl overflow-hidden relative shadow-lg border-2 border-border/30 hover:border-primary hover:shadow-primary/20 transition-all duration-300 ease-in-out group w-full h-full">
       <video
         ref={videoRef}
-        muted={isMe}
+        muted={isMe} // Only self-view should be muted
         autoPlay
         playsInline
         className={cn("w-full h-full object-cover bg-black", !showVideo && "hidden", isMe && mirrorVideo && "video-mirror")}
@@ -255,30 +259,32 @@ export default function MeetingPage() {
 
   const isCurrentUserHost = currentUser?.uid === meetingCreatorId;
 
+  const [playNotificationSound] = useSound('/sounds/notification.mp3', { volume: 0.5 });
+  const prevRequestCountRef = useRef(0);
+
   const handleApproveRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
     
     try {
         const batch = writeBatch(db);
         
-        // Add user to the main participants collection
-        const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
-        const requestData = (await getDoc(doc(db, "meetings", meetingId, "joinRequests", request.id))).data();
-        
-        if (requestData) {
-            batch.set(participantRef, {
-                ...requestData, // copy name, photoURL etc.
+        const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        const requestDataSnap = await getDoc(requestDocRef);
+
+        if (requestDataSnap.exists()) {
+             const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+             batch.set(participantRef, {
+                ...requestDataSnap.data(), // carries over name, photoURL
                 isMicMuted: true,
                 isCameraOff: true,
                 isHandRaised: false,
                 isScreenSharing: false,
                 joinedAt: serverTimestamp(),
             });
+            batch.delete(requestDocRef);
+        } else {
+          throw new Error("Request document no longer exists.");
         }
-        
-        // Delete the request from the joinRequests subcollection
-        const requestRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
-        batch.delete(requestRef);
         
         await batch.commit();
 
@@ -313,13 +319,18 @@ export default function MeetingPage() {
             ...doc.data()
         } as JoinRequest));
         setJoinRequests(pending);
+
+        if (pending.length > prevRequestCountRef.current) {
+            playNotificationSound();
+        }
+        prevRequestCountRef.current = pending.length;
     }, (error) => {
         console.error("Error listening for join requests:", error);
         toast({ variant: "destructive", title: "Join Request Error", description: "Could not listen for join requests. Check Firestore rules."})
     });
 
     return () => unsubscribe();
-  }, [isCurrentUserHost, meetingId, toast]);
+  }, [isCurrentUserHost, meetingId, toast, playNotificationSound]);
 
   useEffect(() => {
       const displayedToasts = new Set<string>();

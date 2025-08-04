@@ -60,10 +60,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
         const creator = docSnap.data().creatorId;
-        // This is the correct place to determine host status.
         setMeetingCreatorId(creator);
       } else {
         // If the doc doesn't exist, it means the current user is the host creating it.
+        // This is a simplifying assumption; in a real app, you might want more robust validation.
         setMeetingCreatorId(user.uid);
       }
     }).catch(err => {
@@ -88,10 +88,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         // We rely on the participant listener to handle the 'approved' case.
         // If participant doc isn't created shortly, we assume denied.
         setTimeout(() => {
-            if (joinStatus === 'pending') { // Check again in case approved listener fired
+            getDoc(participantDocRef).then(partSnap => {
+              if(!partSnap.exists() && joinStatus === 'pending') {
                  setJoinStatus('denied');
-            }
-        }, 1000);
+              }
+            })
+        }, 1500);
       }
     });
 
@@ -234,14 +236,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       : `/dashboard/meeting/${meetingId}`;
 
     if (isHost) {
-        // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
         try {
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            }, { merge: true }); // Use merge:true to avoid overwriting if doc already exists from another tab
+            }, { merge: true });
             router.push(joinNowLinkPath);
         } catch (error) {
             console.error("Host failed to create/update meeting document:", error);
@@ -250,31 +251,52 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
     
-    // For guests, simply navigate to the meeting room. Admission is handled there.
-    router.push(joinNowLinkPath);
+    // If not the host, send a join request
+    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
+    const requestData = {
+        name: user.displayName || userName,
+        photoURL: user.photoURL,
+        requestedAt: serverTimestamp(),
+    };
+
+    try {
+      await setDoc(requestRef, requestData);
+      setJoinStatus('pending');
+      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
+    } catch (error: any) {
+        console.error("Join request failed:", error.code, error.message);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
+        setJoinStatus('idle');
+    }
   };
 
   const getButtonState = () => {
     if (authLoading || isLoadingMeetingData) {
-      return { text: "Loading...", disabled: true, showSpinner: true };
+      return { text: "Loading...", disabled: true, showSpinner: true, onClick: () => {} };
     }
-
+  
     if (isHost) {
       const disabled = !agreedToTerms;
       return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
-
+  
     let text = "Ask to Join";
     let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
-
-    if (joinStatus === 'pending') text = "Waiting for Host...";
-    if (joinStatus === 'approved') text = "Joining...";
+    let onClick = handleJoinAction;
+  
+    if (joinStatus === 'pending') {
+      text = "Waiting for Host...";
+    }
+    if (joinStatus === 'approved') {
+      text = "Joining...";
+    }
     if (joinStatus === 'denied') {
-      text = "Request Denied. Try Entering?";
+      text = "Request Denied. Ask again?";
       disabled = !agreedToTerms;
+      onClick = () => { setJoinStatus('idle'); handleJoinAction(); };
     }
     
-    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
+    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
@@ -312,6 +334,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
+            {(!isCameraActive || hasCameraPermission === false) && (
+               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                 {authLoading ? (
+                      <p>Loading user info...</p>
+                    ) : (
+                      <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
+                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                        <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
+                      </Avatar>
+                    )}
+                {hasCameraPermission === false && (
+                  <>
+                    <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
+                    <p className="font-semibold">Camera permission denied</p>
+                    <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
+                  </>
+                )}
+              </div>
+            )}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-30">
               <Button
                 variant={isMicActive ? "default" : "destructive"}
@@ -332,25 +373,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 {isCameraActive ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </Button>
             </div>
-            {(!isCameraActive || hasCameraPermission === false) && (
-               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                 {authLoading ? (
-                      <p>Loading user info...</p>
-                    ) : (
-                      <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
-                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                        <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
-                      </Avatar>
-                    )}
-                {hasCameraPermission === false && (
-                  <>
-                    <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
-                    <p className="font-semibold">Camera permission denied</p>
-                    <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           {hasCameraPermission === false && (
