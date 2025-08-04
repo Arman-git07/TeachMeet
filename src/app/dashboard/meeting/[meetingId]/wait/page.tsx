@@ -62,12 +62,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creator = docSnap.data().creatorId;
         // This is the correct place to determine host status.
         setMeetingCreatorId(creator);
-        if (user.uid === creator) {
-          // If I am the host, I shouldn't be in a pending state.
-          setJoinStatus('idle');
-        }
       } else {
-        // If the doc doesn't exist, the current user MUST be the host trying to create it.
+        // If the doc doesn't exist, it means the current user is the host creating it.
         setMeetingCreatorId(user.uid);
       }
     }).catch(err => {
@@ -233,6 +229,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
+    const joinNowLinkPath = topic 
+      ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
+      : `/dashboard/meeting/${meetingId}`;
+
     if (isHost) {
         // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
@@ -242,7 +242,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
             }, { merge: true }); // Use merge:true to avoid overwriting if doc already exists from another tab
-            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
             console.error("Host failed to create/update meeting document:", error);
@@ -250,24 +249,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         }
         return;
     }
-
-    // If not host, create a join request
-    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
-    const requestData = {
-        name: user.displayName || userName,
-        photoURL: user.photoURL,
-        requestedAt: serverTimestamp(),
-    };
-
-    try {
-      await setDoc(requestRef, requestData);
-      setJoinStatus('pending');
-      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
-    } catch (error: any) {
-        console.error("Join request failed:", error.code, error.message);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. The meeting may not exist or there may be a permissions issue.'});
-        setJoinStatus('idle');
-    }
+    
+    // For guests, simply navigate to the meeting room. Admission is handled there.
+    router.push(joinNowLinkPath);
   };
 
   const getButtonState = () => {
@@ -286,15 +270,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     if (joinStatus === 'pending') text = "Waiting for Host...";
     if (joinStatus === 'approved') text = "Joining...";
     if (joinStatus === 'denied') {
-      text = "Request Denied. Ask again?";
+      text = "Request Denied. Try Entering?";
       disabled = !agreedToTerms;
-      const originalOnClick = handleJoinAction;
-      return { 
-        text, 
-        disabled, 
-        showSpinner: false, 
-        onClick: () => { setJoinStatus('idle'); originalOnClick(); }
-      };
     }
     
     return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
