@@ -54,6 +54,7 @@ import {
   where,
   writeBatch,
   setDoc,
+  getDocs,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -73,6 +74,7 @@ import {
   GraduationCap,
   Briefcase,
   FileUp,
+  XCircle,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -294,20 +296,22 @@ export default function ClassroomsPage() {
   const router = useRouter();
   
   const [myClasses, setMyClasses] = useState<Classroom[]>([]);
-  const [enrolledClasses, setEnrolledClasses] = useState<EnrolledClassroomInfo[]>([]);
-  const [discoverClasses, setDiscoverClasses] = useState<Classroom[]>([]);
+  const [enrolledClasses, setEnrolledClasses = useState<EnrolledClassroomInfo[]>([]);
+  const [discoverClasses, setDiscoverClasses = useState<Classroom[]>([]);
+  const [pendingRequestIds, setPendingRequestIds = useState<Set<string>>(new Set());
   
   const [isLoadingMy, setIsLoadingMy] = useState(true);
-  const [isLoadingEnrolled, setIsLoadingEnrolled] = useState(true);
-  const [isLoadingDiscover, setIsLoadingDiscover] = useState(true);
+  const [isLoadingEnrolled, setIsLoadingEnrolled = useState(true);
+  const [isLoadingDiscover, setIsLoadingDiscover = useState(true);
+  const [isLoadingRequests, setIsLoadingRequests = useState(true);
 
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isTeacherAppDialogOpen, setIsTeacherAppDialogOpen] = useState(false);
-  const [selectedClassroomForApp, setSelectedClassroomForApp] = useState<Classroom | null>(null);
-  const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
-  const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [requestingToJoin, setRequestingToJoin] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen = useState(false);
+  const [isTeacherAppDialogOpen, setIsTeacherAppDialogOpen = useState(false);
+  const [selectedClassroomForApp, setSelectedClassroomForApp = useState<Classroom | null>(null);
+  const [classroomToEdit, setClassroomToEdit = useState<Classroom | null>(null);
+  const [classroomToDelete, setClassroomToDelete = useState<Classroom | null>(null);
+  const [copiedId, setCopiedId = useState<string | null>(null);
+  const [requestingToJoin, setRequestingToJoin = useState<string | null>(null);
 
 
   // Fetch My Classes
@@ -348,6 +352,38 @@ export default function ClassroomsPage() {
     });
     return () => unsub();
   }, [toast]);
+  
+  // Fetch pending requests for the current user
+  useEffect(() => {
+    if (!user || discoverClasses.length === 0) {
+      setIsLoadingRequests(false);
+      return;
+    }
+    
+    setIsLoadingRequests(true);
+    const fetchRequests = async () => {
+      const classroomIds = discoverClasses.map(c => c.id);
+      const newPendingIds = new Set<string>();
+
+      // Firestore limits 'in' queries to 30 items. If more classrooms, batching is needed.
+      // For this prototype, assuming less than 30 discoverable classes.
+      if (classroomIds.length > 0) {
+        const requestsRef = collection(db, 'classrooms');
+        for (const classroomId of classroomIds) {
+          const requestDocRef = doc(requestsRef, classroomId, 'joinRequests', user.uid);
+          const requestDocSnap = await getDocs(query(collection(doc(requestsRef, classroomId), 'joinRequests'), where('studentId', '==', user.uid)));
+          if (!requestDocSnap.empty) {
+            newPendingIds.add(classroomId);
+          }
+        }
+      }
+      setPendingRequestIds(newPendingIds);
+      setIsLoadingRequests(false);
+    };
+
+    fetchRequests();
+  }, [user, discoverClasses]);
+
 
   const handleEdit = (classroom: Classroom) => {
     setClassroomToEdit(classroom);
@@ -393,10 +429,31 @@ export default function ClassroomsPage() {
             role: 'student',
             requestedAt: serverTimestamp()
         });
+        setPendingRequestIds(prev => new Set(prev).add(classroomId));
         toast({ title: 'Request Sent!', description: `Your request to join as a student has been sent.` });
     } catch (error) {
         console.error("Error sending join request:", error);
         toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Check Firestore Rules for write permissions.' });
+    } finally {
+        setRequestingToJoin(null);
+    }
+  }, [user, toast]);
+  
+   const handleCancelRequest = useCallback(async (classroomId: string) => {
+    if (!user) return;
+    setRequestingToJoin(classroomId); // Visually indicate loading state
+    try {
+      const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
+      await deleteDoc(requestRef);
+      setPendingRequestIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(classroomId);
+          return newSet;
+      });
+      toast({ title: 'Request Canceled', description: 'Your join request has been withdrawn.' });
+    } catch (error) {
+        console.error("Error canceling join request:", error);
+        toast({ variant: 'destructive', title: 'Cancel Failed', description: 'Could not cancel your join request.' });
     } finally {
         setRequestingToJoin(null);
     }
@@ -457,6 +514,7 @@ export default function ClassroomsPage() {
   const renderDiscoverClassroomCard = useCallback((classroom: Classroom) => {
     const isRequesting = requestingToJoin === classroom.id;
     const isMyClass = user?.uid === classroom.teacherId;
+    const hasPendingRequest = pendingRequestIds.has(classroom.id);
 
     return (
       <Card key={classroom.id} className="flex flex-col">
@@ -473,7 +531,12 @@ export default function ClassroomsPage() {
             ) : user ? (
                  isRequesting ? (
                     <Button className="w-full" disabled>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Pending...
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Working...
+                    </Button>
+                ) : hasPendingRequest ? (
+                    <Button variant="destructive" className="w-full" onClick={() => handleCancelRequest(classroom.id)}>
+                        <XCircle className="mr-2 h-4 w-4"/>
+                        Cancel Request
                     </Button>
                 ) : (
                     <div className="grid grid-cols-2 gap-2">
@@ -493,7 +556,7 @@ export default function ClassroomsPage() {
           </CardFooter>
     </Card>
     );
-  }, [user, requestingToJoin, handleRequestToJoinStudent]);
+  }, [user, requestingToJoin, handleRequestToJoinStudent, handleCancelRequest, pendingRequestIds]);
 
   const renderSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -533,7 +596,7 @@ export default function ClassroomsPage() {
   };
 
   const DiscoverClassesTab = () => {
-    if (isLoadingDiscover) return renderSkeleton();
+    if (isLoadingDiscover || isLoadingRequests) return renderSkeleton();
 
     // Filter out classes the user is already enrolled in or teaches
     const discoverableClasses = discoverClasses.filter(publicClass => {
@@ -578,7 +641,7 @@ export default function ClassroomsPage() {
                 classroom={selectedClassroomForApp} 
                 onSubmitted={() => {
                     setIsTeacherAppDialogOpen(false);
-                    setRequestingToJoin(selectedClassroomForApp.id);
+                    setPendingRequestIds(prev => new Set(prev).add(selectedClassroomForApp!.id));
                 }} 
             />
         )}
@@ -600,3 +663,5 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
+    
