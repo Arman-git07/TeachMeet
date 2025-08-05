@@ -62,9 +62,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
         // If the doc doesn't exist, it might be a host joining for the first time.
-        // We will assume the current user is the host if no creatorId is found.
-        // This is safe because only the host can create the meeting document.
-        setMeetingCreatorId(user?.uid || null); 
+        // We'll allow the page to load and let the join logic handle it.
+        // If it's a guest, they'll get an error when they try to request to join.
+        setMeetingCreatorId(null); 
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -72,30 +72,14 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast, user?.uid]);
+  }, [meetingId, authLoading, toast, router]);
 
+  // Listener for being APPROVED
   useEffect(() => {
-    if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
+    if (!user || !meetingId || isHost || joinStatus === 'approved') return;
 
-    // This listener checks if the user's join request document has been deleted, which signifies denial.
-    // Or if their participant document has been created, which signifies approval.
-    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
-
-    const unsubscribeRequest = onSnapshot(requestDocRef, (docSnap) => {
-      if (!docSnap.exists() && joinStatus === 'pending') {
-        // Document was deleted, so request was denied or approved.
-        // We rely on the participant listener to handle the 'approved' case.
-        // If participant doc isn't created shortly, we assume denied.
-        setTimeout(() => {
-            if (joinStatus === 'pending') { // Check again in case approved listener fired
-                 setJoinStatus('denied');
-            }
-        }, 1000);
-      }
-    });
-
-    const unsubscribeParticipant = onSnapshot(participantDocRef, (docSnap) => {
+    const unsubscribe = onSnapshot(participantDocRef, (docSnap) => {
         if (docSnap.exists()) {
             setJoinStatus('approved');
             toast({ title: "Request Approved!", description: "You are now joining the meeting." });
@@ -103,15 +87,27 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
               ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
               : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
+            unsubscribe(); // Clean up listener once approved
         }
     });
 
-
-    return () => {
-        unsubscribeRequest();
-        unsubscribeParticipant();
-    };
+    return () => unsubscribe();
   }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
+
+  // Listener for being DENIED
+  useEffect(() => {
+    if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
+
+    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+    const unsubscribe = onSnapshot(requestDocRef, (docSnap) => {
+      if (!docSnap.exists()) {
+        setJoinStatus('denied');
+        unsubscribe(); // Clean up listener once denied
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user, meetingId, isHost, joinStatus]);
 
 
   useEffect(() => {
@@ -230,13 +226,14 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
+        // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
         try {
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            }, { merge: true });
+            }, { merge: true }); // Use merge to avoid overwriting if it exists
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
@@ -246,6 +243,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
+    // If not host, create a join request
     const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
         name: user.displayName || userName,
