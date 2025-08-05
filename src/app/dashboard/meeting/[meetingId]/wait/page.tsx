@@ -52,7 +52,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const isHost = !authLoading && user?.uid === meetingCreatorId;
 
   useEffect(() => {
-    if (!meetingId || authLoading) return;
+    if (!meetingId || authLoading || !user) {
+        if (!authLoading && !user) {
+            router.push(`/auth/signin?redirect=/dashboard/meeting/${meetingId}/wait`);
+        }
+        return;
+    }
     
     setIsLoadingMeetingData(true);
     const meetingDocRef = doc(db, 'meetings', meetingId);
@@ -61,9 +66,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       if (docSnap.exists()) {
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
-        // If the doc doesn't exist, it might be a host joining for the first time.
-        // We'll allow the page to load and let the join logic handle it.
-        // If it's a guest, they'll get an error when they try to request to join.
         setMeetingCreatorId(null); 
       }
     }).catch(err => {
@@ -72,13 +74,11 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast]);
+  }, [meetingId, authLoading, toast, router, user]);
 
-  // Combined listener for both approval and denial for participants
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    // Listener for approval (participant document creation)
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
     const unsubscribeParticipant = onSnapshot(participantDocRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -91,21 +91,16 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         }
     });
 
-    // Listener for denial (request document deletion)
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const unsubscribeRequest = onSnapshot(requestDocRef, (docSnap) => {
-      if (!docSnap.exists() && joinStatus === 'pending') {
-          // Add a small delay to ensure this doesn't fire before the approval listener has a chance
-          setTimeout(() => {
-              // Re-check the status in case the approval listener just fired
-              setJoinStatus(currentStatus => {
-                  if (currentStatus === 'pending') {
-                      return 'denied';
-                  }
-                  return currentStatus;
-              });
-          }, 500);
-      }
+        if (!docSnap.exists()) {
+            setJoinStatus(currentStatus => {
+                if (currentStatus === 'pending') {
+                    return 'denied';
+                }
+                return currentStatus;
+            });
+        }
     });
 
     return () => {
@@ -231,14 +226,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
         try {
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            }, { merge: true }); // Use merge to avoid overwriting if it exists
+            }, { merge: true }); 
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
@@ -248,7 +242,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
-    // If not host, create a join request
     const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
         name: user.displayName || userName,
@@ -269,7 +262,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const getButtonState = () => {
     if (authLoading || isLoadingMeetingData) {
-      return { text: "Loading...", disabled: true, showSpinner: true };
+      return { text: "Loading...", disabled: true, showSpinner: true, onClick: () => {} };
     }
 
     if (isHost) {
