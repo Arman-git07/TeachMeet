@@ -49,10 +49,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  const isHost = !authLoading && user?.uid === meetingCreatorId;
+  const isHost = !authLoading && !!user && !!meetingCreatorId && user.uid === meetingCreatorId;
 
   useEffect(() => {
-    if (!meetingId || authLoading) {
+    if (authLoading || !meetingId) {
       setIsLoadingMeetingData(authLoading);
       return;
     }
@@ -68,9 +68,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       if (docSnap.exists()) {
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
-        // If the doc doesn't exist, it might be a host joining for the first time.
-        // We'll allow the page to load and let the join logic handle it.
-        setMeetingCreatorId(null); 
+        // This case implies this is the first person (the host) creating the meeting.
+        // We set the current user as the intended creator.
+        setMeetingCreatorId(user.uid);
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
