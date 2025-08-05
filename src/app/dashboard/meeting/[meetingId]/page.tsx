@@ -256,9 +256,8 @@ export default function MeetingPage() {
   const isCurrentUserHost = currentUser?.uid === meetingCreatorId;
 
   const prevRequestCountRef = useRef(0);
-
+  
   const playNotificationSound = useCallback(() => {
-    // Use native browser Audio API for stability
     const audio = new Audio('/sounds/notification.mp3');
     audio.volume = 0.5;
     audio.play().catch(error => {
