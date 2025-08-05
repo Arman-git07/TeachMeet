@@ -12,7 +12,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from '@/hooks/useAuth'; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
 import { useSearchParams, useRouter, useParams } from "next/navigation";
-import Image from 'next/image';
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,28 +48,22 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  const isHost = !authLoading && !!user && !!meetingCreatorId && user.uid === meetingCreatorId;
+  const isHost = user && meetingCreatorId && user.uid === meetingCreatorId;
 
+  // Effect 1: Fetch meeting creator ID to determine if user is host.
   useEffect(() => {
-    if (authLoading || !meetingId) {
-      setIsLoadingMeetingData(authLoading);
-      return;
-    }
-    if (!user) {
-      router.push(`/auth/signin?redirect=/dashboard/meeting/${meetingId}/wait`);
-      return;
-    }
-    
+    if (!meetingId) return;
+
     setIsLoadingMeetingData(true);
     const meetingDocRef = doc(db, 'meetings', meetingId);
-
+    
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
-        // This case implies this is the first person (the host) creating the meeting.
-        // We set the current user as the intended creator.
-        setMeetingCreatorId(user.uid);
+        // If doc doesn't exist, it means the meeting hasn't been created yet.
+        // It's likely the host arriving for the first time. We can't set creatorId yet.
+        setMeetingCreatorId(null);
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -78,41 +71,37 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast, router, user]);
+  }, [meetingId, toast]);
 
+  // Effect 2: Listen for approval/denial if you are a guest who has sent a request.
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
+    // Listener for Approval: Checks if the participant document has been created.
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
     const unsubscribeParticipant = onSnapshot(participantDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            setJoinStatus('approved');
-            toast({ title: "Request Approved!", description: "You are now joining the meeting." });
-            const joinNowLinkPath = topic 
-              ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-              : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
-        }
+      if (docSnap.exists()) {
+        setJoinStatus('approved');
+        toast({ title: "Request Approved!", description: "You are now joining the meeting." });
+        const joinNowLinkPath = topic
+          ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
+          : `/dashboard/meeting/${meetingId}`;
+        router.push(joinNowLinkPath);
+      }
     });
 
+    // Listener for Denial: Checks if the request document has been deleted.
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const unsubscribeRequest = onSnapshot(requestDocRef, (docSnap) => {
-        if (!docSnap.exists()) {
-            // Check again in a moment to see if the participant doc was created.
-            // If not, it means the request was denied.
-            setTimeout(() => {
-                getDoc(participantDocRef).then(pDoc => {
-                    if (!pDoc.exists() && joinStatus === 'pending') {
-                         setJoinStatus('denied');
-                    }
-                });
-            }, 500);
-        }
+      // If the doc doesn't exist AND our status is still 'pending', it means it was deleted (denied).
+      if (!docSnap.exists() && joinStatus === 'pending') {
+        setJoinStatus('denied');
+      }
     });
 
     return () => {
-        unsubscribeParticipant();
-        unsubscribeRequest();
+      unsubscribeParticipant();
+      unsubscribeRequest();
     };
   }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
 
