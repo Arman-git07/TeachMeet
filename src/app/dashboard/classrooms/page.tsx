@@ -41,7 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import {
   collection,
   addDoc,
@@ -55,6 +55,7 @@ import {
   writeBatch,
   setDoc,
 } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   PlusCircle,
   Edit,
@@ -71,12 +72,14 @@ import {
   UserPlus,
   GraduationCap,
   Briefcase,
+  FileUp,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Textarea } from '@/components/ui/textarea';
 
 export interface Classroom {
   id: string;
@@ -197,6 +200,94 @@ const CreateClassroomDialogContent = ({
   );
 };
 
+
+const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [message, setMessage] = useState('');
+    const [resume, setResume] = useState<File | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setResume(e.target.files[0]);
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!user) {
+            toast({ variant: 'destructive', title: 'Not Authenticated' });
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            let resumeURL: string | undefined = undefined;
+            if (resume) {
+                const resumeRef = storageRef(storage, `classrooms/${classroom.id}/teacher_applications/${user.uid}/${resume.name}`);
+                const snapshot = await uploadBytes(resumeRef, resume);
+                resumeURL = await getDownloadURL(snapshot.ref);
+            }
+
+            const requestRef = doc(db, `classrooms/${classroom.id}/joinRequests`, user.uid);
+            await setDoc(requestRef, {
+                studentId: user.uid,
+                studentName: user.displayName || 'Anonymous User',
+                studentPhotoURL: user.photoURL || '',
+                status: 'pending',
+                role: 'teacher',
+                message: message.trim(),
+                resumeURL: resumeURL,
+                requestedAt: serverTimestamp()
+            });
+
+            toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });
+            onSubmitted();
+        } catch (error) {
+            console.error("Error sending teacher application:", error);
+            toast({ variant: 'destructive', title: 'Application Failed', description: 'Could not send your application.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Apply to be a Teacher</DialogTitle>
+                <DialogDescription>
+                    Apply to join "{classroom.title}". The classroom owner will review your application.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="message">Message to the Owner</Label>
+                    <Textarea 
+                        id="message" 
+                        value={message} 
+                        onChange={(e) => setMessage(e.target.value)} 
+                        placeholder="Introduce yourself and explain why you'd be a good fit..."
+                        disabled={isLoading}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="resume">Resume/CV (Optional)</Label>
+                    <Input id="resume" type="file" onChange={handleFileChange} disabled={isLoading} />
+                </div>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                <Button onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                    Submit Application
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+};
+
+
 export default function ClassroomsPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -211,6 +302,8 @@ export default function ClassroomsPage() {
   const [isLoadingDiscover, setIsLoadingDiscover] = useState(true);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isTeacherAppDialogOpen, setIsTeacherAppDialogOpen] = useState(false);
+  const [selectedClassroomForApp, setSelectedClassroomForApp] = useState<Classroom | null>(null);
   const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -284,7 +377,7 @@ export default function ClassroomsPage() {
     }
   };
   
-  const handleRequestToJoin = useCallback(async (classroomId: string, role: 'student' | 'teacher') => {
+  const handleRequestToJoinStudent = useCallback(async (classroomId: string) => {
     if (!user) {
         toast({ variant: 'destructive', title: "Authentication required", description: "You must be signed in to join a class." });
         return;
@@ -297,18 +390,22 @@ export default function ClassroomsPage() {
             studentName: user.displayName || 'Anonymous User',
             studentPhotoURL: user.photoURL || '',
             status: 'pending',
-            role: role,
+            role: 'student',
             requestedAt: serverTimestamp()
         });
-        toast({ title: 'Request Sent!', description: `Your request to join as a ${role} has been sent.` });
+        toast({ title: 'Request Sent!', description: `Your request to join as a student has been sent.` });
     } catch (error) {
         console.error("Error sending join request:", error);
         toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Check Firestore Rules for write permissions.' });
     } finally {
-        // We might not want to reset this immediately to show a pending state
-        // setRequestingToJoin(null);
+        setRequestingToJoin(null);
     }
   }, [user, toast]);
+
+  const handleOpenTeacherAppDialog = (classroom: Classroom) => {
+    setSelectedClassroomForApp(classroom);
+    setIsTeacherAppDialogOpen(true);
+  };
 
   const copyClassId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -380,11 +477,11 @@ export default function ClassroomsPage() {
                     </Button>
                 ) : (
                     <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" onClick={() => handleRequestToJoin(classroom.id, 'student')}>
+                        <Button variant="outline" onClick={() => handleRequestToJoinStudent(classroom.id)}>
                             <GraduationCap className="mr-2 h-4 w-4"/>
                             Join as Student
                         </Button>
-                        <Button variant="outline" onClick={() => handleRequestToJoin(classroom.id, 'teacher')}>
+                        <Button variant="outline" onClick={() => handleOpenTeacherAppDialog(classroom)}>
                             <Briefcase className="mr-2 h-4 w-4"/>
                              Join as Teacher
                         </Button>
@@ -396,7 +493,7 @@ export default function ClassroomsPage() {
           </CardFooter>
     </Card>
     );
-  }, [user, requestingToJoin, handleRequestToJoin]);
+  }, [user, requestingToJoin, handleRequestToJoinStudent]);
 
   const renderSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -474,6 +571,18 @@ export default function ClassroomsPage() {
             </div>
         )}
       </div>
+
+      <Dialog open={isTeacherAppDialogOpen} onOpenChange={setIsTeacherAppDialogOpen}>
+        {selectedClassroomForApp && (
+            <TeacherApplicationDialog 
+                classroom={selectedClassroomForApp} 
+                onSubmitted={() => {
+                    setIsTeacherAppDialogOpen(false);
+                    setRequestingToJoin(selectedClassroomForApp.id);
+                }} 
+            />
+        )}
+      </Dialog>
 
       <AlertDialog open={!!classroomToDelete} onOpenChange={(isOpen) => !isOpen && setClassroomToDelete(null)}>
         <AlertDialogContent>
