@@ -691,6 +691,42 @@ export default function MeetingPage() {
     
   }, [joinStatus, isScreenSharingActive, localCameraOff, localMicMuted, toast]);
 
+  const updateUserStatusInFirestore = async (updates: { [key: string]: any }) => {
+    if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
+    const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
+    try {
+      await updateDoc(userDocRef, updates);
+    } catch (error) {
+      if ((error as any).code !== 'not-found') {
+        console.error("[MeetingPage] Error updating user status in Firestore:", error);
+        toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
+      }
+    }
+  };
+
+  const stopScreenShare = useCallback(async (showToast = true) => {
+    if (!isScreenSharingActive) return;
+
+    if (screenShareStreamRef.current) {
+      screenShareStreamRef.current.getTracks().forEach(track => track.stop());
+      screenShareStreamRef.current = null;
+    }
+    setIsScreenSharingActive(false);
+    await updateUserStatusInFirestore({ isScreenSharing: false, isCameraOff: localCameraOff });
+
+    if (localStreamRef.current) {
+        const videoTrack = localStreamRef.current.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !localCameraOff;
+        }
+    }
+
+    if (showToast) {
+        toast({ title: "Screen Sharing Stopped" });
+    }
+    setRealtimeParticipants(prev => [...prev]);
+  }, [isScreenSharingActive, localCameraOff, toast, updateUserStatusInFirestore]);
+
   const leaveMeeting = useCallback(async (shouldRedirect = true) => {
     if(isScreenSharingActive) {
         await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
@@ -743,20 +779,6 @@ export default function MeetingPage() {
     };
   }, [meetingId, leaveMeeting]);
 
-
-  const updateUserStatusInFirestore = async (updates: { [key: string]: any }) => {
-    if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
-    const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
-    try {
-      await updateDoc(userDocRef, updates);
-    } catch (error) {
-      if ((error as any).code !== 'not-found') {
-        console.error("[MeetingPage] Error updating user status in Firestore:", error);
-        toast({ variant: "destructive", title: "Sync Error", description: "Could not update your status." });
-      }
-    }
-  };
-
   const toggleMic = async () => {
     const newMicStateIsMuted = !localMicMuted;
     setLocalMicMuted(newMicStateIsMuted);
@@ -770,29 +792,6 @@ export default function MeetingPage() {
       }
     }
   };
-
-  const stopScreenShare = useCallback(async (showToast = true) => {
-    if (!isScreenSharingActive) return;
-
-    if (screenShareStreamRef.current) {
-      screenShareStreamRef.current.getTracks().forEach(track => track.stop());
-      screenShareStreamRef.current = null;
-    }
-    setIsScreenSharingActive(false);
-    await updateUserStatusInFirestore({ isScreenSharing: false, isCameraOff: localCameraOff });
-
-    if (localStreamRef.current) {
-        const videoTrack = localStreamRef.current.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = !localCameraOff;
-        }
-    }
-
-    if (showToast) {
-        toast({ title: "Screen Sharing Stopped" });
-    }
-    setRealtimeParticipants(prev => [...prev]);
-  }, [isScreenSharingActive, localCameraOff, toast]);
 
   const toggleCamera = async () => {
     if (isScreenSharingActive) {
