@@ -596,60 +596,6 @@ export default function MeetingPage() {
     }
   }, [currentUser, meetingId, db, toast, joinStatus, searchParamsHook]);
 
-  useEffect(() => {
-    if (joinStatus !== 'joined' || !meetingId || !db) return;
-
-    const participantsColRef = collection(db, "meetings", meetingId, "participants");
-    const q = query(participantsColRef);
-    const unsubscribeParticipants = onSnapshot(q, (querySnapshot) => {
-      const fetchedParticipants: Participant[] = [];
-      querySnapshot.forEach((docSnap: DocumentData) => {
-        const data = docSnap.data();
-        const participantId = docSnap.id;
-        const isCurrentUser = currentUser?.uid === participantId;
-        
-        fetchedParticipants.push({
-          id: participantId,
-          name: data.name || "Guest",
-          photoURL: data.photoURL,
-          isMicMuted: data.isMicMuted,
-          isCameraOff: isCurrentUser ? (isScreenSharingActive ? true : localCameraOff) : data.isCameraOff,
-          isHandRaisedForView: data.isHandRaised,
-          isScreenSharing: data.isScreenSharing,
-          isMe: isCurrentUser,
-          stream: isCurrentUser ? (isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current) : null,
-        });
-      });
-      setRealtimeParticipants(fetchedParticipants);
-    }, (error) => {
-        console.error("[MeetingPage] Error fetching participants from Firestore:", error);
-        toast({
-          variant: "destructive",
-          title: "Participant List Error",
-          description: "Could not load participant list. Error: " + error.message,
-          duration: 7000,
-        });
-    });
-
-    const meetingDocRef = doc(db, 'meetings', meetingId);
-    const unsubscribeMeeting = onSnapshot(meetingDocRef, (docSnap) => {
-        if (!docSnap.exists()) {
-            toast({
-                title: "Meeting Ended",
-                description: "The host has ended the meeting.",
-                duration: 5000,
-            });
-            router.push('/');
-        }
-    });
-
-    return () => {
-      unsubscribeParticipants();
-      unsubscribeMeeting();
-    };
-  }, [meetingId, toast, joinStatus, currentUser, localCameraOff, isScreenSharingActive, router]);
-
-
   const stopScreenShare = useCallback(async (showToast = true) => {
     if (!isScreenSharingActive) return;
 
@@ -724,6 +670,59 @@ export default function MeetingPage() {
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
   }, [meetingId, leaveMeeting]);
+
+  useEffect(() => {
+    if (joinStatus !== 'joined') return;
+
+    const participantsColRef = collection(db, "meetings", meetingId, "participants");
+    const q = query(participantsColRef);
+    const unsubscribeParticipants = onSnapshot(q, (querySnapshot) => {
+      const fetchedParticipants: Participant[] = [];
+      querySnapshot.forEach((docSnap: DocumentData) => {
+        const data = docSnap.data();
+        const participantId = docSnap.id;
+        const isCurrentUser = currentUser?.uid === participantId;
+        
+        fetchedParticipants.push({
+          id: participantId,
+          name: data.name || "Guest",
+          photoURL: data.photoURL,
+          isMicMuted: data.isMicMuted,
+          isCameraOff: isCurrentUser ? (isScreenSharingActive ? true : localCameraOff) : data.isCameraOff,
+          isHandRaisedForView: data.isHandRaised,
+          isScreenSharing: data.isScreenSharing,
+          isMe: isCurrentUser,
+          stream: isCurrentUser ? (isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current) : null,
+        });
+      });
+      setRealtimeParticipants(fetchedParticipants);
+    }, (error) => {
+        console.error("[MeetingPage] Error fetching participants from Firestore:", error);
+        toast({
+          variant: "destructive",
+          title: "Participant List Error",
+          description: "Could not load participant list. Error: " + error.message,
+          duration: 7000,
+        });
+    });
+
+    const meetingDocRef = doc(db, 'meetings', meetingId);
+    const unsubscribeMeeting = onSnapshot(meetingDocRef, (docSnap) => {
+        if (!docSnap.exists()) {
+            toast({
+                title: "Meeting Ended",
+                description: "The host has ended the meeting.",
+                duration: 5000,
+            });
+            router.push('/');
+        }
+    });
+
+    return () => {
+      unsubscribeParticipants();
+      unsubscribeMeeting();
+    };
+  }, [meetingId, toast, joinStatus, currentUser, localCameraOff, isScreenSharingActive, router]);
 
   useEffect(() => {
     if (joinStatus !== 'joined') return;
