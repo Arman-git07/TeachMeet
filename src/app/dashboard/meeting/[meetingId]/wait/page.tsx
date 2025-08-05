@@ -40,7 +40,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
-  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
   const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,22 +48,22 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  const isHost = user && meetingCreatorId && user.uid === meetingCreatorId;
 
-  // Effect 1: Fetch meeting creator ID to determine if user is host.
+  // Effect 1: Fetch meeting creator ID and determine if user is host.
   useEffect(() => {
-    if (!meetingId) return;
+    if (!meetingId || !user) return;
 
     setIsLoadingMeetingData(true);
     const meetingDocRef = doc(db, 'meetings', meetingId);
     
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
-        setMeetingCreatorId(docSnap.data().creatorId || null);
+        const creatorId = docSnap.data().creatorId || null;
+        setIsHost(user.uid === creatorId);
       } else {
-        // If doc doesn't exist, it means the meeting hasn't been created yet.
-        // It's likely the host arriving for the first time. We can't set creatorId yet.
-        setMeetingCreatorId(null);
+        // If the document doesn't exist, this user *must* be the host creating it.
+        // A participant cannot arrive at a non-existent meeting.
+        setIsHost(true);
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -71,7 +71,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, toast]);
+  }, [meetingId, user, toast]);
 
   // Effect 2: Listen for approval/denial if you are a guest who has sent a request.
   useEffect(() => {
