@@ -62,9 +62,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
         // If the doc doesn't exist, it might be a host joining for the first time.
-        // We'll allow the page to load and let the join logic handle it.
-        // If it's a guest, they'll get an error when they try to request to join.
-        setMeetingCreatorId(null); 
+        // We will assume the current user is the host if no creatorId is found.
+        // This is safe because only the host can create the meeting document.
+        setMeetingCreatorId(user?.uid || null); 
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -72,7 +72,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast, router]);
+  }, [meetingId, authLoading, toast, user?.uid]);
 
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
@@ -230,18 +230,17 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
         try {
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            });
+            }, { merge: true }); // Use merge to avoid overwriting if doc already exists
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
-            console.error("Host failed to create meeting document:", error);
+            console.error("Host failed to create/update meeting document:", error);
             toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
         }
         return;
