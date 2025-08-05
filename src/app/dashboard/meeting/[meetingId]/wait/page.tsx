@@ -49,7 +49,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  const isHost = user?.uid === meetingCreatorId;
+  const isHost = !authLoading && user?.uid === meetingCreatorId;
 
   useEffect(() => {
     if (!meetingId || authLoading) return;
@@ -72,14 +72,15 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast, router]);
+  }, [meetingId, authLoading, toast]);
 
-  // Listener for being APPROVED
+  // Combined listener for both approval and denial for participants
   useEffect(() => {
-    if (!user || !meetingId || isHost || joinStatus === 'approved') return;
+    if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
+    // Listener for approval (participant document creation)
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
-    const unsubscribe = onSnapshot(participantDocRef, (docSnap) => {
+    const unsubscribeParticipant = onSnapshot(participantDocRef, (docSnap) => {
         if (docSnap.exists()) {
             setJoinStatus('approved');
             toast({ title: "Request Approved!", description: "You are now joining the meeting." });
@@ -87,27 +88,31 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
               ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
               : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
-            unsubscribe(); // Clean up listener once approved
         }
     });
 
-    return () => unsubscribe();
-  }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
-
-  // Listener for being DENIED
-  useEffect(() => {
-    if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
-
+    // Listener for denial (request document deletion)
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-    const unsubscribe = onSnapshot(requestDocRef, (docSnap) => {
-      if (!docSnap.exists()) {
-        setJoinStatus('denied');
-        unsubscribe(); // Clean up listener once denied
+    const unsubscribeRequest = onSnapshot(requestDocRef, (docSnap) => {
+      if (!docSnap.exists() && joinStatus === 'pending') {
+          // Add a small delay to ensure this doesn't fire before the approval listener has a chance
+          setTimeout(() => {
+              // Re-check the status in case the approval listener just fired
+              setJoinStatus(currentStatus => {
+                  if (currentStatus === 'pending') {
+                      return 'denied';
+                  }
+                  return currentStatus;
+              });
+          }, 500);
       }
     });
 
-    return () => unsubscribe();
-  }, [user, meetingId, isHost, joinStatus]);
+    return () => {
+        unsubscribeParticipant();
+        unsubscribeRequest();
+    };
+  }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
 
 
   useEffect(() => {
