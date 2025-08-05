@@ -52,11 +52,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const isHost = !authLoading && user?.uid === meetingCreatorId;
 
   useEffect(() => {
-    if (!meetingId || authLoading || !user) {
-        if (!authLoading && !user) {
-            router.push(`/auth/signin?redirect=/dashboard/meeting/${meetingId}/wait`);
-        }
-        return;
+    if (!meetingId || authLoading) {
+      setIsLoadingMeetingData(authLoading);
+      return;
+    }
+    if (!user) {
+      router.push(`/auth/signin?redirect=/dashboard/meeting/${meetingId}/wait`);
+      return;
     }
     
     setIsLoadingMeetingData(true);
@@ -66,6 +68,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       if (docSnap.exists()) {
         setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
+        // If the doc doesn't exist, it might be a host joining for the first time.
+        // We'll allow the page to load and let the join logic handle it.
         setMeetingCreatorId(null); 
       }
     }).catch(err => {
@@ -94,12 +98,15 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const unsubscribeRequest = onSnapshot(requestDocRef, (docSnap) => {
         if (!docSnap.exists()) {
-            setJoinStatus(currentStatus => {
-                if (currentStatus === 'pending') {
-                    return 'denied';
-                }
-                return currentStatus;
-            });
+            // Check again in a moment to see if the participant doc was created.
+            // If not, it means the request was denied.
+            setTimeout(() => {
+                getDoc(participantDocRef).then(pDoc => {
+                    if (!pDoc.exists() && joinStatus === 'pending') {
+                         setJoinStatus('denied');
+                    }
+                });
+            }, 500);
         }
     });
 
