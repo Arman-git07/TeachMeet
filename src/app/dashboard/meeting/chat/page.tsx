@@ -34,11 +34,17 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const [activeTab, setActiveTab] = useState<string>("public");
   const [privateChatTarget, setPrivateChatTarget] = useState<{id: string, name: string} | null>(null);
 
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  // Use a ref for the scroll viewport's inner content div
+  const scrollContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (viewportRef.current) {
-        viewportRef.current.scrollTo({ top: viewportRef.current.scrollHeight, behavior: 'smooth' });
+    // Scroll to bottom when messages change
+    if (scrollContentRef.current) {
+        // Find the viewport element managed by Radix ScrollArea
+        const viewport = scrollContentRef.current.parentElement;
+        if (viewport) {
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+        }
     }
   }, [messages]);
 
@@ -112,7 +118,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full">
-                <div className="p-4 md:p-6 space-y-4" ref={viewportRef}>
+                <div className="p-4 md:p-6 space-y-4" ref={scrollContentRef}>
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground pt-16">
                       <MessageSquare className="w-16 h-16 mb-4" />
