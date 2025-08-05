@@ -52,19 +52,19 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const isHost = user?.uid === meetingCreatorId;
 
   useEffect(() => {
-    if (!meetingId || authLoading || !user) return;
+    if (!meetingId || authLoading) return;
     
     setIsLoadingMeetingData(true);
     const meetingDocRef = doc(db, 'meetings', meetingId);
 
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
-        const creator = docSnap.data().creatorId;
-        setMeetingCreatorId(creator);
+        setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
-        // If the doc doesn't exist, it means the current user is likely the host creating it.
-        // We set the creatorId to the current user's UID to enable the "Join as Host" button.
-        setMeetingCreatorId(user.uid);
+        // If the doc doesn't exist, it might be a host joining for the first time.
+        // We'll allow the page to load and let the join logic handle it.
+        // If it's a guest, they'll get an error when they try to request to join.
+        setMeetingCreatorId(null); 
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -72,7 +72,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, authLoading, toast, user]);
+  }, [meetingId, authLoading, toast, router]);
 
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
@@ -88,12 +88,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         // We rely on the participant listener to handle the 'approved' case.
         // If participant doc isn't created shortly, we assume denied.
         setTimeout(() => {
-            getDoc(participantDocRef).then(partSnap => {
-              if(!partSnap.exists() && joinStatus === 'pending') {
+            if (joinStatus === 'pending') { // Check again in case approved listener fired
                  setJoinStatus('denied');
-              }
-            })
-        }, 1500);
+            }
+        }, 1000);
       }
     });
 
@@ -231,56 +229,71 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
-    const joinNowLinkPath = topic 
-      ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` 
-      : `/dashboard/meeting/${meetingId}`;
-
     if (isHost) {
+        // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
         try {
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            }, { merge: true });
+            });
+            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
-            console.error("Host failed to create/update meeting document:", error);
-            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create/update the meeting room. Check Firestore rules.'});
+            console.error("Host failed to create meeting document:", error);
+            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
         }
         return;
     }
-    
-    // If not host, just navigate to the meeting page directly.
-    // The host will admit the user from the participant list.
-    router.push(joinNowLinkPath);
+
+    // If not host, create a join request
+    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
+    const requestData = {
+        name: user.displayName || userName,
+        photoURL: user.photoURL,
+        requestedAt: serverTimestamp(),
+    };
+
+    try {
+      await setDoc(requestRef, requestData);
+      setJoinStatus('pending');
+      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
+    } catch (error: any) {
+        console.error("Join request failed:", error.code, error.message);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
+        setJoinStatus('idle');
+    }
   };
 
   const getButtonState = () => {
     if (authLoading || isLoadingMeetingData) {
-      return { text: "Loading...", disabled: true, showSpinner: true, onClick: () => {} };
+      return { text: "Loading...", disabled: true, showSpinner: true };
     }
-  
+
     if (isHost) {
       const disabled = !agreedToTerms;
       return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
-  
+
     let text = "Ask to Join";
     let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
-    let showSpinner = joinStatus === 'pending' || joinStatus === 'approved';
-    let onClick = handleJoinAction;
 
     if (joinStatus === 'pending') text = "Waiting for Host...";
     if (joinStatus === 'approved') text = "Joining...";
     if (joinStatus === 'denied') {
       text = "Request Denied. Ask again?";
       disabled = !agreedToTerms;
-      showSpinner = false;
-      onClick = () => { setJoinStatus('idle'); handleJoinAction(); };
+      const originalOnClick = handleJoinAction;
+      return { 
+        text, 
+        disabled, 
+        showSpinner: false, 
+        onClick: () => { setJoinStatus('idle'); originalOnClick(); }
+      };
     }
     
-    return { text, disabled, showSpinner, onClick };
+    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
@@ -318,7 +331,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
-            {!isCameraActive && (
+            {(!isCameraActive || hasCameraPermission === false) && (
                <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                  {authLoading ? (
                       <p>Loading user info...</p>
@@ -328,23 +341,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                         <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
                       </Avatar>
                     )}
-                {hasCameraPermission === false ? (
+                {hasCameraPermission === false && (
                   <>
                     <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
                     <p className="font-semibold">Camera permission denied</p>
                     <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
                   </>
-                ): (
-                   <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                     {authLoading ? (
-                          <p>Loading user info...</p>
-                        ) : (
-                          <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
-                            <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                            <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
-                          </Avatar>
-                        )}
-                    </div>
                 )}
               </div>
             )}
