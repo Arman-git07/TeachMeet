@@ -258,6 +258,7 @@ export default function MeetingPage() {
   const prevRequestCountRef = useRef(0);
 
   const playNotificationSound = useCallback(() => {
+    // Use native browser Audio API for stability
     const audio = new Audio('/sounds/notification.mp3');
     audio.volume = 0.5;
     audio.play().catch(error => {
@@ -702,7 +703,7 @@ export default function MeetingPage() {
       localStreamRef.current?.getTracks().forEach(track => track.stop());
       screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
     };
-  }, [meetingId]);
+  }, [meetingId, leaveMeeting]);
 
 
   const updateUserStatusInFirestore = async (updates: { [key: string]: any }) => {
@@ -783,7 +784,7 @@ export default function MeetingPage() {
     }
   };
 
-  const leaveMeeting = async (shouldRedirect = true) => {
+  const leaveMeeting = useCallback(async (shouldRedirect = true) => {
     if(isScreenSharingActive) {
         await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
     }
@@ -819,7 +820,7 @@ export default function MeetingPage() {
     if (shouldRedirect) {
       router.push('/');
     }
-  };
+  }, [isScreenSharingActive, stopScreenShare, currentUser, meetingId, db, isCurrentUserHost, router, toast]);
 
   const handleConfirmShareScreen = async () => {
     setIsShareScreenDialogVisible(false);

@@ -236,7 +236,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            }, { merge: true }); // Use merge to avoid overwriting if doc already exists
+            }, { merge: true });
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
@@ -246,7 +246,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
-    // If not host, create a join request
     const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
         name: user.displayName || userName,
