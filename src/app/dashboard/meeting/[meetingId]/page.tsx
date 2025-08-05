@@ -265,6 +265,18 @@ export default function MeetingPage() {
     });
   }, []);
 
+  const handleDenyRequest = useCallback(async (request: JoinRequest) => {
+    if (!isCurrentUserHost) return;
+    try {
+        const requestRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        await deleteDoc(requestRef);
+        toast({ title: "Request Denied", description: `${request.name}'s request to join has been denied.` });
+    } catch (error) {
+        console.error("Failed to deny request:", error);
+        toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not deny the request.' });
+    }
+  }, [isCurrentUserHost, meetingId, toast]);
+  
   const handleApproveRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
     
@@ -297,18 +309,7 @@ export default function MeetingPage() {
         toast({ variant: 'destructive', title: 'Approval Failed', description: 'Could not add the participant. Check Firestore rules.' });
     }
   }, [isCurrentUserHost, meetingId, toast]);
-  
-  const handleDenyRequest = useCallback(async (request: JoinRequest) => {
-    if (!isCurrentUserHost) return;
-    try {
-        const requestRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
-        await deleteDoc(requestRef);
-        toast({ title: "Request Denied", description: `${request.name}'s request to join has been denied.` });
-    } catch (error) {
-        console.error("Failed to deny request:", error);
-        toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not deny the request.' });
-    }
-  }, [isCurrentUserHost, meetingId, toast]);
+
 
   useEffect(() => {
     if (!isCurrentUserHost || !meetingId) return;
@@ -649,6 +650,81 @@ export default function MeetingPage() {
   }, [meetingId, toast, joinStatus, currentUser, localCameraOff, isScreenSharingActive, router]);
 
 
+  const stopScreenShare = useCallback(async (showToast = true) => {
+    if (!isScreenSharingActive) return;
+
+    if (screenShareStreamRef.current) {
+      screenShareStreamRef.current.getTracks().forEach(track => track.stop());
+      screenShareStreamRef.current = null;
+    }
+    setIsScreenSharingActive(false);
+    await updateUserStatusInFirestore({ isScreenSharing: false, isCameraOff: localCameraOff });
+
+    if (localStreamRef.current) {
+        const videoTrack = localStreamRef.current.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !localCameraOff;
+        }
+    }
+
+    if (showToast) {
+        toast({ title: "Screen Sharing Stopped" });
+    }
+    setRealtimeParticipants(prev => [...prev]);
+  }, [isScreenSharingActive, localCameraOff, toast]);
+
+  const leaveMeeting = useCallback(async (shouldRedirect = true) => {
+    if(isScreenSharingActive) {
+        await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
+    }
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+
+    if (currentUser && meetingId && db) {
+      try {
+        if (isCurrentUserHost) {
+          // If host leaves, delete the entire meeting document
+          await deleteDoc(doc(db, "meetings", meetingId));
+
+          // Also remove from localStorage
+          const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+          const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+          if (startedMeetingsRaw) {
+              let startedMeetings = JSON.parse(startedMeetingsRaw);
+              if (Array.isArray(startedMeetings)) {
+                  startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingId);
+                  localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings));
+              }
+          }
+
+          toast({ title: "Meeting Ended", description: "As the host, you have ended the meeting for all participants." });
+        } else {
+          // If participant leaves, just delete their own document
+          await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
+        }
+      } catch (error) {
+        console.error("[MeetingPage] Error on leave:", error);
+      }
+    }
+    
+    if (shouldRedirect) {
+      router.push('/');
+    }
+  }, [isScreenSharingActive, stopScreenShare, currentUser, meetingId, db, isCurrentUserHost, router, toast]);
+
+   useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      if (auth.currentUser && meetingId && db) {
+        await leaveMeeting(false); // Call leaveMeeting on unload, without redirect
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      localStreamRef.current?.getTracks().forEach(track => track.stop());
+      screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
+    };
+  }, [meetingId, leaveMeeting]);
+
   useEffect(() => {
     if (joinStatus !== 'joined') return;
 
@@ -702,81 +778,6 @@ export default function MeetingPage() {
       }
     }
   };
-
-  const stopScreenShare = useCallback(async (showToast = true) => {
-    if (!isScreenSharingActive) return;
-
-    if (screenShareStreamRef.current) {
-      screenShareStreamRef.current.getTracks().forEach(track => track.stop());
-      screenShareStreamRef.current = null;
-    }
-    setIsScreenSharingActive(false);
-    await updateUserStatusInFirestore({ isScreenSharing: false, isCameraOff: localCameraOff });
-
-    if (localStreamRef.current) {
-        const videoTrack = localStreamRef.current.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = !localCameraOff;
-        }
-    }
-
-    if (showToast) {
-        toast({ title: "Screen Sharing Stopped" });
-    }
-    setRealtimeParticipants(prev => [...prev]);
-  }, [isScreenSharingActive, localCameraOff, toast, updateUserStatusInFirestore]);
-
-  const leaveMeeting = useCallback(async (shouldRedirect = true) => {
-    if(isScreenSharingActive) {
-        await stopScreenShare(false).catch(e => console.error("Error stopping screen share on leave:", e));
-    }
-    localStreamRef.current?.getTracks().forEach(track => track.stop());
-
-    if (currentUser && meetingId && db) {
-      try {
-        if (isCurrentUserHost) {
-          // If host leaves, delete the entire meeting document
-          await deleteDoc(doc(db, "meetings", meetingId));
-
-          // Also remove from localStorage
-          const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
-          const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-          if (startedMeetingsRaw) {
-              let startedMeetings = JSON.parse(startedMeetingsRaw);
-              if (Array.isArray(startedMeetings)) {
-                  startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingId);
-                  localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings));
-              }
-          }
-
-          toast({ title: "Meeting Ended", description: "As the host, you have ended the meeting for all participants." });
-        } else {
-          // If participant leaves, just delete their own document
-          await deleteDoc(doc(db, "meetings", meetingId, "participants", currentUser.uid));
-        }
-      } catch (error) {
-        console.error("[MeetingPage] Error on leave:", error);
-      }
-    }
-    
-    if (shouldRedirect) {
-      router.push('/');
-    }
-  }, [isScreenSharingActive, stopScreenShare, currentUser, meetingId, db, isCurrentUserHost, router, toast]);
-
-   useEffect(() => {
-    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
-      if (auth.currentUser && meetingId && db) {
-        await leaveMeeting(false); // Call leaveMeeting on unload, without redirect
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      localStreamRef.current?.getTracks().forEach(track => track.stop());
-      screenShareStreamRef.current?.getTracks().forEach(track => track.stop());
-    };
-  }, [meetingId, leaveMeeting]);
 
   const toggleMic = async () => {
     const newMicStateIsMuted = !localMicMuted;
@@ -1049,7 +1050,7 @@ export default function MeetingPage() {
           </Button>
           
           <Button variant="destructive" size="lg" className="rounded-full px-4 sm:px-6 h-10 sm:h-12" onClick={() => leaveMeeting()} aria-label="Leave Meeting">
-            <PhoneOff className="h-5 w-5 sm:h-6 sm:h-6" />
+            <PhoneOff className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
         </div>
       </div>
