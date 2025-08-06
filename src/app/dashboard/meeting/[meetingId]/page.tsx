@@ -406,7 +406,7 @@ export default function MeetingPage() {
   };
 
   const handleOpenParticipants = () => {
-    setIsParticipantsPanelOpen(true);
+    router.push(`/dashboard/meeting/${meetingId}/participants${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
   };
 
   const handleToggleRecording = async () => {

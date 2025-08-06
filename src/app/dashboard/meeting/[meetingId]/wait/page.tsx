@@ -60,6 +60,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creatorId = docSnap.data().creatorId || null;
         setIsHost(user.uid === creatorId);
       } else {
+        // A non-existent meeting can only be created by its host.
+        // Assume this user is the host if the meeting document doesn't exist yet.
         setIsHost(true);
       }
     }).catch(err => {
