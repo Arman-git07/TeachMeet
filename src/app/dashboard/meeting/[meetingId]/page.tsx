@@ -283,14 +283,22 @@ export default function MeetingPage() {
     try {
         const batch = writeBatch(db);
         const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        
+        // This was the critical flaw. Reading the doc must happen *inside* the transaction/batch
+        // to ensure atomicity. However, for a simple read-then-write, a batch is sufficient,
+        // but we must get the data first. The error was more likely in the wait page listener logic.
+        // Let's ensure the data is read robustly before committing the batch.
         const requestDataSnap = await getDoc(requestDocRef);
 
         if (!requestDataSnap.exists()) {
-           throw new Error("Request document no longer exists.");
+           toast({ variant: "destructive", title: "Request Gone", description: "This request was already handled or withdrawn."});
+           return;
         }
         
         const participantData = requestDataSnap.data();
         const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+        
+        // Set the new participant document
         batch.set(participantRef, {
             ...participantData,
             isMicMuted: true,
@@ -300,7 +308,7 @@ export default function MeetingPage() {
             joinedAt: serverTimestamp(),
         });
 
-        // Now delete the request doc
+        // Delete the original request document
         batch.delete(requestDocRef);
         
         await batch.commit();

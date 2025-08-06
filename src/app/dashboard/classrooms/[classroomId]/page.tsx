@@ -78,6 +78,7 @@ interface JoinRequest {
   id: string;
   studentName: string;
   studentPhotoURL?: string;
+  studentId: string;
 }
 
 interface Announcement {
@@ -545,7 +546,6 @@ export default function ClassroomPage() {
     if (!isTeacher || !classroomId) return;
     
     try {
-        const batch = writeBatch(db);
         const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', requestId);
         
         if (approve) {
@@ -553,8 +553,9 @@ export default function ClassroomPage() {
             if (!studentRequestSnap.exists()) {
                 throw new Error("Join request not found.");
             }
-            const studentData = studentRequestSnap.data();
+            const studentData = studentRequestSnap.data() as JoinRequest;
 
+            const batch = writeBatch(db);
             const enrollmentRef = doc(db, 'users', studentData.studentId, 'enrolled', classroomId);
             batch.set(enrollmentRef, {
                 classroomId: classroomId,
@@ -563,12 +564,13 @@ export default function ClassroomPage() {
                 teacherName: classroom?.teacherName,
                 enrolledAt: serverTimestamp(),
             });
+            batch.delete(requestRef);
+            await batch.commit();
+
+        } else {
+            await deleteDoc(requestRef);
         }
         
-        batch.delete(requestRef);
-        
-        await batch.commit();
-
         toast({ title: `Request ${approve ? 'Approved' : 'Denied'}`, description: `The student has been ${approve ? 'added to the class' : 'denied entry'}.` });
     } catch (error) {
         console.error("Error handling join request:", error);
