@@ -281,25 +281,28 @@ export default function MeetingPage() {
     if (!isCurrentUserHost) return;
     
     try {
-        const batch = writeBatch(db);
-        
         const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
         const requestDataSnap = await getDoc(requestDocRef);
 
-        if (requestDataSnap.exists()) {
-             const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
-             batch.set(participantRef, {
-                ...requestDataSnap.data(),
-                isMicMuted: true,
-                isCameraOff: true,
-                isHandRaised: false,
-                isScreenSharing: false,
-                joinedAt: serverTimestamp(),
-            });
-            batch.delete(requestDocRef);
-        } else {
-          throw new Error("Request document no longer exists.");
+        if (!requestDataSnap.exists()) {
+           throw new Error("Request document no longer exists.");
         }
+        
+        const participantData = requestDataSnap.data();
+        const batch = writeBatch(db);
+
+        const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+        batch.set(participantRef, {
+            ...participantData,
+            isMicMuted: true,
+            isCameraOff: true,
+            isHandRaised: false,
+            isScreenSharing: false,
+            joinedAt: serverTimestamp(),
+        });
+
+        // Now delete the request doc
+        batch.delete(requestDocRef);
         
         await batch.commit();
 
