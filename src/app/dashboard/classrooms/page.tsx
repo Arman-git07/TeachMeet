@@ -55,6 +55,7 @@ import {
   writeBatch,
   setDoc,
   getDocs,
+  collectionGroup,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -353,36 +354,38 @@ export default function ClassroomsPage() {
     return () => unsub();
   }, [toast]);
   
-  // Fetch pending requests for the current user
+  // OPTIMIZED: Fetch pending requests for the current user using a single collectionGroup query
   useEffect(() => {
-    if (!user || discoverClasses.length === 0) {
+    if (!user) {
+      setPendingRequestIds(new Set());
       setIsLoadingRequests(false);
       return;
     }
-    
     setIsLoadingRequests(true);
-    const fetchRequests = async () => {
-      const classroomIds = discoverClasses.map(c => c.id);
-      const newPendingIds = new Set<string>();
+    const requestsQuery = query(
+        collectionGroup(db, 'joinRequests'),
+        where('studentId', '==', user.uid)
+    );
 
-      // Firestore limits 'in' queries to 30 items. If more classrooms, batching is needed.
-      // For this prototype, assuming less than 30 discoverable classes.
-      if (classroomIds.length > 0) {
-        const requestsRef = collection(db, 'classrooms');
-        for (const classroomId of classroomIds) {
-          const requestDocRef = doc(requestsRef, classroomId, 'joinRequests', user.uid);
-          const requestDocSnap = await getDocs(query(collection(doc(requestsRef, classroomId), 'joinRequests'), where('studentId', '==', user.uid)));
-          if (!requestDocSnap.empty) {
-            newPendingIds.add(classroomId);
-          }
-        }
-      }
-      setPendingRequestIds(newPendingIds);
-      setIsLoadingRequests(false);
-    };
+    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+        const newPendingIds = new Set<string>();
+        snapshot.forEach((doc) => {
+            // The classroom ID is the parent document's ID
+            const classroomId = doc.ref.parent.parent?.id;
+            if (classroomId) {
+                newPendingIds.add(classroomId);
+            }
+        });
+        setPendingRequestIds(newPendingIds);
+        setIsLoadingRequests(false);
+    }, (error) => {
+        console.error("Error fetching pending requests:", error);
+        toast({ variant: 'destructive', title: 'Fetch Error', description: 'Could not get your pending join requests.' });
+        setIsLoadingRequests(false);
+    });
 
-    fetchRequests();
-  }, [user, discoverClasses]);
+    return () => unsubscribe();
+  }, [user, toast]);
 
 
   const handleEdit = (classroom: Classroom) => {
@@ -422,14 +425,14 @@ export default function ClassroomsPage() {
     try {
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
         await setDoc(requestRef, {
-            studentId: user.uid,
+            studentId: user.uid, // Keep for single-user request lookup
             studentName: user.displayName || 'Anonymous User',
             studentPhotoURL: user.photoURL || '',
             status: 'pending',
             role: 'student',
             requestedAt: serverTimestamp()
         });
-        setPendingRequestIds(prev => new Set(prev).add(classroomId));
+        // No need to manually update state, the onSnapshot listener will do it.
         toast({ title: 'Request Sent!', description: `Your request to join as a student has been sent.` });
     } catch (error) {
         console.error("Error sending join request:", error);
@@ -441,15 +444,11 @@ export default function ClassroomsPage() {
   
    const handleCancelRequest = useCallback(async (classroomId: string) => {
     if (!user) return;
-    setRequestingToJoin(classroomId); // Visually indicate loading state
+    setRequestingToJoin(classroomId);
     try {
       const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
       await deleteDoc(requestRef);
-      setPendingRequestIds(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(classroomId);
-          return newSet;
-      });
+      // No need to manually update state, the onSnapshot listener will do it.
       toast({ title: 'Request Canceled', description: 'Your join request has been withdrawn.' });
     } catch (error) {
         console.error("Error canceling join request:", error);
@@ -641,7 +640,7 @@ export default function ClassroomsPage() {
                 classroom={selectedClassroomForApp} 
                 onSubmitted={() => {
                     setIsTeacherAppDialogOpen(false);
-                    setPendingRequestIds(prev => new Set(prev).add(selectedClassroomForApp!.id));
+                    // The onSnapshot listener will handle updating the UI, no need to manually set pending IDs here.
                 }} 
             />
         )}
