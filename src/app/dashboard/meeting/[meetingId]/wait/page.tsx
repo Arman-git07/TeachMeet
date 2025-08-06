@@ -48,8 +48,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-
-  // Effect 1: Fetch meeting creator ID and determine if user is host.
+  // Effect 1: Determine if the user is the host when the component loads.
   useEffect(() => {
     if (!meetingId || !user) return;
 
@@ -61,8 +60,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creatorId = docSnap.data().creatorId || null;
         setIsHost(user.uid === creatorId);
       } else {
-        // If the document doesn't exist, this user *must* be the host creating it.
-        // A participant cannot arrive at a non-existent meeting.
         setIsHost(true);
       }
     }).catch(err => {
@@ -73,36 +70,46 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     });
   }, [meetingId, user, toast]);
 
-  // Effect 2: Listen for approval/denial if you are a guest who has sent a request.
+  // Effect 2: This is the critical listener for guests awaiting approval.
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
 
-    // Listener for Approval: Checks if the participant document has been created.
-    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
-    const unsubscribeParticipant = onSnapshot(participantDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setJoinStatus('approved');
-        toast({ title: "Request Approved!", description: "You are now joining the meeting." });
-        const joinNowLinkPath = topic
-          ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
-          : `/dashboard/meeting/${meetingId}`;
-        router.push(joinNowLinkPath);
-      }
-    });
-
-    // Listener for Denial: Checks if the request document has been deleted.
+    // Listen for changes to your own join request document.
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-    const unsubscribeRequest = onSnapshot(requestDocRef, (docSnap) => {
-      // If the doc doesn't exist AND our status is still 'pending', it means it was deleted (denied).
-      if (!docSnap.exists() && joinStatus === 'pending') {
+
+    const unsubscribe = onSnapshot(requestDocRef, async (requestSnap) => {
+        // If the request document is deleted, it means the host has made a decision (approve or deny).
+        if (!requestSnap.exists()) {
+            // Give Firestore a moment to propagate the participant document creation.
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+            try {
+                const participantSnap = await getDoc(participantDocRef);
+                if (participantSnap.exists()) {
+                    // Participant document exists, so we were approved.
+                    setJoinStatus('approved');
+                    toast({ title: "Request Approved!", description: "You are now joining the meeting." });
+                    const joinNowLinkPath = topic
+                        ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
+                        : `/dashboard/meeting/${meetingId}`;
+                    router.push(joinNowLinkPath);
+                } else {
+                    // Participant document does NOT exist, so we were denied.
+                    setJoinStatus('denied');
+                }
+            } catch (error) {
+                console.error("Error checking for participant document after request deletion:", error);
+                setJoinStatus('denied');
+            }
+        }
+    }, (error) => {
+        console.error("Error listening to join request:", error);
+        toast({ variant: 'destructive', title: 'Connection Error', description: 'Lost connection while waiting for host.' });
         setJoinStatus('denied');
-      }
     });
 
-    return () => {
-      unsubscribeParticipant();
-      unsubscribeRequest();
-    };
+    return () => unsubscribe();
   }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
 
 
