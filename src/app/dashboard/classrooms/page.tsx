@@ -18,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog';
 import {
@@ -296,22 +295,22 @@ export default function ClassroomsPage() {
   const router = useRouter();
   
   const [myClasses, setMyClasses] = useState<Classroom[]>([]);
-  const [enrolledClasses, setEnrolledClasses = useState<EnrolledClassroomInfo[]>([]);
-  const [discoverClasses, setDiscoverClasses = useState<Classroom[]>([]);
-  const [pendingRequestIds, setPendingRequestIds = useState<Set<string>>(new Set());
+  const [enrolledClasses, setEnrolledClasses] = useState<EnrolledClassroomInfo[]>([]);
+  const [discoverClasses, setDiscoverClasses] = useState<Classroom[]>([]);
+  const [pendingRequestIds, setPendingRequestIds] = useState<Set<string>>(new Set());
   
   const [isLoadingMy, setIsLoadingMy] = useState(true);
-  const [isLoadingEnrolled, setIsLoadingEnrolled = useState(true);
-  const [isLoadingDiscover, setIsLoadingDiscover = useState(true);
-  const [isLoadingRequests, setIsLoadingRequests = useState(true);
+  const [isLoadingEnrolled, setIsLoadingEnrolled] = useState(true);
+  const [isLoadingDiscover, setIsLoadingDiscover] = useState(true);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(true);
 
-  const [isCreateDialogOpen, setIsCreateDialogOpen = useState(false);
-  const [isTeacherAppDialogOpen, setIsTeacherAppDialogOpen = useState(false);
-  const [selectedClassroomForApp, setSelectedClassroomForApp = useState<Classroom | null>(null);
-  const [classroomToEdit, setClassroomToEdit = useState<Classroom | null>(null);
-  const [classroomToDelete, setClassroomToDelete = useState<Classroom | null>(null);
-  const [copiedId, setCopiedId = useState<string | null>(null);
-  const [requestingToJoin, setRequestingToJoin = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isTeacherAppDialogOpen, setIsTeacherAppDialogOpen] = useState(false);
+  const [selectedClassroomForApp, setSelectedClassroomForApp] = useState<Classroom | null>(null);
+  const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
+  const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [requestingToJoin, setRequestingToJoin] = useState<string | null>(null);
 
 
   // Fetch My Classes
@@ -663,5 +662,3 @@ export default function ClassroomsPage() {
     </div>
   );
 }
-
-    
