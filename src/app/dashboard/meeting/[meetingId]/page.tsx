@@ -281,6 +281,7 @@ export default function MeetingPage() {
     if (!isCurrentUserHost) return;
     
     try {
+        const batch = writeBatch(db);
         const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
         const requestDataSnap = await getDoc(requestDocRef);
 
@@ -289,8 +290,6 @@ export default function MeetingPage() {
         }
         
         const participantData = requestDataSnap.data();
-        const batch = writeBatch(db);
-
         const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
         batch.set(participantRef, {
             ...participantData,
