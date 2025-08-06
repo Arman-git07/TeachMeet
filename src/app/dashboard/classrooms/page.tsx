@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
