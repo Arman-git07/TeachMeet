@@ -279,21 +279,21 @@ export default function MeetingPage() {
   
   const handleApproveRequest = useCallback(async (request: JoinRequest) => {
     if (!isCurrentUserHost) return;
-    
+
+    const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+    const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+
     try {
-        const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
+        const batch = writeBatch(db);
         const requestDataSnap = await getDoc(requestDocRef);
 
         if (!requestDataSnap.exists()) {
            toast({ variant: "destructive", title: "Request Gone", description: "This request was already handled or withdrawn."});
            return;
         }
-        
-        const participantData = requestDataSnap.data();
-        const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
 
-        const batch = writeBatch(db);
-        
+        const participantData = requestDataSnap.data();
+
         batch.set(participantRef, {
             ...participantData,
             isMicMuted: true,

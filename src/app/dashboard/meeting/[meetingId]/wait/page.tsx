@@ -60,6 +60,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creatorId = docSnap.data().creatorId || null;
         setIsHost(user.uid === creatorId);
       } else {
+        // If the meeting document doesn't exist, this user must be the host,
+        // as only they can create it upon joining.
         setIsHost(true);
       }
     }).catch(err => {
@@ -81,6 +83,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     const unsubscribe = onSnapshot(requestDocRef, async (requestSnap) => {
         if (!requestSnap.exists()) {
+            // Wait a moment to allow the participant document to be created.
             await new Promise(resolve => setTimeout(resolve, 500));
             
             const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
@@ -268,7 +271,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       const disabled = !agreedToTerms;
-      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
+      return { text: "Start Meeting as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
 
     let text = "Ask to Join";
