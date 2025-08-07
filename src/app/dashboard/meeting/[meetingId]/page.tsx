@@ -281,13 +281,7 @@ export default function MeetingPage() {
     if (!isCurrentUserHost) return;
     
     try {
-        const batch = writeBatch(db);
         const requestDocRef = doc(db, "meetings", meetingId, "joinRequests", request.id);
-        
-        // This was the critical flaw. Reading the doc must happen *inside* the transaction/batch
-        // to ensure atomicity. However, for a simple read-then-write, a batch is sufficient,
-        // but we must get the data first. The error was more likely in the wait page listener logic.
-        // Let's ensure the data is read robustly before committing the batch.
         const requestDataSnap = await getDoc(requestDocRef);
 
         if (!requestDataSnap.exists()) {
@@ -297,8 +291,9 @@ export default function MeetingPage() {
         
         const participantData = requestDataSnap.data();
         const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
+
+        const batch = writeBatch(db);
         
-        // Set the new participant document
         batch.set(participantRef, {
             ...participantData,
             isMicMuted: true,
@@ -307,8 +302,6 @@ export default function MeetingPage() {
             isScreenSharing: false,
             joinedAt: serverTimestamp(),
         });
-
-        // Delete the original request document
         batch.delete(requestDocRef);
         
         await batch.commit();

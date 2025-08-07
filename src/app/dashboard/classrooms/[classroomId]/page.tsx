@@ -544,7 +544,7 @@ export default function ClassroomPage() {
 
   const handleRequestAction = useCallback(async (requestId: string, approve: boolean) => {
     if (!isTeacher || !classroomId) return;
-    
+
     try {
         const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', requestId);
         
@@ -576,7 +576,7 @@ export default function ClassroomPage() {
         console.error("Error handling join request:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not process the request. Check Firestore rules.' });
     }
-  }, [isTeacher, classroomId, classroom?.title, classroom?.description, classroom?.teacherName, toast]);
+  }, [isTeacher, classroomId, classroom, toast]);
   
   const handlePostAnnouncement = async () => {
     if ((!newAnnouncement.trim() && !audioAttachment) || !user || !isTeacher) return;

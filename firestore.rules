@@ -69,18 +69,20 @@ service cloud.firestore {
     // Meetings: Documents are temporary and can be created by any authenticated user.
     match /meetings/{meetingId} {
       allow create: if isAuthenticated();
+      // Only the creator (host) can update/delete the meeting document itself.
       allow update, delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
       // Allow participants to read the meeting once they're approved
-      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
+      allow read: if isAuthenticated() && (
+        resource.data.creatorId == request.auth.uid ||
+        exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid))
+      );
 
       match /participants/{userId} {
-        // Any authenticated user can create their own participant document to join.
         allow create: if isUser(userId);
-        // A user can read their own participant document.
         allow read: if isUser(userId);
-        // Any authenticated user IN THE MEETING can see other participants.
-        allow list: if exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
-        // A user can update their own status (mute, etc.) or delete their document to leave.
+        // Any user who is a participant can see the list of other participants.
+        allow list: if isAuthenticated() && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
+        // A user can update their own status (mute, camera off, etc.) or delete their document to leave.
         allow update, delete: if isUser(userId);
       }
       

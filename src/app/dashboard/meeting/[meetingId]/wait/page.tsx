@@ -60,8 +60,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creatorId = docSnap.data().creatorId || null;
         setIsHost(user.uid === creatorId);
       } else {
-        // A non-existent meeting can only be created by its host.
-        // Assume this user is the host if the meeting document doesn't exist yet.
         setIsHost(true);
       }
     }).catch(err => {
@@ -74,22 +72,21 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   // Effect 2: This is the critical listener for guests awaiting approval.
   useEffect(() => {
-    if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
+    if (!user || !meetingId || isLoadingMeetingData || isHost) return;
+    
+    // Only proceed if the user is not the host and has sent a request.
+    if (joinStatus !== 'pending') return;
 
-    // Listen for changes to your own join request document.
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
 
     const unsubscribe = onSnapshot(requestDocRef, async (requestSnap) => {
-        // If the request document is deleted, it means the host has made a decision (approve or deny).
         if (!requestSnap.exists()) {
-            // Give Firestore a moment to propagate the participant document creation.
             await new Promise(resolve => setTimeout(resolve, 500));
             
             const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
             try {
                 const participantSnap = await getDoc(participantDocRef);
                 if (participantSnap.exists()) {
-                    // Participant document exists, so we were approved.
                     setJoinStatus('approved');
                     toast({ title: "Request Approved!", description: "You are now joining the meeting." });
                     const joinNowLinkPath = topic
@@ -97,7 +94,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                         : `/dashboard/meeting/${meetingId}`;
                     router.push(joinNowLinkPath);
                 } else {
-                    // Participant document does NOT exist, so we were denied.
                     setJoinStatus('denied');
                 }
             } catch (error) {
@@ -112,7 +108,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     });
 
     return () => unsubscribe();
-  }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
+  }, [user, meetingId, isHost, isLoadingMeetingData, joinStatus, router, topic, toast]);
 
 
   useEffect(() => {
