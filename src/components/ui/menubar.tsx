@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -30,10 +31,8 @@ function MenubarRadioGroup({
   return <MenubarPrimitive.RadioGroup {...props} />
 }
 
-function MenubarSub({
-  ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Sub>) {
-  return <MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />
+function MenubarSub({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Sub>) {
+  return <MenubarPrimitive.Sub {...props} />;
 }
 
 const Menubar = React.forwardRef<
