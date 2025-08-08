@@ -264,7 +264,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
             const requestRef = doc(db, `classrooms/${classroom.id}/joinRequests`, user.uid);
             await setDoc(requestRef, {
                 userId: user.uid,
-                studentName: data.fullName,
+                studentName: data.fullName, // Use consistent field name for display
                 studentPhotoURL: user.photoURL || '',
                 role: 'teacher',
                 applicationData: {
@@ -283,7 +283,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
             onSubmitted();
         } catch (error) {
             console.error("Error sending teacher application:", error);
-            toast({ variant: 'destructive', title: 'Application Failed', description: 'Could not send your application.' });
+            toast({ variant: 'destructive', title: 'Application Failed', description: 'Could not send your application. Check Firestore rules.' });
         } finally {
             setIsLoading(false);
         }
