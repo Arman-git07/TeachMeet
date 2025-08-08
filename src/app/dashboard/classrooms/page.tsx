@@ -91,6 +91,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 export interface Classroom {
@@ -326,13 +327,31 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                             <FormMessage />
                         </FormItem>
                     )} />
-                     <FormField control={form.control} name="experience" render={({ field }) => (
+                    <FormField
+                      control={form.control}
+                      name="experience"
+                      render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Teaching Experience</FormLabel>
-                            <FormControl><Textarea placeholder="Briefly describe your teaching experience..." {...field} disabled={isLoading} /></FormControl>
-                            <FormMessage />
+                          <FormLabel>Teaching Experience</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select years of experience" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Less than 1 year">Less than 1 year</SelectItem>
+                              <SelectItem value="1 year">1 year</SelectItem>
+                              <SelectItem value="2 years">2 years</SelectItem>
+                              <SelectItem value="3 years">3 years</SelectItem>
+                              <SelectItem value="4 years">4 years</SelectItem>
+                              <SelectItem value="5+ years">5+ years</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
                         </FormItem>
-                    )} />
+                      )}
+                    />
                      <FormField control={form.control} name="availability" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Time / Availability</FormLabel>
