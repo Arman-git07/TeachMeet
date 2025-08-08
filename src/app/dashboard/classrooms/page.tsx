@@ -235,7 +235,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
 
             const requestRef = doc(db, `classrooms/${classroom.id}/joinRequests`, user.uid);
             await setDoc(requestRef, {
-                studentId: user.uid,
+                userId: user.uid,
                 studentName: user.displayName || 'Anonymous User',
                 studentPhotoURL: user.photoURL || '',
                 status: 'pending',
@@ -364,7 +364,7 @@ export default function ClassroomsPage() {
     setIsLoadingRequests(true);
     const requestsQuery = query(
         collectionGroup(db, 'joinRequests'),
-        where('studentId', '==', user.uid)
+        where('userId', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
@@ -425,7 +425,7 @@ export default function ClassroomsPage() {
     try {
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
         await setDoc(requestRef, {
-            studentId: user.uid, // Keep for single-user request lookup
+            userId: user.uid, // Use userId for the collectionGroup query
             studentName: user.displayName || 'Anonymous User',
             studentPhotoURL: user.photoURL || '',
             status: 'pending',
