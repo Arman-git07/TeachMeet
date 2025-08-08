@@ -76,6 +76,10 @@ import {
   Briefcase,
   FileUp,
   XCircle,
+  Book,
+  Phone,
+  Clock,
+  Award,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -83,6 +87,11 @@ import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
 
 export interface Classroom {
   id: string;
@@ -204,20 +213,37 @@ const CreateClassroomDialogContent = ({
 };
 
 
+const teacherApplicationSchema = z.object({
+    fullName: z.string().min(1, 'Full name is required'),
+    subject: z.string().min(1, 'Subject is required'),
+    mobile: z.string().regex(/^\+?[0-9\s-()]+$/, 'Please enter a valid mobile number').min(1, 'Mobile number is required'),
+    qualification: z.string().min(1, 'Qualification is required'),
+    experience: z.string().min(1, 'Experience is required'),
+    availability: z.string().min(1, 'Availability is required'),
+    message: z.string().optional(),
+    resume: z.any().optional(),
+});
+
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
     const { user } = useAuth();
     const { toast } = useToast();
-    const [message, setMessage] = useState('');
-    const [resume, setResume] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setResume(e.target.files[0]);
-        }
-    };
+    const form = useForm<z.infer<typeof teacherApplicationSchema>>({
+        resolver: zodResolver(teacherApplicationSchema),
+        defaultValues: {
+            fullName: user?.displayName || '',
+            subject: '',
+            mobile: '',
+            qualification: '',
+            experience: '',
+            availability: '',
+            message: '',
+            resume: null,
+        },
+    });
 
-    const handleSubmit = async () => {
+    const onSubmit = async (data: z.infer<typeof teacherApplicationSchema>) => {
         if (!user) {
             toast({ variant: 'destructive', title: 'Not Authenticated' });
             return;
@@ -227,20 +253,27 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
 
         try {
             let resumeURL: string | undefined = undefined;
-            if (resume) {
-                const resumeRef = storageRef(storage, `classrooms/${classroom.id}/teacher_applications/${user.uid}/${resume.name}`);
-                const snapshot = await uploadBytes(resumeRef, resume);
+            if (data.resume && data.resume.length > 0) {
+                const resumeFile = data.resume[0];
+                const resumeRef = storageRef(storage, `classrooms/${classroom.id}/teacher_applications/${user.uid}/${resumeFile.name}`);
+                const snapshot = await uploadBytes(resumeRef, resumeFile);
                 resumeURL = await getDownloadURL(snapshot.ref);
             }
 
             const requestRef = doc(db, `classrooms/${classroom.id}/joinRequests`, user.uid);
             await setDoc(requestRef, {
                 userId: user.uid,
-                studentName: user.displayName || 'Anonymous User',
+                studentName: data.fullName,
                 studentPhotoURL: user.photoURL || '',
-                status: 'pending',
                 role: 'teacher',
-                message: message.trim(),
+                applicationData: {
+                    subject: data.subject,
+                    mobile: data.mobile,
+                    qualification: data.qualification,
+                    experience: data.experience,
+                    availability: data.availability,
+                    message: data.message,
+                },
                 resumeURL: resumeURL,
                 requestedAt: serverTimestamp()
             });
@@ -256,36 +289,88 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
     };
 
     return (
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-                <DialogTitle>Apply to be a Teacher</DialogTitle>
+                <DialogTitle>Apply to Teach: {classroom.title}</DialogTitle>
                 <DialogDescription>
-                    Apply to join "{classroom.title}". The classroom owner will review your application.
+                    Fill out the form below. The classroom owner will review your application.
                 </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <Label htmlFor="message">Message to the Owner</Label>
-                    <Textarea 
-                        id="message" 
-                        value={message} 
-                        onChange={(e) => setMessage(e.target.value)} 
-                        placeholder="Introduce yourself and explain why you'd be a good fit..."
-                        disabled={isLoading}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="resume">Resume/CV (Optional)</Label>
-                    <Input id="resume" type="file" onChange={handleFileChange} disabled={isLoading} />
-                </div>
-            </div>
-            <DialogFooter>
-                <DialogClose asChild><Button variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                <Button onClick={handleSubmit} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                    Submit Application
-                </Button>
-            </DialogFooter>
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+                    <FormField control={form.control} name="fullName" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl><Input placeholder="Your full name" {...field} disabled={isLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={form.control} name="subject" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Subject of Expertise</FormLabel>
+                            <FormControl><Input placeholder="e.g., Mathematics, React Development" {...field} disabled={isLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={form.control} name="mobile" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Mobile Number</FormLabel>
+                            <FormControl><Input type="tel" placeholder="Your contact number" {...field} disabled={isLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="qualification" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Highest Qualification</FormLabel>
+                            <FormControl><Textarea placeholder="e.g., Ph.D. in Physics, B.S. in Computer Science" {...field} disabled={isLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={form.control} name="experience" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Teaching Experience</FormLabel>
+                            <FormControl><Textarea placeholder="Briefly describe your teaching experience..." {...field} disabled={isLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={form.control} name="availability" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Time / Availability</FormLabel>
+                            <FormControl><Textarea placeholder="e.g., Weekdays 5-8 PM, Weekends all day" {...field} disabled={isLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="message" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Message to Owner (Optional)</FormLabel>
+                            <FormControl><Textarea placeholder="Introduce yourself..." {...field} disabled={isLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={form.control} name="resume" render={({ field: { onChange, value, ...rest } }) => (
+                        <FormItem>
+                            <FormLabel>Resume/CV (Optional)</FormLabel>
+                            <FormControl>
+                                <Input 
+                                    type="file"
+                                    onChange={(e) => onChange(e.target.files)}
+                                    {...rest}
+                                    disabled={isLoading}
+                                 />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+
+                     <DialogFooter className="sticky bottom-0 bg-background pt-4">
+                        <DialogClose asChild><Button variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                        <Button type="submit" disabled={isLoading}>
+                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            Submit Application
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </Form>
         </DialogContent>
     );
 };
