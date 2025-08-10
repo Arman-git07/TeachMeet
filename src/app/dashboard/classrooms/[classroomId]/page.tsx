@@ -722,7 +722,7 @@ export default function ClassroomPage() {
         
         <Tabs defaultValue="announcements" className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6 mt-4">
           <div className="w-full">
-             <div className="flex-col h-auto items-start gap-2 bg-transparent p-0 w-full">
+             <div className="flex flex-col h-auto items-start gap-2 bg-transparent p-0 w-full">
               {tabItems.map(({ value, label, icon: Icon }) => (
                   <TabsTrigger 
                     key={value}
