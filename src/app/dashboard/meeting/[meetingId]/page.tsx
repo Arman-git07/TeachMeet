@@ -353,7 +353,7 @@ export default function MeetingPage() {
               duration: Infinity,
               action: (
                 <div className="flex gap-2 mt-2">
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8" onClick={() => { handleApproveRequest(request); dismiss(toastId); }}>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8">
                     <Check className="h-4 w-4 mr-1" /> Approve
                   </Button>
                   <Button size="sm" variant="destructive" className="rounded-lg h-8" onClick={() => { handleDenyRequest(request); dismiss(toastId); }}>
