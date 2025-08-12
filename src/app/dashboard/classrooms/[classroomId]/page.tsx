@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -536,7 +537,17 @@ export default function ClassroomPage() {
   useEffect(() => {
     if (isTeacher && classroomId) {
       const unsubRequests = onSnapshot(query(collection(db, 'classrooms', classroomId, 'joinRequests')), (snapshot) => {
-        setJoinRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest)));
+        const reqs: JoinRequest[] = [];
+        snapshot.forEach(d => {
+            const data = d.data();
+            reqs.push({
+                id: d.id,
+                studentName: data.studentName,
+                studentPhotoURL: data.studentPhotoURL,
+                studentId: data.userId, // Use userId field from the document
+            });
+        });
+        setJoinRequests(reqs);
       });
       return () => unsubRequests();
     }
@@ -553,10 +564,11 @@ export default function ClassroomPage() {
             if (!studentRequestSnap.exists()) {
                 throw new Error("Join request not found.");
             }
-            const studentData = studentRequestSnap.data() as JoinRequest;
+            const requestData = studentRequestSnap.data();
+            const studentId = requestData.userId; // Assuming userId is stored in request
 
             const batch = writeBatch(db);
-            const enrollmentRef = doc(db, 'users', studentData.studentId, 'enrolled', classroomId);
+            const enrollmentRef = doc(db, 'users', studentId, 'enrolled', classroomId);
             batch.set(enrollmentRef, {
                 classroomId: classroomId,
                 title: classroom?.title,
@@ -565,10 +577,24 @@ export default function ClassroomPage() {
                 enrolledAt: serverTimestamp(),
             });
             batch.delete(requestRef);
+
+            // Also delete from the user's pending requests
+            const userPendingRequestRef = doc(db, `users/${studentId}/pendingJoinRequests`, classroomId);
+            batch.delete(userPendingRequestRef);
+
             await batch.commit();
 
         } else {
-            await deleteDoc(requestRef);
+            const studentRequestSnap = await getDoc(requestRef);
+             if (studentRequestSnap.exists()) {
+                const requestData = studentRequestSnap.data();
+                const studentId = requestData.userId;
+                const batch = writeBatch(db);
+                batch.delete(requestRef);
+                 const userPendingRequestRef = doc(db, `users/${studentId}/pendingJoinRequests`, classroomId);
+                batch.delete(userPendingRequestRef);
+                await batch.commit();
+            }
         }
         
         toast({ title: `Request ${approve ? 'Approved' : 'Denied'}`, description: `The student has been ${approve ? 'added to the class' : 'denied entry'}.` });
