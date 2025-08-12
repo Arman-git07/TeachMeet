@@ -292,10 +292,11 @@ export default function MeetingPage() {
            return;
         }
 
-        const participantData = requestDataSnap.data();
+        const { name, photoURL } = requestDataSnap.data();
 
         batch.set(participantRef, {
-            ...participantData,
+            name,
+            photoURL,
             isMicMuted: true,
             isCameraOff: true,
             isHandRaised: false,

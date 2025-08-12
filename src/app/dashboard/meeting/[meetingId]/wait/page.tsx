@@ -60,9 +60,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creatorId = docSnap.data().creatorId || null;
         setIsHost(user.uid === creatorId);
       } else {
-        // If the meeting document doesn't exist, this user must be the host,
-        // as only they can create it upon joining.
-        setIsHost(true);
+        setIsHost(false); // If doc doesn't exist, they can't be the host yet.
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -74,43 +72,40 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   // Effect 2: This is the critical listener for guests awaiting approval.
   useEffect(() => {
-    if (!user || !meetingId || isLoadingMeetingData || isHost) return;
+    if (!user || !meetingId || isLoadingMeetingData || isHost || joinStatus !== 'pending') return;
     
-    // Only proceed if the user is not the host and has sent a request.
-    if (joinStatus !== 'pending') return;
+    // Only guests who have sent a request should listen.
+    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
 
-    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-
-    const unsubscribe = onSnapshot(requestDocRef, async (requestSnap) => {
-        if (!requestSnap.exists()) {
-            // Wait a moment to allow the participant document to be created.
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
-            try {
-                const participantSnap = await getDoc(participantDocRef);
-                if (participantSnap.exists()) {
-                    setJoinStatus('approved');
-                    toast({ title: "Request Approved!", description: "You are now joining the meeting." });
-                    const joinNowLinkPath = topic
-                        ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
-                        : `/dashboard/meeting/${meetingId}`;
-                    router.push(joinNowLinkPath);
-                } else {
-                    setJoinStatus('denied');
-                }
-            } catch (error) {
-                console.error("Error checking for participant document after request deletion:", error);
-                setJoinStatus('denied');
-            }
+    const unsubscribe = onSnapshot(participantDocRef, (participantSnap) => {
+        if (participantSnap.exists()) {
+            setJoinStatus('approved');
+            toast({ title: "Request Approved!", description: "You are now joining the meeting." });
+            const joinNowLinkPath = topic
+                ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
+                : `/dashboard/meeting/${meetingId}`;
+            router.push(joinNowLinkPath);
         }
     }, (error) => {
-        console.error("Error listening to join request:", error);
-        toast({ variant: 'destructive', title: 'Connection Error', description: 'Lost connection while waiting for host.' });
-        setJoinStatus('denied');
+        console.error("Error listening to participant document:", error);
     });
 
-    return () => unsubscribe();
+    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+    const unsubscribeRequest = onSnapshot(requestDocRef, (requestSnap) => {
+        if (!requestSnap.exists() && joinStatus === 'pending') {
+            // Give a moment for the participant doc to appear before declaring denial
+            setTimeout(() => {
+                if (joinStatus === 'pending') { // Check again in case the other listener hasn't fired
+                    setJoinStatus('denied');
+                }
+            }, 1500);
+        }
+    });
+
+    return () => {
+        unsubscribe();
+        unsubscribeRequest();
+    };
   }, [user, meetingId, isHost, isLoadingMeetingData, joinStatus, router, topic, toast]);
 
 
@@ -282,12 +277,11 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     if (joinStatus === 'denied') {
       text = "Request Denied. Ask again?";
       disabled = !agreedToTerms;
-      const originalOnClick = handleJoinAction;
       return { 
         text, 
         disabled, 
         showSpinner: false, 
-        onClick: () => { setJoinStatus('idle'); originalOnClick(); }
+        onClick: handleJoinAction
       };
     }
     
