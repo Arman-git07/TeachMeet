@@ -284,16 +284,14 @@ export default function MeetingPage() {
     const participantRef = doc(db, "meetings", meetingId, "participants", request.id);
 
     try {
-        const batch = writeBatch(db);
         const requestDataSnap = await getDoc(requestDocRef);
-
         if (!requestDataSnap.exists()) {
            toast({ variant: "destructive", title: "Request Gone", description: "This request was already handled or withdrawn."});
            return;
         }
-
         const { name, photoURL } = requestDataSnap.data();
 
+        const batch = writeBatch(db);
         batch.set(participantRef, {
             name,
             photoURL,

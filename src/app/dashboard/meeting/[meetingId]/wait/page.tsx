@@ -90,22 +90,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         console.error("Error listening to participant document:", error);
     });
 
-    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-    const unsubscribeRequest = onSnapshot(requestDocRef, (requestSnap) => {
-        if (!requestSnap.exists() && joinStatus === 'pending') {
-            // Give a moment for the participant doc to appear before declaring denial
-            setTimeout(() => {
-                if (joinStatus === 'pending') { // Check again in case the other listener hasn't fired
-                    setJoinStatus('denied');
-                }
-            }, 1500);
-        }
-    });
-
-    return () => {
-        unsubscribe();
-        unsubscribeRequest();
-    };
+    return () => unsubscribe();
   }, [user, meetingId, isHost, isLoadingMeetingData, joinStatus, router, topic, toast]);
 
 
