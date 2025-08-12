@@ -69,7 +69,7 @@ type NavItemProps = {
   target?: string;
 };
 
-const NavItem = ({
+const NavItem = React.memo(({
   href,
   icon: Icon,
   children,
@@ -180,7 +180,8 @@ const NavItem = ({
          </SidebarMenuButton>
      </SidebarMenuItem>
   );
-};
+});
+NavItem.displayName = 'NavItem';
 
 
 export function AppSidebar() {
