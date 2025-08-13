@@ -58,6 +58,8 @@ import {
   Calendar as CalendarIcon,
   Edit,
   FileUp,
+  HelpCircle,
+  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -112,6 +114,14 @@ interface Assignment {
   fileURL?: string;
   fileName?: string;
   createdAt: { seconds: number };
+}
+
+interface SubjectTeacher {
+  id: string; // Corresponds to the userId of the teacher
+  name: string;
+  photoURL?: string;
+  subject: string;
+  timings: string;
 }
 
 
@@ -460,6 +470,7 @@ export default function ClassroomPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [audioAttachment, setAudioAttachment] = useState<Blob | null>(null);
   const [isPosting, setIsPosting] = useState(false);
@@ -525,12 +536,17 @@ export default function ClassroomPage() {
     const unsubAssignments = onSnapshot(query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('createdAt', 'desc')), (snapshot) => {
         setAssignments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Assignment)));
     });
+    
+    const unsubTeachers = onSnapshot(query(collection(db, 'classrooms', classroomId, 'teachers'), orderBy('name')), (snapshot) => {
+        setSubjectTeachers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SubjectTeacher)));
+    });
 
     return () => { 
         unsubClassroom();
         unsubAnnouncements();
         unsubMaterials();
         unsubAssignments();
+        unsubTeachers();
      };
   }, [classroomId, router, toast]);
   
@@ -706,7 +722,7 @@ export default function ClassroomPage() {
     { value: "announcements", label: "Announcements", icon: Bell },
     { value: "materials", label: "Materials", icon: Book },
     { value: "assignments", label: "Assignments", icon: ClipboardList },
-    { value: "subjects", label: "Subjects", icon: GraduationCap },
+    { value: "teachers", label: "Teachers", icon: Users },
     { value: "exams", label: "Exams", icon: FileText },
     { value: "fees", label: "Fees", icon: CreditCard },
     { value: "chat", label: "Chat", icon: MessageSquare },
@@ -747,22 +763,22 @@ export default function ClassroomPage() {
         )}
         
         <Tabs defaultValue="announcements" className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6 mt-4">
-           <TabsList className="flex-col h-auto items-start gap-2 bg-transparent p-0 w-full">
-              {tabItems.map(({ value, label, icon: Icon }) => (
-                  <TabsTrigger 
-                    key={value}
-                    value={value} 
-                    className={cn(
-                      "w-full justify-start text-base py-3 px-4 rounded-lg",
-                      "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
-                      "hover:bg-muted"
-                    )}
-                  >
-                    <Icon className="mr-3 h-5 w-5" />
-                    {label}
-                  </TabsTrigger>
-              ))}
-            </TabsList>
+          <TabsList className="flex-col h-auto items-start gap-2 bg-transparent p-0 w-full">
+            {tabItems.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger 
+                key={value}
+                value={value} 
+                className={cn(
+                  "w-full justify-start text-base py-3 px-4 rounded-lg",
+                  "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
+                  "hover:bg-muted"
+                )}
+              >
+                <Icon className="mr-3 h-5 w-5" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
           
           <div className="md:col-start-2">
               <TabsContent value="announcements" className="mt-0">
@@ -982,15 +998,47 @@ export default function ClassroomPage() {
                 )}
               </TabsContent>
 
-              <TabsContent value="subjects" className="mt-0">
+              <TabsContent value="teachers" className="mt-0">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Subjects</CardTitle>
-                        <CardDescription>Overview of subjects covered in this classroom.</CardDescription>
+                        <CardTitle>Subject Teachers</CardTitle>
+                        <CardDescription>Contact your teachers for questions and support.</CardDescription>
                     </CardHeader>
-                    <CardContent className="text-center text-muted-foreground py-12">
-                        <GraduationCap className="h-12 w-12 mx-auto mb-2" />
-                        <p>No subjects listed yet.</p>
+                    <CardContent>
+                        {subjectTeachers.length > 0 ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {subjectTeachers.map(teacher => (
+                                    <Card key={teacher.id} className="shadow-md">
+                                      <CardHeader className="flex flex-row items-start gap-4">
+                                          <Avatar className="h-12 w-12 mt-1">
+                                              <AvatarImage src={teacher.photoURL} data-ai-hint="avatar teacher"/>
+                                              <AvatarFallback>{teacher.name.charAt(0)}</AvatarFallback>
+                                          </Avatar>
+                                          <div className="flex-grow">
+                                            <CardTitle className="text-lg">{teacher.name}</CardTitle>
+                                            <CardDescription>{teacher.subject}</CardDescription>
+                                          </div>
+                                      </CardHeader>
+                                      <CardContent>
+                                          <div className="flex items-center text-sm text-muted-foreground">
+                                            <Clock className="h-4 w-4 mr-2" />
+                                            <span>{teacher.timings || "Not specified"}</span>
+                                          </div>
+                                      </CardContent>
+                                      <CardFooter>
+                                        <Button className="w-full btn-gel">
+                                          <HelpCircle className="mr-2 h-4 w-4" /> Ask a Question
+                                        </Button>
+                                      </CardFooter>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center text-muted-foreground py-12">
+                                <Users className="h-12 w-12 mx-auto mb-2" />
+                                <p>No subject teachers have been assigned to this class yet.</p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
               </TabsContent>
