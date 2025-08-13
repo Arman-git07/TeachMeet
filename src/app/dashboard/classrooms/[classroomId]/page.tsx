@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject as deleteFile } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject as deleteFile, getBlob } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,7 @@ import {
   FileUp,
   HelpCircle,
   Clock,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -67,6 +68,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
+import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
 
 
 interface Classroom {
@@ -142,6 +144,21 @@ interface ChatMessage {
   senderName: string;
   senderPhotoURL?: string;
   createdAt: { seconds: number };
+}
+
+// --- New Interfaces for Assignment Submissions & Grading ---
+interface AssignmentSubmission {
+    id: string; // studentId
+    studentName: string;
+    studentPhotoURL?: string;
+    submittedAt: { seconds: number };
+    fileURL: string;
+    fileName: string;
+    grade?: {
+        score: number;
+        feedback: string;
+        gradedAt: { seconds: number };
+    }
 }
 
 
@@ -645,6 +662,9 @@ export default function ClassroomPage() {
   const [newChatMessage, setNewChatMessage] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const chatScrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
+  const [isCheckingAI, setIsCheckingAI] = useState<string | null>(null);
   
   const isTeacher = user?.uid === classroom?.teacherId;
 
@@ -725,6 +745,20 @@ export default function ClassroomPage() {
         unsubChat();
      };
   }, [classroomId, router, toast]);
+
+  useEffect(() => {
+    if (selectedAssignment) {
+        const subCollectionRef = collection(db, `classrooms/${classroomId}/assignments/${selectedAssignment.id}/submissions`);
+        const q = query(subCollectionRef, orderBy('submittedAt', 'desc'));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedSubmissions = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AssignmentSubmission));
+            setSubmissions(fetchedSubmissions);
+        });
+
+        return () => unsubscribe();
+    }
+  }, [selectedAssignment, classroomId]);
   
   useEffect(() => {
     if (chatScrollAreaRef.current) {
@@ -914,6 +948,85 @@ export default function ClassroomPage() {
         toast({ variant: 'destructive', title: 'Send Failed', description: 'Could not send your message.' });
     } finally {
         setIsSendingMessage(false);
+    }
+  };
+
+  const handleAssignmentSubmit = async (file: File) => {
+    if (!user || !selectedAssignment) return;
+
+    const toastId = `upload-${Date.now()}`;
+    toast({ id: toastId, title: "Submitting Assignment...", duration: Infinity });
+
+    try {
+        const submissionPath = `classrooms/${classroomId}/assignments/${selectedAssignment.id}/submissions/${user.uid}/${file.name}`;
+        const submissionRef = storageRef(storage, submissionPath);
+        const snapshot = await uploadBytes(submissionRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${selectedAssignment.id}/submissions`, user.uid);
+        await setDoc(submissionDocRef, {
+            studentName: user.displayName,
+            studentPhotoURL: user.photoURL,
+            submittedAt: serverTimestamp(),
+            fileURL: downloadURL,
+            fileName: file.name,
+        });
+
+        toast({ id: toastId, title: "Assignment Submitted!", description: "Your submission has been received." });
+    } catch (error) {
+        console.error("Error submitting assignment:", error);
+        toast({ id: toastId, variant: 'destructive', title: "Submission Failed", description: "Could not submit your assignment." });
+    }
+  };
+  
+  const blobToDataURI = (blob: Blob): Promise<string> => {
+      return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target?.result as string);
+          reader.onerror = e => reject(e);
+          reader.readAsDataURL(blob);
+      });
+  };
+
+  const handleAutoCheck = async (submission: AssignmentSubmission) => {
+    if (!selectedAssignment || !selectedAssignment.fileURL) {
+      toast({ variant: 'destructive', title: 'Missing Key', description: "Teacher's assignment file is missing." });
+      return;
+    }
+    
+    setIsCheckingAI(submission.id);
+    const toastId = `check-${submission.id}`;
+    toast({ id: toastId, title: "AI Check Started", description: `Grading ${submission.studentName}'s assignment...`, duration: Infinity });
+
+    try {
+        const teacherFileRef = storageRef(storage, selectedAssignment.fileURL);
+        const studentFileRef = storageRef(storage, submission.fileURL);
+
+        const [teacherBlob, studentBlob] = await Promise.all([getBlob(teacherFileRef), getBlob(studentFileRef)]);
+        
+        const [teacherAssignmentDataUri, studentSubmissionDataUri] = await Promise.all([
+            blobToDataURI(teacherBlob),
+            blobToDataURI(studentBlob)
+        ]);
+        
+        const result = await gradeAssignment({ teacherAssignmentDataUri, studentSubmissionDataUri });
+
+        const submissionDocRef = doc(db, `classrooms/${classroomId}/assignments/${selectedAssignment.id}/submissions`, submission.id);
+        await updateDoc(submissionDocRef, {
+            grade: {
+                score: result.score,
+                feedback: result.feedback,
+                gradedAt: serverTimestamp()
+            }
+        });
+
+        toast({ id: toastId, title: "Grading Complete!", description: `${submission.studentName} scored ${result.score}/100.` });
+
+    } catch (error) {
+        console.error("AI Grading error:", error);
+        toast({ id: toastId, variant: 'destructive', title: 'AI Check Failed', description: error instanceof Error ? error.message : "An unknown error occurred." });
+    } finally {
+        setIsCheckingAI(null);
     }
   };
 
@@ -1157,23 +1270,47 @@ export default function ClassroomPage() {
                              )}
 
                             <div className="border-t pt-4">
-                                <h3 className="font-semibold text-lg mb-2">{isTeacher ? "Student Submissions" : "Your Submission"}</h3>
-                                 <Card className="bg-muted/50 p-6 text-center">
-                                    {isTeacher ? (
-                                        <div>
-                                            <p>Student answers will appear here once submitted.</p>
-                                            <p className="text-xs text-muted-foreground mt-1">This feature is under development.</p>
+                                <h3 className="font-semibold text-lg mb-4">{isTeacher ? "Student Submissions" : "Your Submission"}</h3>
+                                 {isTeacher ? (
+                                    submissions.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {submissions.map(sub => (
+                                                <Card key={sub.id} className="p-3">
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar><AvatarImage src={sub.studentPhotoURL} data-ai-hint="avatar student"/><AvatarFallback>{sub.studentName.charAt(0)}</AvatarFallback></Avatar>
+                                                            <div>
+                                                                <p className="font-medium">{sub.studentName}</p>
+                                                                <p className="text-xs text-muted-foreground">Submitted: {formatDistanceToNow(new Date(sub.submittedAt.seconds * 1000), {addSuffix: true})}</p>
+                                                                <a href={sub.fileURL} target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:underline">View Submission</a>
+                                                            </div>
+                                                        </div>
+                                                        <Button size="sm" variant="outline" onClick={() => handleAutoCheck(sub)} disabled={isCheckingAI !== null}>
+                                                            {isCheckingAI === sub.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4"/>}
+                                                            {isCheckingAI === sub.id ? 'Checking...':'Auto-Check'}
+                                                        </Button>
+                                                    </div>
+                                                    {sub.grade && (
+                                                        <Card className="mt-3 bg-muted/50">
+                                                            <CardHeader className="flex flex-row items-center justify-between p-3">
+                                                                <CardTitle className="text-base">AI Grade: {sub.grade.score}/100</CardTitle>
+                                                                <CardDescription className="text-xs">Graded: {formatDistanceToNow(new Date(sub.grade.gradedAt.seconds * 1000), {addSuffix: true})}</CardDescription>
+                                                            </CardHeader>
+                                                            <CardContent className="p-3 pt-0">
+                                                                <p className="text-sm whitespace-pre-wrap">{sub.grade.feedback}</p>
+                                                            </CardContent>
+                                                        </Card>
+                                                    )}
+                                                </Card>
+                                            ))}
                                         </div>
-                                    ) : (
-                                        <div>
-                                            <p className="mb-4">Upload your answer sheet or type your response below.</p>
-                                            <div className="flex justify-center gap-4">
-                                                <Button><FileUp className="mr-2 h-4 w-4"/> Upload Answer</Button>
-                                                <Button variant="outline">Type Answer</Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                 </Card>
+                                    ) : <p className="text-sm text-muted-foreground text-center py-6">No submissions yet.</p>
+                                 ) : (
+                                    <div className="text-center">
+                                        <p className="mb-4">Upload your answer sheet for this assignment.</p>
+                                        <Input type="file" onChange={e => { if (e.target.files?.[0]) handleAssignmentSubmit(e.target.files[0]) }} className="max-w-xs mx-auto"/>
+                                    </div>
+                                 )}
                             </div>
                         </CardContent>
                     </Card>
