@@ -125,6 +125,15 @@ interface SubjectTeacher {
   timings: string;
 }
 
+interface ChatMessage {
+  id: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  senderPhotoURL?: string;
+  createdAt: { seconds: number };
+}
+
 
 const AudioRecordingDialog = React.memo(({ onAudioRecorded }: { onAudioRecorded: (blob: Blob) => void }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -488,6 +497,8 @@ export default function ClassroomPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [audioAttachment, setAudioAttachment] = useState<Blob | null>(null);
   const [isPosting, setIsPosting] = useState(false);
@@ -496,6 +507,10 @@ export default function ClassroomPage() {
   const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+
+  const [newChatMessage, setNewChatMessage] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const chatScrollAreaRef = useRef<HTMLDivElement>(null);
   
   const isTeacher = user?.uid === classroom?.teacherId;
 
@@ -558,15 +573,29 @@ export default function ClassroomPage() {
         setSubjectTeachers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SubjectTeacher)));
     });
 
+    const unsubChat = onSnapshot(query(collection(db, 'classrooms', classroomId, 'chat'), orderBy('createdAt', 'asc')), (snapshot) => {
+        setChatMessages(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage)));
+    });
+
     return () => { 
         unsubClassroom();
         unsubAnnouncements();
         unsubMaterials();
         unsubExams();
         unsubTeachers();
+        unsubChat();
      };
   }, [classroomId, router, toast]);
   
+  useEffect(() => {
+    if (chatScrollAreaRef.current) {
+        const viewport = chatScrollAreaRef.current.children[1] as HTMLDivElement;
+        if(viewport) {
+           viewport.scrollTop = viewport.scrollHeight;
+        }
+    }
+  }, [chatMessages]);
+
   useEffect(() => {
     if (isTeacher && classroomId) {
       const unsubRequests = onSnapshot(query(collection(db, 'classrooms', classroomId, 'joinRequests')), (snapshot) => {
@@ -705,6 +734,27 @@ export default function ClassroomPage() {
     } catch (error) {
       console.error("Error deleting exam:", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the exam.' });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newChatMessage.trim() || !user) return;
+
+    setIsSendingMessage(true);
+    try {
+        await addDoc(collection(db, `classrooms/${classroomId}/chat`), {
+            text: newChatMessage.trim(),
+            senderId: user.uid,
+            senderName: user.displayName || 'Anonymous',
+            senderPhotoURL: user.photoURL,
+            createdAt: serverTimestamp(),
+        });
+        setNewChatMessage('');
+    } catch (error) {
+        console.error("Error sending chat message:", error);
+        toast({ variant: 'destructive', title: 'Send Failed', description: 'Could not send your message.' });
+    } finally {
+        setIsSendingMessage(false);
     }
   };
 
@@ -1093,19 +1143,68 @@ export default function ClassroomPage() {
               </TabsContent>
 
                <TabsContent value="chat" className="mt-0">
-                <Card className="h-[400px] flex flex-col">
+                <Card className="h-[600px] flex flex-col">
                     <CardHeader>
                         <CardTitle>Class Chat</CardTitle>
                         <CardDescription>Discuss topics with your classmates and teacher.</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex-grow flex items-center justify-center text-center text-muted-foreground">
-                         <div>
-                            <MessageSquare className="h-12 w-12 mx-auto mb-2" />
-                            <p>Chat feature is coming soon!</p>
-                         </div>
+                    <CardContent className="flex-grow p-0 overflow-hidden">
+                        <ScrollArea className="h-full" ref={chatScrollAreaRef}>
+                            <div className="p-4 space-y-4">
+                                {chatMessages.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground pt-16">
+                                      <MessageSquare className="w-16 h-16 mb-4" />
+                                      <p className="text-lg">No messages yet.</p>
+                                      <p>Be the first to say hello!</p>
+                                    </div>
+                                ) : (
+                                    chatMessages.map(msg => (
+                                        <div key={msg.id} className={cn("flex items-end gap-2", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
+                                          {msg.senderId !== user?.uid && (
+                                              <Avatar className="h-8 w-8 self-start">
+                                                  <AvatarImage src={msg.senderPhotoURL} data-ai-hint="avatar user"/>
+                                                  <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                                              </Avatar>
+                                          )}
+                                          <div className={cn(
+                                              "max-w-[70%] p-3 rounded-xl shadow",
+                                              msg.senderId === user?.uid
+                                              ? "bg-primary text-primary-foreground rounded-br-none"
+                                              : "bg-card text-card-foreground rounded-bl-none"
+                                          )}>
+                                              {msg.senderId !== user?.uid && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                                              <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                              <p className="text-xs opacity-70 mt-1 text-right">{msg.createdAt ? formatDistanceToNow(new Date(msg.createdAt.seconds * 1000), { addSuffix: true }) : 'sending...'}</p>
+                                          </div>
+                                           {msg.senderId === user?.uid && (
+                                              <Avatar className="h-8 w-8 self-start">
+                                                  <AvatarImage src={user?.photoURL ?? ''} data-ai-hint="avatar user"/>
+                                                  <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+                                              </Avatar>
+                                          )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </ScrollArea>
                     </CardContent>
-                    <CardFooter>
-                        <Button className="w-full" disabled>Open Chat (Unavailable)</Button>
+                    <CardFooter className="p-4 border-t bg-background">
+                        <form
+                            onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                            className="flex w-full items-center gap-2"
+                        >
+                            <Input
+                                value={newChatMessage}
+                                onChange={(e) => setNewChatMessage(e.target.value)}
+                                placeholder="Type your message..."
+                                className="flex-grow rounded-lg text-base"
+                                disabled={isSendingMessage}
+                            />
+                            <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={isSendingMessage || !newChatMessage.trim()}>
+                                {isSendingMessage ? <Loader2 className="h-5 w-5 animate-spin"/> : <Send className="h-5 w-5" />}
+                                <span className="sr-only">Send message</span>
+                            </Button>
+                        </form>
                     </CardFooter>
                 </Card>
               </TabsContent>
