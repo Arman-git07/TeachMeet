@@ -198,7 +198,7 @@ const PaymentDialog = () => {
             </div>
             <DialogFooter className="text-xs text-muted-foreground text-center">
                  <p>
-                    Please note: A 2% convenience fee (Developer Share: UPI ID 07arman2004-1@oksbi) is included in the payment amount. This is a UI mockup; no real transaction will occur.
+                    Please note: A 2% convenience fee is included in the payment amount to support the developer. This is a UI mockup; no real transaction will occur.
                 </p>
             </DialogFooter>
         </DialogContent>
