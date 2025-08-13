@@ -183,6 +183,10 @@ const PaymentDialog = () => {
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Google Pay')}>
+                    <Wallet className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">Google Pay</span>
+                </Button>
                 <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('PhonePe')}>
                     <Wallet className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">PhonePe</span>
@@ -190,6 +194,10 @@ const PaymentDialog = () => {
                 <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Paytm')}>
                     <Wallet className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">Paytm</span>
+                </Button>
+                 <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('UPI')}>
+                    <Wallet className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">UPI</span>
                 </Button>
                 <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Net Banking')}>
                     <Landmark className="mr-4 h-6 w-6 text-primary" />
