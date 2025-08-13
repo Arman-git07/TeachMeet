@@ -105,11 +105,12 @@ interface Material {
   createdAt: { seconds: number };
 }
 
-interface Assignment {
+interface Exam {
   id: string;
   title: string;
   description: string;
-  dueDate: { seconds: number };
+  startDate: { seconds: number };
+  endDate: { seconds: number };
   status: 'draft' | 'published';
   fileURL?: string;
   fileName?: string;
@@ -330,28 +331,31 @@ const AddMaterialDialog = React.memo(({ teachingId, onMaterialAdded }: { teachin
 });
 AddMaterialDialog.displayName = 'AddMaterialDialog';
 
-const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignmentToEdit }: { classroomId: string; onAssignmentAction: () => void, assignmentToEdit: Assignment | null }) => {
+const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { classroomId: string; onExamAction: () => void, examToEdit: Exam | null }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+    const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+    const [endDate, setEndDate] = useState<Date | undefined>(undefined);
     const [file, setFile] = useState<File | null>(null);
     const [isPublished, setIsPublished] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
-        if (assignmentToEdit) {
-            setTitle(assignmentToEdit.title);
-            setDescription(assignmentToEdit.description);
-            setDueDate(new Date(assignmentToEdit.dueDate.seconds * 1000));
-            setIsPublished(assignmentToEdit.status === 'published');
+        if (examToEdit) {
+            setTitle(examToEdit.title);
+            setDescription(examToEdit.description);
+            setStartDate(new Date(examToEdit.startDate.seconds * 1000));
+            setEndDate(new Date(examToEdit.endDate.seconds * 1000));
+            setIsPublished(examToEdit.status === 'published');
         } else {
             setTitle('');
             setDescription('');
-            setDueDate(undefined);
+            setStartDate(undefined);
+            setEndDate(undefined);
             setIsPublished(false);
         }
-    }, [assignmentToEdit]);
+    }, [examToEdit]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -360,48 +364,49 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
     };
 
     const handleSubmit = async () => {
-        if (!title.trim() || !dueDate) {
-            toast({ variant: 'destructive', title: 'Missing Fields', description: 'Title and due date are required.' });
+        if (!title.trim() || !startDate || !endDate) {
+            toast({ variant: 'destructive', title: 'Missing Fields', description: 'Title, start date, and end date are required.' });
             return;
         }
 
         setIsLoading(true);
         try {
-            let fileURL: string | undefined = assignmentToEdit?.fileURL;
-            let fileName: string | undefined = assignmentToEdit?.fileName;
+            let fileURL: string | undefined = examToEdit?.fileURL;
+            let fileName: string | undefined = examToEdit?.fileName;
 
             if (file) {
-                const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${Date.now()}-${file.name}`);
+                const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${file.name}`);
                 const snapshot = await uploadBytes(fileRef, file);
                 fileURL = await getDownloadURL(snapshot.ref);
                 fileName = file.name;
             }
 
-            const assignmentData = {
+            const examData = {
                 title: title.trim(),
                 description: description.trim(),
-                dueDate,
+                startDate,
+                endDate,
                 status: isPublished ? 'published' : 'draft',
                 fileURL,
                 fileName,
             };
 
-            if (assignmentToEdit) {
-                const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentToEdit.id);
-                await updateDoc(assignmentRef, assignmentData);
-                toast({ title: 'Assignment Updated', description: `"${title.trim()}" has been updated.` });
+            if (examToEdit) {
+                const examRef = doc(db, 'classrooms', classroomId, 'exams', examToEdit.id);
+                await updateDoc(examRef, examData);
+                toast({ title: 'Exam Updated', description: `"${title.trim()}" has been updated.` });
             } else {
-                await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), {
-                    ...assignmentData,
+                await addDoc(collection(db, 'classrooms', classroomId, 'exams'), {
+                    ...examData,
                     createdAt: serverTimestamp(),
                 });
-                toast({ title: 'Assignment Created', description: `"${title.trim()}" has been created as a ${isPublished ? 'published' : 'draft'} assignment.` });
+                toast({ title: 'Exam Created', description: `"${title.trim()}" has been created as a ${isPublished ? 'published' : 'draft'} exam.` });
             }
-            onAssignmentAction();
+            onExamAction();
 
         } catch (error) {
-            console.error('Error saving assignment:', error);
-            toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the assignment.' });
+            console.error('Error saving exam:', error);
+            toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the exam.' });
         } finally {
             setIsLoading(false);
         }
@@ -410,28 +415,40 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
     return (
         <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-                <DialogTitle>{assignmentToEdit ? 'Edit Assignment' : 'Create New Assignment'}</DialogTitle>
-                <DialogDescription>{assignmentToEdit ? 'Update details for this assignment.' : 'Fill out the details for the new assignment.'}</DialogDescription>
+                <DialogTitle>{examToEdit ? 'Edit Exam' : 'Create New Exam'}</DialogTitle>
+                <DialogDescription>{examToEdit ? 'Update details for this exam.' : 'Fill out the details for the new exam.'}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="title" className="text-right">Title</Label>
-                    <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., Essay on Photosynthesis"/>
+                    <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., Mid-Term Exam"/>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="description" className="text-right">Description</Label>
                     <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="(Optional) Instructions or details"/>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Due Date</Label>
+                    <Label className="text-right">Start Date</Label>
                     <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !dueDate && "text-muted-foreground")}>
+                            <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                                {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus /></PopoverContent>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                    </Popover>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">End Date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
                     </Popover>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -439,7 +456,7 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
                     <Input id="file" type="file" onChange={handleFileChange} className="col-span-3"/>
                 </div>
                  {file && <p className="col-span-4 text-sm text-muted-foreground text-center">Attaching: {file.name}</p>}
-                {assignmentToEdit && assignmentToEdit.fileName && !file && <p className="col-span-4 text-sm text-muted-foreground text-center">Current file: {assignmentToEdit.fileName}</p>}
+                {examToEdit && examToEdit.fileName && !file && <p className="col-span-4 text-sm text-muted-foreground text-center">Current file: {examToEdit.fileName}</p>}
                 <div className="flex items-center justify-end space-x-2 pt-4 border-t">
                     <Label htmlFor="publish-switch">Publish to Students</Label>
                     <Switch id="publish-switch" checked={isPublished} onCheckedChange={setIsPublished}/>
@@ -448,13 +465,13 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
             <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                 <Button onClick={handleSubmit} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : assignmentToEdit ? "Save Changes" : "Create"}
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : examToEdit ? "Save Changes" : "Create"}
                 </Button>
             </DialogFooter>
         </DialogContent>
     );
 });
-AssignmentDialog.displayName = 'AssignmentDialog';
+ExamDialog.displayName = 'ExamDialog';
 
 
 export default function ClassroomPage() {
@@ -469,16 +486,16 @@ export default function ClassroomPage() {
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [audioAttachment, setAudioAttachment] = useState<Blob | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
-  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   
   const isTeacher = user?.uid === classroom?.teacherId;
 
@@ -533,8 +550,8 @@ export default function ClassroomPage() {
         setMaterials(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Material)));
     });
 
-    const unsubAssignments = onSnapshot(query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('createdAt', 'desc')), (snapshot) => {
-        setAssignments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Assignment)));
+    const unsubExams = onSnapshot(query(collection(db, 'classrooms', classroomId, 'exams'), orderBy('createdAt', 'desc')), (snapshot) => {
+        setExams(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Exam)));
     });
     
     const unsubTeachers = onSnapshot(query(collection(db, 'classrooms', classroomId, 'teachers'), orderBy('name')), (snapshot) => {
@@ -545,7 +562,7 @@ export default function ClassroomPage() {
         unsubClassroom();
         unsubAnnouncements();
         unsubMaterials();
-        unsubAssignments();
+        unsubExams();
         unsubTeachers();
      };
   }, [classroomId, router, toast]);
@@ -671,23 +688,23 @@ export default function ClassroomPage() {
     }
   };
 
-  const handleOpenAssignmentDialog = (assignment: Assignment | null) => {
-    setEditingAssignment(assignment);
-    setIsAssignmentDialogOpen(true);
+  const handleOpenExamDialog = (exam: Exam | null) => {
+    setEditingExam(exam);
+    setIsExamDialogOpen(true);
   };
   
-  const handleDeleteAssignment = async (assignment: Assignment) => {
+  const handleDeleteExam = async (exam: Exam) => {
     if (!isTeacher) return;
     try {
-      await deleteDoc(doc(db, 'classrooms', classroomId, 'assignments', assignment.id));
-      if (assignment.fileURL) {
-        const fileRef = storageRef(storage, assignment.fileURL);
-        await deleteFile(fileRef).catch(err => console.warn("Could not delete assignment file, it might not exist:", err));
+      await deleteDoc(doc(db, 'classrooms', classroomId, 'exams', exam.id));
+      if (exam.fileURL) {
+        const fileRef = storageRef(storage, exam.fileURL);
+        await deleteFile(fileRef).catch(err => console.warn("Could not delete exam file, it might not exist:", err));
       }
-      toast({ title: 'Assignment Deleted', description: `"${assignment.title}" has been removed.` });
+      toast({ title: 'Exam Deleted', description: `"${exam.title}" has been removed.` });
     } catch (error) {
-      console.error("Error deleting assignment:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the assignment.' });
+      console.error("Error deleting exam:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the exam.' });
     }
   };
 
@@ -721,14 +738,13 @@ export default function ClassroomPage() {
   const tabItems = [
     { value: "announcements", label: "Announcements", icon: Bell },
     { value: "materials", label: "Materials", icon: Book },
-    { value: "assignments", label: "Assignments", icon: ClipboardList },
-    { value: "teachers", label: "Teachers", icon: Users },
     { value: "exams", label: "Exams", icon: FileText },
+    { value: "teachers", label: "Teachers", icon: Users },
     { value: "fees", label: "Fees", icon: CreditCard },
     { value: "chat", label: "Chat", icon: MessageSquare },
   ];
   
-  const displayedAssignments = isTeacher ? assignments : assignments.filter(a => a.status === 'published');
+  const displayedExams = isTeacher ? exams : exams.filter(a => a.status === 'published');
 
 
   return (
@@ -909,36 +925,42 @@ export default function ClassroomPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="assignments" className="mt-0">
-                {selectedAssignment ? (
+              <TabsContent value="exams" className="mt-0">
+                {selectedExam ? (
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <Button variant="ghost" size="sm" onClick={() => setSelectedAssignment(null)} className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4"/> Back to list</Button>
-                                    <CardTitle className="mt-2">{selectedAssignment.title}</CardTitle>
-                                    <CardDescription>Due: {format(new Date(selectedAssignment.dueDate.seconds * 1000), "PPP")}</CardDescription>
+                                    <Button variant="ghost" size="sm" onClick={() => setSelectedExam(null)} className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4"/> Back to list</Button>
+                                    <CardTitle className="mt-2">{selectedExam.title}</CardTitle>
+                                    <CardDescription>Due: {format(new Date(selectedExam.endDate.seconds * 1000), "PPP")}</CardDescription>
                                 </div>
                                 {isTeacher && (
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenAssignmentDialog(selectedAssignment)}><Edit className="mr-2 h-4 w-4"/> Edit</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenExamDialog(selectedExam)}><Edit className="mr-2 h-4 w-4"/> Edit</Button>
                                 )}
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {selectedAssignment.description && <p className="mb-4 text-sm whitespace-pre-wrap">{selectedAssignment.description}</p>}
-                             {selectedAssignment.fileURL && (
-                                <Button asChild variant="secondary" className="mb-6"><a href={selectedAssignment.fileURL} target="_blank" rel="noopener noreferrer"><Download className="mr-2 h-4 w-4"/>Download Assignment File</a></Button>
+                            {selectedExam.description && <p className="mb-4 text-sm whitespace-pre-wrap">{selectedExam.description}</p>}
+                             {selectedExam.fileURL && (
+                                <Button asChild variant="secondary" className="mb-6"><a href={selectedExam.fileURL} target="_blank" rel="noopener noreferrer"><Download className="mr-2 h-4 w-4"/>Download Question Paper</a></Button>
                              )}
 
                             <div className="border-t pt-4">
-                                <h3 className="font-semibold text-lg mb-2">{isTeacher ? "Student Submissions" : "Your Submission"}</h3>
+                                <h3 className="font-semibold text-lg mb-2">{isTeacher ? "Student Submissions" : "Your Answer"}</h3>
                                  <Card className="bg-muted/50 p-6 text-center">
                                     {isTeacher ? (
-                                        <p>Submissions will appear here.</p>
+                                        <div>
+                                            <p>Student answers will appear here once submitted.</p>
+                                            <p className="text-xs text-muted-foreground mt-1">This feature is under development.</p>
+                                        </div>
                                     ) : (
                                         <div>
-                                            <p className="mb-4">You have not submitted this assignment yet.</p>
-                                            <Button><FileUp className="mr-2 h-4 w-4"/> Upload Your Work</Button>
+                                            <p className="mb-4">Upload your answer sheet or type your response below.</p>
+                                            <div className="flex justify-center gap-4">
+                                                <Button><FileUp className="mr-2 h-4 w-4"/> Upload Answer</Button>
+                                                <Button variant="outline">Type Answer</Button>
+                                            </div>
                                         </div>
                                     )}
                                  </Card>
@@ -949,37 +971,37 @@ export default function ClassroomPage() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <CardTitle>Assignments</CardTitle>
-                                <CardDescription>View upcoming and past assignments.</CardDescription>
+                                <CardTitle>Exams</CardTitle>
+                                <CardDescription>View upcoming and past exams.</CardDescription>
                             </div>
                             {isTeacher && (
-                                <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+                                <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button onClick={() => handleOpenAssignmentDialog(null)}><PlusCircle className="mr-2 h-4 w-4"/>New Assignment</Button>
+                                        <Button onClick={() => handleOpenExamDialog(null)}><PlusCircle className="mr-2 h-4 w-4"/>New Exam</Button>
                                     </DialogTrigger>
-                                    <AssignmentDialog classroomId={classroomId} onAssignmentAction={() => setIsAssignmentDialogOpen(false)} assignmentToEdit={editingAssignment} />
+                                    <ExamDialog classroomId={classroomId} onExamAction={() => setIsExamDialogOpen(false)} examToEdit={editingExam} />
                                 </Dialog>
                             )}
                         </CardHeader>
                         <CardContent>
-                            {displayedAssignments.length > 0 ? (
+                            {displayedExams.length > 0 ? (
                                 <div className="space-y-2">
-                                    {displayedAssignments.map(assignment => (
-                                        <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted group">
+                                    {displayedExams.map(exam => (
+                                        <div key={exam.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted group">
                                             <div className="flex items-center gap-3">
-                                                <ClipboardList className="h-5 w-5 text-primary" />
+                                                <FileText className="h-5 w-5 text-primary" />
                                                 <div>
-                                                    <a onClick={() => setSelectedAssignment(assignment)} className="font-medium text-foreground cursor-pointer hover:underline">{assignment.title}</a>
+                                                    <a onClick={() => setSelectedExam(exam)} className="font-medium text-foreground cursor-pointer hover:underline">{exam.title}</a>
                                                     <p className="text-xs text-muted-foreground">
-                                                        Due on {format(new Date(assignment.dueDate.seconds * 1000), 'MMM d, yyyy')}
-                                                        {isTeacher && <span className={cn("ml-2 px-2 py-0.5 rounded-full text-xs", assignment.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>{assignment.status}</span>}
+                                                        Due by {format(new Date(exam.endDate.seconds * 1000), 'MMM d, yyyy')}
+                                                        {isTeacher && <span className={cn("ml-2 px-2 py-0.5 rounded-full text-xs", exam.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>{exam.status}</span>}
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                 <Button variant="secondary" size="sm" onClick={() => setSelectedAssignment(assignment)}>View</Button>
+                                                 <Button variant="secondary" size="sm" onClick={() => setSelectedExam(exam)}>View</Button>
                                                 {isTeacher && (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => handleDeleteAssignment(assignment)}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100" onClick={() => handleDeleteExam(exam)}>
                                                         <Trash2 className="h-4 w-4"/>
                                                     </Button>
                                                 )}
@@ -989,8 +1011,8 @@ export default function ClassroomPage() {
                                 </div>
                             ) : (
                                 <div className="text-center text-muted-foreground py-12">
-                                    <ClipboardList className="h-12 w-12 mx-auto mb-2" />
-                                    <p>No assignments posted yet.</p>
+                                    <FileText className="h-12 w-12 mx-auto mb-2" />
+                                    <p>No exams posted yet.</p>
                                 </div>
                             )}
                         </CardContent>
@@ -1043,19 +1065,6 @@ export default function ClassroomPage() {
                 </Card>
               </TabsContent>
               
-              <TabsContent value="exams" className="mt-0">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Exams</CardTitle>
-                        <CardDescription>Schedule and details for upcoming exams.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center text-muted-foreground py-12">
-                        <FileText className="h-12 w-12 mx-auto mb-2" />
-                        <p>No exams scheduled yet.</p>
-                    </CardContent>
-                </Card>
-              </TabsContent>
-
               <TabsContent value="fees" className="mt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card>
