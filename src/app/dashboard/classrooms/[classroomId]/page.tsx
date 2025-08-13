@@ -7,7 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, writeBatch, addDoc, serverTimestamp, orderBy, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject as deleteFile, getBlob } from 'firebase/storage';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
@@ -61,6 +61,9 @@ import {
   HelpCircle,
   Clock,
   Sparkles,
+  Banknote,
+  Landmark,
+  Wallet,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -161,6 +164,46 @@ interface AssignmentSubmission {
     }
 }
 
+const PaymentDialog = () => {
+    const { toast } = useToast();
+
+    const handlePaymentAction = (method: string) => {
+        toast({
+            title: "Payment Simulated",
+            description: `Payment initiated via ${method}. In a real app, this would redirect to a payment gateway.`,
+        });
+    };
+
+    return (
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Complete Your Payment</DialogTitle>
+                <DialogDescription>
+                    Choose your preferred payment method to pay the fees.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('UPI/Google Pay')}>
+                    <Wallet className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">UPI / Google Pay</span>
+                </Button>
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Net Banking')}>
+                    <Landmark className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">Net Banking</span>
+                </Button>
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Card')}>
+                    <CreditCard className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">Credit/Debit Card</span>
+                </Button>
+            </div>
+            <DialogFooter className="text-xs text-muted-foreground text-center">
+                 <p>
+                    Please note: A 2% convenience fee (Developer Share: UPI ID 07arman2004-1@oksbi) is included in the payment amount. This is a UI mockup; no real transaction will occur.
+                </p>
+            </DialogFooter>
+        </DialogContent>
+    );
+};
 
 const AudioRecordingDialog = React.memo(({ onAudioRecorded }: { onAudioRecorded: (blob: Blob) => void }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -1518,7 +1561,12 @@ export default function ClassroomPage() {
                                 <p className="font-bold text-3xl">$500.00</p>
                                 <p className="text-sm text-muted-foreground">Due by: Dec 31, 2024</p>
                             </div>
-                            <Button className="w-full btn-gel">Pay Now</Button>
+                             <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button className="w-full btn-gel">Pay Now</Button>
+                                </DialogTrigger>
+                                <PaymentDialog />
+                            </Dialog>
                         </CardContent>
                     </Card>
                     <Card>
