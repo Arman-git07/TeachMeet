@@ -72,6 +72,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface Classroom {
@@ -80,6 +81,8 @@ interface Classroom {
   description: string;
   teacherId: string;
   teacherName: string;
+  feeAmount?: number;
+  feeCurrency?: string;
 }
 
 interface JoinRequest {
@@ -163,6 +166,67 @@ interface AssignmentSubmission {
         gradedAt: { seconds: number };
     }
 }
+
+const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFeeUpdated: () => void }) => {
+    const { toast } = useToast();
+    const [amount, setAmount] = useState(classroom.feeAmount ?? 500);
+    const [currency, setCurrency] = useState(classroom.feeCurrency ?? 'USD');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSave = async () => {
+        setIsLoading(true);
+        try {
+            const classroomRef = doc(db, 'classrooms', classroom.id);
+            await updateDoc(classroomRef, {
+                feeAmount: Number(amount),
+                feeCurrency: currency,
+            });
+            toast({ title: "Fee Updated!", description: "The classroom fee has been successfully changed." });
+            onFeeUpdated();
+        } catch (error) {
+            console.error("Error updating fee:", error);
+            toast({ variant: 'destructive', title: "Update Failed", description: "Could not update the fee." });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Classroom Fee</DialogTitle>
+                <DialogDescription>Set the tuition fee and currency for this class.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-3 gap-4 py-4">
+                <div className="col-span-2 space-y-2">
+                    <Label htmlFor="fee-amount">Amount</Label>
+                    <Input id="fee-amount" type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="e.g., 500" />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="fee-currency">Currency</Label>
+                    <Select value={currency} onValueChange={setCurrency}>
+                      <SelectTrigger id="fee-currency"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                        <SelectItem value="INR">INR</SelectItem>
+                        <SelectItem value="CAD">CAD</SelectItem>
+                        <SelectItem value="AUD">AUD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                <Button onClick={handleSave} disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+};
 
 const PaymentDialog = () => {
     const { toast } = useToast();
@@ -765,6 +829,8 @@ export default function ClassroomPage() {
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [isCheckingAI, setIsCheckingAI] = useState<string | null>(null);
   
+  const [isEditFeeOpen, setIsEditFeeOpen] = useState(false);
+
   const isTeacher = user?.uid === classroom?.teacherId;
 
   useEffect(() => {
@@ -1167,7 +1233,11 @@ export default function ClassroomPage() {
   ];
   
   const displayedExams = isTeacher ? exams : exams.filter(a => a.status === 'published');
-
+  
+  const feeAmountFormatted = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: classroom.feeCurrency || 'USD',
+  }).format(classroom.feeAmount ?? 500);
 
   return (
     <div className="flex flex-col gap-4 pb-24 px-4 md:px-8">
@@ -1608,13 +1678,23 @@ export default function ClassroomPage() {
               <TabsContent value="fees" className="mt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5"/>Make a Payment</CardTitle>
-                            <CardDescription>Pay your tuition and other fees securely.</CardDescription>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div className="flex-grow">
+                                <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5"/>Make a Payment</CardTitle>
+                                <CardDescription>Pay your tuition and other fees securely.</CardDescription>
+                            </div>
+                            {isTeacher && (
+                                <Dialog open={isEditFeeOpen} onOpenChange={setIsEditFeeOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="icon"><Edit className="h-4 w-4" /></Button>
+                                    </DialogTrigger>
+                                    {classroom && <EditFeeDialog classroom={classroom} onFeeUpdated={() => setIsEditFeeOpen(false)} />}
+                                </Dialog>
+                            )}
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <p className="font-bold text-3xl">$500.00</p>
+                                <p className="font-bold text-3xl">{feeAmountFormatted}</p>
                                 <p className="text-sm text-muted-foreground">Due by: Dec 31, 2024</p>
                             </div>
                              <Dialog>
