@@ -5,81 +5,73 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-
     function isUser(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isMeetingHost(meetingId) {
-      return get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
-    }
-
-    match /users/{userId}/{document=**} {
+    match /users/{userId}/{subcollection}/{docId} {
       allow read, write: if isUser(userId);
     }
-
+    
     match /classrooms/{classroomId} {
       allow read: if isAuthenticated();
-      allow create: if isUser(request.resource.data.teacherId);
-      allow update, delete: if isUser(resource.data.teacherId);
+      allow create, update, delete: if isAuthenticated() && request.resource.data.teacherId == request.auth.uid;
+    }
 
-      match /joinRequests/{userId} {
-        allow create, read, delete: if isAuthenticated();
-      }
+    match /classrooms/{classroomId}/{subcollection}/{docId} {
+      allow read: if isAuthenticated();
+      // Only the main classroom teacher can write to subcollections
+      allow write: if isAuthenticated() && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
+    }
+    
+    match /documents/{documentId} {
+        allow read: if resource.data.isPrivate == false || (isAuthenticated() && resource.data.uploaderId == request.auth.uid);
+        allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
+        allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
+    }
+    
+    match /recordings/{recordingId} {
+        allow read: if resource.data.isPrivate == false || (isAuthenticated() && resource.data.uploaderId == request.auth.uid);
+        allow create: if isAuthenticated() && request.resource.data.uploaderId == request.auth.uid;
+        allow delete: if isAuthenticated() && resource.data.uploaderId == request.auth.uid;
+    }
 
-      match /{subcollection}/{docId} {
-        allow read, list: if isAuthenticated(); // More open for simplicity in this prototype
-        allow create, update, delete: if isMeetingHost(classroomId); // Simplified rule for subcollections
-      }
-    }
-    
-    match /documents/{docId} {
-      allow read: if resource.data.isPrivate == false || isUser(resource.data.uploaderId);
-      allow create: if isUser(request.resource.data.uploaderId);
-      allow delete: if isUser(resource.data.uploaderId);
-    }
-    
-    match /recordings/{docId} {
-      allow read: if resource.data.isPrivate == false || isUser(resource.data.uploaderId);
-      allow create: if isUser(request.resource.data.uploaderId);
-      allow delete: if isUser(resource.data.uploaderId);
-    }
-    
     match /fcmTokens/{userId} {
-        allow read, write: if isUser(userId);
+        allow write: if isUser(userId);
     }
-
+    
     match /meetings/{meetingId} {
-      // Anyone authenticated can create a meeting if they are the creator
-      allow create: if isUser(request.resource.data.creatorId);
+      // Anyone authenticated can create a meeting document (the host does this)
+      allow create: if isAuthenticated();
 
-      // Only host can update or delete the meeting document
-      allow update, delete: if isMeetingHost(meetingId);
+      // Only host can update or delete the main meeting document
+      allow update, delete: if isAuthenticated()
+        && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
 
-      // A user can read a meeting document if they are a participant
-      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
+      // Authenticated users can read the meeting doc (to find the host)
+      allow read: if isAuthenticated();
 
-      match /participants/{participantId} {
-        // The host can add anyone. A user can add themselves.
-        allow create: if isMeetingHost(meetingId) || isUser(participantId);
+      match /participants/{userId} {
+        // Host can add participants
+        allow create: if isAuthenticated() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
 
-        // A participant can update their own status (e.g. mic mute)
-        // The host can also update participant status (e.g. mute all)
-        allow update: if isUser(participantId) || isMeetingHost(meetingId);
+        // Any participant can list other participants
+        allow list: if isAuthenticated() && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
         
-        // Host can remove a participant. A participant can remove themselves (leave).
-        allow delete: if isMeetingHost(meetingId) || isUser(participantId);
-
-        // Any authenticated user can list participants to see who is in the meeting.
-        allow list, read: if isAuthenticated();
+        // A user can read their own participant entry
+        allow read: if isUser(userId);
+        
+        // A participant can update/delete their own entry (e.g., mute, leave)
+        allow update, delete: if isUser(userId);
       }
 
       match /joinRequests/{userId} {
-        // Any user can create their own join request
+        // A user can create their own join request.
         allow create: if isUser(userId);
 
-        // Only the host can read and delete join requests
-        allow read, delete: if isMeetingHost(meetingId);
+        // Host can read/delete join requests.
+        allow read, delete: if isAuthenticated()
+          && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
       }
     }
   }
