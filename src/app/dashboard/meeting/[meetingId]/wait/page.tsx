@@ -40,7 +40,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
-  const [isHost, setIsHost] = useState(false);
+  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,22 +48,23 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
+  const isHost = user?.uid === meetingCreatorId;
+
   // Effect 1: Determine if the user is the host when the component loads.
   useEffect(() => {
-    if (!meetingId || !user) return;
-
+    if (!meetingId || authLoading) return;
+    
     setIsLoadingMeetingData(true);
     const meetingDocRef = doc(db, 'meetings', meetingId);
-    
+
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
-        const creatorId = docSnap.data().creatorId || null;
-        setIsHost(user.uid === creatorId);
+        setMeetingCreatorId(docSnap.data().creatorId || null);
       } else {
-        // If doc doesn't exist yet, this user might be the host creating it for the first time.
-        // The logic in handleJoinAction will create the document.
-        // For now, assume they are not the host until they try to join.
-        setIsHost(false);
+        // If the doc doesn't exist, it might be a host joining for the first time.
+        // We'll allow the page to load and let the join logic handle it.
+        // If it's a guest, they'll get an error when they try to request to join.
+        setMeetingCreatorId(null); 
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -71,11 +72,11 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }).finally(() => {
       setIsLoadingMeetingData(false);
     });
-  }, [meetingId, user, toast]);
+  }, [meetingId, authLoading, toast, router]);
 
   // Effect 2: This is the critical listener for guests awaiting approval.
   useEffect(() => {
-    if (!user || !meetingId || isLoadingMeetingData || isHost || joinStatus !== 'pending') return;
+    if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
     
     // Only guests who have sent a request should listen.
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
@@ -111,7 +112,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         unsubscribe();
         unsubscribeDenial();
     };
-  }, [user, meetingId, isHost, isLoadingMeetingData, joinStatus, router, topic, toast]);
+  }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
 
 
   useEffect(() => {
@@ -230,22 +231,24 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
+        // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
         try {
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            }, { merge: true }); 
+            }, { merge: true });
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
-            console.error("Host failed to create/update meeting document:", error);
+            console.error("Host failed to create meeting document:", error);
             toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
         }
         return;
     }
 
+    // If not host, create a join request
     const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
         name: user.displayName || userName,
