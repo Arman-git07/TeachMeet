@@ -60,7 +60,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         const creatorId = docSnap.data().creatorId || null;
         setIsHost(user.uid === creatorId);
       } else {
-        setIsHost(false); // If doc doesn't exist, they can't be the host yet.
+        // If doc doesn't exist yet, this user might be the host creating it for the first time.
+        // The logic in handleJoinAction will create the document.
+        // For now, assume they are not the host until they try to join.
+        setIsHost(false);
       }
     }).catch(err => {
       console.error("Error fetching meeting details:", err);
@@ -89,8 +92,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }, (error) => {
         console.error("Error listening to participant document:", error);
     });
+    
+    // Also listen for denial (request document deleted)
+    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+    const unsubscribeDenial = onSnapshot(requestDocRef, (requestSnap) => {
+        if (!requestSnap.exists() && joinStatus === 'pending') {
+            // Give a small grace period for the approval listener to fire first
+            setTimeout(() => {
+                if (joinStatus === 'pending') {
+                    setJoinStatus('denied');
+                }
+            }, 1500);
+        }
+    });
 
-    return () => unsubscribe();
+
+    return () => {
+        unsubscribe();
+        unsubscribeDenial();
+    };
   }, [user, meetingId, isHost, isLoadingMeetingData, joinStatus, router, topic, toast]);
 
 
