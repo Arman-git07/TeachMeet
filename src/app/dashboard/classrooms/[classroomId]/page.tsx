@@ -292,12 +292,28 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
                     <Select value={currency} onValueChange={setCurrency}>
                       <SelectTrigger id="fee-currency"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                        <SelectItem value="INR">INR</SelectItem>
-                        <SelectItem value="CAD">CAD</SelectItem>
-                        <SelectItem value="AUD">AUD</SelectItem>
+                        <SelectItem value="USD">USD - US Dollar</SelectItem>
+                        <SelectItem value="EUR">EUR - Euro</SelectItem>
+                        <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                        <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                        <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                        <SelectItem value="CHF">CHF - Swiss Franc</SelectItem>
+                        <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
+                        <SelectItem value="HKD">HKD - Hong Kong Dollar</SelectItem>
+                        <SelectItem value="NZD">NZD - New Zealand Dollar</SelectItem>
+                        <SelectItem value="SEK">SEK - Swedish Krona</SelectItem>
+                        <SelectItem value="KRW">KRW - South Korean Won</SelectItem>
+                        <SelectItem value="SGD">SGD - Singapore Dollar</SelectItem>
+                        <SelectItem value="NOK">NOK - Norwegian Krone</SelectItem>
+                        <SelectItem value="MXN">MXN - Mexican Peso</SelectItem>
+                        <SelectItem value="INR">INR - Indian Rupee</SelectItem>
+                        <SelectItem value="RUB">RUB - Russian Ruble</SelectItem>
+                        <SelectItem value="ZAR">ZAR - South African Rand</SelectItem>
+                        <SelectItem value="BRL">BRL - Brazilian Real</SelectItem>
+                        <SelectItem value="TRY">TRY - Turkish Lira</SelectItem>
+                        <SelectItem value="AED">AED - UAE Dirham</SelectItem>
+                        <SelectItem value="SAR">SAR - Saudi Riyal</SelectItem>
                       </SelectContent>
                     </Select>
                 </div>
@@ -1088,7 +1104,7 @@ export default function ClassroomPage() {
         toast({ title: `Request ${approve ? 'Approved' : 'Denied'}`, description: `The student has been ${approve ? 'added to the class' : 'denied entry'}.` });
     } catch (error) {
         console.error("Error handling join request:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not process the request. Check Firestore rules.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not process the request. Check console for permissions errors.' });
     }
   }, [isTeacher, classroomId, classroom, toast]);
   
