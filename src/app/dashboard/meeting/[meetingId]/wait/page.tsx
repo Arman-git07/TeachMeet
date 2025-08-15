@@ -25,7 +25,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const { meetingId } = params;
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic");
-  const isExplicitHost = searchParams.get("host") === "true"; // New check for the host flag
+  const isExplicitHost = searchParams.get("host") === "true";
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
@@ -233,12 +233,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
         const meetingDocRef = doc(db, "meetings", meetingId);
+        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
         try {
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
             }, { merge: true });
+
+            // Host also adds themselves as a participant immediately
+            await setDoc(participantDocRef, {
+                name: user.displayName || userName,
+                photoURL: user.photoURL,
+                isMicMuted: !isMicActive,
+                isCameraOff: !isCameraActive,
+                isHandRaised: false,
+                isScreenSharing: false,
+                joinedAt: serverTimestamp(),
+            });
+
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {

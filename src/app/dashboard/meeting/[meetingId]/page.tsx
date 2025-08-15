@@ -227,7 +227,7 @@ export default function MeetingPage() {
   const [localHandRaised, setLocalHandRaised] = useState(false);
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
-  const [joinStatus, setJoinStatus] = useState<'pending' | 'joining' | 'joined' | 'failed'>('pending');
+  const [joinStatus, setJoinStatus] = useState<'pending' | 'joined' | 'failed'>('pending');
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
@@ -545,58 +545,32 @@ export default function MeetingPage() {
       return;
     }
 
-    const joinMeetingRoom = async () => {
-      setJoinStatus('joining');
+    const initialCameraOff = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') !== 'on' : true;
+    const initialMicMuted = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') !== 'on' : true;
+    setLocalCameraOff(initialCameraOff);
+    setLocalMicMuted(initialMicMuted);
 
-      const initialCameraOff = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') !== 'on' : true;
-      const initialMicMuted = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') !== 'on' : true;
-      setLocalCameraOff(initialCameraOff);
-      setLocalMicMuted(initialMicMuted);
-
-      const meetingDocRef = doc(db, "meetings", meetingId);
-      
-      try {
-        const meetingDocSnap = await getDoc(meetingDocRef);
+    const meetingDocRef = doc(db, "meetings", meetingId);
+    getDoc(meetingDocRef).then(meetingDocSnap => {
         if (!meetingDocSnap.exists()) {
-          console.error("[MeetingPage] Meeting document does not exist. This shouldn't happen.");
+          console.error("[MeetingPage] Meeting document does not exist.");
           setJoinStatus('failed');
           return;
         }
-
-        const meetingData = meetingDocSnap.data();
-        const creatorId = meetingData?.creatorId || null;
-        setMeetingCreatorId(creatorId);
-        
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
-        
-        await setDoc(participantDocRef, {
-            name: currentUser.displayName || currentUser.email?.split('@')[0] || "User",
-            photoURL: currentUser.photoURL,
-            isMicMuted: initialMicMuted,
-            isCameraOff: initialCameraOff,
-            isHandRaised: false,
-            isScreenSharing: false,
-            joinedAt: serverTimestamp(),
-        }, { merge: true });
-        
+        setMeetingCreatorId(meetingDocSnap.data()?.creatorId || null);
         setJoinStatus('joined');
-
-      } catch (error) {
-        console.error("[MeetingPage] CRITICAL: Failed to join meeting room:", error);
+    }).catch(error => {
+        console.error("[MeetingPage] CRITICAL: Failed to get meeting document:", error);
         toast({
           variant: "destructive",
           title: "Failed to Join Meeting Room",
-          description: `Could not register your presence: ${(error as Error).message}. Check console & Firestore rules.`,
+          description: `Could not load meeting details: ${(error as Error).message}.`,
           duration: 10000,
         });
         setJoinStatus('failed');
-      }
-    };
+    });
 
-    if (joinStatus === 'pending') {
-      joinMeetingRoom();
-    }
-  }, [currentUser, meetingId, db, toast, joinStatus, searchParamsHook]);
+  }, [currentUser, meetingId, db, toast]);
 
   const stopScreenShare = useCallback(async (showToast = true) => {
     if (!isScreenSharingActive) return;
@@ -864,12 +838,12 @@ export default function MeetingPage() {
   };
   
 
-  if (joinStatus === 'pending' || joinStatus === 'joining') {
+  if (joinStatus === 'pending') {
     return (
       <div className="flex flex-col h-full bg-background items-center justify-center p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <h2 className="text-2xl font-semibold text-foreground mb-2">
-          {joinStatus === 'pending' ? 'Preparing Meeting Room...' : 'Joining Meeting Room...'}
+          Joining Meeting Room...
         </h2>
         <p className="text-muted-foreground">Please wait a moment.</p>
       </div>
