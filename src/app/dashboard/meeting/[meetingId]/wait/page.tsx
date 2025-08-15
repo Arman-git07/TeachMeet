@@ -25,6 +25,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const { meetingId } = params;
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic");
+  const isExplicitHost = searchParams.get("host") === "true"; // New check for the host flag
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
@@ -40,7 +41,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
-  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,37 +48,41 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  const isHost = user?.uid === meetingCreatorId;
+  const [isHost, setIsHost] = useState(false);
 
-  // Effect 1: Determine if the user is the host when the component loads.
   useEffect(() => {
-    if (!meetingId || authLoading) return;
-    
-    setIsLoadingMeetingData(true);
-    const meetingDocRef = doc(db, 'meetings', meetingId);
-
-    getDoc(meetingDocRef).then(docSnap => {
-      if (docSnap.exists()) {
-        setMeetingCreatorId(docSnap.data().creatorId || null);
-      } else {
-        // If the doc doesn't exist, it might be a host joining for the first time.
-        // We'll allow the page to load and let the join logic handle it.
-        // If it's a guest, they'll get an error when they try to request to join.
-        setMeetingCreatorId(null); 
-      }
-    }).catch(err => {
-      console.error("Error fetching meeting details:", err);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch meeting details.'});
-    }).finally(() => {
+    // Determine host status. Prioritize the explicit URL flag.
+    if (isExplicitHost && user) {
+      setIsHost(true);
       setIsLoadingMeetingData(false);
-    });
-  }, [meetingId, authLoading, toast, router]);
+    } else if (user && !authLoading) {
+      // If not explicitly a host, check the database for existing meeting.
+      const meetingDocRef = doc(db, 'meetings', meetingId);
+      getDoc(meetingDocRef).then(docSnap => {
+        if (docSnap.exists()) {
+          setIsHost(docSnap.data().creatorId === user.uid);
+        } else {
+          // If doc doesn't exist and they don't have the flag, they are a guest.
+          setIsHost(false);
+        }
+      }).catch(err => {
+        console.error("Error checking host status:", err);
+        setIsHost(false);
+      }).finally(() => {
+        setIsLoadingMeetingData(false);
+      });
+    }
+    // If not logged in, they cannot be the host.
+    if (!user && !authLoading) {
+      setIsHost(false);
+      setIsLoadingMeetingData(false);
+    }
+  }, [meetingId, user, authLoading, isExplicitHost]);
 
-  // Effect 2: This is the critical listener for guests awaiting approval.
+  // Listener for guests awaiting approval.
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
     
-    // Only guests who have sent a request should listen.
     const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
 
     const unsubscribe = onSnapshot(participantDocRef, (participantSnap) => {
@@ -94,11 +98,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         console.error("Error listening to participant document:", error);
     });
     
-    // Also listen for denial (request document deleted)
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const unsubscribeDenial = onSnapshot(requestDocRef, (requestSnap) => {
         if (!requestSnap.exists() && joinStatus === 'pending') {
-            // Give a small grace period for the approval listener to fire first
             setTimeout(() => {
                 if (joinStatus === 'pending') {
                     setJoinStatus('denied');
@@ -106,7 +108,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             }, 1500);
         }
     });
-
 
     return () => {
         unsubscribe();
@@ -231,7 +232,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        // If host, create the meeting document and go directly to the meeting page.
         const meetingDocRef = doc(db, "meetings", meetingId);
         try {
             await setDoc(meetingDocRef, {
@@ -242,13 +242,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
-            console.error("Host failed to create meeting document:", error);
+            console.error("Host failed to create/update meeting document:", error);
             toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
         }
         return;
     }
 
-    // If not host, create a join request
     const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
         name: user.displayName || userName,
@@ -262,7 +261,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
     } catch (error: any) {
         console.error("Join request failed:", error.code, error.message);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. Check console and Firestore rules for errors like PERMISSION_DENIED. Message: ' + error.message});
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. The meeting may not exist or there may be a permissions issue.'});
         setJoinStatus('idle');
     }
   };
@@ -274,7 +273,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       const disabled = !agreedToTerms;
-      return { text: "Start Meeting as Host", disabled, showSpinner: false, onClick: handleJoinAction };
+      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
 
     let text = "Ask to Join";
@@ -289,7 +288,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         text, 
         disabled, 
         showSpinner: false, 
-        onClick: handleJoinAction
+        onClick: () => { setJoinStatus('idle'); handleJoinAction(); }
       };
     }
     

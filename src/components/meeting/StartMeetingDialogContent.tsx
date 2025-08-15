@@ -17,11 +17,9 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
-// Firestore imports are no longer needed here, they are moved to the wait page.
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
-// Helper function to generate a random string, defined outside the component
 const generateRandomId = (length: number) => {
     const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -106,14 +104,12 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // Immediately navigate to make the UI feel fast
-    const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}`;
+    // Pass a special flag to the wait room to identify the host.
+    const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}&host=true`;
     router.push(waitRoomPath);
 
-    // Perform non-critical background tasks after navigation has been initiated
     setTimeout(() => {
       try {
-        // Save meeting to localStorage for the activity feed
         const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
         let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
         if (!Array.isArray(startedMeetings)) startedMeetings = [];
@@ -132,7 +128,6 @@ export function StartMeetingDialogContent() {
         window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
       } catch (error) {
         console.error("Failed to update local meeting records:", error);
-        // This is a non-critical error, so we don't need to bother the user with a toast.
       }
     }, 100);
   };
