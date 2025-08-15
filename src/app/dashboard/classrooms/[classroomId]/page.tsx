@@ -167,6 +167,91 @@ interface AssignmentSubmission {
     }
 }
 
+const TeacherDialog = React.memo(({ classroomId, onAction, teacherToEdit }: { classroomId: string; onAction: () => void, teacherToEdit: SubjectTeacher | null }) => {
+    const [name, setName] = useState('');
+    const [subject, setSubject] = useState('');
+    const [timings, setTimings] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (teacherToEdit) {
+            setName(teacherToEdit.name);
+            setSubject(teacherToEdit.subject);
+            setTimings(teacherToEdit.timings);
+        } else {
+            setName('');
+            setSubject('');
+            setTimings('');
+        }
+    }, [teacherToEdit]);
+
+    const handleSubmit = async () => {
+        if (!name.trim() || !subject.trim() || !timings.trim()) {
+            toast({ variant: 'destructive', title: 'Missing Fields', description: 'All fields are required.' });
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const teacherData = {
+                name: name.trim(),
+                subject: subject.trim(),
+                timings: timings.trim(),
+            };
+
+            if (teacherToEdit) {
+                const teacherRef = doc(db, 'classrooms', classroomId, 'teachers', teacherToEdit.id);
+                await updateDoc(teacherRef, teacherData);
+                toast({ title: 'Teacher Updated', description: `Details for ${name.trim()} have been updated.` });
+            } else {
+                await addDoc(collection(db, 'classrooms', classroomId, 'teachers'), {
+                    ...teacherData,
+                    createdAt: serverTimestamp(),
+                });
+                toast({ title: 'Teacher Added', description: `${name.trim()} has been added to the class.` });
+            }
+            onAction();
+
+        } catch (error) {
+            console.error('Error saving teacher:', error);
+            toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the teacher details.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle>{teacherToEdit ? 'Edit Teacher' : 'Add New Teacher'}</DialogTitle>
+                <DialogDescription>{teacherToEdit ? 'Update details for this teacher.' : 'Fill out the details for the new teacher.'}</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">Name</Label>
+                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="e.g., John Doe"/>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="subject" className="text-right">Subject</Label>
+                    <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="col-span-3" placeholder="e.g., Physics"/>
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="timings" className="text-right">Timings</Label>
+                    <Input id="timings" value={timings} onChange={(e) => setTimings(e.target.value)} className="col-span-3" placeholder="e.g., Mon-Fri, 2-4 PM"/>
+                </div>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                <Button onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : teacherToEdit ? "Save Changes" : "Add Teacher"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+});
+TeacherDialog.displayName = 'TeacherDialog';
+
 const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFeeUpdated: () => void }) => {
     const { toast } = useToast();
     const [amount, setAmount] = useState(classroom.feeAmount ?? 500);
@@ -831,6 +916,9 @@ export default function ClassroomPage() {
   
   const [isEditFeeOpen, setIsEditFeeOpen] = useState(false);
 
+  const [isTeacherDialogOpen, setIsTeacherDialogOpen] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<SubjectTeacher | null>(null);
+
   const isTeacher = user?.uid === classroom?.teacherId;
 
   useEffect(() => {
@@ -1092,6 +1180,22 @@ export default function ClassroomPage() {
     } catch (error) {
       console.error("Error deleting assignment:", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the assignment.' });
+    }
+  };
+
+  const handleOpenTeacherDialog = (teacher: SubjectTeacher | null) => {
+    setEditingTeacher(teacher);
+    setIsTeacherDialogOpen(true);
+  };
+
+  const handleDeleteTeacher = async (teacher: SubjectTeacher) => {
+    if (!isTeacher) return;
+    try {
+      await deleteDoc(doc(db, 'classrooms', classroomId, 'teachers', teacher.id));
+      toast({ title: 'Teacher Removed', description: `${teacher.name} has been removed from the class.` });
+    } catch (error) {
+      console.error("Error deleting teacher:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not remove the teacher.' });
     }
   };
 
@@ -1632,15 +1736,25 @@ export default function ClassroomPage() {
 
               <TabsContent value="teachers" className="mt-0">
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Subject Teachers</CardTitle>
-                        <CardDescription>Contact your teachers for questions and support.</CardDescription>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>Subject Teachers</CardTitle>
+                            <CardDescription>Contact your teachers for questions and support.</CardDescription>
+                        </div>
+                        {isTeacher && (
+                            <Dialog open={isTeacherDialogOpen} onOpenChange={setIsTeacherDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button onClick={() => handleOpenTeacherDialog(null)}><PlusCircle className="mr-2 h-4 w-4"/>Add Teacher</Button>
+                                </DialogTrigger>
+                                <TeacherDialog classroomId={classroomId} onAction={() => setIsTeacherDialogOpen(false)} teacherToEdit={editingTeacher} />
+                            </Dialog>
+                        )}
                     </CardHeader>
                     <CardContent>
                         {subjectTeachers.length > 0 ? (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {subjectTeachers.map(teacher => (
-                                    <Card key={teacher.id} className="shadow-md">
+                                    <Card key={teacher.id} className="shadow-md group relative">
                                       <CardHeader className="flex flex-row items-start gap-4">
                                           <Avatar className="h-12 w-12 mt-1">
                                               <AvatarImage src={teacher.photoURL} data-ai-hint="avatar teacher"/>
@@ -1650,6 +1764,12 @@ export default function ClassroomPage() {
                                             <CardTitle className="text-lg">{teacher.name}</CardTitle>
                                             <CardDescription>{teacher.subject}</CardDescription>
                                           </div>
+                                           {isTeacher && (
+                                              <div className="absolute top-2 right-2 flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <Button variant="ghost" size="icon" onClick={() => handleOpenTeacherDialog(teacher)} className="h-7 w-7"><Edit className="h-4 w-4"/></Button>
+                                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteTeacher(teacher)} className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                              </div>
+                                          )}
                                       </CardHeader>
                                       <CardContent>
                                           <div className="flex items-center text-sm text-muted-foreground">
