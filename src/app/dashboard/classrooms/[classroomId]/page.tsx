@@ -64,6 +64,7 @@ import {
   Banknote,
   Landmark,
   Wallet,
+  Type,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -73,6 +74,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 interface Classroom {
@@ -113,6 +115,14 @@ interface Material {
   createdAt: { seconds: number };
 }
 
+type ManualQuestion = {
+    id: string;
+    type: 'multiple-choice' | 'short-answer';
+    questionText: string;
+    options?: string[];
+    correctAnswer?: string | number; // Index for mcq
+};
+
 interface Exam {
   id: string;
   title: string;
@@ -120,10 +130,13 @@ interface Exam {
   startDate: { seconds: number };
   endDate: { seconds: number };
   status: 'draft' | 'published';
+  type: 'file' | 'manual';
   fileURL?: string;
   fileName?: string;
+  questions?: ManualQuestion[];
   createdAt: { seconds: number };
 }
+
 
 interface Assignment {
   id: string;
@@ -292,28 +305,19 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
                     <Select value={currency} onValueChange={setCurrency}>
                       <SelectTrigger id="fee-currency"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="USD">USD - US Dollar</SelectItem>
-                        <SelectItem value="EUR">EUR - Euro</SelectItem>
-                        <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
-                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                        <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
-                        <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                        <SelectItem value="CHF">CHF - Swiss Franc</SelectItem>
-                        <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
-                        <SelectItem value="HKD">HKD - Hong Kong Dollar</SelectItem>
-                        <SelectItem value="NZD">NZD - New Zealand Dollar</SelectItem>
-                        <SelectItem value="SEK">SEK - Swedish Krona</SelectItem>
-                        <SelectItem value="KRW">KRW - South Korean Won</SelectItem>
-                        <SelectItem value="SGD">SGD - Singapore Dollar</SelectItem>
-                        <SelectItem value="NOK">NOK - Norwegian Krone</SelectItem>
-                        <SelectItem value="MXN">MXN - Mexican Peso</SelectItem>
-                        <SelectItem value="INR">INR - Indian Rupee</SelectItem>
-                        <SelectItem value="RUB">RUB - Russian Ruble</SelectItem>
-                        <SelectItem value="ZAR">ZAR - South African Rand</SelectItem>
-                        <SelectItem value="BRL">BRL - Brazilian Real</SelectItem>
-                        <SelectItem value="TRY">TRY - Turkish Lira</SelectItem>
-                        <SelectItem value="AED">AED - UAE Dirham</SelectItem>
-                        <SelectItem value="SAR">SAR - Saudi Riyal</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="JPY">JPY</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                        <SelectItem value="AUD">AUD</SelectItem>
+                        <SelectItem value="CAD">CAD</SelectItem>
+                        <SelectItem value="CHF">CHF</SelectItem>
+                        <SelectItem value="CNY">CNY</SelectItem>
+                        <SelectItem value="INR">INR</SelectItem>
+                        <SelectItem value="BRL">BRL</SelectItem>
+                        <SelectItem value="RUB">RUB</SelectItem>
+                        <SelectItem value="KRW">KRW</SelectItem>
+                        <SelectItem value="SGD">SGD</SelectItem>
                       </SelectContent>
                     </Select>
                 </div>
@@ -631,7 +635,8 @@ const AddMaterialDialog = React.memo(({ teachingId, onMaterialAdded }: { teachin
 });
 AddMaterialDialog.displayName = 'AddMaterialDialog';
 
-const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { classroomId: string; onExamAction: () => void, examToEdit: Exam | null }) => {
+const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { classroomId: string; onExamAction: () => void; examToEdit: Exam | null }) => {
+    const [examType, setExamType] = useState<'file' | 'manual'>('file');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -640,6 +645,7 @@ const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { clas
     const [isPublished, setIsPublished] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
+    const [questions, setQuestions] = useState<ManualQuestion[]>([]);
 
     useEffect(() => {
         if (examToEdit) {
@@ -648,12 +654,16 @@ const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { clas
             setStartDate(new Date(examToEdit.startDate.seconds * 1000));
             setEndDate(new Date(examToEdit.endDate.seconds * 1000));
             setIsPublished(examToEdit.status === 'published');
+            setExamType(examToEdit.type || 'file');
+            setQuestions(examToEdit.questions || []);
         } else {
             setTitle('');
             setDescription('');
             setStartDate(undefined);
             setEndDate(undefined);
             setIsPublished(false);
+            setExamType('file');
+            setQuestions([]);
         }
     }, [examToEdit]);
 
@@ -662,10 +672,42 @@ const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { clas
             setFile(e.target.files[0]);
         }
     };
+    
+    const handleAddQuestion = (type: 'multiple-choice' | 'short-answer') => {
+        const newQuestion: ManualQuestion = {
+            id: `q_${Date.now()}`,
+            type,
+            questionText: '',
+            options: type === 'multiple-choice' ? ['', '', '', ''] : undefined,
+            correctAnswer: type === 'multiple-choice' ? 0 : undefined,
+        };
+        setQuestions(prev => [...prev, newQuestion]);
+    };
+
+    const handleQuestionChange = (id: string, newText: string) => {
+        setQuestions(prev => prev.map(q => q.id === id ? { ...q, questionText: newText } : q));
+    };
+
+    const handleOptionChange = (qId: string, optIndex: number, newText: string) => {
+        setQuestions(prev => prev.map(q => q.id === qId ? { ...q, options: q.options?.map((opt, i) => i === optIndex ? newText : opt) } : q));
+    };
+
+    const handleCorrectAnswerChange = (qId: string, optIndex: number) => {
+        setQuestions(prev => prev.map(q => q.id === qId ? { ...q, correctAnswer: optIndex } : q));
+    };
+
+    const handleRemoveQuestion = (id: string) => {
+        setQuestions(prev => prev.filter(q => q.id !== id));
+    };
 
     const handleSubmit = async () => {
         if (!title.trim() || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'Missing Fields', description: 'Title, start date, and end date are required.' });
+            return;
+        }
+
+        if (examType === 'manual' && questions.length === 0) {
+            toast({ variant: 'destructive', title: 'No Questions', description: 'Please add at least one question for a manual exam.' });
             return;
         }
 
@@ -674,21 +716,23 @@ const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { clas
             let fileURL: string | undefined = examToEdit?.fileURL;
             let fileName: string | undefined = examToEdit?.fileName;
 
-            if (file) {
+            if (examType === 'file' && file) {
                 const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${file.name}`);
                 const snapshot = await uploadBytes(fileRef, file);
                 fileURL = await getDownloadURL(snapshot.ref);
                 fileName = file.name;
             }
 
-            const examData = {
+            const examData: Omit<Exam, 'id' | 'createdAt'> = {
                 title: title.trim(),
                 description: description.trim(),
                 startDate,
                 endDate,
                 status: isPublished ? 'published' : 'draft',
-                fileURL,
-                fileName,
+                type: examType,
+                fileURL: examType === 'file' ? fileURL : undefined,
+                fileName: examType === 'file' ? fileName : undefined,
+                questions: examType === 'manual' ? questions : undefined,
             };
 
             if (examToEdit) {
@@ -700,7 +744,7 @@ const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { clas
                     ...examData,
                     createdAt: serverTimestamp(),
                 });
-                toast({ title: 'Exam Created', description: `"${title.trim()}" has been created as a ${isPublished ? 'published' : 'draft'} exam.` });
+                toast({ title: 'Exam Created', description: `"${title.trim()}" has been created.` });
             }
             onExamAction();
 
@@ -713,65 +757,113 @@ const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { clas
     };
 
     return (
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
                 <DialogTitle>{examToEdit ? 'Edit Exam' : 'Create New Exam'}</DialogTitle>
-                <DialogDescription>{examToEdit ? 'Update details for this exam.' : 'Fill out the details for the new exam.'}</DialogDescription>
+                <DialogDescription>{examToEdit ? 'Update details for this exam.' : 'Create a new exam by uploading a file or adding questions manually.'}</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="title" className="text-right">Title</Label>
-                    <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., Mid-Term Exam"/>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                {/* Left Column: General Details */}
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="title">Title</Label>
+                        <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Mid-Term Exam" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="(Optional) Instructions or details" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Start Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>End Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                            </Popover>
+                        </div>
+                    </div>
+                     <div className="flex items-center justify-end space-x-2 pt-4 border-t">
+                        <Label htmlFor="publish-switch">Publish to Students</Label>
+                        <Switch id="publish-switch" checked={isPublished} onCheckedChange={setIsPublished}/>
+                    </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="description" className="text-right">Description</Label>
-                    <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="(Optional) Instructions or details"/>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Start Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
-                    </Popover>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">End Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
-                    </Popover>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="file" className="text-right">File</Label>
-                    <Input id="file" type="file" onChange={handleFileChange} className="col-span-3"/>
-                </div>
-                 {file && <p className="col-span-4 text-sm text-muted-foreground text-center">Attaching: {file.name}</p>}
-                {examToEdit && examToEdit.fileName && !file && <p className="col-span-4 text-sm text-muted-foreground text-center">Current file: {examToEdit.fileName}</p>}
-                <div className="flex items-center justify-end space-x-2 pt-4 border-t">
-                    <Label htmlFor="publish-switch">Publish to Students</Label>
-                    <Switch id="publish-switch" checked={isPublished} onCheckedChange={setIsPublished}/>
-                </div>
+
+                {/* Right Column: Exam Content */}
+                <Tabs value={examType} onValueChange={(v) => setExamType(v as any)} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="file"><FileUp className="mr-2 h-4 w-4"/>Upload File</TabsTrigger>
+                        <TabsTrigger value="manual"><Type className="mr-2 h-4 w-4"/>Create Manually</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="file" className="mt-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="file">Exam Paper</Label>
+                            <Input id="file" type="file" onChange={handleFileChange} />
+                        </div>
+                        {file && <p className="text-sm text-muted-foreground">Attaching: {file.name}</p>}
+                        {examToEdit && examToEdit.fileName && !file && <p className="text-sm text-muted-foreground">Current file: {examToEdit.fileName}</p>}
+                    </TabsContent>
+                    <TabsContent value="manual" className="mt-4 space-y-4">
+                        <div className="space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => handleAddQuestion('multiple-choice')}>+ Multiple Choice</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleAddQuestion('short-answer')}>+ Short Answer</Button>
+                        </div>
+                        <ScrollArea className="h-64 border rounded-md p-4 space-y-4">
+                            {questions.length === 0 && <p className="text-sm text-muted-foreground text-center">No questions added yet.</p>}
+                            {questions.map((q, index) => (
+                                <div key={q.id} className="p-3 border rounded-lg space-y-2 bg-muted/50">
+                                    <div className="flex justify-between items-center">
+                                        <Label>Question {index + 1}</Label>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleRemoveQuestion(q.id)}><Trash2 className="h-4 w-4"/></Button>
+                                    </div>
+                                    <Textarea placeholder="Type your question..." value={q.questionText} onChange={(e) => handleQuestionChange(q.id, e.target.value)} />
+                                    {q.type === 'multiple-choice' && (
+                                        <RadioGroup onValueChange={(val) => handleCorrectAnswerChange(q.id, parseInt(val))} defaultValue={String(q.correctAnswer ?? 0)}>
+                                            <div className="space-y-2 mt-2">
+                                                {q.options?.map((opt, i) => (
+                                                    <div key={i} className="flex items-center gap-2">
+                                                        <RadioGroupItem value={String(i)} id={`${q.id}-opt-${i}`} />
+                                                        <Input placeholder={`Option ${i + 1}`} value={opt} onChange={(e) => handleOptionChange(q.id, i, e.target.value)} className="flex-1"/>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </RadioGroup>
+                                    )}
+                                </div>
+                            ))}
+                        </ScrollArea>
+                    </TabsContent>
+                </Tabs>
             </div>
+            
             <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                 <Button onClick={handleSubmit} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : examToEdit ? "Save Changes" : "Create"}
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : examToEdit ? "Save Changes" : "Create Exam"}
                 </Button>
             </DialogFooter>
         </DialogContent>
     );
 });
 ExamDialog.displayName = 'ExamDialog';
+
 
 const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignmentToEdit }: { classroomId: string; onAssignmentAction: () => void, assignmentToEdit: Assignment | null }) => {
     const [title, setTitle] = useState('');
