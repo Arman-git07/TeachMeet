@@ -339,8 +339,9 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
 
 const PaymentDialog = () => {
     const { toast } = useToast();
-    const [view, setView] = useState<'options' | 'card' | 'netbanking'>('options');
+    const [view, setView] = useState<'options' | 'card' | 'netbanking' | 'bank-details'>('options');
     const [bankSearch, setBankSearch] = useState('');
+    const [selectedBank, setSelectedBank] = useState<string | null>(null);
 
     const handlePaymentAction = (method: string) => {
         toast({
@@ -385,23 +386,43 @@ const PaymentDialog = () => {
         </DialogFooter>
       </>
     );
+
+     const renderBankDetailsForm = () => (
+        <>
+            <DialogHeader>
+                <DialogTitle>Login to {selectedBank}</DialogTitle>
+                <DialogDescription>Enter your internet banking credentials. This is a mockup.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                    <Label htmlFor="userId">User ID</Label>
+                    <Input id="userId" placeholder="Your User ID" />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor="password">Password</Label>
+                    <Input id="password" type="password" placeholder="••••••••" />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setView('netbanking')}>Back</Button>
+                <DialogClose asChild>
+                    <Button onClick={() => handlePaymentAction(selectedBank || 'Net Banking')}>Login & Pay</Button>
+                </DialogClose>
+            </DialogFooter>
+        </>
+    );
     
     const renderNetBankingForm = () => {
         const banks = [
-            // Public Sector Banks
             "State Bank of India", "Punjab National Bank", "Bank of Baroda", "Canara Bank",
             "Union Bank of India", "Bank of India", "Indian Bank", "Central Bank of India",
             "Indian Overseas Bank", "UCO Bank", "Bank of Maharashtra", "Punjab & Sind Bank",
-            // Private Sector Banks
             "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank",
             "Yes Bank", "IDFC First Bank", "Bandhan Bank", "RBL Bank", "Federal Bank",
             "South Indian Bank", "Karur Vysya Bank", "City Union Bank", "DCB Bank",
             "Dhanlaxmi Bank", "Jammu & Kashmir Bank",
-            // Payments Banks
             "Airtel Payments Bank", "India Post Payments Bank", "Fino Payments Bank", "Jio Payments Bank", "Paytm Payments Bank",
-            // Foreign Banks
             "Citibank", "HSBC Bank", "Standard Chartered Bank", "Deutsche Bank", "DBS Bank",
-            // Small Finance Banks
             "AU Small Finance Bank", "Equitas Small Finance Bank", "Ujjivan Small Finance Bank", "Jana Small Finance Bank"
         ];
         const filteredBanks = banks.filter(bank => bank.toLowerCase().includes(bankSearch.toLowerCase()));
@@ -427,12 +448,18 @@ const PaymentDialog = () => {
                     <div className="space-y-2 pr-4">
                         {filteredBanks.length > 0 ? (
                             filteredBanks.map(bank => (
-                                <DialogClose asChild key={bank}>
-                                    <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction(bank)}>
-                                        <Landmark className="mr-4 h-5 w-5 text-muted-foreground" />
-                                        <span className="text-sm">{bank}</span>
-                                    </Button>
-                                </DialogClose>
+                                <Button
+                                    key={bank}
+                                    className="w-full justify-start py-6"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setSelectedBank(bank);
+                                        setView('bank-details');
+                                    }}
+                                >
+                                    <Landmark className="mr-4 h-5 w-5 text-muted-foreground" />
+                                    <span className="text-sm">{bank}</span>
+                                </Button>
                             ))
                         ) : (
                             <p className="text-sm text-muted-foreground text-center py-10">No banks found.</p>
@@ -494,6 +521,7 @@ const PaymentDialog = () => {
             {view === 'options' && renderOptions()}
             {view === 'card' && renderCardForm()}
             {view === 'netbanking' && renderNetBankingForm()}
+            {view === 'bank-details' && renderBankDetailsForm()}
         </DialogContent>
     );
 };
@@ -987,9 +1015,7 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
 
             if (assignmentToEdit) {
                 const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentToEdit.id);
-                await updateDoc(assignmentRef, {
-                    ...assignmentData,
-                });
+                await updateDoc(assignmentRef, assignmentData);
                 toast({ title: 'Assignment Updated', description: `"${title.trim()}" has been updated.` });
             } else {
                 await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), {
