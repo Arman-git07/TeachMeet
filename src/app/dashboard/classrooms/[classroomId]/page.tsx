@@ -387,7 +387,23 @@ const PaymentDialog = () => {
     );
     
     const renderNetBankingForm = () => {
-        const banks = ["State Bank of India", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "Punjab National Bank", "Bank of Baroda", "Canara Bank", "IDFC First Bank", "Union Bank of India", "IndusInd Bank", "Yes Bank"];
+        const banks = [
+            // Public Sector Banks
+            "State Bank of India", "Punjab National Bank", "Bank of Baroda", "Canara Bank",
+            "Union Bank of India", "Bank of India", "Indian Bank", "Central Bank of India",
+            "Indian Overseas Bank", "UCO Bank", "Bank of Maharashtra", "Punjab & Sind Bank",
+            // Private Sector Banks
+            "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank",
+            "Yes Bank", "IDFC First Bank", "Bandhan Bank", "RBL Bank", "Federal Bank",
+            "South Indian Bank", "Karur Vysya Bank", "City Union Bank", "DCB Bank",
+            "Dhanlaxmi Bank", "Jammu & Kashmir Bank",
+            // Payments Banks
+            "Airtel Payments Bank", "India Post Payments Bank", "Fino Payments Bank", "Jio Payments Bank", "Paytm Payments Bank",
+            // Foreign Banks
+            "Citibank", "HSBC Bank", "Standard Chartered Bank", "Deutsche Bank", "DBS Bank",
+            // Small Finance Banks
+            "AU Small Finance Bank", "Equitas Small Finance Bank", "Ujjivan Small Finance Bank", "Jana Small Finance Bank"
+        ];
         const filteredBanks = banks.filter(bank => bank.toLowerCase().includes(bankSearch.toLowerCase()));
         return (
           <>
