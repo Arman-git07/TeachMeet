@@ -65,6 +65,7 @@ import {
   Landmark,
   Wallet,
   Type,
+  Search,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -339,6 +340,7 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
 const PaymentDialog = () => {
     const { toast } = useToast();
     const [view, setView] = useState<'options' | 'card' | 'netbanking'>('options');
+    const [bankSearch, setBankSearch] = useState('');
 
     const handlePaymentAction = (method: string) => {
         toast({
@@ -385,7 +387,8 @@ const PaymentDialog = () => {
     );
     
     const renderNetBankingForm = () => {
-        const banks = ["State Bank of India", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "Punjab National Bank", "Bank of Baroda", "Canara Bank"];
+        const banks = ["State Bank of India", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "Punjab National Bank", "Bank of Baroda", "Canara Bank", "IDFC First Bank", "Union Bank of India", "IndusInd Bank", "Yes Bank"];
+        const filteredBanks = banks.filter(bank => bank.toLowerCase().includes(bankSearch.toLowerCase()));
         return (
           <>
             <DialogHeader>
@@ -394,18 +397,33 @@ const PaymentDialog = () => {
                     Choose your bank to proceed with Net Banking.
                 </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="h-72 my-4">
-                <div className="space-y-2 pr-4">
-                    {banks.map(bank => (
-                         <DialogClose asChild key={bank}>
-                            <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction(bank)}>
-                                <Landmark className="mr-4 h-5 w-5 text-muted-foreground" />
-                                <span className="text-sm">{bank}</span>
-                            </Button>
-                        </DialogClose>
-                    ))}
+            <div className="py-4">
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input 
+                      placeholder="Search bank name..."
+                      className="pl-10"
+                      value={bankSearch}
+                      onChange={(e) => setBankSearch(e.target.value)}
+                  />
                 </div>
-            </ScrollArea>
+                <ScrollArea className="h-60">
+                    <div className="space-y-2 pr-4">
+                        {filteredBanks.length > 0 ? (
+                            filteredBanks.map(bank => (
+                                <DialogClose asChild key={bank}>
+                                    <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction(bank)}>
+                                        <Landmark className="mr-4 h-5 w-5 text-muted-foreground" />
+                                        <span className="text-sm">{bank}</span>
+                                    </Button>
+                                </DialogClose>
+                            ))
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-10">No banks found.</p>
+                        )}
+                    </div>
+                </ScrollArea>
+            </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setView('options')}>Back to Payment Options</Button>
             </DialogFooter>
@@ -946,14 +964,16 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
             const assignmentData = {
                 title: title.trim(),
                 description: description.trim(),
-                dueDate: dueDate, // Firestore handles JS Date objects
+                dueDate: dueDate,
                 fileURL,
                 fileName,
             };
 
             if (assignmentToEdit) {
                 const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentToEdit.id);
-                await updateDoc(assignmentRef, assignmentData);
+                await updateDoc(assignmentRef, {
+                    ...assignmentData,
+                });
                 toast({ title: 'Assignment Updated', description: `"${title.trim()}" has been updated.` });
             } else {
                 await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), {
@@ -2050,3 +2070,5 @@ export default function ClassroomPage() {
     </div>
   );
 }
+
+    
