@@ -305,19 +305,22 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
                     <Select value={currency} onValueChange={setCurrency}>
                       <SelectTrigger id="fee-currency"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="JPY">JPY</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                        <SelectItem value="AUD">AUD</SelectItem>
-                        <SelectItem value="CAD">CAD</SelectItem>
-                        <SelectItem value="CHF">CHF</SelectItem>
-                        <SelectItem value="CNY">CNY</SelectItem>
-                        <SelectItem value="INR">INR</SelectItem>
-                        <SelectItem value="BRL">BRL</SelectItem>
-                        <SelectItem value="RUB">RUB</SelectItem>
-                        <SelectItem value="KRW">KRW</SelectItem>
-                        <SelectItem value="SGD">SGD</SelectItem>
+                        <SelectItem value="USD">USD - US Dollar</SelectItem>
+                        <SelectItem value="EUR">EUR - Euro</SelectItem>
+                        <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                        <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                        <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                        <SelectItem value="CHF">CHF - Swiss Franc</SelectItem>
+                        <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
+                        <SelectItem value="INR">INR - Indian Rupee</SelectItem>
+                        <SelectItem value="BRL">BRL - Brazilian Real</SelectItem>
+                        <SelectItem value="RUB">RUB - Russian Ruble</SelectItem>
+                        <SelectItem value="KRW">KRW - South Korean Won</SelectItem>
+                        <SelectItem value="SGD">SGD - Singapore Dollar</SelectItem>
+                        <SelectItem value="NZD">NZD - New Zealand Dollar</SelectItem>
+                        <SelectItem value="MXN">MXN - Mexican Peso</SelectItem>
+                        <SelectItem value="ZAR">ZAR - South African Rand</SelectItem>
                       </SelectContent>
                     </Select>
                 </div>
@@ -335,7 +338,7 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
 
 const PaymentDialog = () => {
     const { toast } = useToast();
-    const [view, setView] = useState<'options' | 'card'>('options');
+    const [view, setView] = useState<'options' | 'card' | 'netbanking'>('options');
 
     const handlePaymentAction = (method: string) => {
         toast({
@@ -381,6 +384,35 @@ const PaymentDialog = () => {
       </>
     );
     
+    const renderNetBankingForm = () => {
+        const banks = ["State Bank of India", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "Punjab National Bank", "Bank of Baroda", "Canara Bank"];
+        return (
+          <>
+            <DialogHeader>
+                <DialogTitle>Select Your Bank</DialogTitle>
+                <DialogDescription>
+                    Choose your bank to proceed with Net Banking.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-72 my-4">
+                <div className="space-y-2 pr-4">
+                    {banks.map(bank => (
+                         <DialogClose asChild key={bank}>
+                            <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction(bank)}>
+                                <Landmark className="mr-4 h-5 w-5 text-muted-foreground" />
+                                <span className="text-sm">{bank}</span>
+                            </Button>
+                        </DialogClose>
+                    ))}
+                </div>
+            </ScrollArea>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setView('options')}>Back to Payment Options</Button>
+            </DialogFooter>
+          </>
+        );
+    };
+    
     const renderOptions = () => (
       <>
         <DialogHeader>
@@ -406,7 +438,7 @@ const PaymentDialog = () => {
                 <Wallet className="mr-4 h-6 w-6 text-primary" />
                 <span className="text-base">UPI</span>
             </Button>
-            <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Net Banking')}>
+            <Button className="w-full justify-start py-6" variant="outline" onClick={() => setView('netbanking')}>
                 <Landmark className="mr-4 h-6 w-6 text-primary" />
                 <span className="text-base">Net Banking</span>
             </Button>
@@ -425,7 +457,9 @@ const PaymentDialog = () => {
 
     return (
         <DialogContent className="sm:max-w-md">
-            {view === 'options' ? renderOptions() : renderCardForm()}
+            {view === 'options' && renderOptions()}
+            {view === 'card' && renderCardForm()}
+            {view === 'netbanking' && renderNetBankingForm()}
         </DialogContent>
     );
 };
@@ -1847,7 +1881,7 @@ export default function ClassroomPage() {
                     <CardHeader className="flex flex-row items-center justify-between">
                         <div>
                             <CardTitle>Subject Teachers</CardTitle>
-                            <CardDescription>Contact your teachers for questions and support.</CardDescription>
+                            <CardDescription>Teacher who created this class can add subject teachers from here also and can edit timing and all thing</CardDescription>
                         </div>
                         {isTeacher && (
                             <Dialog open={isTeacherDialogOpen} onOpenChange={setIsTeacherDialogOpen}>
