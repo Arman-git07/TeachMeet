@@ -737,7 +737,7 @@ const ExamDialog = React.memo(({ classroomId, onExamAction, examToEdit }: { clas
 
             if (examToEdit) {
                 const examRef = doc(db, 'classrooms', classroomId, 'exams', examToEdit.id);
-                await updateDoc(examRef, examData);
+                await updateDoc(examRef, examData as any);
                 toast({ title: 'Exam Updated', description: `"${title.trim()}" has been updated.` });
             } else {
                 await addDoc(collection(db, 'classrooms', classroomId, 'exams'), {
@@ -912,7 +912,7 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
             const assignmentData = {
                 title: title.trim(),
                 description: description.trim(),
-                dueDate,
+                dueDate: dueDate, // Firestore handles JS Date objects
                 fileURL,
                 fileName,
             };
