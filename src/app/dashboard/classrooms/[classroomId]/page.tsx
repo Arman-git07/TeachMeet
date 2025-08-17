@@ -339,9 +339,6 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
 
 const PaymentDialog = () => {
     const { toast } = useToast();
-    const [view, setView] = useState<'options' | 'card' | 'netbanking' | 'bank-details'>('options');
-    const [bankSearch, setBankSearch] = useState('');
-    const [selectedBank, setSelectedBank] = useState<string | null>(null);
 
     const handlePaymentAction = (method: string) => {
         toast({
@@ -349,179 +346,46 @@ const PaymentDialog = () => {
             description: `Payment initiated via ${method}. In a real app, this would redirect to a payment gateway.`,
         });
     };
-    
-    const renderCardForm = () => (
-      <>
-        <DialogHeader>
-            <DialogTitle>Enter Card Details</DialogTitle>
-            <DialogDescription>
-                Your payment is secure. This is a UI mockup.
-            </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-            <div className="space-y-1">
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input id="cardNumber" placeholder="•••• •••• •••• ••••" />
-            </div>
-            <div className="space-y-1">
-                <Label htmlFor="cardName">Name on Card</Label>
-                <Input id="cardName" placeholder="John Doe" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-1">
-                    <Label htmlFor="expiryDate">Expiry Date</Label>
-                    <Input id="expiryDate" placeholder="MM/YY" />
-                </div>
-                 <div className="space-y-1">
-                    <Label htmlFor="cvv">CVV</Label>
-                    <Input id="cvv" placeholder="•••" />
-                </div>
-            </div>
-        </div>
-        <DialogFooter>
-            <Button variant="outline" onClick={() => setView('options')}>Back</Button>
-            <DialogClose asChild>
-                <Button onClick={() => handlePaymentAction('Card')}>Pay Now</Button>
-            </DialogClose>
-        </DialogFooter>
-      </>
-    );
-
-     const renderBankDetailsForm = () => (
-        <>
-            <DialogHeader>
-                <DialogTitle>Login to {selectedBank}</DialogTitle>
-                <DialogDescription>Enter your internet banking credentials. This is a mockup.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                    <Label htmlFor="userId">User ID</Label>
-                    <Input id="userId" placeholder="Your User ID" />
-                </div>
-                <div className="space-y-1">
-                    <Label htmlFor="password">Password</Label>
-                    <Input id="password" type="password" placeholder="••••••••" />
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setView('netbanking')}>Back</Button>
-                <DialogClose asChild>
-                    <Button onClick={() => handlePaymentAction(selectedBank || 'Net Banking')}>Login & Pay</Button>
-                </DialogClose>
-            </DialogFooter>
-        </>
-    );
-    
-    const renderNetBankingForm = () => {
-        const banks = [
-            "State Bank of India", "Punjab National Bank", "Bank of Baroda", "Canara Bank",
-            "Union Bank of India", "Bank of India", "Indian Bank", "Central Bank of India",
-            "Indian Overseas Bank", "UCO Bank", "Bank of Maharashtra", "Punjab & Sind Bank",
-            "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank",
-            "Yes Bank", "IDFC First Bank", "Bandhan Bank", "RBL Bank", "Federal Bank",
-            "South Indian Bank", "Karur Vysya Bank", "City Union Bank", "DCB Bank",
-            "Dhanlaxmi Bank", "Jammu & Kashmir Bank",
-            "Airtel Payments Bank", "India Post Payments Bank", "Fino Payments Bank", "Jio Payments Bank", "Paytm Payments Bank",
-            "Citibank", "HSBC Bank", "Standard Chartered Bank", "Deutsche Bank", "DBS Bank",
-            "AU Small Finance Bank", "Equitas Small Finance Bank", "Ujjivan Small Finance Bank", "Jana Small Finance Bank"
-        ];
-        const filteredBanks = banks.filter(bank => bank.toLowerCase().includes(bankSearch.toLowerCase()));
-        return (
-          <>
-            <DialogHeader>
-                <DialogTitle>Select Your Bank</DialogTitle>
-                <DialogDescription>
-                    Choose your bank to proceed with Net Banking.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input 
-                      placeholder="Search bank name..."
-                      className="pl-10"
-                      value={bankSearch}
-                      onChange={(e) => setBankSearch(e.target.value)}
-                  />
-                </div>
-                <ScrollArea className="h-60">
-                    <div className="space-y-2 pr-4">
-                        {filteredBanks.length > 0 ? (
-                            filteredBanks.map(bank => (
-                                <Button
-                                    key={bank}
-                                    className="w-full justify-start py-6"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setSelectedBank(bank);
-                                        setView('bank-details');
-                                    }}
-                                >
-                                    <Landmark className="mr-4 h-5 w-5 text-muted-foreground" />
-                                    <span className="text-sm">{bank}</span>
-                                </Button>
-                            ))
-                        ) : (
-                            <p className="text-sm text-muted-foreground text-center py-10">No banks found.</p>
-                        )}
-                    </div>
-                </ScrollArea>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setView('options')}>Back to Payment Options</Button>
-            </DialogFooter>
-          </>
-        );
-    };
-    
-    const renderOptions = () => (
-      <>
-        <DialogHeader>
-            <DialogTitle>Complete Your Payment</DialogTitle>
-            <DialogDescription>
-                Choose your preferred payment method to pay the fees.
-            </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-            <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Google Pay')}>
-                <Wallet className="mr-4 h-6 w-6 text-primary" />
-                <span className="text-base">Google Pay</span>
-            </Button>
-            <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('PhonePe')}>
-                <Wallet className="mr-4 h-6 w-6 text-primary" />
-                <span className="text-base">PhonePe</span>
-            </Button>
-            <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Paytm')}>
-                <Wallet className="mr-4 h-6 w-6 text-primary" />
-                <span className="text-base">Paytm</span>
-            </Button>
-             <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('UPI')}>
-                <Wallet className="mr-4 h-6 w-6 text-primary" />
-                <span className="text-base">UPI</span>
-            </Button>
-            <Button className="w-full justify-start py-6" variant="outline" onClick={() => setView('netbanking')}>
-                <Landmark className="mr-4 h-6 w-6 text-primary" />
-                <span className="text-base">Net Banking</span>
-            </Button>
-            <Button className="w-full justify-start py-6" variant="outline" onClick={() => setView('card')}>
-                <CreditCard className="mr-4 h-6 w-6 text-primary" />
-                <span className="text-base">Credit/Debit Card</span>
-            </Button>
-        </div>
-        <DialogFooter className="text-xs text-muted-foreground text-center">
-             <p>
-                Please note: A 2% convenience fee is included in the payment amount to support the developer. This is a UI mockup; no real transaction will occur.
-            </p>
-        </DialogFooter>
-       </>
-    );
 
     return (
         <DialogContent className="sm:max-w-md">
-            {view === 'options' && renderOptions()}
-            {view === 'card' && renderCardForm()}
-            {view === 'netbanking' && renderNetBankingForm()}
-            {view === 'bank-details' && renderBankDetailsForm()}
+            <DialogHeader>
+                <DialogTitle>Complete Your Payment</DialogTitle>
+                <DialogDescription>
+                    Choose your preferred payment method to pay the fees.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Google Pay')}>
+                    <Wallet className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">Google Pay</span>
+                </Button>
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('PhonePe')}>
+                    <Wallet className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">PhonePe</span>
+                </Button>
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Paytm')}>
+                    <Wallet className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">Paytm</span>
+                </Button>
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('UPI')}>
+                    <Wallet className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">UPI</span>
+                </Button>
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Net Banking')}>
+                    <Landmark className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">Net Banking</span>
+                </Button>
+                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Credit/Debit Card')}>
+                    <CreditCard className="mr-4 h-6 w-6 text-primary" />
+                    <span className="text-base">Credit/Debit Card</span>
+                </Button>
+            </div>
+            <DialogFooter className="text-xs text-muted-foreground text-center">
+                <p>
+                    Please note: A 2% convenience fee is included in the payment amount to support the developer. This is a UI mockup; no real transaction will occur.
+                </p>
+            </DialogFooter>
         </DialogContent>
     );
 };
