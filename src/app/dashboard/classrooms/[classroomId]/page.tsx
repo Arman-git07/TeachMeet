@@ -19,7 +19,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
   DialogFooter
 } from '@/components/ui/dialog';
@@ -337,15 +336,127 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
     );
 };
 
+const allIndianBanks = [
+    "State Bank of India", "HDFC Bank", "ICICI Bank", "Punjab National Bank", "Bank of Baroda",
+    "Axis Bank", "Canara Bank", "Union Bank of India", "Kotak Mahindra Bank", "IndusInd Bank",
+    "Bank of India", "Yes Bank", "IDBI Bank", "Central Bank of India", "Indian Bank",
+    "UCO Bank", "Indian Overseas Bank", "Federal Bank", "South Indian Bank", "Karnataka Bank",
+    "Jammu & Kashmir Bank", "City Union Bank", "Karur Vysya Bank", "RBL Bank", "IDFC First Bank",
+    "Bandhan Bank", "CSB Bank", "Dhanlaxmi Bank", "Nainital Bank", "DCB Bank",
+    "Allahabad Bank (merged with Indian Bank)", "Andhra Bank (merged with Union Bank)",
+    "Corporation Bank (merged with Union Bank)", "Dena Bank (merged with Bank of Baroda)",
+    "Oriental Bank of Commerce (merged with PNB)", "Syndicate Bank (merged with Canara Bank)",
+    "United Bank of India (merged with PNB)", "Vijaya Bank (merged with Bank of Baroda)"
+];
+
 const PaymentDialog = () => {
     const { toast } = useToast();
+    const [view, setView] = useState<'options' | 'netbanking' | 'bank-details'>('options');
+    const [selectedBank, setSelectedBank] = useState<string | null>(null);
+    const [bankSearchQuery, setBankSearchQuery] = useState("");
 
     const handlePaymentAction = (method: string) => {
-        toast({
-            title: "Payment Simulated",
-            description: `Payment initiated via ${method}. In a real app, this would redirect to a payment gateway.`,
-        });
+        if (method === 'Net Banking') {
+            setView('netbanking');
+        } else {
+            toast({
+                title: "Payment Simulated",
+                description: `Payment initiated via ${method}. In a real app, this would redirect to a payment gateway.`,
+            });
+        }
     };
+    
+    const handleBankSelect = (bankName: string) => {
+        setSelectedBank(bankName);
+        setView('bank-details');
+    };
+
+    const handleFinalPayment = () => {
+         toast({
+            title: "Payment Simulated",
+            description: `Payment initiated via ${selectedBank}. In a real app, this would connect to the bank's portal.`,
+        });
+    }
+
+    const filteredBanks = allIndianBanks.filter(bank => 
+        bank.toLowerCase().includes(bankSearchQuery.toLowerCase())
+    );
+    
+    if (view === 'bank-details' && selectedBank) {
+        return (
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Login to {selectedBank}</DialogTitle>
+                    <DialogDescription>
+                        Enter your credentials to complete the payment. This is a simulation.
+                    </DialogDescription>
+                </DialogHeader>
+                 <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="user-id">User ID</Label>
+                        <Input id="user-id" placeholder="Enter your User ID" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input id="password" type="password" placeholder="Enter your password" />
+                    </div>
+                </div>
+                <DialogFooter className="sm:justify-between">
+                    <Button variant="outline" onClick={() => { setView('netbanking'); setSelectedBank(null); }}>
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                    </Button>
+                    <DialogClose asChild>
+                        <Button type="button" onClick={handleFinalPayment}>Login & Pay</Button>
+                    </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        );
+    }
+    
+    if (view === 'netbanking') {
+        return (
+            <DialogContent className="sm:max-w-md">
+                 <DialogHeader>
+                    <DialogTitle>Select Your Bank</DialogTitle>
+                    <DialogDescription>Choose your bank to proceed with Net Banking.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                     <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input 
+                            placeholder="Search for your bank..." 
+                            className="pl-10"
+                            value={bankSearchQuery}
+                            onChange={(e) => setBankSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <ScrollArea className="h-64 border rounded-md">
+                        <div className="p-2 space-y-1">
+                            {filteredBanks.map(bank => (
+                                <Button 
+                                    key={bank}
+                                    type="button"
+                                    variant="ghost" 
+                                    className="w-full justify-start"
+                                    onClick={() => handleBankSelect(bank)}
+                                >
+                                    {bank}
+                                </Button>
+                            ))}
+                            {filteredBanks.length === 0 && (
+                                <p className="text-center text-sm text-muted-foreground py-4">No banks found.</p>
+                            )}
+                        </div>
+                    </ScrollArea>
+                </div>
+                 <DialogFooter>
+                    <Button variant="outline" onClick={() => setView('options')}>
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Payment Options
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        );
+    }
 
     return (
         <DialogContent className="sm:max-w-md">
@@ -356,27 +467,27 @@ const PaymentDialog = () => {
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Google Pay')}>
+                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Google Pay')}>
                     <Wallet className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">Google Pay</span>
                 </Button>
-                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('PhonePe')}>
+                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('PhonePe')}>
                     <Wallet className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">PhonePe</span>
                 </Button>
-                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Paytm')}>
+                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Paytm')}>
                     <Wallet className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">Paytm</span>
                 </Button>
-                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('UPI')}>
+                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('UPI')}>
                     <Wallet className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">UPI</span>
                 </Button>
-                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Net Banking')}>
+                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Net Banking')}>
                     <Landmark className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">Net Banking</span>
                 </Button>
-                <Button className="w-full justify-start py-6" variant="outline" onClick={() => handlePaymentAction('Credit/Debit Card')}>
+                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Credit/Debit Card')}>
                     <CreditCard className="mr-4 h-6 w-6 text-primary" />
                     <span className="text-base">Credit/Debit Card</span>
                 </Button>
@@ -879,7 +990,10 @@ const AssignmentDialog = React.memo(({ classroomId, onAssignmentAction, assignme
 
             if (assignmentToEdit) {
                 const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentToEdit.id);
-                await updateDoc(assignmentRef, assignmentData);
+                await updateDoc(assignmentRef, {
+                    ...assignmentData,
+                    dueDate: assignmentData.dueDate, // Ensure date is passed correctly
+                });
                 toast({ title: 'Assignment Updated', description: `"${title.trim()}" has been updated.` });
             } else {
                 await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), {
