@@ -2000,7 +2000,12 @@ export default function ClassroomPage() {
                                 <p className="font-bold text-3xl">{feeAmountFormatted}</p>
                                 <p className="text-sm text-muted-foreground">Due by: Dec 31, 2024</p>
                             </div>
-                             <Button className="w-full btn-gel">Pay Now</Button>
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                     <Button className="w-full btn-gel">Pay Now</Button>
+                                </DialogTrigger>
+                                <PaymentDialog />
+                             </Dialog>
                         </CardContent>
                     </Card>
                     <Card>
