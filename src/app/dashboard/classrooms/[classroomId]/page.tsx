@@ -129,7 +129,10 @@ export default function ClassroomPage() {
     const [materialFile, setMaterialFile] = useState<File | null>(null);
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
 
-    const isTeacher = useMemo(() => user && classroom?.teachers.includes(user.uid), [user, classroom]);
+    const isTeacher = useMemo(() => {
+        if (!user || !classroom || !classroom.teachers) return false;
+        return classroom.teachers.includes(user.uid);
+    }, [user, classroom]);
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
