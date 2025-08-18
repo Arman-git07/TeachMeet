@@ -28,6 +28,7 @@ import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 // --- Interfaces ---
 interface Classroom {
@@ -304,15 +305,18 @@ export default function ClassroomPage() {
             )}
 
             <Tabs defaultValue="announcements" className="w-full">
-                <TabsList className="mb-4">
-                    <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
-                    <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
-                    <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
-                    <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
-                    <TabsTrigger value="students"><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
-                    <TabsTrigger value="teachers"><Briefcase className="mr-2 h-4 w-4" />Teachers</TabsTrigger>
-                    <TabsTrigger value="fees"><CreditCard className="mr-2 h-4 w-4" />Fees</TabsTrigger>
-                </TabsList>
+                <ScrollArea className="w-full whitespace-nowrap rounded-lg">
+                    <TabsList className="mb-4 inline-flex">
+                        <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
+                        <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
+                        <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
+                        <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
+                        <TabsTrigger value="students"><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
+                        <TabsTrigger value="teachers"><Briefcase className="mr-2 h-4 w-4" />Teachers</TabsTrigger>
+                        <TabsTrigger value="fees"><CreditCard className="mr-2 h-4 w-4" />Fees</TabsTrigger>
+                    </TabsList>
+                    <ScrollBar orientation="horizontal" />
+                </ScrollArea>
 
                 {/* Announcements Tab */}
                 <TabsContent value="announcements">
