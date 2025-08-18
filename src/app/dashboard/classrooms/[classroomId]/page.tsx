@@ -20,7 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
-  DialogFooter
+  DialogFooter,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
