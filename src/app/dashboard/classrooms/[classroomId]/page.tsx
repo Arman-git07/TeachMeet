@@ -304,7 +304,7 @@ export default function ClassroomPage() {
             )}
 
             <Tabs defaultValue="announcements" className="w-full">
-                <TabsList className="mb-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7">
+                <TabsList className="mb-4">
                     <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
                     <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
                     <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
