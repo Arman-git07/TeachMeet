@@ -2,6 +2,8 @@
 
 'use client';
 
+import React, 'use a client';
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -1919,12 +1921,12 @@ export default function ClassroomPage() {
                                 <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5"/>Make a Payment</CardTitle>
                                 <CardDescription>Pay your tuition and other fees securely.</CardDescription>
                             </div>
-                             {!isTeacher && (
-                                <Dialog>
+                            {isTeacher && (
+                                <Dialog open={isEditFeeOpen} onOpenChange={setIsEditFeeOpen}>
                                     <DialogTrigger asChild>
                                         <Button variant="outline" size="icon"><Edit className="h-4 w-4" /></Button>
                                     </DialogTrigger>
-                                    {classroom && <EditFeeDialog classroom={classroom} onFeeUpdated={() => {}} />}
+                                    {classroom && <EditFeeDialog classroom={classroom} onFeeUpdated={() => setIsEditFeeOpen(false)} />}
                                 </Dialog>
                             )}
                         </CardHeader>
