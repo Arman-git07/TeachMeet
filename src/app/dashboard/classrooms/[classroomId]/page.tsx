@@ -66,6 +66,8 @@ import {
   Wallet,
   Type,
   Search,
+  Copy,
+  QrCode,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -76,6 +78,7 @@ import { Switch } from '@/components/ui/switch';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import Image from 'next/image';
 
 
 interface Classroom {
@@ -86,6 +89,8 @@ interface Classroom {
   teacherName: string;
   feeAmount?: number;
   feeCurrency?: string;
+  upiId?: string;
+  upiQrCodeUrl?: string;
 }
 
 interface JoinRequest {
@@ -337,170 +342,57 @@ const EditFeeDialog = ({ classroom, onFeeUpdated }: { classroom: Classroom; onFe
     );
 };
 
-const allIndianBanks = [
-    "State Bank of India", "HDFC Bank", "ICICI Bank", "Punjab National Bank", "Bank of Baroda",
-    "Axis Bank", "Canara Bank", "Union Bank of India", "Kotak Mahindra Bank", "IndusInd Bank",
-    "Bank of India", "Yes Bank", "IDBI Bank", "Central Bank of India", "Indian Bank",
-    "UCO Bank", "Indian Overseas Bank", "Federal Bank", "South Indian Bank", "Karnataka Bank",
-    "Jammu & Kashmir Bank", "City Union Bank", "Karur Vysya Bank", "RBL Bank", "IDFC First Bank",
-    "Bandhan Bank", "CSB Bank", "Dhanlaxmi Bank", "Nainital Bank", "DCB Bank",
-    "Allahabad Bank (merged with Indian Bank)", "Andhra Bank (merged with Union Bank)",
-    "Corporation Bank (merged with Union Bank)", "Dena Bank (merged with Bank of Baroda)",
-    "Oriental Bank of Commerce (merged with PNB)", "Syndicate Bank (merged with Canara Bank)",
-    "United Bank of India (merged with PNB)", "Vijaya Bank (merged with Bank of Baroda)"
-];
-
-const PaymentDialog = () => {
+const PaymentDetailsDialog = ({ classroom }: { classroom: Classroom | null }) => {
     const { toast } = useToast();
-    const [view, setView] = useState<'options' | 'netbanking' | 'bank-details'>('options');
-    const [selectedBank, setSelectedBank] = useState<string | null>(null);
-    const [bankSearchQuery, setBankSearchQuery] = useState("");
-
-    const handlePaymentAction = (method: string) => {
-        if (method === 'Net Banking') {
-            setView('netbanking');
-        } else {
-            toast({
-                title: "Payment Simulated",
-                description: `Payment initiated via ${method}. In a real app, this would redirect to a payment gateway.`,
-            });
-        }
-    };
-    
-    const handleBankSelect = (bankName: string) => {
-        setSelectedBank(bankName);
-        setView('bank-details');
-    };
-
-    const handleFinalPayment = () => {
-         toast({
-            title: "Payment Simulated",
-            description: `Payment initiated via ${selectedBank}. In a real app, this would connect to the bank's portal.`,
-        });
+    const handleCopy = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast({ title: "Copied!", description: "UPI ID has been copied to your clipboard." });
     }
 
-    const filteredBanks = allIndianBanks.filter(bank => 
-        bank.toLowerCase().includes(bankSearchQuery.toLowerCase())
-    );
-    
-    if (view === 'bank-details' && selectedBank) {
+    if (!classroom?.upiId) {
         return (
-            <DialogContent className="sm:max-w-md">
+            <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Login to {selectedBank}</DialogTitle>
-                    <DialogDescription>
-                        Enter your credentials to complete the payment. This is a simulation.
-                    </DialogDescription>
+                    <DialogTitle>Payment Information</DialogTitle>
                 </DialogHeader>
-                 <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="user-id">User ID</Label>
-                        <Input id="user-id" placeholder="Enter your User ID" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input id="password" type="password" placeholder="Enter your password" />
-                    </div>
+                <div className="py-8 text-center text-muted-foreground">
+                    <p>The teacher has not provided payment details for this classroom yet.</p>
                 </div>
-                <DialogFooter className="sm:justify-between">
-                    <Button variant="outline" onClick={() => { setView('netbanking'); setSelectedBank(null); }}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <DialogClose asChild>
-                        <Button type="button" onClick={handleFinalPayment}>Login & Pay</Button>
-                    </DialogClose>
-                </DialogFooter>
             </DialogContent>
-        );
-    }
-    
-    if (view === 'netbanking') {
-        return (
-            <DialogContent className="sm:max-w-md">
-                 <DialogHeader>
-                    <DialogTitle>Select Your Bank</DialogTitle>
-                    <DialogDescription>Choose your bank to proceed with Net Banking.</DialogDescription>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input 
-                            placeholder="Search for your bank..." 
-                            className="pl-10"
-                            value={bankSearchQuery}
-                            onChange={(e) => setBankSearchQuery(e.target.value)}
-                        />
-                    </div>
-                    <ScrollArea className="h-64 border rounded-md">
-                        <div className="p-2 space-y-1">
-                            {filteredBanks.map(bank => (
-                                <Button 
-                                    key={bank}
-                                    type="button"
-                                    variant="ghost" 
-                                    className="w-full justify-start"
-                                    onClick={() => handleBankSelect(bank)}
-                                >
-                                    {bank}
-                                </Button>
-                            ))}
-                            {filteredBanks.length === 0 && (
-                                <p className="text-center text-sm text-muted-foreground py-4">No banks found.</p>
-                            )}
-                        </div>
-                    </ScrollArea>
-                </div>
-                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setView('options')}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Payment Options
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        );
+        )
     }
 
     return (
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
             <DialogHeader>
-                <DialogTitle>Complete Your Payment</DialogTitle>
-                <DialogDescription>
-                    Choose your preferred payment method to pay the fees.
-                </DialogDescription>
+                <DialogTitle>Pay Classroom Fees</DialogTitle>
+                <DialogDescription>Use the details below to complete your payment. This is a UI prototype; no real transactions will occur.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Google Pay')}>
-                    <Wallet className="mr-4 h-6 w-6 text-primary" />
-                    <span className="text-base">Google Pay</span>
-                </Button>
-                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('PhonePe')}>
-                    <Wallet className="mr-4 h-6 w-6 text-primary" />
-                    <span className="text-base">PhonePe</span>
-                </Button>
-                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Paytm')}>
-                    <Wallet className="mr-4 h-6 w-6 text-primary" />
-                    <span className="text-base">Paytm</span>
-                </Button>
-                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('UPI')}>
-                    <Wallet className="mr-4 h-6 w-6 text-primary" />
-                    <span className="text-base">UPI</span>
-                </Button>
-                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Net Banking')}>
-                    <Landmark className="mr-4 h-6 w-6 text-primary" />
-                    <span className="text-base">Net Banking</span>
-                </Button>
-                <Button className="w-full justify-start py-6" variant="outline" type="button" onClick={() => handlePaymentAction('Credit/Debit Card')}>
-                    <CreditCard className="mr-4 h-6 w-6 text-primary" />
-                    <span className="text-base">Credit/Debit Card</span>
-                </Button>
+            <div className="py-4 space-y-6">
+                <div className="space-y-2">
+                    <Label htmlFor="upiId">Teacher's UPI ID</Label>
+                    <div className="flex items-center gap-2">
+                        <Input id="upiId" value={classroom.upiId} readOnly className="font-mono"/>
+                        <Button variant="outline" size="icon" onClick={() => handleCopy(classroom.upiId || '')}><Copy className="h-4 w-4"/></Button>
+                    </div>
+                </div>
+                {classroom.upiQrCodeUrl && (
+                    <div className="space-y-2">
+                        <Label>Scan QR Code</Label>
+                        <div className="flex justify-center p-4 border rounded-lg bg-muted">
+                            <Image src={classroom.upiQrCodeUrl} alt="UPI QR Code" width={200} height={200} className="rounded-md" data-ai-hint="qr code"/>
+                        </div>
+                    </div>
+                )}
             </div>
-            <DialogFooter className="text-xs text-muted-foreground text-center">
-                <p>
-                    Please note: A 2% convenience fee is included in the payment amount to support the developer. This is a UI mockup; no real transaction will occur.
-                </p>
-            </DialogFooter>
+             <DialogFooter>
+                <DialogClose asChild>
+                    <Button variant="outline">Close</Button>
+                </DialogClose>
+             </DialogFooter>
         </DialogContent>
-    );
-};
+    )
+}
 
 const AudioRecordingDialog = React.memo(({ onAudioRecorded }: { onAudioRecorded: (blob: Blob) => void }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -1103,6 +995,47 @@ export default function ClassroomPage() {
   const [editingTeacher, setEditingTeacher] = useState<SubjectTeacher | null>(null);
 
   const isTeacher = user?.uid === classroom?.teacherId;
+
+  // State for UPI Details Form
+  const [upiIdInput, setUpiIdInput] = useState('');
+  const [qrCodeFile, setQrCodeFile] = useState<File | null>(null);
+  const [isSavingPaymentDetails, setIsSavingPaymentDetails] = useState(false);
+  const qrCodeInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (classroom) {
+      setUpiIdInput(classroom.upiId || '');
+    }
+  }, [classroom]);
+
+  const handleSavePaymentDetails = async () => {
+    if (!isTeacher || !classroomId) return;
+    setIsSavingPaymentDetails(true);
+
+    try {
+      let qrCodeUrl = classroom?.upiQrCodeUrl;
+      if (qrCodeFile) {
+        const qrRef = storageRef(storage, `classrooms/${classroomId}/payment/qrcode.png`);
+        const snapshot = await uploadBytes(qrRef, qrCodeFile);
+        qrCodeUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      const classroomRef = doc(db, 'classrooms', classroomId);
+      await updateDoc(classroomRef, {
+        upiId: upiIdInput.trim(),
+        upiQrCodeUrl: qrCodeUrl || null,
+      });
+
+      toast({ title: 'Payment Details Saved!', description: 'Your UPI details have been updated.' });
+      setQrCodeFile(null);
+    } catch (error) {
+      console.error('Error saving payment details:', error);
+      toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save payment details.' });
+    } finally {
+      setIsSavingPaymentDetails(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!classroom) {
@@ -1986,12 +1919,12 @@ export default function ClassroomPage() {
                                 <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5"/>Make a Payment</CardTitle>
                                 <CardDescription>Pay your tuition and other fees securely.</CardDescription>
                             </div>
-                            {isTeacher && (
-                                <Dialog open={isEditFeeOpen} onOpenChange={setIsEditFeeOpen}>
+                             {!isTeacher && (
+                                <Dialog>
                                     <DialogTrigger asChild>
                                         <Button variant="outline" size="icon"><Edit className="h-4 w-4" /></Button>
                                     </DialogTrigger>
-                                    {classroom && <EditFeeDialog classroom={classroom} onFeeUpdated={() => setIsEditFeeOpen(false)} />}
+                                    {classroom && <EditFeeDialog classroom={classroom} onFeeUpdated={() => {}} />}
                                 </Dialog>
                             )}
                         </CardHeader>
@@ -2000,18 +1933,55 @@ export default function ClassroomPage() {
                                 <p className="font-bold text-3xl">{feeAmountFormatted}</p>
                                 <p className="text-sm text-muted-foreground">Due by: Dec 31, 2024</p>
                             </div>
-                            <Button className="w-full btn-gel">Pay Now</Button>
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button className="w-full btn-gel">Pay Now</Button>
+                                </DialogTrigger>
+                                <PaymentDetailsDialog classroom={classroom} />
+                            </Dialog>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><BadgeDollarSign className="h-5 w-5"/>Payment History</CardTitle>
-                            <CardDescription>View your past transactions.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="text-center text-muted-foreground py-8">
-                             <p>No transaction history found.</p>
-                        </CardContent>
-                    </Card>
+                     {isTeacher ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Payment Details</CardTitle>
+                                <CardDescription>Enter your UPI ID and upload a QR code for students to pay fees.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <Label htmlFor="upi-id">Your UPI ID (e.g., yourname@okbank)</Label>
+                                    <Input id="upi-id" value={upiIdInput} onChange={e => setUpiIdInput(e.target.value)} placeholder="Enter UPI ID" disabled={isSavingPaymentDetails}/>
+                                </div>
+                                <div>
+                                    <Label htmlFor="qr-code">UPI QR Code (Optional)</Label>
+                                    <Input id="qr-code" type="file" accept="image/png, image/jpeg" ref={qrCodeInputRef} onChange={e => setQrCodeFile(e.target.files?.[0] || null)} disabled={isSavingPaymentDetails}/>
+                                </div>
+                                {qrCodeFile ? (
+                                    <p className="text-xs text-muted-foreground">New QR: {qrCodeFile.name}</p>
+                                ) : classroom?.upiQrCodeUrl && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <QrCode className="h-4 w-4" /> Current QR code is set. Upload to replace.
+                                    </div>
+                                )}
+                            </CardContent>
+                            <CardFooter>
+                                <Button onClick={handleSavePaymentDetails} disabled={isSavingPaymentDetails} className="w-full">
+                                    {isSavingPaymentDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                    Save Payment Details
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    ) : (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><BadgeDollarSign className="h-5 w-5"/>Payment History</CardTitle>
+                                <CardDescription>View your past transactions.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="text-center text-muted-foreground py-8">
+                                <p>No transaction history found.</p>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
               </TabsContent>
 
@@ -2086,3 +2056,4 @@ export default function ClassroomPage() {
     </div>
   );
 }
+
