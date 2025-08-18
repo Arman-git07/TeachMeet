@@ -5,118 +5,42 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-
     function isUser(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
     match /meetings/{meetingId} {
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
+      allow update, delete: if isAuthenticated()
+        && resource.data.creatorId == request.auth.uid;
 
-      // Participants can read only if added
+      // Only added participants can read the meeting
       allow read: if isAuthenticated()
-         && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
 
       match /participants/{userId} {
-        // Participant can join themselves or host can add them
-        allow create: if isUser(userId) 
-           || (isAuthenticated() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid);
+        // Host or user themselves can create the participant document
+        allow create: if isUser(userId)
+          || (isAuthenticated() && resource.data.creatorId == request.auth.uid);
 
-        allow read: if isUser(userId) || (isAuthenticated() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid);
+        allow read: if isUser(userId);
 
-        // Any participant in meeting can list participants
+        // Any approved participant can list participants
         allow list: if exists(/databases/$(database)/documents/meetings/$(meetingId)/participants/$(request.auth.uid));
 
-        allow update, delete: if isUser(userId) || (isAuthenticated() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid);
+        allow update, delete: if isUser(userId);
       }
 
       match /joinRequests/{userId} {
-        // Only authenticated users can create their own join request.
         allow create: if isUser(userId);
-        
-        // Host can read and delete join requests for their meeting.
         allow read, delete: if isAuthenticated()
-           && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
-      }
-    }
-
-    // Classrooms
-    match /classrooms/{classroomId} {
-      allow read: if isAuthenticated();
-      allow create: if request.resource.data.teacherId == request.auth.uid;
-      allow update: if resource.data.teacherId == request.auth.uid;
-      allow delete: if resource.data.teacherId == request.auth.uid;
-
-      match /joinRequests/{userId} {
-        allow create: if isUser(userId);
-        allow read, delete: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-      }
-
-      match /announcements/{announcementId} {
-        allow read: if exists(/databases/$(database)/documents/users/$(request.auth.uid)/enrolled/$(classroomId)) || get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-        allow create: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-      }
-
-      match /materials/{materialId} {
-        allow read: if exists(/databases/$(database)/documents/users/$(request.auth.uid)/enrolled/$(classroomId)) || get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-        allow create, delete: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-      }
-      
-      match /assignments/{assignmentId} {
-        allow read: if exists(/databases/$(database)/documents/users/$(request.auth.uid)/enrolled/$(classroomId)) || get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-        allow create, update, delete: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-        
-        match /submissions/{submissionId} {
-            allow read, update: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid || isUser(submissionId);
-            allow create: if isUser(submissionId);
-        }
-      }
-
-      match /exams/{examId} {
-        allow read: if exists(/databases/$(database)/documents/users/$(request.auth.uid)/enrolled/$(classroomId)) || get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-        allow create, update, delete: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-      }
-      
-      match /teachers/{teacherId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-      }
-      
-      match /chat/{messageId} {
-        allow read, create: if exists(/databases/$(database)/documents/users/$(request.auth.uid)/enrolled/$(classroomId)) || get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
+          && resource.data.creatorId == request.auth.uid;
       }
     }
     
-    // User data
-    match /users/{userId} {
-      allow read, create, update: if isUser(userId);
-      
-      match /enrolled/{classroomId} {
-        allow read, create: if isUser(userId);
-        allow delete: if isUser(userId) || get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
-      }
-      
-      match /pendingJoinRequests/{classroomId} {
-        allow read, create, delete: if isUser(userId);
-      }
-    }
-
-    // Documents & Recordings
-    match /documents/{documentId} {
-        allow read: if resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid;
-        allow create: if request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if resource.data.uploaderId == request.auth.uid;
-    }
-
-    match /recordings/{recordingId} {
-        allow read: if resource.data.isPrivate == false || resource.data.uploaderId == request.auth.uid;
-        allow create: if request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if resource.data.uploaderId == request.auth.uid;
-    }
-    
-    match /fcmTokens/{userId} {
-        allow write: if isUser(userId);
+    // Default-deny all other paths for security
+    match /{path=**} {
+      allow read, write: if false;
     }
   }
 }
