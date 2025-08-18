@@ -183,14 +183,20 @@ export default function ClassroomPage() {
     useEffect(() => {
         if (!classroom) return;
         const fetchProfiles = async (userIds: string[], setter: React.Dispatch<React.SetStateAction<UserProfile[]>>) => {
-            if (userIds.length === 0) { setter([]); return; }
+            if (!userIds || userIds.length === 0) { setter([]); return; }
             const profiles: UserProfile[] = [];
-            for (const userId of userIds) {
-                const userDoc = await getDoc(doc(db, 'users', userId));
-                if (userDoc.exists()) profiles.push({ id: userId, ...userDoc.data() } as UserProfile);
-            }
+            // Use Promise.all for more efficient fetching
+            const userDocsPromises = userIds.map(userId => getDoc(doc(db, 'users', userId)));
+            const userDocs = await Promise.all(userDocsPromises);
+            userDocs.forEach((userDoc, index) => {
+                if (userDoc.exists()) {
+                    profiles.push({ id: userIds[index], ...userDoc.data() } as UserProfile);
+                }
+            });
             setter(profiles);
         };
+        
+        // Added check for undefined before accessing .length
         fetchProfiles(classroom.students, setStudents);
         fetchProfiles(classroom.teachers, setTeachers);
     }, [classroom]);
@@ -496,3 +502,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
