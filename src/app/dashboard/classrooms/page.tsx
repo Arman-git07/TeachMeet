@@ -723,8 +723,9 @@ export default function ClassroomsPage() {
       if (!user) return true; // Show all public classes if not logged in
       
       const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
+      const isMyClass = myClasses.some(myClass => myClass.id === publicClass.id);
       
-      return !isEnrolled;
+      return !isEnrolled && !isMyClass;
     });
 
     if (discoverableClasses.length === 0) {

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, writeBatch } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -71,15 +71,21 @@ export default function JoinClassroomPage() {
         setIsJoining(true);
         
         try {
+            const batch = writeBatch(db);
             const requestRef = doc(db, `classrooms/${foundClassroom.id}/joinRequests`, user.uid);
-            
-            await setDoc(requestRef, {
-                studentId: user.uid,
+            batch.set(requestRef, {
+                userId: user.uid, // Explicitly set userId for approval logic
                 studentName: user.displayName || 'Anonymous Student',
                 studentPhotoURL: user.photoURL || '',
                 status: 'pending',
                 requestedAt: serverTimestamp()
             });
+
+            // Also create a document in the user's subcollection to track their pending requests
+            const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, foundClassroom.id);
+            batch.set(userPendingRequestRef, { classroomId: foundClassroom.id, role: 'student' });
+            
+            await batch.commit();
             
             toast({ title: 'Request Sent!', description: 'Your request to join has been sent to the teacher.' });
             router.push('/dashboard/classrooms');
