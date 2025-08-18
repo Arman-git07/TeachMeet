@@ -718,14 +718,13 @@ export default function ClassroomsPage() {
   const DiscoverClassesTab = () => {
     if (isLoadingDiscover || isLoadingRequests) return renderSkeleton();
 
-    // Filter out classes the user is already enrolled in or teaches
+    // Filter out classes the user is already enrolled in
     const discoverableClasses = discoverClasses.filter(publicClass => {
       if (!user) return true; // Show all public classes if not logged in
       
       const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
-      const isMyClass = myClasses.some(myClass => myClass.id === publicClass.id);
       
-      return !isEnrolled && !isMyClass;
+      return !isEnrolled;
     });
 
     if (discoverableClasses.length === 0) {
