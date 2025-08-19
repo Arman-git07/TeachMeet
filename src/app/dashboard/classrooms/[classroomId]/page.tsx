@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -38,6 +38,17 @@ import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // --- Interfaces ---
+interface TeacherInfo {
+    uid: string;
+    name: string;
+    photoURL?: string;
+    subject: string;
+    qualification: string;
+    experience: string;
+    availability: string;
+    resumeURL?: string;
+}
+
 interface Classroom {
     id: string;
     title: string;
@@ -45,7 +56,7 @@ interface Classroom {
     teacherId: string;
     teacherName: string;
     students: string[]; // array of user IDs
-    teachers: string[]; // array of user IDs
+    teachers: TeacherInfo[]; // Array of teacher info objects
     feeAmount?: number;
     feeCurrency?: string;
     paymentDetails?: { upiId: string; qrCodeUrl: string; };
@@ -81,7 +92,7 @@ interface Exam {
   fileUrl?: string; 
   vanishAt?: any; 
 }
-interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; }
+interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; }
 
 // --- Zod Schemas ---
 const feeSchema = z.object({
@@ -312,7 +323,7 @@ export default function ClassroomPage() {
     // State Declarations
     const [classroom, setClassroom] = useState<Classroom | null>(null);
     const [students, setStudents] = useState<UserProfile[]>([]);
-    const [teachers, setTeachers] = useState<UserProfile[]>([]);
+    // Teachers state is now handled by classroom.teachers directly
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
@@ -331,7 +342,7 @@ export default function ClassroomPage() {
 
     const isTeacher = useMemo(() => {
         if (!user || !classroom) return false;
-        return classroom.teacherId === user.uid || (classroom.teachers && classroom.teachers.includes(user.uid));
+        return classroom.teacherId === user.uid || (classroom.teachers && classroom.teachers.some(t => t.uid === user.uid));
     }, [user, classroom]);
 
     // Forms
@@ -383,33 +394,87 @@ export default function ClassroomPage() {
         return () => { unsubAnnouncements(); unsubAssignments(); unsubRequests(); unsubMaterials(); unsubExams(); };
     }, [classroomId]);
 
-    // Fetch user profiles for students and teachers
+    // Fetch user profiles for students
     useEffect(() => {
-        if (!classroom) return;
+        if (!classroom || !classroom.students || classroom.students.length === 0) {
+            setStudents([]);
+            return;
+        }
         const fetchProfiles = async (userIds: string[], setter: React.Dispatch<React.SetStateAction<UserProfile[]>>) => {
             if (!userIds || userIds.length === 0) { setter([]); return; }
             const profiles: UserProfile[] = [];
-            const userDocsPromises = userIds.map(userId => getDoc(doc(db, 'users', userId)));
-            const userDocs = await Promise.all(userDocsPromises);
-            userDocs.forEach((userDoc, index) => {
-                if (userDoc.exists()) {
-                    profiles.push({ id: userIds[index], ...userDoc.data() } as UserProfile);
-                }
-            });
+            // Fetch in chunks of 10 for 'in' query limit
+            for (let i = 0; i < userIds.length; i += 10) {
+                const chunk = userIds.slice(i, i + 10);
+                const q = query(collection(db, 'users'), where('__name__', 'in', chunk));
+                const userDocs = await getDocs(q);
+                userDocs.forEach(userDoc => {
+                    if (userDoc.exists()) {
+                        profiles.push({ id: userDoc.id, ...userDoc.data() } as UserProfile);
+                    }
+                });
+            }
             setter(profiles);
         };
-        
-        if (classroom.students) fetchProfiles(classroom.students, setStudents);
-        if (classroom.teachers) fetchProfiles(classroom.teachers, setTeachers);
-    }, [classroom]);
-
+        fetchProfiles(classroom.students, setStudents);
+    }, [classroom?.students]);
 
     const handleApproveRequest = async (request: JoinRequest) => {
-        // ... (implementation exists)
+        if (!isTeacher || !user) return;
+        try {
+            const batch = writeBatch(db);
+            const classroomRef = doc(db, 'classrooms', classroomId);
+            
+            if (request.role === 'teacher') {
+                const newTeacher: TeacherInfo = {
+                    uid: request.studentId,
+                    name: request.studentName,
+                    photoURL: request.studentPhotoURL || '',
+                    subject: request.applicationData.subject || 'N/A',
+                    qualification: request.applicationData.qualification || 'N/A',
+                    experience: request.applicationData.experience || 'N/A',
+                    availability: request.applicationData.availability || 'N/A',
+                    resumeURL: request.resumeURL || '',
+                };
+                batch.update(classroomRef, { teachers: arrayUnion(newTeacher) });
+            } else {
+                batch.update(classroomRef, { students: arrayUnion(request.studentId) });
+            }
+
+            const enrolledClassroomRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
+            batch.set(enrolledClassroomRef, {
+                classroomId: classroomId,
+                title: classroom?.title,
+                description: classroom?.description,
+                teacherName: classroom?.teacherName,
+            });
+            
+            batch.delete(doc(db, 'classrooms', classroomId, 'joinRequests', request.id));
+            
+            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+            batch.delete(userPendingRequestRef);
+
+            await batch.commit();
+            toast({ title: 'Request Approved!', description: `${request.studentName} has been added to the classroom.` });
+        } catch (error) {
+            console.error('Error approving request:', error);
+            toast({ variant: 'destructive', title: 'Approval Failed' });
+        }
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
-        // ... (implementation exists)
+        if (!isTeacher || !user) return;
+        try {
+            const batch = writeBatch(db);
+            batch.delete(doc(db, 'classrooms', classroomId, 'joinRequests', request.id));
+            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+            batch.delete(userPendingRequestRef);
+            await batch.commit();
+            toast({ title: 'Request Denied' });
+        } catch (error) {
+            console.error('Error denying request:', error);
+            toast({ variant: 'destructive', title: 'Action Failed' });
+        }
     };
     
     const onFeeSubmit = async (data: z.infer<typeof feeSchema>) => {
@@ -590,22 +655,32 @@ export default function ClassroomPage() {
                         </Dialog>
                         <Dialog>
                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Manage Teachers</DropdownMenuItem></DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px]">
+                            <DialogContent className="sm:max-w-lg">
                                 <DialogHeader>
                                     <DialogTitle>Manage Teachers</DialogTitle>
-                                    <DialogDescription>Manage teachers for this classroom ({teachers.length}).</DialogDescription>
+                                    <DialogDescription>Manage subject teachers for this classroom ({classroom.teachers?.length || 0}).</DialogDescription>
                                 </DialogHeader>
                                 <ScrollArea className="max-h-[60vh] p-4">
-                                    <div className="space-y-2">
-                                    {teachers.map(t => (
-                                        <div key={t.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                            <Avatar><AvatarImage src={t.photoURL} /><AvatarFallback>{t.name.charAt(0)}</AvatarFallback></Avatar>
-                                            <span>{t.name}</span>
+                                    <div className="space-y-4">
+                                    {classroom.teachers && classroom.teachers.length > 0 ? classroom.teachers.map(t => (
+                                        <Card key={t.uid} className="p-4">
+                                            <div className="flex items-start gap-4">
+                                                <Avatar className="h-12 w-12"><AvatarImage src={t.photoURL} /><AvatarFallback>{t.name.charAt(0)}</AvatarFallback></Avatar>
+                                                <div className="flex-grow">
+                                                    <CardTitle className="text-lg">{t.name}</CardTitle>
+                                                    <CardDescription>{t.subject}</CardDescription>
+                                                    <div className="mt-2 text-xs space-y-1 text-muted-foreground">
+                                                        <p><Award className="inline-block h-3 w-3 mr-1.5"/>{t.qualification}</p>
+                                                        <p><Book className="inline-block h-3 w-3 mr-1.5"/>{t.experience} experience</p>
+                                                        <p><Clock className="inline-block h-3 w-3 mr-1.5"/>{t.availability}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-2">
+                                                    {t.resumeURL && <Button asChild size="sm" variant="outline"><Link href={t.resumeURL} target="_blank">Resume</Link></Button>}
+                                                </div>
                                             </div>
-                                            <Button variant="outline" size="sm"><MessageSquare className="mr-2 h-4 w-4"/>Chat</Button>
-                                        </div>
-                                    ))}
+                                        </Card>
+                                    )) : <p className="text-muted-foreground text-sm text-center py-4">No subject teachers have been added.</p>}
                                     </div>
                                 </ScrollArea>
                             </DialogContent>
@@ -952,4 +1027,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
