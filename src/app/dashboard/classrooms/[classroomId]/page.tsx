@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -63,7 +63,7 @@ interface Announcement {
 }
 interface Assignment { id: string; title: string; description: string; dueDate: any; }
 interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
-interface Material { id: string; name: string; url: string; uploadedAt: any; }
+interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
 interface Exam { id: string; title: string; date: any; }
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; }
 
@@ -166,7 +166,6 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
 
             await addDoc(collection(db, 'classrooms', classroomId, 'announcements'), announcementData);
             
-            // Notify home screen
             try {
                 const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
                 let activities = rawActivity ? JSON.parse(rawActivity) : [];
@@ -246,12 +245,13 @@ export default function ClassroomPage() {
     const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
     const [isGrading, setIsGrading] = useState<string | null>(null);
     const [materialFile, setMaterialFile] = useState<File | null>(null);
+    const [materialLink, setMaterialLink] = useState('');
+    const [materialName, setMaterialName] = useState('');
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
 
 
     const isTeacher = useMemo(() => {
         if (!user || !classroom) return false;
-        // The user is a teacher if they are the original creator OR if they are in the teachers array.
         return classroom.teacherId === user.uid || (classroom.teachers && classroom.teachers.includes(user.uid));
     }, [user, classroom]);
 
@@ -373,18 +373,49 @@ export default function ClassroomPage() {
     };
 
     const handleMaterialUpload = async () => {
-        if (!materialFile || !isTeacher) return;
+        if (!materialFile || !user) return;
         setIsUploadingMaterial(true);
         try {
             const fileRef = storageRef(storage, `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`);
             const snapshot = await uploadBytes(fileRef, materialFile);
             const url = await getDownloadURL(snapshot.ref);
-            await addDoc(collection(db, 'classrooms', classroomId, 'materials'), { name: materialFile.name, url, uploadedAt: serverTimestamp() });
+            await addDoc(collection(db, 'classrooms', classroomId, 'materials'), { 
+                name: materialFile.name, 
+                url, 
+                uploadedAt: serverTimestamp(), 
+                uploaderName: user.displayName || 'Anonymous',
+                type: 'file',
+            });
             toast({ title: "Material Uploaded!" });
             setMaterialFile(null);
         } catch(error) {
             console.error("Error uploading material:", error);
             toast({ variant: "destructive", title: "Upload Failed" });
+        } finally {
+            setIsUploadingMaterial(false);
+        }
+    };
+
+    const handleLinkShare = async () => {
+        if (!materialLink.trim() || !materialName.trim() || !user) {
+            toast({ variant: "destructive", title: "Invalid Input", description: "Please provide both a name and a valid URL for the link." });
+            return;
+        }
+        setIsUploadingMaterial(true);
+        try {
+             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), { 
+                name: materialName.trim(), 
+                url: materialLink.trim(), 
+                uploadedAt: serverTimestamp(),
+                uploaderName: user.displayName || 'Anonymous',
+                type: 'link',
+            });
+            toast({ title: "Link Shared!" });
+            setMaterialLink('');
+            setMaterialName('');
+        } catch (error) {
+             console.error("Error sharing link:", error);
+            toast({ variant: "destructive", title: "Sharing Failed" });
         } finally {
             setIsUploadingMaterial(false);
         }
@@ -610,25 +641,51 @@ export default function ClassroomPage() {
                             <Card>
                                 <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    {isTeacher && (
-                                        <div className="p-4 border rounded-lg space-y-2">
-                                            <Label htmlFor="material-upload">Upload New Material</Label>
-                                            <div className="flex gap-2">
-                                                <Input id="material-upload" type="file" onChange={(e) => setMaterialFile(e.target.files ? e.target.files[0] : null)} />
-                                                <Button onClick={handleMaterialUpload} disabled={!materialFile || isUploadingMaterial}>
-                                                    {isUploadingMaterial ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
-                                                    Upload
-                                                </Button>
-                                            </div>
-                                        </div>
+                                    {user && (
+                                        <Card className="p-4">
+                                            <Tabs defaultValue="file">
+                                                <TabsList className="grid w-full grid-cols-2">
+                                                    <TabsTrigger value="file">Upload File</TabsTrigger>
+                                                    <TabsTrigger value="link">Share Link</TabsTrigger>
+                                                </TabsList>
+                                                <TabsContent value="file" className="pt-4">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="material-upload">Upload a File (PDF, Image, etc.)</Label>
+                                                        <div className="flex gap-2">
+                                                            <Input id="material-upload" type="file" onChange={(e) => setMaterialFile(e.target.files ? e.target.files[0] : null)} disabled={isUploadingMaterial} />
+                                                            <Button onClick={handleMaterialUpload} disabled={!materialFile || isUploadingMaterial}>
+                                                                {isUploadingMaterial ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
+                                                                Upload
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </TabsContent>
+                                                <TabsContent value="link" className="pt-4">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="material-name">Link Name</Label>
+                                                        <Input id="material-name" placeholder="e.g., 'React Docs', 'Helpful Article'" value={materialName} onChange={(e) => setMaterialName(e.target.value)} disabled={isUploadingMaterial}/>
+                                                    </div>
+                                                     <div className="space-y-2 mt-4">
+                                                        <Label htmlFor="material-link">URL</Label>
+                                                        <Input id="material-link" placeholder="https://example.com" value={materialLink} onChange={(e) => setMaterialLink(e.target.value)} disabled={isUploadingMaterial}/>
+                                                    </div>
+                                                    <Button onClick={handleLinkShare} disabled={!materialLink || !materialName || isUploadingMaterial} className="mt-4">
+                                                        {isUploadingMaterial ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <LinkIcon className="mr-2 h-4 w-4"/>}
+                                                        Share Link
+                                                    </Button>
+                                                </TabsContent>
+                                            </Tabs>
+                                        </Card>
                                     )}
                                     <div className="space-y-2">
                                         {materials.length > 0 ? materials.map(m => (
                                             <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted">
-                                                <span>{m.name}</span>
-                                                <span className="text-xs text-muted-foreground">{new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
+                                                <div>
+                                                    <span className="font-medium flex items-center gap-2">{m.type === 'link' ? <LinkIcon className="h-4 w-4"/> : <FileText className="h-4 w-4"/>}{m.name}</span>
+                                                    <span className="text-xs text-muted-foreground ml-6">Shared by {m.uploaderName} on {new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
+                                                </div>
                                             </a>
-                                        )) : <p className="text-muted-foreground">No materials uploaded yet.</p>}
+                                        )) : <p className="text-muted-foreground text-center py-6">No materials shared yet. Be the first!</p>}
                                     </div>
                                 </CardContent>
                             </Card>
