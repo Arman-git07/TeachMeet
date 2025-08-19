@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -30,6 +31,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import Link from 'next/link';
 
 // --- Interfaces ---
 interface Classroom {
@@ -480,12 +482,14 @@ export default function ClassroomPage() {
                 </Tabs>
             </main>
             <Button
+                asChild
                 variant="default"
                 className="fixed bottom-6 left-6 h-14 w-14 rounded-full shadow-lg btn-gel"
-                onClick={() => toast({ title: 'Class Chat', description: 'Classroom chat feature coming soon!' })}
                 aria-label="Open class chat"
             >
-                <MessageSquare className="h-7 w-7" />
+                <Link href={`/dashboard/classrooms/${classroomId}/chat?topic=${encodeURIComponent(classroom.title)}`}>
+                    <MessageSquare className="h-7 w-7" />
+                </Link>
             </Button>
         </div>
     );
