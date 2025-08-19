@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -34,7 +34,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import Link from 'next/link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // --- Interfaces ---
@@ -113,11 +113,9 @@ const examSchema = z.object({
     title: z.string().min(1, "Exam title is required"),
     date: z.date({ required_error: "Exam date is required" }),
     vanishAt: z.date().optional(),
-    questions: z.array(examQuestionSchema).optional(),
-    examFile: z.any().optional(),
-}).refine(data => (data.questions && data.questions.length > 0) || (data.examFile && data.examFile.length > 0), {
-    message: "You must either add questions or upload an exam file.",
-    path: ["questions"],
+}).refine(data => !data.vanishAt || data.vanishAt > data.date, {
+    message: "Vanish time must be after the exam time.",
+    path: ["vanishAt"],
 });
 
 
@@ -131,10 +129,63 @@ const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, rej
 const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 
 // --- Components ---
+
+const VanishDateTimePicker = ({ date, setDate }: { date: Date | undefined, setDate: (date: Date | undefined) => void }) => {
+    const [time, setTime] = useState({ hour: date?.getHours() ?? 0, minute: date?.getMinutes() ?? 0 });
+    
+    const handleDateSelect = (selectedDate: Date | undefined) => {
+        if (!selectedDate) {
+            setDate(undefined);
+            return;
+        }
+        const newDate = setHours(setMinutes(setSeconds(selectedDate, 0), time.minute), time.hour);
+        setDate(newDate);
+    };
+    
+    const handleTimeChange = (type: 'hour' | 'minute', value: string) => {
+        const numericValue = parseInt(value, 10);
+        if (isNaN(numericValue)) return;
+        
+        let newTime = { ...time };
+        if (type === 'hour') newTime.hour = Math.max(0, Math.min(23, numericValue));
+        if (type === 'minute') newTime.minute = Math.max(0, Math.min(59, numericValue));
+        
+        setTime(newTime);
+        
+        if (date) {
+            const newDate = setHours(setMinutes(date, newTime.minute), newTime.hour);
+            setDate(newDate);
+        }
+    };
+    
+    const displayValue = date ? `${format(date, 'PPP')} at ${format(date, 'p')}` : 'Set vanish date & time';
+
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal rounded-lg", !date && "text-muted-foreground")}>
+                    <Clock className="mr-2 h-4 w-4" />
+                    {displayValue}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+                <Calendar mode="single" selected={date} onSelect={handleDateSelect} initialFocus />
+                <div className="p-3 border-t">
+                    <p className="text-sm font-medium mb-2">Vanish Time</p>
+                    <div className="flex items-center gap-2">
+                        <Input type="number" value={String(time.hour).padStart(2,'0')} onChange={e => handleTimeChange('hour', e.target.value)} className="w-16" min="0" max="23" /> :
+                        <Input type="number" value={String(time.minute).padStart(2,'0')} onChange={e => handleTimeChange('minute', e.target.value)} className="w-16" min="0" max="59"/>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
+
 const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classroomId: string; classroomTitle: string; currentUser: any }) => {
     const [text, setText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [vanishDate, setVanishDate] = useState<Date | undefined>();
+    const [vanishAt, setVanishAt] = useState<Date | undefined>();
     const { toast } = useToast();
 
     const [isRecording, setIsRecording] = useState(false);
@@ -196,7 +247,7 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
                 text: hasText ? text : undefined,
                 audioUrl: audioUrl,
                 createdAt: serverTimestamp(),
-                vanishAt: vanishDate || null,
+                vanishAt: vanishAt || null,
                 creatorId: currentUser.uid,
                 creatorName: currentUser.displayName || "Teacher",
             };
@@ -222,7 +273,7 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
             }
 
             setText('');
-            setVanishDate(undefined);
+            setVanishAt(undefined);
             audioChunksRef.current = [];
             toast({ title: 'Announcement Posted!' });
         } catch (error) {
@@ -241,18 +292,8 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
                     {isRecording ? <StopCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                 </Button>
                 {audioChunksRef.current.length > 0 && !isRecording && <span className="text-sm text-muted-foreground flex items-center gap-1"><AudioLines className="h-4 w-4"/> Audio recorded.</span>}
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-[200px] justify-start text-left font-normal rounded-lg", !vanishDate && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {vanishDate ? format(vanishDate, "PPP") : <span>Set vanish date</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 rounded-xl" align="start">
-                        <Calendar mode="single" selected={vanishDate} onSelect={setVanishDate} initialFocus />
-                    </PopoverContent>
-                </Popover>
-                {vanishDate && <Button variant="ghost" size="sm" onClick={() => setVanishDate(undefined)}>Clear Date</Button>}
+                <VanishDateTimePicker date={vanishAt} setDate={setVanishAt} />
+                {vanishAt && <Button variant="ghost" size="sm" onClick={() => setVanishAt(undefined)}>Clear</Button>}
                 <Button type="submit" disabled={isLoading} className="ml-auto">
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Post Announcement
@@ -297,12 +338,8 @@ export default function ClassroomPage() {
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
     const paymentDetailsForm = useForm<z.infer<typeof paymentDetailsSchema>>({ resolver: zodResolver(paymentDetailsSchema), defaultValues: { upiId: '', qrCode: null } });
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
-    const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema), defaultValues: { questions: [] } });
+    const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema) });
 
-    const { fields, append, remove } = useFieldArray({
-        control: examForm.control,
-        name: "questions"
-    });
 
     // Fetch primary classroom data
     useEffect(() => {
@@ -468,22 +505,36 @@ export default function ClassroomPage() {
     
     const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
         if (!isTeacher || !user) return;
-        examForm.clearErrors(); // Clear previous errors
+        examForm.clearErrors();
+
+        let examContent: any;
+        const examFile = (examForm.getValues('examFile') as FileList)?.[0];
+
+        if (examFile) {
+            examContent = { type: 'file', file: examFile };
+        } else {
+            examContent = { type: 'text', questions: examForm.getValues('questions') };
+        }
+
+        if (examContent.type === 'text' && (!examContent.questions || examContent.questions.length === 0)) {
+            examForm.setError("questions", { type: "manual", message: "You must add at least one question or upload an exam file." });
+            return;
+        }
+
         try {
             let examData: any = {
                 title: data.title,
                 date: data.date,
                 vanishAt: data.vanishAt || null,
-                type: data.examFile && data.examFile.length > 0 ? 'file' : 'text',
+                type: examContent.type,
             };
 
-            if (examData.type === 'file') {
-                const examFile = data.examFile[0];
-                const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${examFile.name}`);
-                const snapshot = await uploadBytes(fileRef, examFile);
+            if (examContent.type === 'file') {
+                const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${examContent.file.name}`);
+                const snapshot = await uploadBytes(fileRef, examContent.file);
                 examData.fileUrl = await getDownloadURL(snapshot.ref);
             } else {
-                examData.content = data.questions;
+                examData.content = examContent.questions;
             }
 
             await addDoc(collection(db, 'classrooms', classroomId, 'exams'), examData);
@@ -783,7 +834,7 @@ export default function ClassroomPage() {
                                                     <DialogTitle>Create New Exam</DialogTitle>
                                                     <DialogDescription>Fill out the details for the new exam.</DialogDescription>
                                                 </DialogHeader>
-                                                <form onSubmit={examForm.handleSubmit(onExamSubmit)} className="space-y-4 py-4">
+                                                 <form onSubmit={examForm.handleSubmit(onExamSubmit)} className="space-y-4 py-4">
                                                     <div className="space-y-2">
                                                         <Label htmlFor="exam-title">Exam Title</Label>
                                                         <Input id="exam-title" {...examForm.register('title')} />
@@ -791,79 +842,19 @@ export default function ClassroomPage() {
                                                     </div>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div className="space-y-2">
-                                                            <Label>Exam Date</Label>
-                                                            <Controller name="date" control={examForm.control} render={({ field }) => (
-                                                                <Popover>
-                                                                    <PopoverTrigger asChild>
-                                                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                                        </Button>
-                                                                    </PopoverTrigger>
-                                                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
-                                                                </Popover>
-                                                            )} />
+                                                            <Label>Exam Date & Time</Label>
+                                                            <Controller control={examForm.control} name="date" render={({ field }) => <VanishDateTimePicker date={field.value} setDate={field.onChange} />} />
                                                             {examForm.formState.errors.date && <p className="text-destructive text-sm">{examForm.formState.errors.date.message}</p>}
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <Label>Vanish Date (Optional)</Label>
-                                                            <Controller name="vanishAt" control={examForm.control} render={({ field }) => (
-                                                                <Popover>
-                                                                    <PopoverTrigger asChild>
-                                                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                                        </Button>
-                                                                    </PopoverTrigger>
-                                                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent>
-                                                                </Popover>
-                                                            )} />
+                                                            <Label>Vanish Time (Optional)</Label>
+                                                            <Controller control={examForm.control} name="vanishAt" render={({ field }) => <VanishDateTimePicker date={field.value} setDate={field.onChange} />} />
+                                                             {examForm.formState.errors.vanishAt && <p className="text-destructive text-sm">{examForm.formState.errors.vanishAt.message}</p>}
                                                         </div>
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <Label>Exam Questions</Label>
-                                                        <ScrollArea className="h-64 w-full rounded-md border p-4 space-y-4">
-                                                            {fields.map((field, index) => (
-                                                                <div key={field.id} className="p-3 border rounded-lg space-y-2 relative">
-                                                                    <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                                                    <Label>Question {index + 1}</Label>
-                                                                    <Input {...examForm.register(`questions.${index}.question`)} placeholder="Question text"/>
-                                                                    {examForm.formState.errors.questions?.[index]?.question && <p className="text-destructive text-sm">{examForm.formState.errors.questions?.[index]?.question?.message}</p>}
-                                                                    
-                                                                    {field.type === 'qa' && (
-                                                                        <>
-                                                                            <Label>Answer</Label>
-                                                                            <Textarea {...examForm.register(`questions.${index}.answer`)} placeholder="Correct answer"/>
-                                                                        </>
-                                                                    )}
-                                                                    
-                                                                    {field.type === 'mcq' && (
-                                                                        <div className="space-y-2 pt-2">
-                                                                            <Label>Options</Label>
-                                                                            <Controller
-                                                                                control={examForm.control}
-                                                                                name={`questions.${index}.correctOptionIndex`}
-                                                                                render={({ field: radioField }) => (
-                                                                                    <RadioGroup onValueChange={(val) => radioField.onChange(parseInt(val))} value={String(radioField.value)} className="space-y-1">
-                                                                                        {[0, 1, 2, 3].map(optionIndex => (
-                                                                                            <div key={optionIndex} className="flex items-center gap-2">
-                                                                                                <RadioGroupItem value={String(optionIndex)} id={`q${index}-o${optionIndex}`}/>
-                                                                                                <Input {...examForm.register(`questions.${index}.options.${optionIndex}.text`)} placeholder={`Option ${optionIndex + 1}`}/>
-                                                                                            </div>
-                                                                                        ))}
-                                                                                    </RadioGroup>
-                                                                                )}
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                            {fields.length === 0 && <p className="text-sm text-muted-foreground text-center">Add questions using the buttons below.</p>}
-                                                        </ScrollArea>
-                                                         <div className="flex gap-2 pt-2">
-                                                            <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'qa', question: '', answer: ''})}>Add Q&A</Button>
-                                                            <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'mcq', question: '', options: [{text:''}, {text:''}, {text:''}, {text:''}], correctOptionIndex: 0 })}>Add Multiple Choice</Button>
-                                                        </div>
+                                                        <Label>Exam Content</Label>
+                                                        <Textarea placeholder="Type or paste exam content here..." />
                                                     </div>
                                                     <div className="relative flex items-center my-4">
                                                         <div className="flex-grow border-t border-muted-foreground"></div><span className="flex-shrink mx-4 text-muted-foreground text-xs">OR</span><div className="flex-grow border-t border-muted-foreground"></div>
@@ -872,12 +863,6 @@ export default function ClassroomPage() {
                                                         <Label htmlFor="exam-file">Upload Exam Paper</Label>
                                                         <Input id="exam-file" type="file" {...examForm.register('examFile')} />
                                                     </div>
-                                                     {examForm.formState.errors.questions && (
-                                                        <div className="p-3 bg-destructive/10 text-destructive-foreground rounded-md text-sm flex items-center gap-2">
-                                                          <AlertTriangle className="h-4 w-4" />
-                                                          <p>{examForm.formState.errors.questions.message}</p>
-                                                        </div>
-                                                      )}
                                                     <DialogFooter>
                                                         <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
                                                         <Button type="submit">Create Exam</Button>
@@ -923,3 +908,4 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
