@@ -250,8 +250,9 @@ export default function ClassroomPage() {
 
 
     const isTeacher = useMemo(() => {
-        if (!user || !classroom || !classroom.teachers) return false;
-        return classroom.teachers.includes(user.uid);
+        if (!user || !classroom) return false;
+        // The user is a teacher if they are the original creator OR if they are in the teachers array.
+        return classroom.teacherId === user.uid || (classroom.teachers && classroom.teachers.includes(user.uid));
     }, [user, classroom]);
 
     // Forms
