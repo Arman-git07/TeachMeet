@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Users, MessageSquare, AtSign, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Users, MessageSquare, AtSign, Loader2, Mic, StopCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -15,12 +15,14 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/components/ui/popover";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from 'firebase/firestore';
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
   id: string;
   senderName: string;
   senderAvatar?: string;
-  text: string;
+  text?: string;
+  audioUrl?: string;
   timestamp: Date;
   isMe: boolean;
 }
@@ -38,6 +40,7 @@ export default function ClassroomChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic') || "Classroom Chat";
+  const { toast } = useToast();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -45,6 +48,10 @@ export default function ClassroomChatPage() {
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
   const [showMentions, setShowMentions] = useState(false);
   
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -179,6 +186,48 @@ export default function ClassroomChatPage() {
     setInputValue("");
     setShowMentions(false);
   };
+  
+  const handleToggleRecording = async () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        const newMessage: ChatMessage = {
+          id: Date.now().toString(),
+          senderName: 'You',
+          audioUrl: audioUrl,
+          timestamp: new Date(),
+          isMe: true,
+        };
+        setMessages(prev => [...prev, newMessage]);
+
+        // Stop the media stream tracks to turn off the recording indicator
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      toast({ title: "Recording Started", description: "Click the stop button to finish." });
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      toast({ variant: 'destructive', title: "Microphone Access Denied", description: "Please enable microphone permissions in your browser settings." });
+    }
+  };
 
   const backToClassroomLink = `/dashboard/classrooms/${classroomId}`;
 
@@ -219,13 +268,15 @@ export default function ClassroomChatPage() {
                           "max-w-[70%] p-3 rounded-xl shadow",
                           msg.isMe
                             ? "bg-primary text-primary-foreground rounded-br-none"
-                            : "bg-card text-card-foreground rounded-bl-none",
-                          msg.sender === 'system' && "w-full text-center bg-transparent shadow-none italic text-muted-foreground text-xs"
+                            : "bg-card text-card-foreground rounded-bl-none"
                         )}
                       >
-                        {!msg.isMe && msg.sender !== 'system' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
-                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                        {msg.sender !== 'system' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                        {!msg.isMe && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                        {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
+                        {msg.audioUrl && (
+                          <audio src={msg.audioUrl} controls className="max-w-full" />
+                        )}
+                        {msg.senderName !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                       </div>
                       {msg.isMe && (
                         <Avatar className="h-8 w-8 self-start">
@@ -263,10 +314,17 @@ export default function ClassroomChatPage() {
                           }
                         }}
                       />
-                      <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
-                        <Send className="h-5 w-5" />
-                        <span className="sr-only">Send message</span>
-                      </Button>
+                      {inputValue.trim() ? (
+                        <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
+                          <Send className="h-5 w-5" />
+                          <span className="sr-only">Send message</span>
+                        </Button>
+                      ) : (
+                        <Button type="button" size="icon" className={cn("rounded-lg btn-gel w-10 h-10", isRecording && "bg-destructive hover:bg-destructive/90")} onClick={handleToggleRecording}>
+                          {isRecording ? <StopCircle className="h-5 w-5"/> : <Mic className="h-5 w-5" />}
+                          <span className="sr-only">{isRecording ? "Stop recording" : "Record voice message"}</span>
+                        </Button>
+                      )}
                     </form>
                   </PopoverAnchor>
                   <PopoverContent onOpenAutoFocus={(e) => e.preventDefault()} className="w-72 p-1 space-y-1 max-h-60 overflow-y-auto">
