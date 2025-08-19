@@ -196,7 +196,6 @@ export default function ClassroomPage() {
             setter(profiles);
         };
         
-        // Added check for undefined before accessing .length
         fetchProfiles(classroom.students, setStudents);
         fetchProfiles(classroom.teachers, setTeachers);
     }, [classroom]);
@@ -311,21 +310,23 @@ export default function ClassroomPage() {
             )}
 
             <Tabs defaultValue="announcements" className="w-full">
-                <ScrollArea className="w-full whitespace-nowrap rounded-lg">
-                    <TabsList className="mb-4 inline-flex">
-                        <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
-                        <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
-                        <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
-                        <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
-                        <TabsTrigger value="students"><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
-                        <TabsTrigger value="teachers"><Briefcase className="mr-2 h-4 w-4" />Teachers</TabsTrigger>
-                        <TabsTrigger value="fees"><CreditCard className="mr-2 h-4 w-4" />Fees</TabsTrigger>
-                    </TabsList>
-                    <ScrollBar orientation="horizontal" />
-                </ScrollArea>
+                 <div className="relative border-b">
+                    <ScrollArea className="w-full whitespace-nowrap">
+                        <TabsList className="mb-[-1px] space-x-2 bg-transparent p-0">
+                            <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
+                            <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
+                            <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
+                            <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
+                            <TabsTrigger value="students"><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
+                            <TabsTrigger value="teachers"><Briefcase className="mr-2 h-4 w-4" />Teachers</TabsTrigger>
+                            <TabsTrigger value="fees"><CreditCard className="mr-2 h-4 w-4" />Fees</TabsTrigger>
+                        </TabsList>
+                        <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                </div>
 
                 {/* Announcements Tab */}
-                <TabsContent value="announcements">
+                <TabsContent value="announcements" className="mt-4">
                     <Card><CardHeader><CardTitle>Announcements</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
                             {isTeacher && <AnnouncementForm classroomId={classroomId} onAnnouncementPosted={() => {}} />}
@@ -342,7 +343,7 @@ export default function ClassroomPage() {
                 </TabsContent>
                 
                 {/* Assignments Tab */}
-                <TabsContent value="assignments">
+                <TabsContent value="assignments" className="mt-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Assignments</CardTitle>
@@ -364,7 +365,7 @@ export default function ClassroomPage() {
                 </TabsContent>
                 
                 {/* Materials Tab */}
-                <TabsContent value="materials">
+                <TabsContent value="materials" className="mt-4">
                     <Card>
                         <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
@@ -393,7 +394,7 @@ export default function ClassroomPage() {
                 </TabsContent>
 
                 {/* Exams Tab */}
-                <TabsContent value="exams">
+                <TabsContent value="exams" className="mt-4">
                     <Card>
                         <CardHeader><CardTitle>Exams & Tests</CardTitle></CardHeader>
                         <CardContent><p className="text-muted-foreground">Exams & Tests feature coming soon.</p></CardContent>
@@ -401,7 +402,7 @@ export default function ClassroomPage() {
                 </TabsContent>
 
                 {/* Students Tab */}
-                <TabsContent value="students">
+                <TabsContent value="students" className="mt-4">
                     <Card>
                         <CardHeader><CardTitle>Enrolled Students ({students.length})</CardTitle></CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -416,7 +417,7 @@ export default function ClassroomPage() {
                 </TabsContent>
                 
                 {/* Teachers Tab */}
-                 <TabsContent value="teachers">
+                 <TabsContent value="teachers" className="mt-4">
                     <Card>
                         <CardHeader><CardTitle>Teachers ({teachers.length})</CardTitle></CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -434,7 +435,7 @@ export default function ClassroomPage() {
                 </TabsContent>
 
                 {/* Fees Tab */}
-                <TabsContent value="fees">
+                <TabsContent value="fees" className="mt-4">
                     <Card>
                         <CardHeader>
                             <div className="flex justify-between items-center">
@@ -482,19 +483,7 @@ export default function ClassroomPage() {
                         <CardContent className="text-center">
                             <p className="text-muted-foreground">Total Amount Due</p>
                             <div className="flex justify-center items-center gap-2">{currencySymbols[classroom.feeCurrency || 'INR']}<p className="font-bold text-3xl">{classroom.feeAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}</p><Badge>{classroom.feeCurrency || 'INR'}</Badge></div>
-                            <Dialog>
-                                <DialogTrigger asChild><Button className="w-full btn-gel mt-4">Pay Now</Button></DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader><DialogTitle>Make a Payment</DialogTitle>
-                                        <DialogDescription>{ classroom?.paymentDetails?.upiId || classroom?.paymentDetails?.qrCodeUrl ? "Use the details below to complete your payment. This is a simulation." : "The teacher has not provided payment details yet."}</DialogDescription>
-                                    </DialogHeader>
-                                    <div className="py-4 space-y-4">
-                                      {classroom?.paymentDetails?.upiId && (<div><p className="font-semibold">UPI ID:</p><p className="font-mono bg-muted p-2 rounded-md">{classroom.paymentDetails.upiId}</p></div>)}
-                                      {classroom?.paymentDetails?.qrCodeUrl && (<div className="text-center"><p className="font-semibold mb-2">Scan QR Code:</p><Image src={classroom.paymentDetails.qrCodeUrl} alt="Payment QR Code" width={200} height={200} className="mx-auto rounded-lg" data-ai-hint="qr code"/></div>)}
-                                      {!(classroom?.paymentDetails?.upiId || classroom?.paymentDetails?.qrCodeUrl) && (<p className="text-center text-muted-foreground">Please check back later or contact your teacher.</p>)}
-                                    </div>
-                                </DialogContent>
-                            </Dialog>
+                            <Button className="w-full btn-gel mt-4">Pay Now</Button>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -502,5 +491,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    
