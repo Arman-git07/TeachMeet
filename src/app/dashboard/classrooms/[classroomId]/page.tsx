@@ -21,7 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, PanelRightOpen, PanelRightClose, Settings } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -129,7 +129,6 @@ export default function ClassroomPage() {
     const [isGrading, setIsGrading] = useState<string | null>(null);
     const [materialFile, setMaterialFile] = useState<File | null>(null);
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
-    const [isManagementPanelOpen, setIsManagementPanelOpen] = useState(false);
 
 
     const isTeacher = useMemo(() => {
@@ -279,216 +278,193 @@ export default function ClassroomPage() {
     };
 
     return (
-        <div className="flex flex-1 overflow-hidden">
-            <main className={cn("flex-1 p-4 md:p-8 transition-all duration-300 ease-in-out overflow-y-auto", isManagementPanelOpen ? "md:mr-[350px]" : "mr-0")}>
-                <header className="mb-6">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <Button variant="link" onClick={() => router.back()} className="p-0 mb-2 text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Back to classrooms</Button>
-                            <h1 className="text-4xl font-bold">{classroom.title}</h1>
-                            <p className="text-lg text-muted-foreground">{classroom.description}</p>
-                            <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
-                        </div>
-                        <Button variant="outline" size="lg" className="hidden md:flex" onClick={() => setIsManagementPanelOpen(!isManagementPanelOpen)}>
-                            {isManagementPanelOpen ? <PanelRightClose className="mr-2 h-5 w-5"/> : <PanelRightOpen className="mr-2 h-5 w-5"/>}
-                            Manage
-                        </Button>
-                    </div>
-                </header>
+        <div className="flex flex-1 flex-col overflow-hidden">
+             <header className="mb-6 px-4 md:px-8">
+                <Button variant="link" onClick={() => router.back()} className="p-0 mb-2 text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Back to classrooms</Button>
+                <h1 className="text-4xl font-bold">{classroom.title}</h1>
+                <p className="text-lg text-muted-foreground">{classroom.description}</p>
+                <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
+            </header>
 
-                <Tabs defaultValue="announcements" className="w-full">
-                    <TabsList>
-                        <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
-                        <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
-                        <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
-                        <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
-                    </TabsList>
+            <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
+                <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1">
+                    <ScrollArea className="w-full whitespace-nowrap rounded-lg border-b">
+                        <TabsList className="inline-flex h-auto">
+                            <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
+                            <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
+                            <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
+                            <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
+                            <TabsTrigger value="students"><Users className="mr-2 h-4 w-4" />Students</TabsTrigger>
+                            <TabsTrigger value="teachers"><Briefcase className="mr-2 h-4 w-4" />Teachers</TabsTrigger>
+                            <TabsTrigger value="fees"><CreditCard className="mr-2 h-4 w-4" />Fees</TabsTrigger>
+                        </TabsList>
+                    </ScrollArea>
                     
-                    {/* Content Tabs */}
-                    <TabsContent value="announcements" className="mt-4">
-                        <Card><CardHeader><CardTitle>Announcements</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                {isTeacher && <AnnouncementForm classroomId={classroomId} onAnnouncementPosted={() => {}} />}
-                                <div className="space-y-3">
-                                    {announcements.length > 0 ? announcements.map(a => (
-                                        <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
-                                            <p className="text-sm">{a.text}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">{new Date(a.createdAt?.toDate()).toLocaleString()}</p>
-                                        </div>
-                                    )) : <p className="text-muted-foreground">No announcements yet.</p>}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    
-                    <TabsContent value="assignments" className="mt-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Assignments</CardTitle>
-                                {isTeacher && (
-                                    <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-                                        <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4"/>Create Assignment</Button></DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader><DialogTitle>New Assignment</DialogTitle></DialogHeader>
-                                            <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
-                                                {/* Assignment form fields here */}
-                                                <Button type="submit">Create</Button>
-                                            </form>
-                                        </DialogContent>
-                                    </Dialog>
-                                )}
-                            </CardHeader>
-                            <CardContent><p className="text-muted-foreground">Assignments feature coming soon.</p></CardContent>
-                        </Card>
-                    </TabsContent>
-                    
-                    <TabsContent value="materials" className="mt-4">
-                        <Card>
-                            <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                {isTeacher && (
-                                    <div className="p-4 border rounded-lg space-y-2">
-                                        <Label htmlFor="material-upload">Upload New Material</Label>
-                                        <div className="flex gap-2">
-                                            <Input id="material-upload" type="file" onChange={(e) => setMaterialFile(e.target.files ? e.target.files[0] : null)} />
-                                            <Button onClick={handleMaterialUpload} disabled={!materialFile || isUploadingMaterial}>
-                                                {isUploadingMaterial ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
-                                                Upload
-                                            </Button>
-                                        </div>
+                    <div className="flex-grow overflow-y-auto pt-4">
+                        <TabsContent value="announcements">
+                            <Card><CardHeader><CardTitle>Announcements</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    {isTeacher && <AnnouncementForm classroomId={classroomId} onAnnouncementPosted={() => {}} />}
+                                    <div className="space-y-3">
+                                        {announcements.length > 0 ? announcements.map(a => (
+                                            <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
+                                                <p className="text-sm">{a.text}</p>
+                                                <p className="text-xs text-muted-foreground mt-1">{new Date(a.createdAt?.toDate()).toLocaleString()}</p>
+                                            </div>
+                                        )) : <p className="text-muted-foreground">No announcements yet.</p>}
                                     </div>
-                                )}
-                                <div className="space-y-2">
-                                    {materials.length > 0 ? materials.map(m => (
-                                        <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted">
-                                            <span>{m.name}</span>
-                                            <span className="text-xs text-muted-foreground">{new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
-                                        </a>
-                                    )) : <p className="text-muted-foreground">No materials uploaded yet.</p>}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    <TabsContent value="exams" className="mt-4">
-                        <Card>
-                            <CardHeader><CardTitle>Exams & Tests</CardTitle></CardHeader>
-                            <CardContent><p className="text-muted-foreground">Exams & Tests feature coming soon.</p></CardContent>
-                        </Card>
-                    </TabsContent>
-
-                </Tabs>
-            </main>
-
-            {/* Management Panel */}
-            <aside className={cn(
-                "fixed top-16 right-0 bottom-0 z-20 w-[350px] bg-card border-l transform transition-transform duration-300 ease-in-out",
-                isManagementPanelOpen ? "translate-x-0" : "translate-x-full"
-            )}>
-                 <ScrollArea className="h-full">
-                    <div className="p-4 space-y-6">
-                        {isTeacher && joinRequests.length > 0 && (
-                            <Card className="bg-primary/10 border-primary/20">
-                                <CardHeader><CardTitle>{joinRequests.length} New Join Request{joinRequests.length > 1 ? 's' : ''}</CardTitle></CardHeader>
-                                <CardContent className="space-y-3">
-                                    {joinRequests.map(req => (
-                                        <div key={req.id} className="flex items-center justify-between p-2 bg-background rounded-lg">
-                                            <div className="flex items-center gap-2">
-                                                <Avatar><AvatarImage src={req.studentPhotoURL} /><AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback></Avatar>
-                                                <div><p className="font-medium">{req.studentName}</p><Badge variant="secondary">{req.role}</Badge></div>
-                                            </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        
+                        <TabsContent value="assignments">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle>Assignments</CardTitle>
+                                    {isTeacher && (
+                                        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+                                            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4"/>Create Assignment</Button></DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader><DialogTitle>New Assignment</DialogTitle></DialogHeader>
+                                                <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
+                                                    {/* Assignment form fields here */}
+                                                    <Button type="submit">Create</Button>
+                                                </form>
+                                            </DialogContent>
+                                        </Dialog>
+                                    )}
+                                </CardHeader>
+                                <CardContent><p className="text-muted-foreground">Assignments feature coming soon.</p></CardContent>
+                            </Card>
+                        </TabsContent>
+                        
+                        <TabsContent value="materials">
+                            <Card>
+                                <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    {isTeacher && (
+                                        <div className="p-4 border rounded-lg space-y-2">
+                                            <Label htmlFor="material-upload">Upload New Material</Label>
                                             <div className="flex gap-2">
-                                                <Button size="icon" variant="outline" className="h-8 w-8 bg-green-100 text-green-700" onClick={() => handleApproveRequest(req)}><Check className="h-4 w-4" /></Button>
-                                                <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => handleDenyRequest(req)}><X className="h-4 w-4" /></Button>
+                                                <Input id="material-upload" type="file" onChange={(e) => setMaterialFile(e.target.files ? e.target.files[0] : null)} />
+                                                <Button onClick={handleMaterialUpload} disabled={!materialFile || isUploadingMaterial}>
+                                                    {isUploadingMaterial ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
+                                                    Upload
+                                                </Button>
                                             </div>
+                                        </div>
+                                    )}
+                                    <div className="space-y-2">
+                                        {materials.length > 0 ? materials.map(m => (
+                                            <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted">
+                                                <span>{m.name}</span>
+                                                <span className="text-xs text-muted-foreground">{new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
+                                            </a>
+                                        )) : <p className="text-muted-foreground">No materials uploaded yet.</p>}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="exams">
+                            <Card>
+                                <CardHeader><CardTitle>Exams & Tests</CardTitle></CardHeader>
+                                <CardContent><p className="text-muted-foreground">Exams & Tests feature coming soon.</p></CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="students">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Students ({students.length})</CardTitle>
+                                    <CardDescription>List of all enrolled students.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {students.length > 0 ? students.map(s => (
+                                        <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
+                                            <Avatar><AvatarImage src={s.photoURL} /><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
+                                            <span>{s.name}</span>
+                                        </div>
+                                    )) : <p className="text-muted-foreground text-sm">No students enrolled yet.</p>}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="teachers">
+                             <Card>
+                                <CardHeader>
+                                    <CardTitle>Teachers ({teachers.length})</CardTitle>
+                                    <CardDescription>Manage teachers for this classroom.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {teachers.map(t => (
+                                        <div key={t.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                                            <div className="flex items-center gap-3">
+                                            <Avatar><AvatarImage src={t.photoURL} /><AvatarFallback>{t.name.charAt(0)}</AvatarFallback></Avatar>
+                                            <span>{t.name}</span>
+                                            </div>
+                                            <Button variant="outline" size="sm"><MessageSquare className="mr-2 h-4 w-4"/>Chat</Button>
                                         </div>
                                     ))}
                                 </CardContent>
                             </Card>
-                        )}
+                        </TabsContent>
                         
-                        {/* Students Card */}
-                         <Card>
-                            <CardHeader><CardTitle className="flex items-center gap-2"><Users/> Students ({students.length})</CardTitle></CardHeader>
-                            <CardContent className="space-y-2">
-                                {students.length > 0 ? students.map(s => (
-                                    <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
-                                        <Avatar><AvatarImage src={s.photoURL} /><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
-                                        <span>{s.name}</span>
+                        <TabsContent value="fees">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex justify-between items-center">
+                                        <CardTitle>Fees & Payment</CardTitle>
+                                        {isTeacher && (
+                                            <Dialog open={isPaymentDetailsDialogOpen} onOpenChange={setIsPaymentDetailsDialogOpen}>
+                                                <DialogTrigger asChild><Button variant="ghost" size="icon"><Settings className="h-4 w-4" /></Button></DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Update Payment Settings</DialogTitle>
+                                                        <DialogDescription>Set the fee amount and your payment receiving details.</DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="space-y-6 py-4">
+                                                        <form id="fee-form" onSubmit={feeForm.handleSubmit(onFeeSubmit)} className="space-y-4 p-4 border rounded-lg">
+                                                            <h4 className="font-medium">Fee Details</h4>
+                                                            <div className="space-y-2"><Label htmlFor="amount">Fee Amount</Label><Input id="amount" type="number" {...feeForm.register('amount')} />
+                                                                {feeForm.formState.errors.amount && <p className="text-destructive text-sm">{feeForm.formState.errors.amount.message}</p>}
+                                                            </div>
+                                                            <div className="space-y-2"><Label htmlFor="currency">Currency</Label>
+                                                                <Controller name="currency" control={feeForm.control} render={({ field }) => (
+                                                                    <Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
+                                                                        <SelectContent><SelectItem value="INR">INR (₹)</SelectItem><SelectItem value="USD">USD ($)</SelectItem><SelectItem value="EUR">EUR (€)</SelectItem><SelectItem value="GBP">GBP (£)</SelectItem></SelectContent>
+                                                                    </Select>
+                                                                )} />
+                                                                {feeForm.formState.errors.currency && <p className="text-destructive text-sm">{feeForm.formState.errors.currency.message}</p>}
+                                                            </div>
+                                                            <Button type="submit" size="sm">Save Fee</Button>
+                                                        </form>
+                                                        <form id="payment-details-form" onSubmit={paymentDetailsForm.handleSubmit(onPaymentDetailsSubmit)} className="space-y-4 p-4 border rounded-lg">
+                                                            <h4 className="font-medium">Payment Details</h4>
+                                                            <div className="space-y-2"><Label htmlFor="upiId">UPI ID</Label><Input id="upiId" {...paymentDetailsForm.register('upiId')} placeholder="yourname@bank"/></div>
+                                                            <div className="space-y-2"><Label htmlFor="qrCode">QR Code Image</Label><Input id="qrCode" type="file" accept="image/*" {...paymentDetailsForm.register('qrCode')} /></div>
+                                                            {classroom?.paymentDetails?.qrCodeUrl && (
+                                                                <div className="text-center"><p className="text-sm text-muted-foreground mb-2">Current QR Code:</p><Image src={classroom.paymentDetails.qrCodeUrl} alt="Current QR Code" width={128} height={128} className="mx-auto rounded-lg" data-ai-hint="qr code"/></div>
+                                                            )}
+                                                            <Button type="submit" size="sm">Save Payment Details</Button>
+                                                        </form>
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
                                     </div>
-                                )) : <p className="text-muted-foreground text-sm">No students enrolled yet.</p>}
-                            </CardContent>
-                        </Card>
-                        
-                        {/* Teachers Card */}
-                        <Card>
-                            <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase/> Teachers ({teachers.length})</CardTitle></CardHeader>
-                            <CardContent className="space-y-2">
-                                {teachers.map(t => (
-                                    <div key={t.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                        <Avatar><AvatarImage src={t.photoURL} /><AvatarFallback>{t.name.charAt(0)}</AvatarFallback></Avatar>
-                                        <span>{t.name}</span>
-                                        </div>
-                                        <Button variant="outline" size="sm"><MessageSquare className="mr-2 h-4 w-4"/>Chat</Button>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
+                                </CardHeader>
+                                <CardContent className="text-center">
+                                    <p className="text-muted-foreground">Total Amount Due</p>
+                                    <div className="flex justify-center items-center gap-2">{currencySymbols[classroom.feeCurrency || 'INR']}<p className="font-bold text-3xl">{classroom.feeAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}</p><Badge>{classroom.feeCurrency || 'INR'}</Badge></div>
+                                    <Button className="w-full btn-gel mt-4">Pay Now</Button>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
 
-                        {/* Fees Card */}
-                        <Card>
-                            <CardHeader>
-                                <div className="flex justify-between items-center">
-                                    <CardTitle className="flex items-center gap-2"><CreditCard/> Fees & Payment</CardTitle>
-                                    {isTeacher && (
-                                        <Dialog open={isPaymentDetailsDialogOpen} onOpenChange={setIsPaymentDetailsDialogOpen}>
-                                            <DialogTrigger asChild><Button variant="ghost" size="icon"><Settings className="h-4 w-4" /></Button></DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Update Payment Settings</DialogTitle>
-                                                    <DialogDescription>Set the fee amount and your payment receiving details.</DialogDescription>
-                                                </DialogHeader>
-                                                <div className="space-y-6 py-4">
-                                                    <form id="fee-form" onSubmit={feeForm.handleSubmit(onFeeSubmit)} className="space-y-4 p-4 border rounded-lg">
-                                                        <h4 className="font-medium">Fee Details</h4>
-                                                         <div className="space-y-2"><Label htmlFor="amount">Fee Amount</Label><Input id="amount" type="number" {...feeForm.register('amount')} />
-                                                            {feeForm.formState.errors.amount && <p className="text-destructive text-sm">{feeForm.formState.errors.amount.message}</p>}
-                                                        </div>
-                                                        <div className="space-y-2"><Label htmlFor="currency">Currency</Label>
-                                                            <Controller name="currency" control={feeForm.control} render={({ field }) => (
-                                                                <Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
-                                                                    <SelectContent><SelectItem value="INR">INR (₹)</SelectItem><SelectItem value="USD">USD ($)</SelectItem><SelectItem value="EUR">EUR (€)</SelectItem><SelectItem value="GBP">GBP (£)</SelectItem></SelectContent>
-                                                                </Select>
-                                                            )} />
-                                                            {feeForm.formState.errors.currency && <p className="text-destructive text-sm">{feeForm.formState.errors.currency.message}</p>}
-                                                        </div>
-                                                        <Button type="submit" size="sm">Save Fee</Button>
-                                                    </form>
-                                                     <form id="payment-details-form" onSubmit={paymentDetailsForm.handleSubmit(onPaymentDetailsSubmit)} className="space-y-4 p-4 border rounded-lg">
-                                                        <h4 className="font-medium">Payment Details</h4>
-                                                        <div className="space-y-2"><Label htmlFor="upiId">UPI ID</Label><Input id="upiId" {...paymentDetailsForm.register('upiId')} placeholder="yourname@bank"/></div>
-                                                        <div className="space-y-2"><Label htmlFor="qrCode">QR Code Image</Label><Input id="qrCode" type="file" accept="image/*" {...paymentDetailsForm.register('qrCode')} /></div>
-                                                        {classroom?.paymentDetails?.qrCodeUrl && (
-                                                            <div className="text-center"><p className="text-sm text-muted-foreground mb-2">Current QR Code:</p><Image src={classroom.paymentDetails.qrCodeUrl} alt="Current QR Code" width={128} height={128} className="mx-auto rounded-lg" data-ai-hint="qr code"/></div>
-                                                        )}
-                                                         <Button type="submit" size="sm">Save Payment Details</Button>
-                                                    </form>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
-                                </div>
-                            </CardHeader>
-                            <CardContent className="text-center">
-                                <p className="text-muted-foreground">Total Amount Due</p>
-                                <div className="flex justify-center items-center gap-2">{currencySymbols[classroom.feeCurrency || 'INR']}<p className="font-bold text-3xl">{classroom.feeAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}</p><Badge>{classroom.feeCurrency || 'INR'}</Badge></div>
-                                <Button className="w-full btn-gel mt-4">Pay Now</Button>
-                            </CardContent>
-                        </Card>
                     </div>
-                </ScrollArea>
-            </aside>
+                </Tabs>
+            </main>
         </div>
     );
 }
