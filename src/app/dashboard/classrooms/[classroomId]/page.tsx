@@ -479,6 +479,14 @@ export default function ClassroomPage() {
                     </div>
                 </Tabs>
             </main>
+            <Button
+                variant="default"
+                className="fixed bottom-6 left-6 h-14 w-14 rounded-full shadow-lg btn-gel"
+                onClick={() => toast({ title: 'Class Chat', description: 'Classroom chat feature coming soon!' })}
+                aria-label="Open class chat"
+            >
+                <MessageSquare className="h-7 w-7" />
+            </Button>
         </div>
     );
 }
