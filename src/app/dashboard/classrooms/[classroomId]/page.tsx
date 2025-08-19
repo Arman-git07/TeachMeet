@@ -26,7 +26,7 @@ import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle,
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -35,6 +35,7 @@ import Link from 'next/link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // --- Interfaces ---
 interface Classroom {
@@ -64,7 +65,22 @@ interface Announcement {
 interface Assignment { id: string; title: string; description: string; dueDate: any; }
 interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
 interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
-interface Exam { id: string; title: string; date: any; type: 'file' | 'text'; content?: string; fileUrl?: string; vanishAt?: any; }
+
+// --- Exam Interfaces & Schemas ---
+interface QAQuestion { type: 'qa'; question: string; answer: string; }
+interface MCQOption { text: string; }
+interface MCQQuestion { type: 'mcq'; question: string; options: MCQOption[]; correctOptionIndex: number; }
+type ExamQuestion = QAQuestion | MCQQuestion;
+
+interface Exam { 
+  id: string; 
+  title: string; 
+  date: any; 
+  type: 'file' | 'text'; 
+  content?: ExamQuestion[]; // Updated to structured content
+  fileUrl?: string; 
+  vanishAt?: any; 
+}
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; }
 
 // --- Zod Schemas ---
@@ -84,15 +100,24 @@ const assignmentSchema = z.object({
   dueDate: z.date(),
 });
 
+
+const examQuestionSchema = z.object({
+    type: z.enum(['qa', 'mcq']),
+    question: z.string().min(1, 'Question text is required.'),
+    answer: z.string().optional(),
+    options: z.array(z.object({ text: z.string().min(1, 'Option text cannot be empty.') })).optional(),
+    correctOptionIndex: z.number().optional(),
+});
+
 const examSchema = z.object({
     title: z.string().min(1, "Exam title is required"),
     date: z.date({ required_error: "Exam date is required" }),
     vanishAt: z.date().optional(),
-    content: z.string().optional(),
+    questions: z.array(examQuestionSchema).optional(),
     examFile: z.any().optional(),
-}).refine(data => data.content || (data.examFile && data.examFile.length > 0), {
-    message: "You must either type the exam content or upload a file.",
-    path: ["content"],
+}).refine(data => (data.questions && data.questions.length > 0) || (data.examFile && data.examFile.length > 0), {
+    message: "You must either add questions or upload an exam file.",
+    path: ["questions"],
 });
 
 
@@ -272,7 +297,12 @@ export default function ClassroomPage() {
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
     const paymentDetailsForm = useForm<z.infer<typeof paymentDetailsSchema>>({ resolver: zodResolver(paymentDetailsSchema), defaultValues: { upiId: '', qrCode: null } });
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
-    const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema) });
+    const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema), defaultValues: { questions: [] } });
+
+    const { fields, append, remove } = useFieldArray({
+        control: examForm.control,
+        name: "questions"
+    });
 
     // Fetch primary classroom data
     useEffect(() => {
@@ -440,7 +470,7 @@ export default function ClassroomPage() {
         if (!isTeacher || !user) return;
         examForm.clearErrors(); // Clear previous errors
         try {
-            const examData: Omit<Exam, 'id'> = {
+            let examData: any = {
                 title: data.title,
                 date: data.date,
                 vanishAt: data.vanishAt || null,
@@ -453,13 +483,13 @@ export default function ClassroomPage() {
                 const snapshot = await uploadBytes(fileRef, examFile);
                 examData.fileUrl = await getDownloadURL(snapshot.ref);
             } else {
-                examData.content = data.content;
+                examData.content = data.questions;
             }
 
             await addDoc(collection(db, 'classrooms', classroomId, 'exams'), examData);
             toast({ title: "Exam Created!" });
             setIsExamDialogOpen(false);
-            examForm.reset();
+            examForm.reset({ questions: [] });
         } catch (error) {
             console.error("Error creating exam:", error);
             toast({ variant: 'destructive', title: "Creation Failed" });
@@ -748,7 +778,7 @@ export default function ClassroomPage() {
                                             <DialogTrigger asChild>
                                                 <Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Exam</Button>
                                             </DialogTrigger>
-                                            <DialogContent className="sm:max-w-lg">
+                                            <DialogContent className="sm:max-w-2xl">
                                                 <DialogHeader>
                                                     <DialogTitle>Create New Exam</DialogTitle>
                                                     <DialogDescription>Fill out the details for the new exam.</DialogDescription>
@@ -791,8 +821,49 @@ export default function ClassroomPage() {
                                                         </div>
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <Label htmlFor="exam-content">Exam Content (Type or Paste)</Label>
-                                                        <Textarea id="exam-content" rows={8} {...examForm.register('content')} placeholder="Type questions here (e.g., 1. What is React?)..." />
+                                                        <Label>Exam Questions</Label>
+                                                        <ScrollArea className="h-64 w-full rounded-md border p-4 space-y-4">
+                                                            {fields.map((field, index) => (
+                                                                <div key={field.id} className="p-3 border rounded-lg space-y-2 relative">
+                                                                    <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                                                    <Label>Question {index + 1}</Label>
+                                                                    <Input {...examForm.register(`questions.${index}.question`)} placeholder="Question text"/>
+                                                                    {examForm.formState.errors.questions?.[index]?.question && <p className="text-destructive text-sm">{examForm.formState.errors.questions?.[index]?.question?.message}</p>}
+                                                                    
+                                                                    {field.type === 'qa' && (
+                                                                        <>
+                                                                            <Label>Answer</Label>
+                                                                            <Textarea {...examForm.register(`questions.${index}.answer`)} placeholder="Correct answer"/>
+                                                                        </>
+                                                                    )}
+                                                                    
+                                                                    {field.type === 'mcq' && (
+                                                                        <div className="space-y-2 pt-2">
+                                                                            <Label>Options</Label>
+                                                                            <Controller
+                                                                                control={examForm.control}
+                                                                                name={`questions.${index}.correctOptionIndex`}
+                                                                                render={({ field: radioField }) => (
+                                                                                    <RadioGroup onValueChange={(val) => radioField.onChange(parseInt(val))} value={String(radioField.value)} className="space-y-1">
+                                                                                        {[0, 1, 2, 3].map(optionIndex => (
+                                                                                            <div key={optionIndex} className="flex items-center gap-2">
+                                                                                                <RadioGroupItem value={String(optionIndex)} id={`q${index}-o${optionIndex}`}/>
+                                                                                                <Input {...examForm.register(`questions.${index}.options.${optionIndex}.text`)} placeholder={`Option ${optionIndex + 1}`}/>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </RadioGroup>
+                                                                                )}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            {fields.length === 0 && <p className="text-sm text-muted-foreground text-center">Add questions using the buttons below.</p>}
+                                                        </ScrollArea>
+                                                         <div className="flex gap-2 pt-2">
+                                                            <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'qa', question: '', answer: ''})}>Add Q&A</Button>
+                                                            <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'mcq', question: '', options: [{text:''}, {text:''}, {text:''}, {text:''}], correctOptionIndex: 0 })}>Add Multiple Choice</Button>
+                                                        </div>
                                                     </div>
                                                     <div className="relative flex items-center my-4">
                                                         <div className="flex-grow border-t border-muted-foreground"></div><span className="flex-shrink mx-4 text-muted-foreground text-xs">OR</span><div className="flex-grow border-t border-muted-foreground"></div>
@@ -801,10 +872,10 @@ export default function ClassroomPage() {
                                                         <Label htmlFor="exam-file">Upload Exam Paper</Label>
                                                         <Input id="exam-file" type="file" {...examForm.register('examFile')} />
                                                     </div>
-                                                     {examForm.formState.errors.content && (
+                                                     {examForm.formState.errors.questions && (
                                                         <div className="p-3 bg-destructive/10 text-destructive-foreground rounded-md text-sm flex items-center gap-2">
                                                           <AlertTriangle className="h-4 w-4" />
-                                                          <p>{examForm.formState.errors.content.message}</p>
+                                                          <p>{examForm.formState.errors.questions.message}</p>
                                                         </div>
                                                       )}
                                                     <DialogFooter>
