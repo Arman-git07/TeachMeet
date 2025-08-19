@@ -2,11 +2,11 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, getDocs, writeBatch, deleteDoc, arrayUnion, arrayRemove, orderBy, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, getDocs, writeBatch, deleteDoc, arrayUnion, arrayRemove, orderBy, getDoc, where } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -32,6 +32,9 @@ import * as z from 'zod';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 
 // --- Interfaces ---
 interface Classroom {
@@ -48,7 +51,16 @@ interface Classroom {
 }
 
 interface UserProfile { id: string; name: string; photoURL?: string; }
-interface Announcement { id: string; text: string; createdAt: any; }
+interface Announcement {
+  id: string;
+  type: 'text' | 'audio';
+  text?: string;
+  audioUrl?: string;
+  createdAt: any;
+  vanishAt?: any;
+  creatorId: string;
+  creatorName: string;
+}
 interface Assignment { id: string; title: string; description: string; dueDate: any; }
 interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
 interface Material { id: string; name: string; url: string; uploadedAt: any; }
@@ -79,32 +91,137 @@ const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, rej
     reader.onerror = reject;
     reader.readAsDataURL(file);
 });
+const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 
 // --- Components ---
-const AnnouncementForm = ({ classroomId, onAnnouncementPosted }: { classroomId: string; onAnnouncementPosted: () => void }) => {
+const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classroomId: string; classroomTitle: string; currentUser: any }) => {
     const [text, setText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [vanishDate, setVanishDate] = useState<Date | undefined>();
     const { toast } = useToast();
+
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+
+    const handleToggleRecording = async () => {
+        if (isRecording) {
+            mediaRecorderRef.current?.stop();
+            setIsRecording(false);
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream);
+            audioChunksRef.current = [];
+
+            mediaRecorderRef.current.ondataavailable = (event) => {
+                audioChunksRef.current.push(event.data);
+            };
+
+            mediaRecorderRef.current.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+                toast({ title: "Recording Stopped", description: "Your voice message is ready to be posted." });
+            };
+
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+            toast({ title: "Recording Started..." });
+        } catch (error) {
+            console.error("Mic access error:", error);
+            toast({ variant: "destructive", title: "Microphone Access Denied" });
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!text.trim()) { toast({ variant: 'destructive', title: 'Announcement cannot be empty.' }); return; }
+        const hasText = text.trim();
+        const hasAudio = audioChunksRef.current.length > 0;
+
+        if (!hasText && !hasAudio) {
+            toast({ variant: 'destructive', title: 'Announcement cannot be empty.' });
+            return;
+        }
         setIsLoading(true);
+
         try {
-            await addDoc(collection(db, 'classrooms', classroomId, 'announcements'), { text, createdAt: serverTimestamp() });
+            let audioUrl: string | undefined = undefined;
+            if (hasAudio) {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const audioFileRef = storageRef(storage, `classrooms/${classroomId}/announcements/${Date.now()}.webm`);
+                const snapshot = await uploadBytes(audioFileRef, audioBlob);
+                audioUrl = await getDownloadURL(snapshot.ref);
+            }
+            
+            const announcementData = {
+                type: hasAudio ? 'audio' : 'text',
+                text: hasText ? text : undefined,
+                audioUrl: audioUrl,
+                createdAt: serverTimestamp(),
+                vanishAt: vanishDate || null,
+                creatorId: currentUser.uid,
+                creatorName: currentUser.displayName || "Teacher",
+            };
+
+            await addDoc(collection(db, 'classrooms', classroomId, 'announcements'), announcementData);
+            
+            // Notify home screen
+            try {
+                const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+                let activities = rawActivity ? JSON.parse(rawActivity) : [];
+                if (!Array.isArray(activities)) activities = [];
+                const newNotification = {
+                  id: `announcement-${Date.now()}`,
+                  type: 'announcement',
+                  title: `New announcement in "${classroomTitle}"`,
+                  timestamp: Date.now(),
+                  classroomId,
+                };
+                activities.unshift(newNotification);
+                localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
+                window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+            } catch (e) {
+                console.error("Failed to update latest activity:", e);
+            }
+
             setText('');
+            setVanishDate(undefined);
+            audioChunksRef.current = [];
             toast({ title: 'Announcement Posted!' });
-            onAnnouncementPosted();
         } catch (error) {
             console.error('Error posting announcement:', error);
             toast({ variant: 'destructive', title: 'Failed to post announcement.' });
-        } finally { setIsLoading(false); }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-3">
-            <Textarea placeholder="Type your announcement here..." value={text} onChange={(e) => setText(e.target.value)} disabled={isLoading} rows={3} />
-            <Button type="submit" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Post Announcement</Button>
+        <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded-lg bg-muted/30">
+            <Textarea placeholder="Type your announcement here..." value={text} onChange={(e) => setText(e.target.value)} disabled={isLoading || isRecording} rows={3} />
+            <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="icon" onClick={handleToggleRecording} disabled={isLoading || !!text.trim()} className={cn(isRecording && "bg-destructive text-destructive-foreground")}>
+                    {isRecording ? <StopCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+                {audioChunksRef.current.length > 0 && !isRecording && <span className="text-sm text-muted-foreground flex items-center gap-1"><AudioLines className="h-4 w-4"/> Audio recorded.</span>}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("w-[200px] justify-start text-left font-normal rounded-lg", !vanishDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {vanishDate ? format(vanishDate, "PPP") : <span>Set vanish date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+                        <Calendar mode="single" selected={vanishDate} onSelect={setVanishDate} initialFocus />
+                    </PopoverContent>
+                </Popover>
+                {vanishDate && <Button variant="ghost" size="sm" onClick={() => setVanishDate(undefined)}>Clear Date</Button>}
+                <Button type="submit" disabled={isLoading} className="ml-auto">
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Post Announcement
+                </Button>
+            </div>
         </form>
     );
 };
@@ -163,7 +280,9 @@ export default function ClassroomPage() {
     // Fetch subcollections data
     useEffect(() => {
         if (!classroomId) return;
-        const unsubAnnouncements = onSnapshot(query(collection(db, 'classrooms', classroomId, 'announcements'), orderBy('createdAt', 'desc')), snap => setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement))));
+        const announcementsQuery = query(collection(db, 'classrooms', classroomId, 'announcements'), where('vanishAt', '>', new Date()), orderBy('vanishAt', 'desc'), orderBy('createdAt', 'desc'));
+        const unsubAnnouncements = onSnapshot(announcementsQuery, snap => setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement))));
+        
         const unsubAssignments = onSnapshot(query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('dueDate', 'desc')), async (snap) => {
             const assignmentsData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Assignment));
             setAssignments(assignmentsData);
@@ -292,7 +411,7 @@ export default function ClassroomPage() {
                         <Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <Dialog>
+                         <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Students</DropdownMenuItem></DialogTrigger>
                              <DialogContent className="sm:max-w-[425px]">
                                 <DialogHeader>
@@ -410,14 +529,18 @@ export default function ClassroomPage() {
                         <TabsContent value="announcements">
                             <Card><CardHeader><CardTitle>Announcements</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    {isTeacher && <AnnouncementForm classroomId={classroomId} onAnnouncementPosted={() => {}} />}
+                                    {isTeacher && user && <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} />}
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
-                                                <p className="text-sm">{a.text}</p>
-                                                <p className="text-xs text-muted-foreground mt-1">{new Date(a.createdAt?.toDate()).toLocaleString()}</p>
+                                                {a.type === 'text' && <p className="text-sm">{a.text}</p>}
+                                                {a.type === 'audio' && a.audioUrl && <audio controls src={a.audioUrl} className="w-full" />}
+                                                <p className="text-xs text-muted-foreground mt-2">
+                                                  Posted by {a.creatorName} on {new Date(a.createdAt?.toDate()).toLocaleString()}
+                                                  {a.vanishAt && ` | Vanishes on ${new Date(a.vanishAt?.toDate()).toLocaleString()}`}
+                                                </p>
                                             </div>
-                                        )) : <p className="text-muted-foreground">No announcements yet.</p>}
+                                        )) : <p className="text-muted-foreground text-center py-4">No announcements yet.</p>}
                                     </div>
                                 </CardContent>
                             </Card>

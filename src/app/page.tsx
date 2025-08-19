@@ -1,4 +1,5 @@
 
+
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -6,13 +7,13 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign } from 'lucide-react';
+import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
 
-export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention';
+export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement';
 
 interface BaseActivityItem {
   id: string;
@@ -42,7 +43,12 @@ export interface ChatMentionActivityItem extends BaseActivityItem {
     mentionedBy: string;
 }
 
-export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem;
+export interface AnnouncementActivityItem extends BaseActivityItem {
+    type: 'announcement';
+    classroomId: string;
+}
+
+export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem;
 
 
 const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
@@ -55,13 +61,15 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   document: FileText,
   recording: Clapperboard,
   chatMention: AtSign,
+  announcement: Megaphone,
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   meeting: (id, item) => `/dashboard/meeting/${id}/wait?topic=${encodeURIComponent(item.title)}`,
   document: (id) => `/dashboard/documents`,
   recording: (id) => `/dashboard/recordings`,
-  chatMention: (id, item) => `/dashboard/classrooms` // Link to classrooms page for now
+  chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
+  announcement: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
 };
 
 export default function HomePage() {
@@ -192,6 +200,7 @@ export default function HomePage() {
       case 'document': return `New Document: ${item.title}`;
       case 'recording': return `New Recording: ${item.title}`;
       case 'chatMention': return `${(item as ChatMentionActivityItem).mentionedBy} mentioned you: "${item.title}"`;
+      case 'announcement': return `New in Classroom: ${item.title}`;
       default: return item.title;
     }
   };
