@@ -196,8 +196,8 @@ export default function ClassroomPage() {
             setter(profiles);
         };
         
-        fetchProfiles(classroom.students, setStudents);
-        fetchProfiles(classroom.teachers, setTeachers);
+        if (classroom.students) fetchProfiles(classroom.students, setStudents);
+        if (classroom.teachers) fetchProfiles(classroom.teachers, setTeachers);
     }, [classroom]);
 
 
@@ -279,7 +279,7 @@ export default function ClassroomPage() {
 
     return (
         <div className="flex flex-1 flex-col overflow-hidden">
-             <header className="mb-6 px-4 md:px-8">
+             <header className="mb-6 px-4 md:px-8 flex-shrink-0">
                 <Button variant="link" onClick={() => router.back()} className="p-0 mb-2 text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Back to classrooms</Button>
                 <h1 className="text-4xl font-bold">{classroom.title}</h1>
                 <p className="text-lg text-muted-foreground">{classroom.description}</p>
@@ -287,8 +287,8 @@ export default function ClassroomPage() {
             </header>
 
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
-                <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1">
-                    <ScrollArea className="w-full whitespace-nowrap rounded-lg border-b">
+                <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
+                    <ScrollArea className="w-full whitespace-nowrap rounded-lg border-b flex-shrink-0">
                         <TabsList className="inline-flex h-auto">
                             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
                             <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
@@ -468,3 +468,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
