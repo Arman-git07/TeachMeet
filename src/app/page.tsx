@@ -65,7 +65,7 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
-  meeting: (id, item) => `/dashboard/meeting/${id}/wait?topic=${encodeURIComponent(item.title)}`,
+  meeting: (id, item) => `/dashboard/meeting/${id}/wait?topic=${encodeURIComponent(item.title)}&host=true`,
   document: (id) => `/dashboard/documents`,
   recording: (id) => `/dashboard/recordings`,
   chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
@@ -82,9 +82,6 @@ export default function HomePage() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   
-  // NOTE: This component no longer fetches documents/recordings directly.
-  // It only reads ongoing meetings from localStorage.
-  // Documents and recordings are now loaded on their respective pages.
   useEffect(() => {
     const loadActivities = () => {
       if (authLoading) return;
@@ -96,7 +93,7 @@ export default function HomePage() {
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
       let ongoingMeetings: MeetingActivityItem[] = [];
 
-      if (startedMeetingsRaw) {
+      if (user && startedMeetingsRaw) {
         let storedMeetings = JSON.parse(startedMeetingsRaw);
         if (Array.isArray(storedMeetings)) {
           const now = Date.now();
@@ -253,10 +250,10 @@ export default function HomePage() {
                       >
                         <Icon className="mr-3 h-5 w-5 text-primary/80" />
                         <span className="truncate flex-grow text-foreground">{getNotificationText(item)}</span>
-                        {item.type === 'meeting' && item.participants && (
+                        {item.type === 'meeting' && (item as MeetingActivityItem).participants && (
                           <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
                             <UsersIcon className="h-3 w-3 mr-1" />
-                            {item.participants}
+                            {(item as MeetingActivityItem).participants}
                           </span>
                         )}
                       </Link>
