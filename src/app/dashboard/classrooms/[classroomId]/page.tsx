@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -663,7 +663,51 @@ export default function ClassroomPage() {
                                     <CardContent className="text-center">
                                         <p className="text-muted-foreground">Total Amount Due</p>
                                         <div className="flex justify-center items-center gap-2">{currencySymbols[classroom.feeCurrency || 'INR']}<p className="font-bold text-3xl">{classroom.feeAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}</p><Badge>{classroom.feeCurrency || 'INR'}</Badge></div>
-                                        <Button className="w-full btn-gel mt-4">Pay Now</Button>
+                                         <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button className="w-full btn-gel mt-4" disabled={!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl}>Pay Now</Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="sm:max-w-xs">
+                                                <DialogHeader>
+                                                <DialogTitle>Payment Information</DialogTitle>
+                                                <DialogDescription>
+                                                    Use the details below to complete your payment.
+                                                </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="py-4 space-y-4">
+                                                {classroom.paymentDetails?.upiId && (
+                                                    <div className="space-y-1">
+                                                    <Label>UPI ID</Label>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input readOnly value={classroom.paymentDetails.upiId} className="font-mono text-sm" />
+                                                        <Button size="icon" variant="ghost" onClick={() => {
+                                                            navigator.clipboard.writeText(classroom.paymentDetails!.upiId!);
+                                                            toast({ title: 'UPI ID Copied!' });
+                                                            }}>
+                                                        <Copy className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                    </div>
+                                                )}
+                                                {classroom.paymentDetails?.qrCodeUrl && (
+                                                    <div className="space-y-2 text-center">
+                                                    <Label>Scan QR Code</Label>
+                                                    <div className="p-2 border rounded-lg inline-block bg-white">
+                                                        <Image src={classroom.paymentDetails.qrCodeUrl} alt="Payment QR Code" width={200} height={200} data-ai-hint="qr code"/>
+                                                    </div>
+                                                    </div>
+                                                )}
+                                                { !classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl && (
+                                                    <p className="text-sm text-muted-foreground text-center">The teacher has not provided payment details yet.</p>
+                                                )}
+                                                </div>
+                                                <DialogFooter>
+                                                <DialogClose asChild>
+                                                    <Button type="button" variant="secondary">Close</Button>
+                                                </DialogClose>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
                                     </CardContent>
                                 </Card>
                             </DialogContent>
