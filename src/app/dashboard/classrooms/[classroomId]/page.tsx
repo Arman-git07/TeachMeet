@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -64,7 +64,7 @@ interface Announcement {
 interface Assignment { id: string; title: string; description: string; dueDate: any; }
 interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
 interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
-interface Exam { id: string; title: string; date: any; }
+interface Exam { id: string; title: string; date: any; type: 'file' | 'text'; content?: string; fileUrl?: string; vanishAt?: any; }
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; }
 
 // --- Zod Schemas ---
@@ -83,6 +83,18 @@ const assignmentSchema = z.object({
   description: z.string().optional(),
   dueDate: z.date(),
 });
+
+const examSchema = z.object({
+    title: z.string().min(1, "Exam title is required"),
+    date: z.date({ required_error: "Exam date is required" }),
+    vanishAt: z.date().optional(),
+    content: z.string().optional(),
+    examFile: z.any().optional(),
+}).refine(data => data.content || (data.examFile && data.examFile.length > 0), {
+    message: "You must either type the exam content or upload a file.",
+    path: ["content"],
+});
+
 
 // --- Utility Functions ---
 const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -243,6 +255,7 @@ export default function ClassroomPage() {
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+    const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
     const [isGrading, setIsGrading] = useState<string | null>(null);
     const [materialFile, setMaterialFile] = useState<File | null>(null);
     const [materialLink, setMaterialLink] = useState('');
@@ -259,6 +272,7 @@ export default function ClassroomPage() {
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
     const paymentDetailsForm = useForm<z.infer<typeof paymentDetailsSchema>>({ resolver: zodResolver(paymentDetailsSchema), defaultValues: { upiId: '', qrCode: null } });
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
+    const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema) });
 
     // Fetch primary classroom data
     useEffect(() => {
@@ -296,7 +310,8 @@ export default function ClassroomPage() {
         });
         const unsubRequests = onSnapshot(collection(db, 'classrooms', classroomId, 'joinRequests'), snap => setJoinRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest))));
         const unsubMaterials = onSnapshot(query(collection(db, 'classrooms', classroomId, 'materials'), orderBy('uploadedAt', 'desc')), snap => setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))));
-        const unsubExams = onSnapshot(query(collection(db, 'classrooms', classroomId, 'exams'), orderBy('date', 'desc')), snap => setExams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam))));
+        const examsQuery = query(collection(db, 'classrooms', classroomId, 'exams'), where('vanishAt', '>', new Date()), orderBy('vanishAt', 'desc'), orderBy('date', 'desc'));
+        const unsubExams = onSnapshot(examsQuery, snap => setExams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam))));
         
         return () => { unsubAnnouncements(); unsubAssignments(); unsubRequests(); unsubMaterials(); unsubExams(); };
     }, [classroomId]);
@@ -418,6 +433,36 @@ export default function ClassroomPage() {
             toast({ variant: "destructive", title: "Sharing Failed" });
         } finally {
             setIsUploadingMaterial(false);
+        }
+    };
+    
+    const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
+        if (!isTeacher || !user) return;
+        examForm.clearErrors(); // Clear previous errors
+        try {
+            const examData: Omit<Exam, 'id'> = {
+                title: data.title,
+                date: data.date,
+                vanishAt: data.vanishAt || null,
+                type: data.examFile && data.examFile.length > 0 ? 'file' : 'text',
+            };
+
+            if (examData.type === 'file') {
+                const examFile = data.examFile[0];
+                const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${examFile.name}`);
+                const snapshot = await uploadBytes(fileRef, examFile);
+                examData.fileUrl = await getDownloadURL(snapshot.ref);
+            } else {
+                examData.content = data.content;
+            }
+
+            await addDoc(collection(db, 'classrooms', classroomId, 'exams'), examData);
+            toast({ title: "Exam Created!" });
+            setIsExamDialogOpen(false);
+            examForm.reset();
+        } catch (error) {
+            console.error("Error creating exam:", error);
+            toast({ variant: 'destructive', title: "Creation Failed" });
         }
     };
 
@@ -693,8 +738,102 @@ export default function ClassroomPage() {
 
                         <TabsContent value="exams">
                             <Card>
-                                <CardHeader><CardTitle>Exams & Tests</CardTitle></CardHeader>
-                                <CardContent><p className="text-muted-foreground">Exams & Tests feature coming soon.</p></CardContent>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <div>
+                                        <CardTitle>Exams & Tests</CardTitle>
+                                        <CardDescription>Manage and view scheduled exams.</CardDescription>
+                                    </div>
+                                    {isTeacher && (
+                                        <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
+                                            <DialogTrigger asChild>
+                                                <Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Exam</Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="sm:max-w-lg">
+                                                <DialogHeader>
+                                                    <DialogTitle>Create New Exam</DialogTitle>
+                                                    <DialogDescription>Fill out the details for the new exam.</DialogDescription>
+                                                </DialogHeader>
+                                                <form onSubmit={examForm.handleSubmit(onExamSubmit)} className="space-y-4 py-4">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="exam-title">Exam Title</Label>
+                                                        <Input id="exam-title" {...examForm.register('title')} />
+                                                        {examForm.formState.errors.title && <p className="text-destructive text-sm">{examForm.formState.errors.title.message}</p>}
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="space-y-2">
+                                                            <Label>Exam Date</Label>
+                                                            <Controller name="date" control={examForm.control} render={({ field }) => (
+                                                                <Popover>
+                                                                    <PopoverTrigger asChild>
+                                                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                                        </Button>
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
+                                                                </Popover>
+                                                            )} />
+                                                            {examForm.formState.errors.date && <p className="text-destructive text-sm">{examForm.formState.errors.date.message}</p>}
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Vanish Date (Optional)</Label>
+                                                            <Controller name="vanishAt" control={examForm.control} render={({ field }) => (
+                                                                <Popover>
+                                                                    <PopoverTrigger asChild>
+                                                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                                        </Button>
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent>
+                                                                </Popover>
+                                                            )} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="exam-content">Exam Content (Type or Paste)</Label>
+                                                        <Textarea id="exam-content" rows={8} {...examForm.register('content')} placeholder="Type questions here (e.g., 1. What is React?)..." />
+                                                    </div>
+                                                    <div className="relative flex items-center my-4">
+                                                        <div className="flex-grow border-t border-muted-foreground"></div><span className="flex-shrink mx-4 text-muted-foreground text-xs">OR</span><div className="flex-grow border-t border-muted-foreground"></div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="exam-file">Upload Exam Paper</Label>
+                                                        <Input id="exam-file" type="file" {...examForm.register('examFile')} />
+                                                    </div>
+                                                     {examForm.formState.errors.content && (
+                                                        <div className="p-3 bg-destructive/10 text-destructive-foreground rounded-md text-sm flex items-center gap-2">
+                                                          <AlertTriangle className="h-4 w-4" />
+                                                          <p>{examForm.formState.errors.content.message}</p>
+                                                        </div>
+                                                      )}
+                                                    <DialogFooter>
+                                                        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                                                        <Button type="submit">Create Exam</Button>
+                                                    </DialogFooter>
+                                                </form>
+                                            </DialogContent>
+                                        </Dialog>
+                                    )}
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {exams.length > 0 ? exams.map(exam => (
+                                            <div key={exam.id} className="p-4 border rounded-lg">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h4 className="font-semibold">{exam.title}</h4>
+                                                        <p className="text-sm text-muted-foreground">Scheduled for: {new Date(exam.date.toDate()).toLocaleString()}</p>
+                                                    </div>
+                                                    <Button size="sm" className="btn-gel">Take Exam</Button>
+                                                </div>
+                                                {exam.vanishAt && <p className="text-xs text-destructive mt-1">Vanishes on: {new Date(exam.vanishAt.toDate()).toLocaleString()}</p>}
+                                            </div>
+                                        )) : (
+                                            <p className="text-muted-foreground text-center py-4">No exams scheduled yet.</p>
+                                        )}
+                                    </div>
+                                </CardContent>
                             </Card>
                         </TabsContent>
                     </div>
