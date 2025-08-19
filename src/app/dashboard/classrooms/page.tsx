@@ -173,7 +173,7 @@ const CreateClassroomDialogContent = ({
         toast({ title: 'Classroom Created', description: `"${title}" has been successfully created.` });
       }
       
-      onSuccess();
+      onSuccess(); // This now correctly closes the dialog upon success
 
     } catch (error) {
       console.error('Error saving classroom:', error);
