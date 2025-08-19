@@ -6,13 +6,13 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2 } from 'lucide-react';
+import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
 
-export type ActivityItemType = 'meeting' | 'document' | 'recording';
+export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention';
 
 interface BaseActivityItem {
   id: string;
@@ -37,23 +37,31 @@ export interface RecordingActivityItem extends BaseActivityItem {
   thumbnailUrl?: string;
 }
 
-export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem;
+export interface ChatMentionActivityItem extends BaseActivityItem {
+    type: 'chatMention';
+    mentionedBy: string;
+}
+
+export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem;
 
 
 const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
 const itemIcons: Record<ActivityItemType, React.ElementType> = {
   meeting: Video,
   document: FileText,
   recording: Clapperboard,
+  chatMention: AtSign,
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   meeting: (id, item) => `/dashboard/meeting/${id}/wait?topic=${encodeURIComponent(item.title)}`,
   document: (id) => `/dashboard/documents`,
   recording: (id) => `/dashboard/recordings`,
+  chatMention: (id, item) => `/dashboard/classrooms` // Link to classrooms page for now
 };
 
 export default function HomePage() {
@@ -76,7 +84,7 @@ export default function HomePage() {
 
       const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
       const dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
-
+      
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
       let ongoingMeetings: MeetingActivityItem[] = [];
 
@@ -84,7 +92,6 @@ export default function HomePage() {
         let storedMeetings = JSON.parse(startedMeetingsRaw);
         if (Array.isArray(storedMeetings)) {
           const now = Date.now();
-          // Filter out old or invalid meetings and update storage
           const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < THIRTY_MINUTES_IN_MS));
           
           if(validMeetings.length < storedMeetings.length) {
@@ -99,8 +106,11 @@ export default function HomePage() {
           }));
         }
       }
+      
+      const latestActivityRaw = localStorage.getItem(LATEST_ACTIVITY_KEY);
+      const otherActivities = latestActivityRaw ? JSON.parse(latestActivityRaw) : [];
 
-      const combined = [...ongoingMeetings]
+      const combined = [...ongoingMeetings, ...otherActivities]
         .filter(item => !dismissedItemIds.includes(item.id))
         .sort((a, b) => b.timestamp - a.timestamp);
 
@@ -111,7 +121,7 @@ export default function HomePage() {
     loadActivities();
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === STARTED_MEETINGS_KEY || event.key === DISMISSED_ITEMS_KEY) {
+      if (event.key === STARTED_MEETINGS_KEY || event.key === DISMISSED_ITEMS_KEY || event.key === LATEST_ACTIVITY_KEY) {
         loadActivities();
       }
     };
@@ -121,11 +131,13 @@ export default function HomePage() {
     // Also listen for custom events dispatched from within the app
     window.addEventListener('teachmeet_meeting_started', loadActivities);
     window.addEventListener('teachmeet_meeting_ended', loadActivities);
+    window.addEventListener('teachmeet_activity_updated', loadActivities);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('teachmeet_meeting_started', loadActivities);
       window.removeEventListener('teachmeet_meeting_ended', loadActivities);
+      window.removeEventListener('teachmeet_activity_updated', loadActivities);
     };
   }, [user, authLoading]);
 
@@ -179,6 +191,7 @@ export default function HomePage() {
       case 'meeting': return `Ongoing Meeting: ${item.title}`;
       case 'document': return `New Document: ${item.title}`;
       case 'recording': return `New Recording: ${item.title}`;
+      case 'chatMention': return `${(item as ChatMentionActivityItem).mentionedBy} mentioned you: "${item.title}"`;
       default: return item.title;
     }
   };
