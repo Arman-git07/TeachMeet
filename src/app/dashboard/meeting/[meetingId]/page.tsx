@@ -720,7 +720,12 @@ export default function MeetingPage() {
         if (audioTrack) {
           audioTrack.enabled = !localMicMuted;
         }
-        setRealtimeParticipants(prev => [...prev]);
+        // Force a re-render to update self-view with the new stream
+        setRealtimeParticipants(prev => {
+            const self = prev.find(p => p.id === currentUser?.uid);
+            if (self) self.stream = stream;
+            return [...prev];
+        });
 
       } catch (err) {
         console.error("[MeetingPage] Failed to get media on mount:", err);
@@ -739,7 +744,7 @@ export default function MeetingPage() {
       initializeMedia();
     }
     
-  }, [joinStatus, isScreenSharingActive, localCameraOff, localMicMuted, toast]);
+  }, [joinStatus, isScreenSharingActive, localCameraOff, localMicMuted, toast, currentUser?.uid]);
 
   const updateUserStatusInFirestore = async (updates: { [key: string]: any }) => {
     if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;

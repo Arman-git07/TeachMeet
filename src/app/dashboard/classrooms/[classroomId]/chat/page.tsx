@@ -16,6 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/compon
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 interface ChatMessage {
   id: string;
@@ -49,6 +51,7 @@ export default function ClassroomChatPage() {
   const [showMentions, setShowMentions] = useState(false);
   
   const [isRecording, setIsRecording] = useState(false);
+  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -190,12 +193,19 @@ export default function ClassroomChatPage() {
   const handleToggleRecording = async () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
-      setIsRecording(false);
+      // The onstop event handler will handle the rest
+      return;
+    }
+
+    if (hasMicPermission === false) {
+      toast({ variant: 'destructive', title: "Microphone Access Denied", description: "Please enable microphone permissions in your browser settings." });
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setHasMicPermission(true);
+
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
 
@@ -215,6 +225,7 @@ export default function ClassroomChatPage() {
           isMe: true,
         };
         setMessages(prev => [...prev, newMessage]);
+        setIsRecording(false); // Update state after stopping
 
         // Stop the media stream tracks to turn off the recording indicator
         stream.getTracks().forEach(track => track.stop());
@@ -225,9 +236,11 @@ export default function ClassroomChatPage() {
       toast({ title: "Recording Started", description: "Click the stop button to finish." });
     } catch (error) {
       console.error("Error accessing microphone:", error);
+      setHasMicPermission(false);
       toast({ variant: 'destructive', title: "Microphone Access Denied", description: "Please enable microphone permissions in your browser settings." });
     }
   };
+
 
   const backToClassroomLink = `/dashboard/classrooms/${classroomId}`;
 
@@ -255,6 +268,14 @@ export default function ClassroomChatPage() {
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
+                  {hasMicPermission === false && (
+                    <Alert variant="destructive">
+                      <AlertTitle>Microphone Access Denied</AlertTitle>
+                      <AlertDescription>
+                        Voice recording is disabled. Please allow microphone access in your browser settings to use this feature.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   {messages.map((msg) => (
                     <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
                       {!msg.isMe && (
