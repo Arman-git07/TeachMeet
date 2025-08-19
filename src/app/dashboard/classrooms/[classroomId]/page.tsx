@@ -548,25 +548,63 @@ export default function ClassroomPage() {
                         </TabsContent>
                         
                         <TabsContent value="assignments">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <CardTitle>Assignments</CardTitle>
-                                    {isTeacher && (
-                                        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-                                            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4"/>Create Assignment</Button></DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader><DialogTitle>New Assignment</DialogTitle></DialogHeader>
-                                                <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
-                                                    {/* Assignment form fields here */}
-                                                    <Button type="submit">Create</Button>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
-                                </CardHeader>
-                                <CardContent><p className="text-muted-foreground">Assignments feature coming soon.</p></CardContent>
-                            </Card>
-                        </TabsContent>
+                             <Card>
+                                 <CardHeader className="flex flex-row items-center justify-between">
+                                     <div>
+                                         <CardTitle>Assignments</CardTitle>
+                                         <CardDescription>Manage and grade assignments here.</CardDescription>
+                                     </div>
+                                     {isTeacher && (
+                                         <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+                                             <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4"/>Create Assignment</Button></DialogTrigger>
+                                             <DialogContent>
+                                                 <DialogHeader><DialogTitle>New Assignment</DialogTitle></DialogHeader>
+                                                 <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
+                                                     <div className="space-y-2">
+                                                         <Label htmlFor="title">Title</Label>
+                                                         <Input id="title" {...assignmentForm.register('title')} />
+                                                         {assignmentForm.formState.errors.title && <p className="text-destructive text-sm">{assignmentForm.formState.errors.title.message}</p>}
+                                                     </div>
+                                                     <div className="space-y-2">
+                                                         <Label htmlFor="description">Description</Label>
+                                                         <Textarea id="description" {...assignmentForm.register('description')} />
+                                                     </div>
+                                                     <div className="space-y-2">
+                                                         <Label>Due Date</Label>
+                                                          <Controller name="dueDate" control={assignmentForm.control} render={({ field }) => (
+                                                             <Popover>
+                                                                 <PopoverTrigger asChild>
+                                                                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                                         <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                         {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                                     </Button>
+                                                                 </PopoverTrigger>
+                                                                 <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
+                                                             </Popover>
+                                                          )} />
+                                                          {assignmentForm.formState.errors.dueDate && <p className="text-destructive text-sm">{assignmentForm.formState.errors.dueDate.message}</p>}
+                                                     </div>
+                                                     <DialogFooter>
+                                                        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                                                        <Button type="submit">Create</Button>
+                                                     </DialogFooter>
+                                                 </form>
+                                             </DialogContent>
+                                         </Dialog>
+                                     )}
+                                 </CardHeader>
+                                 <CardContent className="space-y-6">
+                                     {assignments.length > 0 ? assignments.map(assignment => (
+                                         <div key={assignment.id} className="p-4 border rounded-lg">
+                                             <h4 className="font-semibold">{assignment.title}</h4>
+                                             <p className="text-sm text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleDateString()}</p>
+                                             <p className="text-sm mt-1">{assignment.description}</p>
+                                             {/* Submissions section */}
+                                         </div>
+                                     )) : <p className="text-muted-foreground text-center py-4">No assignments created yet.</p>}
+                                 </CardContent>
+                             </Card>
+                         </TabsContent>
                         
                         <TabsContent value="materials">
                             <Card>
