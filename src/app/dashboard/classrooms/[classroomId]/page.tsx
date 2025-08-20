@@ -437,7 +437,7 @@ export default function ClassroomPage() {
     }, [classroom?.students]);
 
     const handleApproveRequest = async (request: JoinRequest) => {
-        if (!isTeacher || !user) return;
+        if (!isCreator || !user) return;
         try {
             const batch = writeBatch(db);
             const classroomRef = doc(db, 'classrooms', classroomId);
@@ -481,7 +481,7 @@ export default function ClassroomPage() {
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
-        if (!isTeacher || !user) return;
+        if (!isCreator || !user) return;
         try {
             const batch = writeBatch(db);
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
@@ -800,6 +800,7 @@ export default function ClassroomPage() {
                                                 </div>
                                                 <div className="flex flex-col gap-2">
                                                     {t.resumeURL && <Button asChild size="sm" variant="outline"><Link href={t.resumeURL} target="_blank">Resume</Link></Button>}
+                                                     <Button size="sm"><Phone className="mr-2 h-4 w-4"/>Contact</Button>
                                                 </div>
                                             </div>
                                         </Card>
