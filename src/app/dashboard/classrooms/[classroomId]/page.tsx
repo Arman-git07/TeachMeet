@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -30,7 +30,7 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -73,7 +73,7 @@ interface Announcement {
   creatorId: string;
   creatorName: string;
 }
-interface Assignment { id: string; title: string; description: string; dueDate: any; }
+interface Assignment { id: string; title: string; description: string; dueDate: any; submissionFile?: File | null; }
 interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
 interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
 
@@ -109,6 +109,7 @@ const assignmentSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   dueDate: z.date(),
+  submissionFile: z.any().optional(),
 });
 
 
@@ -117,13 +118,15 @@ const examQuestionSchema = z.object({
     question: z.string().min(1, 'Question text is required.'),
     answer: z.string().optional(),
     options: z.array(z.object({ text: z.string().min(1, 'Option text cannot be empty.') })).optional(),
-    correctOptionIndex: z.number().optional(),
+    correctOptionIndex: z.coerce.number().optional(),
 });
 
 const examSchema = z.object({
     title: z.string().min(1, "Exam title is required"),
     date: z.date({ required_error: "Exam date is required" }),
     vanishAt: z.date().optional(),
+    examFile: z.any().optional(),
+    questions: z.array(examQuestionSchema).optional(),
 }).refine(data => !data.vanishAt || data.vanishAt > data.date, {
     message: "Vanish time must be after the exam time.",
     path: ["vanishAt"],
@@ -144,6 +147,12 @@ const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 const VanishDateTimePicker = ({ date, setDate }: { date: Date | undefined, setDate: (date: Date | undefined) => void }) => {
     const [time, setTime] = useState({ hour: date?.getHours() ?? 0, minute: date?.getMinutes() ?? 0 });
     
+    useEffect(() => {
+      if (date) {
+        setTime({ hour: date.getHours(), minute: date.getMinutes() });
+      }
+    }, [date]);
+
     const handleDateSelect = (selectedDate: Date | undefined) => {
         if (!selectedDate) {
             setDate(undefined);
@@ -350,7 +359,7 @@ export default function ClassroomPage() {
     const paymentDetailsForm = useForm<z.infer<typeof paymentDetailsSchema>>({ resolver: zodResolver(paymentDetailsSchema), defaultValues: { upiId: '', qrCode: null } });
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
     const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema) });
-
+    const { fields, append, remove } = useFieldArray({ control: examForm.control, name: "questions" });
 
     // Fetch primary classroom data
     useEffect(() => {
@@ -386,7 +395,7 @@ export default function ClassroomPage() {
             }
             setSubmissions(newSubmissions);
         });
-        const unsubRequests = onSnapshot(collection(db, 'classrooms', classroomId, 'joinRequests'), snap => setJoinRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest))));
+        const unsubRequests = onSnapshot(query(collection(db, 'classrooms', classroomId, 'joinRequests'), orderBy('requestedAt', 'desc')), snap => setJoinRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest))));
         const unsubMaterials = onSnapshot(query(collection(db, 'classrooms', classroomId, 'materials'), orderBy('uploadedAt', 'desc')), snap => setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))));
         const examsQuery = query(collection(db, 'classrooms', classroomId, 'exams'), where('vanishAt', '>', new Date()), orderBy('vanishAt', 'desc'), orderBy('date', 'desc'));
         const unsubExams = onSnapshot(examsQuery, snap => setExams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam))));
@@ -427,7 +436,7 @@ export default function ClassroomPage() {
             
             if (request.role === 'teacher') {
                 const newTeacher: TeacherInfo = {
-                    uid: request.studentId,
+                    uid: request.id, // Use request.id which is the user's UID
                     name: request.studentName,
                     photoURL: request.studentPhotoURL || '',
                     subject: request.applicationData.subject || 'N/A',
@@ -438,10 +447,10 @@ export default function ClassroomPage() {
                 };
                 batch.update(classroomRef, { teachers: arrayUnion(newTeacher) });
             } else {
-                batch.update(classroomRef, { students: arrayUnion(request.studentId) });
+                batch.update(classroomRef, { students: arrayUnion(request.id) });
             }
 
-            const enrolledClassroomRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
+            const enrolledClassroomRef = doc(db, `users/${request.id}/enrolled`, classroomId);
             batch.set(enrolledClassroomRef, {
                 classroomId: classroomId,
                 title: classroom?.title,
@@ -451,7 +460,7 @@ export default function ClassroomPage() {
             
             batch.delete(doc(db, 'classrooms', classroomId, 'joinRequests', request.id));
             
-            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+            const userPendingRequestRef = doc(db, `users/${request.id}/pendingJoinRequests`, classroomId);
             batch.delete(userPendingRequestRef);
 
             await batch.commit();
@@ -467,7 +476,7 @@ export default function ClassroomPage() {
         try {
             const batch = writeBatch(db);
             batch.delete(doc(db, 'classrooms', classroomId, 'joinRequests', request.id));
-            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+            const userPendingRequestRef = doc(db, `users/${request.id}/pendingJoinRequests`, classroomId);
             batch.delete(userPendingRequestRef);
             await batch.commit();
             toast({ title: 'Request Denied' });
@@ -478,17 +487,45 @@ export default function ClassroomPage() {
     };
     
     const onFeeSubmit = async (data: z.infer<typeof feeSchema>) => {
-        // ... (implementation exists)
+        try {
+            await updateDoc(doc(db, 'classrooms', classroomId), {
+                feeAmount: data.amount,
+                feeCurrency: data.currency,
+            });
+            toast({ title: 'Fee Details Updated!' });
+        } catch (error) {
+            console.error('Error updating fee:', error);
+            toast({ variant: 'destructive', title: 'Update Failed' });
+        }
     };
 
     const onPaymentDetailsSubmit = async (data: z.infer<typeof paymentDetailsSchema>) => {
-        // ... (implementation exists)
+        try {
+            let qrCodeUrl = classroom?.paymentDetails?.qrCodeUrl;
+            if (data.qrCode && data.qrCode[0]) {
+                const file = data.qrCode[0];
+                const qrRef = storageRef(storage, `classrooms/${classroomId}/paymentQR.png`);
+                await uploadBytes(qrRef, file);
+                qrCodeUrl = await getDownloadURL(qrRef);
+            }
+            await updateDoc(doc(db, 'classrooms', classroomId), {
+                paymentDetails: {
+                    upiId: data.upiId,
+                    qrCodeUrl: qrCodeUrl,
+                }
+            });
+            toast({ title: 'Payment Details Updated!' });
+        } catch (error) {
+            console.error('Error updating payment details:', error);
+            toast({ variant: 'destructive', title: 'Update Failed' });
+        }
     };
 
     const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
         if (!isTeacher) return;
         try {
-            await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), { ...data, createdAt: serverTimestamp() });
+            const { submissionFile, ...assignmentData } = data;
+            await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), { ...assignmentData, createdAt: serverTimestamp() });
             toast({ title: "Assignment Created!" });
             setIsAssignmentDialogOpen(false);
             assignmentForm.reset();
@@ -497,12 +534,54 @@ export default function ClassroomPage() {
             toast({ variant: 'destructive', title: "Creation Failed" });
         }
     };
+
+    const handleAssignmentSubmission = async (assignmentId: string, submissionFile: File | null) => {
+        if (!submissionFile || !user) {
+            toast({ variant: "destructive", title: "No file selected." });
+            return;
+        }
+
+        const submissionToastId = toast({
+            title: "Uploading Submission...",
+            description: "Please wait.",
+        });
+
+        try {
+            const filePath = `classrooms/${classroomId}/assignments/${assignmentId}/${user.uid}/${submissionFile.name}`;
+            const fileRef = storageRef(storage, filePath);
+            await uploadBytes(fileRef, submissionFile);
+            const fileUrl = await getDownloadURL(fileRef);
+
+            const submissionRef = doc(collection(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`));
+            await setDoc(submissionRef, {
+                studentId: user.uid,
+                studentName: user.displayName,
+                fileUrl: fileUrl,
+                submittedAt: serverTimestamp(),
+            });
+
+            toast({ id: submissionToastId.id, title: "Submission successful!", description: "Your assignment has been submitted." });
+        } catch (error) {
+            console.error("Error submitting assignment:", error);
+            toast({ id: submissionToastId.id, variant: "destructive", title: "Submission Failed" });
+        }
+    };
     
     const handleGradeSubmission = async (assignmentId: string, submission: Submission, teacherFile: File) => {
         if (!user || !isTeacher) return;
         setIsGrading(submission.id);
         try {
-            const studentSubmissionDataUri = submission.fileUrl; // Assuming fileUrl is a data URI or we fetch and convert
+            // Here we assume submission.fileUrl is a direct downloadable URL.
+            // For AI, we need to fetch it and convert to data URI.
+            const studentFileResponse = await fetch(submission.fileUrl);
+            const studentFileBlob = await studentFileResponse.blob();
+            const studentSubmissionDataUri = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(studentFileBlob);
+            });
+
             const teacherAssignmentDataUri = await fileToDataUri(teacherFile);
 
             const result = await gradeAssignment({ studentSubmissionDataUri, teacherAssignmentDataUri });
@@ -572,16 +651,9 @@ export default function ClassroomPage() {
         if (!isTeacher || !user) return;
         examForm.clearErrors();
 
-        let examContent: any;
-        const examFile = (examForm.getValues('examFile') as FileList)?.[0];
+        const examFile = data.examFile?.[0];
 
-        if (examFile) {
-            examContent = { type: 'file', file: examFile };
-        } else {
-            examContent = { type: 'text', questions: examForm.getValues('questions') };
-        }
-
-        if (examContent.type === 'text' && (!examContent.questions || examContent.questions.length === 0)) {
+        if (!examFile && (!data.questions || data.questions.length === 0)) {
             examForm.setError("questions", { type: "manual", message: "You must add at least one question or upload an exam file." });
             return;
         }
@@ -591,15 +663,16 @@ export default function ClassroomPage() {
                 title: data.title,
                 date: data.date,
                 vanishAt: data.vanishAt || null,
-                type: examContent.type,
             };
 
-            if (examContent.type === 'file') {
-                const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${examContent.file.name}`);
-                const snapshot = await uploadBytes(fileRef, examContent.file);
+            if (examFile) {
+                examData.type = 'file';
+                const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${examFile.name}`);
+                const snapshot = await uploadBytes(fileRef, examFile);
                 examData.fileUrl = await getDownloadURL(snapshot.ref);
             } else {
-                examData.content = examContent.questions;
+                examData.type = 'text';
+                examData.content = data.questions;
             }
 
             await addDoc(collection(db, 'classrooms', classroomId, 'exams'), examData);
@@ -629,26 +702,49 @@ export default function ClassroomPage() {
                     <p className="text-lg text-muted-foreground">{classroom.description}</p>
                     <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
                 </div>
+                {isTeacher && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                          <Dialog>
-                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Students</DropdownMenuItem></DialogTrigger>
-                             <DialogContent className="sm:max-w-[425px]">
+                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem></DialogTrigger>
+                             <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
-                                <DialogTitle>Manage Students</DialogTitle>
-                                <DialogDescription>List of all enrolled students ({students.length}).</DialogDescription>
+                                <DialogTitle>Manage Participants</DialogTitle>
+                                <DialogDescription>Approve requests and view enrolled students.</DialogDescription>
                                 </DialogHeader>
-                                <ScrollArea className="max-h-[60vh] p-4">
+                                <ScrollArea className="max-h-[60vh] -mx-6 px-6">
+                                    <div className="space-y-4 py-4">
+                                    {joinRequests.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm text-muted-foreground px-1">Pending Requests ({joinRequests.length})</h4>
+                                            {joinRequests.map(req => (
+                                                <div key={req.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg">
+                                                    <Avatar>
+                                                        <AvatarImage src={req.studentPhotoURL} />
+                                                        <AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-grow">
+                                                        <p className="font-medium text-sm">{req.studentName}</p>
+                                                        <p className="text-xs capitalize text-muted-foreground">{req.role}</p>
+                                                    </div>
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => handleApproveRequest(req)}><Check className="h-4 w-4" /></Button>
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleDenyRequest(req)}><X className="h-4 w-4" /></Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                     <div className="space-y-2">
+                                        <h4 className="font-medium text-sm text-muted-foreground px-1">Enrolled Students ({students.length})</h4>
                                         {students.length > 0 ? students.map(s => (
                                             <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
                                                 <Avatar><AvatarImage src={s.photoURL} /><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
-                                                <span>{s.name}</span>
+                                                <span className="text-sm">{s.name}</span>
                                             </div>
-                                        )) : <p className="text-muted-foreground text-sm">No students enrolled yet.</p>}
+                                        )) : <p className="text-muted-foreground text-sm text-center pt-4">No students enrolled yet.</p>}
+                                    </div>
                                     </div>
                                 </ScrollArea>
                             </DialogContent>
@@ -685,6 +781,7 @@ export default function ClassroomPage() {
                                 </ScrollArea>
                             </DialogContent>
                         </Dialog>
+                        <DropdownMenuSeparator />
                         <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Manage Fees</DropdownMenuItem></DialogTrigger>
                              <DialogContent className="sm:max-w-md">
@@ -789,6 +886,7 @@ export default function ClassroomPage() {
                         </Dialog>
                     </DropdownMenuContent>
                 </DropdownMenu>
+                )}
             </header>
 
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
@@ -872,10 +970,55 @@ export default function ClassroomPage() {
                                  <CardContent className="space-y-6">
                                      {assignments.length > 0 ? assignments.map(assignment => (
                                          <div key={assignment.id} className="p-4 border rounded-lg">
-                                             <h4 className="font-semibold">{assignment.title}</h4>
-                                             <p className="text-sm text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleDateString()}</p>
-                                             <p className="text-sm mt-1">{assignment.description}</p>
-                                             {/* Submissions section */}
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h4 className="font-semibold">{assignment.title}</h4>
+                                                    <p className="text-sm text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleDateString()}</p>
+                                                    <p className="text-sm mt-1">{assignment.description}</p>
+                                                </div>
+                                                {!isTeacher && (
+                                                    <div className="flex-shrink-0">
+                                                        <Input type="file" id={`submission-upload-${assignment.id}`} className="hidden" onChange={(e) => handleAssignmentSubmission(assignment.id, e.target.files?.[0] || null)} />
+                                                        <Label htmlFor={`submission-upload-${assignment.id}`} className={cn(buttonVariants(), "cursor-pointer")}>
+                                                            <Upload className="mr-2 h-4 w-4"/> Submit Work
+                                                        </Label>
+                                                    </div>
+                                                )}
+                                            </div>
+                                             <div className="mt-4 pt-4 border-t">
+                                                 <h5 className="text-sm font-medium">Submissions ({submissions.get(assignment.id)?.length || 0})</h5>
+                                                 <div className="space-y-2 mt-2">
+                                                     {submissions.get(assignment.id)?.map(sub => (
+                                                         <div key={sub.id} className="flex justify-between items-center p-2 bg-muted/50 rounded-lg">
+                                                             <div className="flex items-center gap-2">
+                                                                <a href={sub.fileUrl} target="_blank" className="text-primary hover:underline font-medium text-sm">{sub.studentName}'s Submission</a>
+                                                                <span className="text-xs text-muted-foreground">({new Date(sub.submittedAt?.toDate()).toLocaleDateString()})</span>
+                                                             </div>
+                                                             {isTeacher ? (
+                                                                sub.grade !== undefined ? (
+                                                                    <div className="text-right">
+                                                                        <p className="font-bold text-lg text-primary">{sub.grade}/100</p>
+                                                                        <p className="text-xs text-muted-foreground">{sub.feedback}</p>
+                                                                    </div>
+                                                                ) : (
+                                                                     <div className="flex items-center gap-2">
+                                                                        <Input type="file" id={`teacher-key-${sub.id}`} className="hidden" onChange={(e) => handleGradeSubmission(assignment.id, sub, e.target.files![0])} />
+                                                                        <Label htmlFor={`teacher-key-${sub.id}`} className={cn(buttonVariants({variant: 'outline', size: 'sm'}), "cursor-pointer")}>
+                                                                            {isGrading === sub.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BrainCircuit className="mr-2 h-4 w-4"/>} Grade with AI
+                                                                        </Label>
+                                                                     </div>
+                                                                )
+                                                             ) : (
+                                                                sub.grade !== undefined ? (
+                                                                     <p className="font-bold text-lg text-primary">{sub.grade}/100</p>
+                                                                ) : (
+                                                                     <p className="text-sm text-muted-foreground">Pending Grade</p>
+                                                                )
+                                                             )}
+                                                         </div>
+                                                     ))}
+                                                 </div>
+                                             </div>
                                          </div>
                                      )) : <p className="text-muted-foreground text-center py-4">No assignments created yet.</p>}
                                  </CardContent>
@@ -948,7 +1091,7 @@ export default function ClassroomPage() {
                                             <DialogTrigger asChild>
                                                 <Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Exam</Button>
                                             </DialogTrigger>
-                                            <DialogContent className="sm:max-w-2xl">
+                                            <DialogContent className="sm:max-w-3xl">
                                                 <DialogHeader>
                                                     <DialogTitle>Create New Exam</DialogTitle>
                                                     <DialogDescription>Fill out the details for the new exam.</DialogDescription>
@@ -971,16 +1114,46 @@ export default function ClassroomPage() {
                                                              {examForm.formState.errors.vanishAt && <p className="text-destructive text-sm">{examForm.formState.errors.vanishAt.message}</p>}
                                                         </div>
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Exam Content</Label>
-                                                        <Textarea placeholder="Type or paste exam content here..." />
+                                                     <div className="relative flex items-center my-4">
+                                                        <div className="flex-grow border-t border-muted-foreground"></div><span className="flex-shrink mx-4 text-muted-foreground text-xs">UPLOAD FILE OR CREATE QUESTIONS</span><div className="flex-grow border-t border-muted-foreground"></div>
                                                     </div>
-                                                    <div className="relative flex items-center my-4">
-                                                        <div className="flex-grow border-t border-muted-foreground"></div><span className="flex-shrink mx-4 text-muted-foreground text-xs">OR</span><div className="flex-grow border-t border-muted-foreground"></div>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="exam-file">Upload Exam Paper</Label>
+                                                     <div className="space-y-2">
+                                                        <Label htmlFor="exam-file">Upload Exam Paper (optional)</Label>
                                                         <Input id="exam-file" type="file" {...examForm.register('examFile')} />
+                                                    </div>
+                                                    <div className="space-y-4">
+                                                        <Label>Questions</Label>
+                                                         <ScrollArea className="h-72 w-full rounded-md border p-4">
+                                                        {fields.map((field, index) => (
+                                                            <Card key={field.id} className="mb-4 p-4 space-y-3 relative">
+                                                                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => remove(index)}><X className="h-4 w-4 text-destructive" /></Button>
+                                                                <h4 className="font-medium text-sm">Question {index + 1} ({field.type.toUpperCase()})</h4>
+                                                                <Input {...examForm.register(`questions.${index}.question`)} placeholder="Question Text" />
+                                                                {examForm.formState.errors.questions?.[index]?.question && <p className="text-sm text-destructive">{examForm.formState.errors.questions?.[index]?.question?.message}</p>}
+                                                                {field.type === 'qa' && (
+                                                                    <Textarea {...examForm.register(`questions.${index}.answer`)} placeholder="Answer" />
+                                                                )}
+                                                                {field.type === 'mcq' && (
+                                                                    <div className="space-y-2 pl-4">
+                                                                        {field.options?.map((opt, optIndex) => (
+                                                                            <div key={optIndex} className="flex items-center gap-2">
+                                                                                 <Input {...examForm.register(`questions.${index}.options.${optIndex}.text`)} placeholder={`Option ${optIndex + 1}`} />
+                                                                                <RadioGroup onValueChange={(val) => examForm.setValue(`questions.${index}.correctOptionIndex`, parseInt(val))} value={String(examForm.watch(`questions.${index}.correctOptionIndex`))}>
+                                                                                    <RadioGroupItem value={String(optIndex)} id={`q${index}-opt${optIndex}`} />
+                                                                                </RadioGroup>
+                                                                                <Label htmlFor={`q${index}-opt${optIndex}`} className="text-xs">Correct</Label>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </Card>
+                                                        ))}
+                                                        </ScrollArea>
+                                                         {examForm.formState.errors.questions && <p className="text-destructive text-sm">{examForm.formState.errors.questions.message}</p>}
+                                                        <div className="flex gap-2">
+                                                             <Button type="button" variant="outline" onClick={() => append({ type: 'qa', question: '', answer: '' })}><PlusCircle className="mr-2 h-4 w-4"/>Add Q/A</Button>
+                                                             <Button type="button" variant="outline" onClick={() => append({ type: 'mcq', question: '', options: [{text:''},{text:''},{text:''},{text:''}], correctOptionIndex: 0 })}><PlusCircle className="mr-2 h-4 w-4"/>Add MCQ</Button>
+                                                        </div>
                                                     </div>
                                                     <DialogFooter>
                                                         <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
