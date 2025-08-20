@@ -545,8 +545,8 @@ export default function MeetingPage() {
       return;
     }
 
-    const initialCameraOff = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') !== 'on' : true;
-    const initialMicMuted = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') !== 'on' : true;
+    const initialCameraOff = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
+    const initialMicMuted = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') === 'off' : true;
     setLocalCameraOff(initialCameraOff);
     setLocalMicMuted(initialMicMuted);
 
@@ -706,20 +706,11 @@ export default function MeetingPage() {
     const initializeMedia = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: true
+          audio: !localMicMuted,
+          video: !localCameraOff,
         });
         localStreamRef.current = stream;
-        
-        const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack) {
-          videoTrack.enabled = !localCameraOff;
-        }
-        
-        const audioTrack = stream.getAudioTracks()[0];
-        if (audioTrack) {
-          audioTrack.enabled = !localMicMuted;
-        }
+
         // Force a re-render to update self-view with the new stream
         setRealtimeParticipants(prev => {
             const self = prev.find(p => p.id === currentUser?.uid);
@@ -740,7 +731,7 @@ export default function MeetingPage() {
       }
     };
 
-    if (!isScreenSharingActive) {
+    if (!isScreenSharingActive && ( !localCameraOff || !localMicMuted) ) {
       initializeMedia();
     }
     

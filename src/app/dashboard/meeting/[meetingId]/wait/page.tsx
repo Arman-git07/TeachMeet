@@ -30,8 +30,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const { user, loading: authLoading } = useAuth(); 
 
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isMicActive, setIsMicActive] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   
@@ -44,11 +44,73 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const currentVideoStreamRef = useRef<MediaStream | null>(null);
-  const currentMicStreamRef = useRef<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
   const [isHost, setIsHost] = useState(false);
+
+  useEffect(() => {
+    // Load preferences from localStorage on component mount
+    const cameraPref = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
+    const micPref = localStorage.getItem('teachmeet-desired-mic-state') === 'on';
+    setIsCameraOn(cameraPref);
+    setIsMicOn(micPref);
+
+    const storedFilter = localStorage.getItem("teachmeet-camera-filter");
+    if (storedFilter) {
+      setAppliedFilter(storedFilter);
+      if (storedFilter !== "none") {
+        setIsFilterToggleOn(true); 
+      }
+    }
+    setMirrorVideo(localStorage.getItem('teachmeet-camera-mirror') === 'true');
+    setAgreedToTerms(localStorage.getItem('teachmeet-agreed-terms') === 'true');
+  }, []);
+
+  const stopStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      if(videoRef.current) videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const getMedia = useCallback(async (video: boolean, audio: boolean) => {
+    stopStream();
+    if (!video && !audio) {
+      setHasCameraPermission(true); // Technically, no permission needed if off
+      setHasMicPermission(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video, audio });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setHasCameraPermission(video ? true : hasCameraPermission);
+      setHasMicPermission(audio ? true : hasMicPermission);
+    } catch (err) {
+      console.error('Error accessing media:', err);
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+        if(video) setHasCameraPermission(false);
+        if(audio) setHasMicPermission(false);
+      } else {
+        toast({ variant: 'destructive', title: 'Media Device Error', description: 'Could not find a camera or microphone. Please check your devices.' });
+      }
+      // If we failed, turn the toggles off
+      if(video) setIsCameraOn(false);
+      if(audio) setIsMicOn(false);
+    }
+  }, [stopStream, toast, hasCameraPermission, hasMicPermission]);
+
+  useEffect(() => {
+    getMedia(isCameraOn, isMicOn);
+    return () => stopStream();
+  }, [isCameraOn, isMicOn, getMedia, stopStream]);
+  
+  const handleToggleCamera = () => setIsCameraOn(prev => !prev);
+  const handleToggleMic = () => setIsMicOn(prev => !prev);
 
   useEffect(() => {
     // Determine host status. Prioritize the explicit URL flag.
@@ -115,107 +177,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     };
   }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
 
-
-  useEffect(() => {
-    const storedFilter = localStorage.getItem("teachmeet-camera-filter");
-    if (storedFilter) {
-      setAppliedFilter(storedFilter);
-      if (storedFilter !== "none") {
-        setIsFilterToggleOn(true); 
-      }
-    }
-    setMirrorVideo(localStorage.getItem('teachmeet-camera-mirror') === 'true');
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (currentVideoStreamRef.current) {
-        currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (currentMicStreamRef.current) {
-        currentMicStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  const handleToggleCamera = async () => {
-    if (isCameraActive) {
-      if (currentVideoStreamRef.current) {
-        currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
-        currentVideoStreamRef.current = null;
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      setIsCameraActive(false);
-    } else {
-      if (hasCameraPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Camera Access Denied",
-          description: "Please enable camera permissions in your browser settings to use this feature.",
-        });
-        return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        currentVideoStreamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setHasCameraPermission(true);
-        setIsCameraActive(true);
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        setIsCameraActive(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Failed',
-          description: 'Could not access the camera. Please ensure it is not in use by another application and that permissions are allowed.',
-        });
-      }
-    }
-  };
-
-  const handleToggleMic = async () => {
-    if (isMicActive) {
-      if (currentMicStreamRef.current) {
-        currentMicStreamRef.current.getTracks().forEach(track => track.stop());
-        currentMicStreamRef.current = null;
-      }
-      setIsMicActive(false);
-    } else {
-      if (hasMicPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Microphone Access Denied",
-          description: "Please enable microphone permissions in your browser settings.",
-        });
-        return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        currentMicStreamRef.current = stream;
-        setHasMicPermission(true);
-        setIsMicActive(true);
-        toast({
-          title: "Microphone On",
-          description: "Your microphone is now active.",
-        });
-      } catch (error) {
-        console.error('Error accessing microphone:', error);
-        setHasMicPermission(false);
-        setIsMicActive(false);
-        toast({
-          variant: 'destructive',
-          title: 'Microphone Access Failed',
-          description: 'Could not access the microphone. Please ensure it is not in use and permissions are allowed.',
-        });
-      }
-    }
-  };
-
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
   const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
   const userFallback = userName.charAt(0).toUpperCase();
@@ -223,8 +184,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
   const handleJoinAction = async () => {
-    localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
-    localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
+    // Persist settings for the next session
+    localStorage.setItem('teachmeet-desired-camera-state', isCameraOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-desired-mic-state', isMicOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-agreed-terms', agreedToTerms ? 'true' : 'false');
     
     if (!user) {
         toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
@@ -245,8 +208,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             await setDoc(participantDocRef, {
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
-                isMicMuted: !isMicActive,
-                isCameraOff: !isCameraActive,
+                isMicMuted: !isMicOn,
+                isCameraOff: !isCameraOn,
                 isHandRaised: false,
                 isScreenSharing: false,
                 joinedAt: serverTimestamp(),
@@ -314,17 +277,17 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     "w-full h-full object-cover",
     {
       "video-mirror": mirrorVideo,
-      "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale" && isCameraActive,
-      "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia" && isCameraActive,
-      "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage" && isCameraActive,
-      "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous" && isCameraActive,
-      "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic" && isCameraActive,
-      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour" && isCameraActive,
-      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus" && isCameraActive,
-      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear" && isCameraActive,
-      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow" && isCameraActive,
-      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin" && isCameraActive,
-      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright" && isCameraActive,
+      "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale" && isCameraOn,
+      "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia" && isCameraOn,
+      "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage" && isCameraOn,
+      "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous" && isCameraOn,
+      "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic" && isCameraOn,
+      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour" && isCameraOn,
+      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus" && isCameraOn,
+      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear" && isCameraOn,
+      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow" && isCameraOn,
+      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin" && isCameraOn,
+      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright" && isCameraOn,
     }
   );
 
@@ -343,7 +306,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
-            {(!isCameraActive || hasCameraPermission === false) && (
+            {(!isCameraOn || hasCameraPermission === false) && (
                <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                  {authLoading ? (
                       <p>Loading user info...</p>
@@ -364,22 +327,22 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             )}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-30">
               <Button
-                variant={isMicActive ? "default" : "destructive"}
+                variant={isMicOn ? "default" : "destructive"}
                 size="icon"
                 className="rounded-full shadow-md"
                 onClick={handleToggleMic}
-                aria-label={isMicActive ? "Mute microphone" : "Unmute microphone"}
+                aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
               >
-                {isMicActive ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                {isMicOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
               </Button>
               <Button
-                variant={isCameraActive ? "default" : "destructive"}
+                variant={isCameraOn ? "default" : "destructive"}
                 size="icon"
                 className="rounded-full shadow-md"
                 onClick={handleToggleCamera}
-                aria-label={isCameraActive ? "Turn camera off" : "Turn camera on"}
+                aria-label={isCameraOn ? "Turn camera off" : "Turn camera on"}
               >
-                {isCameraActive ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                {isCameraOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </Button>
             </div>
           </div>
@@ -387,10 +350,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
           {hasCameraPermission === false && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Camera Permission Required</AlertTitle>
+              <AlertTitle>Camera Permission Denied</AlertTitle>
               <AlertDescription>
-                TeachMeet needs access to your camera to share your video.
-                Please enable camera permissions in your browser settings and refresh the page or try toggling the camera again.
+                TeachMeet needs access to your camera. Please enable it in your browser settings and try toggling the camera again.
               </AlertDescription>
             </Alert>
           )}
@@ -398,10 +360,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
           {hasMicPermission === false && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Microphone Permission Required</AlertTitle>
+              <AlertTitle>Microphone Permission Denied</AlertTitle>
               <AlertDescription>
-                TeachMeet needs access to your microphone to share your audio.
-                Please enable microphone permissions in your browser settings and try toggling the microphone again.
+                TeachMeet needs access to your microphone. Please enable it in your browser settings and try toggling the microphone again.
               </AlertDescription>
             </Alert>
           )}

@@ -70,7 +70,7 @@ export default function ClassroomChatPage() {
           const classroomData = classroomSnap.data();
           const studentIds: string[] = classroomData.students || [];
           const teacherIds: string[] = classroomData.teachers || [];
-          const allUserIds = [...new Set([...studentIds, ...teacherIds])];
+          const allUserIds = [...new Set([...studentIds, ...teacherIds.map((t:any) => t.uid)])];
 
           const profilesPromises = allUserIds.map(async (userId) => {
             const userRef = doc(db, 'users', userId);
