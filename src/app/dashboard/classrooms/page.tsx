@@ -167,13 +167,14 @@ const CreateClassroomDialogContent = ({
           teacherName: user.displayName || 'Anonymous Teacher',
           isPublic,
           students: [], 
+          teachers: [],
           createdAt: serverTimestamp(),
         };
         await addDoc(collection(db, 'classrooms'), classroomData);
         toast({ title: 'Classroom Created', description: `"${title}" has been successfully created.` });
       }
       
-      onSuccess(); // This now correctly closes the dialog upon success
+      onSuccess();
 
     } catch (error) {
       console.error('Error saving classroom:', error);
