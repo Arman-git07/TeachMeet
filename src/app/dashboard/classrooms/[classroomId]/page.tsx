@@ -404,27 +404,31 @@ export default function ClassroomPage() {
 
     // Fetch user profiles for students
     useEffect(() => {
-        if (!classroom || !classroom.students || classroom.students.length === 0) {
-            setStudents([]);
-            return;
-        }
-        const fetchProfiles = async (userIds: string[], setter: React.Dispatch<React.SetStateAction<UserProfile[]>>) => {
-            if (!userIds || userIds.length === 0) { setter([]); return; }
-            const profiles: UserProfile[] = [];
-            // Fetch in chunks of 10 for 'in' query limit
-            for (let i = 0; i < userIds.length; i += 10) {
-                const chunk = userIds.slice(i, i + 10);
-                const q = query(collection(db, 'users'), where('__name__', 'in', chunk));
-                const userDocs = await getDocs(q);
-                userDocs.forEach(userDoc => {
-                    if (userDoc.exists()) {
-                        profiles.push({ id: userDoc.id, ...userDoc.data() } as UserProfile);
-                    }
-                });
+        const fetchStudentProfiles = async () => {
+            if (!classroom || !classroom.students || classroom.students.length === 0) {
+                setStudents([]);
+                return;
             }
-            setter(profiles);
+            
+            const studentIds = classroom.students;
+            const profiles: UserProfile[] = [];
+            // Firestore 'in' query supports up to 30 elements in the array since late 2023
+            for (let i = 0; i < studentIds.length; i += 30) {
+                const chunk = studentIds.slice(i, i + 30);
+                if(chunk.length > 0) {
+                    const q = query(collection(db, 'users'), where('__name__', 'in', chunk));
+                    const userDocs = await getDocs(q);
+                    userDocs.forEach(userDoc => {
+                        if (userDoc.exists()) {
+                            profiles.push({ id: userDoc.id, ...userDoc.data() } as UserProfile);
+                        }
+                    });
+                }
+            }
+            setStudents(profiles);
         };
-        fetchProfiles(classroom.students, setStudents);
+
+        fetchStudentProfiles();
     }, [classroom?.students]);
 
     const handleApproveRequest = async (request: JoinRequest) => {
