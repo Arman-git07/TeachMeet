@@ -21,7 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, Calendar as CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -351,6 +351,11 @@ export default function ClassroomPage() {
     const isTeacher = useMemo(() => {
         if (!user || !classroom) return false;
         return classroom.teacherId === user.uid || (classroom.teachers && classroom.teachers.some(t => t.uid === user.uid));
+    }, [user, classroom]);
+
+    const isCreator = useMemo(() => {
+        if (!user || !classroom) return false;
+        return classroom.teacherId === user.uid;
     }, [user, classroom]);
 
     // Forms
@@ -707,11 +712,11 @@ export default function ClassroomPage() {
                     <p className="text-lg text-muted-foreground">{classroom.description}</p>
                     <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
                 </div>
-                {isTeacher && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                         <Dialog>
+                        {isCreator && (
+                        <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem></DialogTrigger>
                              <DialogContent className="sm:max-w-2xl">
                                 <DialogHeader>
@@ -769,6 +774,8 @@ export default function ClassroomPage() {
                                 </ScrollArea>
                             </DialogContent>
                         </Dialog>
+                        )}
+                        {isTeacher && (
                         <Dialog>
                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Manage Teachers</DropdownMenuItem></DialogTrigger>
                             <DialogContent className="sm:max-w-lg">
@@ -801,6 +808,7 @@ export default function ClassroomPage() {
                                 </ScrollArea>
                             </DialogContent>
                         </Dialog>
+                        )}
                         <DropdownMenuSeparator />
                         <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Manage Fees</DropdownMenuItem></DialogTrigger>
@@ -906,7 +914,6 @@ export default function ClassroomPage() {
                         </Dialog>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                )}
             </header>
 
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
