@@ -545,11 +545,6 @@ export default function MeetingPage() {
       return;
     }
 
-    const initialCameraOff = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-camera-state') === 'off' : true;
-    const initialMicMuted = typeof window !== 'undefined' ? localStorage.getItem('teachmeet-desired-mic-state') === 'off' : true;
-    setLocalCameraOff(initialCameraOff);
-    setLocalMicMuted(initialMicMuted);
-
     const meetingDocRef = doc(db, "meetings", meetingId);
     getDoc(meetingDocRef).then(meetingDocSnap => {
         if (!meetingDocSnap.exists()) {
@@ -668,6 +663,8 @@ export default function MeetingPage() {
           isHandRaisedForView: data.isHandRaised,
           isScreenSharing: data.isScreenSharing,
           isMe: isCurrentUser,
+          // Correctly assign streams for both local and remote (if available)
+          // For now, remote streams are null until WebRTC is implemented.
           stream: isCurrentUser ? (isScreenSharingActive ? screenShareStreamRef.current : localStreamRef.current) : null,
         });
       });
@@ -700,46 +697,6 @@ export default function MeetingPage() {
     };
   }, [meetingId, toast, joinStatus, currentUser, localCameraOff, isScreenSharingActive, router]);
 
-  useEffect(() => {
-    if (joinStatus !== 'joined') return;
-
-    const initializeMedia = async () => {
-      try {
-        // Always request both, but only enable based on state.
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        
-        // Control tracks based on state
-        stream.getAudioTracks().forEach(track => track.enabled = !localMicMuted);
-        stream.getVideoTracks().forEach(track => track.enabled = !localCameraOff);
-        
-        localStreamRef.current = stream;
-
-        // Force a re-render to update self-view with the new stream
-        setRealtimeParticipants(prev => {
-            const self = prev.find(p => p.id === currentUser?.uid);
-            if (self) self.stream = stream;
-            return [...prev];
-        });
-
-      } catch (err) {
-        console.error("[MeetingPage] Failed to get media on mount:", err);
-        if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-          toast({ variant: 'destructive', title: 'Permissions Denied', description: 'Camera and microphone access was denied. Please enable them in your browser settings.' });
-          setLocalCameraOff(true);
-          setLocalMicMuted(true);
-          await updateUserStatusInFirestore({ isCameraOff: true, isMicMuted: true });
-        } else {
-            toast({ variant: 'destructive', title: 'Media Device Error', description: 'Could not find a camera or microphone. Please check your devices.' });
-        }
-      }
-    };
-
-    if (!isScreenSharingActive) {
-      initializeMedia();
-    }
-    
-  }, [joinStatus, isScreenSharingActive, currentUser?.uid, toast]);
-
   const updateUserStatusInFirestore = async (updates: { [key: string]: any }) => {
     if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
     const userDocRef = doc(db, "meetings", meetingId, "participants", currentUser.uid);
@@ -752,6 +709,47 @@ export default function MeetingPage() {
       }
     }
   };
+
+  const getMedia = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { deviceId: localStorage.getItem('teachmeet-audioin-device') || undefined },
+        video: { deviceId: localStorage.getItem('teachmeet-video-device') || undefined }
+      });
+      localStreamRef.current = stream;
+
+      const initialCameraOff = localStorage.getItem('teachmeet-desired-camera-state') === 'off';
+      const initialMicMuted = localStorage.getItem('teachmeet-desired-mic-state') !== 'on'; // Note: 'on' is explicit
+      setLocalCameraOff(initialCameraOff);
+      setLocalMicMuted(initialMicMuted);
+
+      stream.getAudioTracks().forEach(track => track.enabled = !initialMicMuted);
+      stream.getVideoTracks().forEach(track => track.enabled = !initialCameraOff);
+      
+      updateUserStatusInFirestore({ isCameraOff: initialCameraOff, isMicMuted: initialMicMuted });
+
+      // Force a re-render to update self-view with the new stream
+      setRealtimeParticipants(prev => {
+          const self = prev.find(p => p.id === currentUser?.uid);
+          if (self) self.stream = stream;
+          return [...prev];
+      });
+
+    } catch (err) {
+      console.error("[MeetingPage] Failed to get media on mount:", err);
+      toast({ variant: 'destructive', title: 'Permissions Denied', description: 'Camera and microphone access was denied. Please enable them in your browser settings.' });
+      setLocalCameraOff(true);
+      setLocalMicMuted(true);
+      await updateUserStatusInFirestore({ isCameraOff: true, isMicMuted: true });
+    }
+  }, [currentUser?.uid, toast]);
+
+  useEffect(() => {
+    if (joinStatus === 'joined' && !isScreenSharingActive) {
+      getMedia();
+    }
+  }, [joinStatus, isScreenSharingActive, getMedia]);
+
 
   const toggleMic = async () => {
     const newMicStateIsMuted = !localMicMuted;
