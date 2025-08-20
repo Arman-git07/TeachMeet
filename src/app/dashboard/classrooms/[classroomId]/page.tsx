@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, getDocs, writeBatch, deleteDoc, arrayUnion, arrayRemove, orderBy, getDoc, where } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, getDocs, writeBatch, deleteDoc, arrayUnion, arrayRemove, orderBy, getDoc, where, setDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -92,7 +92,7 @@ interface Exam {
   fileUrl?: string; 
   vanishAt?: any; 
 }
-interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; }
+interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; }
 
 // --- Zod Schemas ---
 const feeSchema = z.object({
@@ -436,7 +436,7 @@ export default function ClassroomPage() {
             
             if (request.role === 'teacher') {
                 const newTeacher: TeacherInfo = {
-                    uid: request.id, // Use request.id which is the user's UID
+                    uid: request.id,
                     name: request.studentName,
                     photoURL: request.studentPhotoURL || '',
                     subject: request.applicationData.subject || 'N/A',
@@ -458,7 +458,8 @@ export default function ClassroomPage() {
                 teacherName: classroom?.teacherName,
             });
             
-            batch.delete(doc(db, 'classrooms', classroomId, 'joinRequests', request.id));
+            const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
+            batch.delete(requestRef);
             
             const userPendingRequestRef = doc(db, `users/${request.id}/pendingJoinRequests`, classroomId);
             batch.delete(userPendingRequestRef);
@@ -475,7 +476,8 @@ export default function ClassroomPage() {
         if (!isTeacher || !user) return;
         try {
             const batch = writeBatch(db);
-            batch.delete(doc(db, 'classrooms', classroomId, 'joinRequests', request.id));
+            const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
+            batch.delete(requestRef);
             const userPendingRequestRef = doc(db, `users/${request.id}/pendingJoinRequests`, classroomId);
             batch.delete(userPendingRequestRef);
             await batch.commit();
