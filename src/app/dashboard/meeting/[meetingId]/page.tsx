@@ -705,10 +705,13 @@ export default function MeetingPage() {
 
     const initializeMedia = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: !localMicMuted,
-          video: !localCameraOff,
-        });
+        // Always request both, but only enable based on state.
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        
+        // Control tracks based on state
+        stream.getAudioTracks().forEach(track => track.enabled = !localMicMuted);
+        stream.getVideoTracks().forEach(track => track.enabled = !localCameraOff);
+        
         localStreamRef.current = stream;
 
         // Force a re-render to update self-view with the new stream
@@ -731,11 +734,11 @@ export default function MeetingPage() {
       }
     };
 
-    if (!isScreenSharingActive && ( !localCameraOff || !localMicMuted) ) {
+    if (!isScreenSharingActive) {
       initializeMedia();
     }
     
-  }, [joinStatus, isScreenSharingActive, localCameraOff, localMicMuted, toast, currentUser?.uid]);
+  }, [joinStatus, isScreenSharingActive, currentUser?.uid, toast]);
 
   const updateUserStatusInFirestore = async (updates: { [key: string]: any }) => {
     if (!currentUser || !meetingId || !db || joinStatus !== 'joined') return;
