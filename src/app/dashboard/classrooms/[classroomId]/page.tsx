@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -149,7 +148,7 @@ const VanishDateTimePicker = ({ date, setDate }: { date: Date | undefined, setDa
     
     useEffect(() => {
       if (date) {
-        setTime({ hour: date.getHours(), minute: date.getMinutes() });
+        setTime({ hour: date.getHours(), minute: date.getMinutes());
       }
     }, [date]);
 
@@ -605,7 +604,7 @@ export default function ClassroomPage() {
         setIsUploadingMaterial(true);
         try {
             const fileRef = storageRef(storage, `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`);
-            const snapshot = await uploadBytes(fileRef, materialFile);
+            const snapshot = await uploadBytes(fileRef, fileRef);
             const url = await getDownloadURL(snapshot.ref);
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), { 
                 name: materialFile.name, 
@@ -712,7 +711,7 @@ export default function ClassroomPage() {
                     <DropdownMenuContent align="end">
                          <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem></DialogTrigger>
-                             <DialogContent className="sm:max-w-md">
+                             <DialogContent className="sm:max-w-2xl">
                                 <DialogHeader>
                                 <DialogTitle>Manage Participants</DialogTitle>
                                 <DialogDescription>Approve requests and view enrolled students.</DialogDescription>
@@ -723,18 +722,35 @@ export default function ClassroomPage() {
                                         <div className="space-y-2">
                                             <h4 className="font-medium text-sm text-muted-foreground px-1">Pending Requests ({joinRequests.length})</h4>
                                             {joinRequests.map(req => (
-                                                <div key={req.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg">
-                                                    <Avatar>
-                                                        <AvatarImage src={req.studentPhotoURL} />
-                                                        <AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="flex-grow">
-                                                        <p className="font-medium text-sm">{req.studentName}</p>
-                                                        <p className="text-xs capitalize text-muted-foreground">{req.role}</p>
+                                                <Card key={req.id} className="p-3 bg-muted/30">
+                                                    <div className="flex items-start gap-4">
+                                                        <Avatar className="mt-1">
+                                                            <AvatarImage src={req.studentPhotoURL} />
+                                                            <AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback>
+                                                        </Avatar>
+                                                        <div className="flex-grow">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <p className="font-medium text-sm">{req.studentName}</p>
+                                                                    <p className="text-xs capitalize text-muted-foreground">{req.role}</p>
+                                                                </div>
+                                                                 <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50" onClick={() => handleApproveRequest(req)}><Check className="h-4 w-4" /></Button>
+                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50" onClick={() => handleDenyRequest(req)}><X className="h-4 w-4" /></Button>
+                                                                </div>
+                                                            </div>
+                                                            {req.role === 'teacher' && req.applicationData && (
+                                                                <div className="mt-2 text-xs space-y-1 text-muted-foreground border-t pt-2">
+                                                                    <p><strong className="text-foreground/80">Subject:</strong> {req.applicationData.subject}</p>
+                                                                    <p><strong className="text-foreground/80">Qualification:</strong> {req.applicationData.qualification}</p>
+                                                                    <p><strong className="text-foreground/80">Experience:</strong> {req.applicationData.experience}</p>
+                                                                    <p><strong className="text-foreground/80">Availability:</strong> {req.applicationData.availability}</p>
+                                                                    {req.resumeURL && <Button asChild size="sm" variant="link" className="p-0 h-auto mt-1"><Link href={req.resumeURL} target="_blank">View Resume</Link></Button>}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => handleApproveRequest(req)}><Check className="h-4 w-4" /></Button>
-                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleDenyRequest(req)}><X className="h-4 w-4" /></Button>
-                                                </div>
+                                                </Card>
                                             ))}
                                         </div>
                                     )}
@@ -1202,3 +1218,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
