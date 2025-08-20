@@ -437,7 +437,7 @@ export default function ClassroomPage() {
     }, [classroom?.students]);
 
     const handleApproveRequest = async (request: JoinRequest) => {
-        if (!isCreator || !user) return;
+        if (!isCreator || !user || !classroom) return;
         try {
             const batch = writeBatch(db);
             const classroomRef = doc(db, 'classrooms', classroomId);
@@ -461,9 +461,9 @@ export default function ClassroomPage() {
             const enrolledClassroomRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
             batch.set(enrolledClassroomRef, {
                 classroomId: classroomId,
-                title: classroom?.title,
-                description: classroom?.description,
-                teacherName: classroom?.teacherName,
+                title: classroom.title,
+                description: classroom.description,
+                teacherName: classroom.teacherName,
             });
             
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
