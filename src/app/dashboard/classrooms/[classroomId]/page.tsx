@@ -436,7 +436,7 @@ export default function ClassroomPage() {
             
             if (request.role === 'teacher') {
                 const newTeacher: TeacherInfo = {
-                    uid: request.id,
+                    uid: request.studentId,
                     name: request.studentName,
                     photoURL: request.studentPhotoURL || '',
                     subject: request.applicationData.subject || 'N/A',
@@ -447,10 +447,10 @@ export default function ClassroomPage() {
                 };
                 batch.update(classroomRef, { teachers: arrayUnion(newTeacher) });
             } else {
-                batch.update(classroomRef, { students: arrayUnion(request.id) });
+                batch.update(classroomRef, { students: arrayUnion(request.studentId) });
             }
 
-            const enrolledClassroomRef = doc(db, `users/${request.id}/enrolled`, classroomId);
+            const enrolledClassroomRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
             batch.set(enrolledClassroomRef, {
                 classroomId: classroomId,
                 title: classroom?.title,
@@ -461,7 +461,7 @@ export default function ClassroomPage() {
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
             batch.delete(requestRef);
             
-            const userPendingRequestRef = doc(db, `users/${request.id}/pendingJoinRequests`, classroomId);
+            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
             batch.delete(userPendingRequestRef);
 
             await batch.commit();
@@ -478,7 +478,7 @@ export default function ClassroomPage() {
             const batch = writeBatch(db);
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
             batch.delete(requestRef);
-            const userPendingRequestRef = doc(db, `users/${request.id}/pendingJoinRequests`, classroomId);
+            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
             batch.delete(userPendingRequestRef);
             await batch.commit();
             toast({ title: 'Request Denied' });
