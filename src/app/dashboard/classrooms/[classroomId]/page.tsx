@@ -148,7 +148,7 @@ const VanishDateTimePicker = ({ date, setDate }: { date: Date | undefined, setDa
     
     useEffect(() => {
       if (date) {
-        setTime({ hour: date.getHours(), minute: date.getMinutes());
+        setTime({ hour: date.getHours(), minute: date.getMinutes() });
       }
     }, [date]);
 
@@ -705,9 +705,7 @@ export default function ClassroomPage() {
                 </div>
                 {isTeacher && (
                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button>
-                    </DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                          <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem></DialogTrigger>
@@ -1218,5 +1216,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    
