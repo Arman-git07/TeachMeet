@@ -35,6 +35,7 @@ import Link from 'next/link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Calendar } from '@/components/ui/calendar';
 
 // --- Interfaces ---
 interface TeacherInfo {
