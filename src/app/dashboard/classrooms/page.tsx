@@ -644,8 +644,26 @@ export default function ClassroomsPage() {
     const hasPendingRequest = pendingRequestIds.has(classroom.id);
     const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === classroom.id);
     
+    if (isMyClass) {
+      // Always render the user's own class with an "Enter" button.
+       return (
+          <Card key={classroom.id} className="flex flex-col">
+              <CardHeader>
+                  <CardTitle>{classroom.title}</CardTitle>
+                  <CardDescription>{classroom.description || "No description."}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                  <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
+              </CardContent>
+              <CardFooter className="flex-col items-stretch gap-2 pt-4">
+                 <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+              </CardFooter>
+          </Card>
+        );
+    }
+    
     if (isEnrolled) {
-      return null; // Don't show in Discover if already enrolled
+      return null; // Don't show in Discover if already enrolled (will be in Enrolled tab)
     }
 
     return (
@@ -658,9 +676,7 @@ export default function ClassroomsPage() {
               <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-2 pt-4">
-            {isMyClass ? (
-              <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-            ) : user ? (
+            {user ? (
                  isRequesting ? (
                     <Button className="w-full" disabled>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Working...
@@ -729,19 +745,18 @@ export default function ClassroomsPage() {
 
   const DiscoverClassesTab = () => {
     if (isLoadingDiscover || isLoadingRequests) return renderSkeleton();
-
-    // Filter out classes the user owns or is enrolled in
+  
+    // Filter out classes the user is already enrolled in
     const discoverableClasses = discoverClasses.filter(publicClass => {
       if (!user) return true; // Show all public classes if not logged in
-      const isMyClass = publicClass.teacherId === user.uid;
       const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
-      return !isMyClass && !isEnrolled;
+      return !isEnrolled;
     });
-
+  
     if (discoverableClasses.length === 0) {
-        return <p className="text-muted-foreground text-center py-10">No new public classrooms to discover right now.</p>;
+      return <p className="text-muted-foreground text-center py-10">No new public classrooms to discover right now.</p>;
     }
-
+  
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {discoverableClasses.map(renderDiscoverClassroomCard)}
