@@ -263,10 +263,11 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                 resumeURL = await getDownloadURL(snapshot.ref);
             }
 
-            const requestRef = doc(collection(db, `classrooms/${classroom.id}/joinRequests`));
+            // Use the user's UID as the document ID for the join request
+            const requestRef = doc(db, `classrooms/${classroom.id}/joinRequests`, user.uid);
             
             await setDoc(requestRef, {
-                studentId: user.uid, // Keep consistent field name for rules
+                studentId: user.uid, // Crucial for security rules
                 studentName: data.fullName,
                 studentPhotoURL: user.photoURL || '',
                 role: 'teacher',
@@ -287,7 +288,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
             onSubmitted();
         } catch (error) {
             console.error("Error sending teacher application:", error);
-            toast({ variant: 'destructive', title: 'Application Failed', description: 'Could not send your application. Check Firestore rules.' });
+            toast({ variant: 'destructive', title: 'Application Failed', description: "Could not send your application. Check Firestore rules and console for details." });
         } finally {
             setIsLoading(false);
         }
@@ -527,7 +528,7 @@ export default function ClassroomsPage() {
     }
     setRequestingToJoin(classroomId);
     try {
-        const requestRef = doc(collection(db, `classrooms/${classroomId}/joinRequests`));
+        const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
         
         await setDoc(requestRef, {
             studentId: user.uid,
@@ -551,15 +552,8 @@ export default function ClassroomsPage() {
     if (!user) return;
     setRequestingToJoin(classroomId);
     try {
-      const joinRequestsRef = collection(db, `classrooms/${classroomId}/joinRequests`);
-      const q = query(joinRequestsRef, where("studentId", "==", user.uid));
-      const querySnapshot = await getDocs(q);
-
-      const batch = writeBatch(db);
-      querySnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
+      const joinRequestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
+      await deleteDoc(joinRequestRef);
 
       toast({ title: 'Request Canceled', description: 'Your join request has been withdrawn.' });
     } catch (error) {
