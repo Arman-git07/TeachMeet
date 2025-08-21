@@ -61,7 +61,7 @@ interface Classroom {
     paymentDetails?: { upiId: string; qrCodeUrl: string; };
 }
 
-interface UserProfile { id: string; name: string; photoURL?: string; }
+interface UserProfile { id: string; name: string; photoURL?: string; role: 'student' | 'teacher'; }
 interface Announcement {
   id: string;
   type: 'text' | 'audio';
@@ -345,6 +345,7 @@ export default function ClassroomPage() {
     const [materialLink, setMaterialLink] = useState('');
     const [materialName, setMaterialName] = useState('');
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
+    const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
 
 
     const isTeacher = useMemo(() => {
@@ -411,6 +412,7 @@ export default function ClassroomPage() {
 
     const handleApproveRequest = async (request: JoinRequest) => {
         if (!isCreator || !user || !classroom) return;
+        setIsProcessingRequest(request.id);
         const { studentId, studentName, studentPhotoURL, role, applicationData, resumeURL } = request;
         
         try {
@@ -463,11 +465,14 @@ export default function ClassroomPage() {
         } catch (error) {
             console.error('Error approving request:', error);
             toast({ variant: 'destructive', title: 'Approval Failed' });
+        } finally {
+            setIsProcessingRequest(null);
         }
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
         if (!isCreator || !user) return;
+        setIsProcessingRequest(request.id);
         try {
             const batch = writeBatch(db);
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
@@ -479,6 +484,8 @@ export default function ClassroomPage() {
         } catch (error) {
             console.error('Error denying request:', error);
             toast({ variant: 'destructive', title: 'Action Failed' });
+        } finally {
+            setIsProcessingRequest(null);
         }
     };
     
@@ -728,8 +735,12 @@ export default function ClassroomPage() {
                                                                     <p className="text-xs capitalize text-muted-foreground">{req.role}</p>
                                                                 </div>
                                                                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50" onClick={() => handleApproveRequest(req)}><Check className="h-4 w-4" /></Button>
-                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50" onClick={() => handleDenyRequest(req)}><X className="h-4 w-4" /></Button>
+                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50" onClick={() => handleApproveRequest(req)} disabled={isProcessingRequest === req.id}>
+                                                                        {isProcessingRequest === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4" />}
+                                                                    </Button>
+                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50" onClick={() => handleDenyRequest(req)} disabled={isProcessingRequest === req.id}>
+                                                                        {isProcessingRequest === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <X className="h-4 w-4" />}
+                                                                    </Button>
                                                                 </div>
                                                             </div>
                                                             {req.role === 'teacher' && req.applicationData && (
@@ -753,6 +764,7 @@ export default function ClassroomPage() {
                                             <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
                                                 <Avatar><AvatarImage src={s.photoURL} /><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm">{s.name}</span>
+                                                 <Badge variant={s.role === 'teacher' ? 'secondary' : 'default'} className="ml-auto capitalize">{s.role}</Badge>
                                             </div>
                                         )) : <p className="text-muted-foreground text-sm text-center pt-4">No participants enrolled yet.</p>}
                                     </div>
@@ -1214,5 +1226,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    
