@@ -93,6 +93,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { auth } from '@/lib/firebase';
 
 
 export interface Classroom {
@@ -230,7 +231,7 @@ const teacherApplicationSchema = z.object({
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
 async function submitTeacherApplication(classroomId: string, data: TeacherApplicationValues, resumeURL?: string) {
-    const { user } = auth;
+    const user = auth.currentUser;
     if (!user) throw new Error("Not logged in");
 
     // The joinRequests doc ID MUST be the applicant's UID

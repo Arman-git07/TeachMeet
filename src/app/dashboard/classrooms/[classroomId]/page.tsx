@@ -93,6 +93,7 @@ interface Exam {
   vanishAt?: any; 
 }
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; }
+interface SubjectTeacher { teacherId: string; name: string; subject: string; availability: string; }
 
 // --- Zod Schemas ---
 const feeSchema = z.object({
@@ -143,11 +144,36 @@ const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, rej
 const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 
 // --- Approval/Denial Functions ---
+export const handleTeacherRequest = async (classroomId: string, teacherId: string, action: 'accept' | 'deny', teacherData: any) => {
+    try {
+        const requestRef = doc(db, "classrooms", classroomId, "joinRequests", teacherId);
+        
+        if (action === "accept") {
+            const teacherRef = doc(db, "classrooms", classroomId, "teachers", teacherId);
+            await setDoc(teacherRef, {
+                teacherId,
+                name: teacherData.studentName,
+                subject: teacherData.applicationData.subject,
+                availability: teacherData.applicationData.availability,
+                addedAt: new Date(),
+            });
+            await updateDoc(requestRef, { status: "accepted" });
+            await deleteDoc(requestRef); // Optional: clean up the request
+        } else if (action === "deny") {
+            await updateDoc(requestRef, { status: "denied" });
+            await deleteDoc(requestRef); // Optional: clean up the request
+        }
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error handling teacher request:", error);
+        return { success: false, error: error.message };
+    }
+};
+
 export const approveRequest = async (classroomId: string, request: any) => {
   try {
     const batch = writeBatch(db);
 
-    // ✅ Step 1: Add participant
     const participantRef = doc(db, "classrooms", classroomId, "participants", request.studentId);
     batch.set(participantRef, {
       uid: request.studentId,
@@ -157,24 +183,14 @@ export const approveRequest = async (classroomId: string, request: any) => {
       joinedAt: serverTimestamp(),
     });
     
-    // Add to main classroom document array
     const classroomRef = doc(db, "classrooms", classroomId);
-     if (request.role === 'teacher' && request.applicationData) {
-        batch.update(classroomRef, { teachers: arrayUnion({
-            uid: request.studentId,
-            name: request.studentName,
-            photoURL: request.studentPhotoURL || '',
-            subject: request.applicationData.subject,
-            qualification: request.applicationData.qualification,
-            experience: request.applicationData.experience,
-            availability: request.applicationData.availability,
-            resumeURL: request.resumeURL || '',
-        }) });
-    } else {
+     if (request.role === 'teacher') {
+        // This part might be superseded by the new handleTeacherRequest logic but kept for safety.
+        // It's better to handle teacher role via its specific flow.
+     } else {
         batch.update(classroomRef, { students: arrayUnion(request.studentId) });
     }
     
-    // Add to user's enrolled subcollection
     const userEnrolledRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
     const classroomSnap = await getDoc(classroomRef);
     if(classroomSnap.exists()) {
@@ -188,7 +204,6 @@ export const approveRequest = async (classroomId: string, request: any) => {
       });
     }
 
-    // ✅ Step 2 & 3: Delete request
     const requestRef = doc(db, "classrooms", classroomId, "joinRequests", request.studentId);
     batch.delete(requestRef);
     const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
@@ -411,6 +426,7 @@ export default function ClassroomPage() {
     // State Declarations
     const [classroom, setClassroom] = useState<Classroom | null>(null);
     const [participants, setParticipants] = useState<UserProfile[]>([]);
+    const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
@@ -486,8 +502,10 @@ export default function ClassroomPage() {
         const unsubExams = onSnapshot(examsQuery, snap => setExams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam))));
         
         const unsubParticipants = onSnapshot(query(collection(db, 'classrooms', classroomId, 'participants'), orderBy('joinedAt', 'desc')), snap => setParticipants(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile))));
+        
+        const unsubTeachers = onSnapshot(query(collection(db, 'classrooms', classroomId, 'teachers'), orderBy('addedAt', 'desc')), snap => setSubjectTeachers(snap.docs.map(d => ({ ...d.data() } as SubjectTeacher))));
 
-        return () => { unsubAnnouncements(); unsubAssignments(); unsubRequests(); unsubMaterials(); unsubExams(); unsubParticipants(); };
+        return () => { unsubAnnouncements(); unsubAssignments(); unsubRequests(); unsubMaterials(); unsubExams(); unsubParticipants(); unsubTeachers(); };
     }, [classroomId]);
 
 
@@ -495,7 +513,12 @@ export default function ClassroomPage() {
         if (!isCreator || !user || !classroom) return;
         setIsProcessingRequest(request.id);
         
-        const result = await approveRequest(classroomId, request);
+        let result;
+        if (request.role === 'teacher') {
+            result = await handleTeacherRequest(classroomId, request.studentId, 'accept', request);
+        } else {
+            result = await approveRequest(classroomId, request);
+        }
         
         if (result.success) {
             toast({ title: 'Request Approved!', description: `${request.studentName} has been added to the classroom.` });
@@ -509,8 +532,13 @@ export default function ClassroomPage() {
     const handleDenyRequest = async (request: JoinRequest) => {
         if (!isCreator || !user) return;
         setIsProcessingRequest(request.id);
-
-        const result = await denyRequest(classroomId, request.studentId);
+        
+        let result;
+        if (request.role === 'teacher') {
+            result = await handleTeacherRequest(classroomId, request.studentId, 'deny', request);
+        } else {
+            result = await denyRequest(classroomId, request.studentId);
+        }
 
         if (result.success) {
             toast({ title: 'Request Denied' });
@@ -531,15 +559,14 @@ export default function ClassroomPage() {
         const participantRef = doc(db, "classrooms", classroomId, "participants", participant.uid);
         batch.delete(participantRef);
         
-        // 2. Remove from main classroom document array
-        const classroomRef = doc(db, "classrooms", classroomId);
-        if (participant.role === 'teacher') {
-            const teacherObject = classroom?.teachers.find(t => t.uid === participant.uid);
-            if (teacherObject) {
-                 batch.update(classroomRef, { teachers: arrayRemove(teacherObject) });
-            }
-        } else {
+        // 2. Remove from main classroom document array (if applicable)
+        if (participant.role === 'student') {
+            const classroomRef = doc(db, "classrooms", classroomId);
             batch.update(classroomRef, { students: arrayRemove(participant.uid) });
+        } else if (participant.role === 'teacher') {
+            // Also remove from the teachers subcollection
+            const teacherRef = doc(db, "classrooms", classroomId, "teachers", participant.uid);
+            batch.delete(teacherRef);
         }
         
         // 3. Delete from user's enrolled subcollection
@@ -850,25 +877,21 @@ export default function ClassroomPage() {
                             <DialogContent className="sm:max-w-lg">
                                 <DialogHeader>
                                     <DialogTitle>Subject Teachers</DialogTitle>
-                                    <DialogDescription>Manage subject teachers for this classroom ({classroom.teachers?.length || 0}).</DialogDescription>
+                                    <DialogDescription>Manage subject teachers for this classroom ({subjectTeachers.length}).</DialogDescription>
                                 </DialogHeader>
                                 <ScrollArea className="max-h-[60vh] p-4">
                                     <div className="space-y-4">
-                                    {classroom.teachers && classroom.teachers.length > 0 ? classroom.teachers.map(t => (
-                                        <Card key={t.uid} className="p-4">
+                                    {subjectTeachers.length > 0 ? subjectTeachers.map(t => (
+                                        <Card key={t.teacherId} className="p-4">
                                             <div className="flex items-start gap-4">
-                                                <Avatar className="h-12 w-12"><AvatarImage src={t.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{t.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <div className="flex-grow">
                                                     <CardTitle className="text-lg">{t.name}</CardTitle>
                                                     <CardDescription>{t.subject}</CardDescription>
                                                     <div className="mt-2 text-xs space-y-1 text-muted-foreground">
-                                                        <p><Award className="inline-block h-3 w-3 mr-1.5"/>{t.qualification}</p>
-                                                        <p><Book className="inline-block h-3 w-3 mr-1.5"/>{t.experience} experience</p>
                                                         <p><Clock className="inline-block h-3 w-3 mr-1.5"/>{t.availability}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col gap-2">
-                                                    {t.resumeURL && <Button asChild size="sm" variant="outline"><Link href={t.resumeURL} target="_blank">Resume</Link></Button>}
                                                      <Button size="sm"><Phone className="mr-2 h-4 w-4"/>Contact</Button>
                                                 </div>
                                             </div>
