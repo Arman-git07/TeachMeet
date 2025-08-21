@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, Calendar as CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus } from 'lucide-react';
+import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, Calendar as CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus, UserX } from 'lucide-react';
 import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
@@ -62,7 +62,7 @@ interface Classroom {
     paymentDetails?: { upiId: string; qrCodeUrl: string; };
 }
 
-interface UserProfile { id: string; name: string; photoURL?: string; role: 'student' | 'teacher'; }
+interface UserProfile { id: string; name: string; photoURL?: string; role: 'student' | 'teacher'; uid: string; }
 interface Announcement {
   id: string;
   type: 'text' | 'audio';
@@ -426,6 +426,7 @@ export default function ClassroomPage() {
     const [materialName, setMaterialName] = useState('');
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
     const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
+    const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
 
 
     const isTeacher = useMemo(() => {
@@ -519,6 +520,41 @@ export default function ClassroomPage() {
         setIsProcessingRequest(null);
     };
     
+     const handleRemoveParticipant = async () => {
+        if (!isCreator || !participantToRemove) return;
+        const participant = participantToRemove;
+        setParticipantToRemove(null); // Close dialog immediately
+        
+        const batch = writeBatch(db);
+        
+        // 1. Delete from participants subcollection
+        const participantRef = doc(db, "classrooms", classroomId, "participants", participant.uid);
+        batch.delete(participantRef);
+        
+        // 2. Remove from main classroom document array
+        const classroomRef = doc(db, "classrooms", classroomId);
+        if (participant.role === 'teacher') {
+            const teacherObject = classroom?.teachers.find(t => t.uid === participant.uid);
+            if (teacherObject) {
+                 batch.update(classroomRef, { teachers: arrayRemove(teacherObject) });
+            }
+        } else {
+            batch.update(classroomRef, { students: arrayRemove(participant.uid) });
+        }
+        
+        // 3. Delete from user's enrolled subcollection
+        const userEnrolledRef = doc(db, `users/${participant.uid}/enrolled`, classroomId);
+        batch.delete(userEnrolledRef);
+        
+        try {
+            await batch.commit();
+            toast({ title: 'Participant Removed', description: `${participant.name} has been removed from the classroom.` });
+        } catch (error) {
+            console.error("Failed to remove participant:", error);
+            toast({ variant: 'destructive', title: 'Removal Failed', description: 'Could not remove the participant. Check Firestore rules and console for details.' });
+        }
+    };
+
     const onFeeSubmit = async (data: z.infer<typeof feeSchema>) => {
         try {
             await updateDoc(doc(db, 'classrooms', classroomId), {
@@ -793,8 +829,13 @@ export default function ClassroomPage() {
                                         {participants.length > 0 ? participants.map(s => (
                                             <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
                                                 <Avatar><AvatarImage src={s.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
-                                                <span className="text-sm">{s.name}</span>
-                                                 <Badge variant={s.role === 'teacher' ? 'secondary' : 'default'} className="ml-auto capitalize">{s.role}</Badge>
+                                                <span className="text-sm flex-grow">{s.name}</span>
+                                                <Badge variant={s.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{s.role}</Badge>
+                                                {isCreator && s.uid !== user?.uid && (
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 rounded-full" onClick={() => setParticipantToRemove(s)}>
+                                                        <UserX className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         )) : <p className="text-muted-foreground text-sm text-center pt-4">No participants enrolled yet.</p>}
                                     </div>
@@ -944,6 +985,21 @@ export default function ClassroomPage() {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </header>
+            
+            <AlertDialog open={!!participantToRemove} onOpenChange={(isOpen) => !isOpen && setParticipantToRemove(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove Participant?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to remove {participantToRemove?.name} from this classroom? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRemoveParticipant}>Remove</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
                 <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
