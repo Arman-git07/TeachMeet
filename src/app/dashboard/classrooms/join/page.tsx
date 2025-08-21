@@ -74,16 +74,21 @@ export default function JoinClassroomPage() {
             const batch = writeBatch(db);
             const requestRef = doc(db, `classrooms/${foundClassroom.id}/joinRequests`, user.uid);
             batch.set(requestRef, {
-                userId: user.uid, // Explicitly set userId for approval logic
+                studentId: user.uid,
                 studentName: user.displayName || 'Anonymous Student',
                 studentPhotoURL: user.photoURL || '',
+                role: 'student', // Assuming student role for this join page
                 status: 'pending',
                 requestedAt: serverTimestamp()
             });
 
             // Also create a document in the user's subcollection to track their pending requests
             const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, foundClassroom.id);
-            batch.set(userPendingRequestRef, { classroomId: foundClassroom.id, role: 'student' });
+            batch.set(userPendingRequestRef, { 
+                classroomId: foundClassroom.id, 
+                classroomTitle: foundClassroom.title,
+                requestedAt: serverTimestamp() 
+            });
             
             await batch.commit();
             

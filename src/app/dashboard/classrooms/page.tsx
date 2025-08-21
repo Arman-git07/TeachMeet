@@ -471,15 +471,12 @@ export default function ClassroomsPage() {
       return;
     }
     setIsLoadingRequests(true);
-    // This query is simplified. A more robust solution might involve a separate top-level collection for requests
-    // or querying all classrooms, which isn't scalable. This implementation is for demonstration.
-    const q = query(collectionGroup(db, 'joinRequests'), where('studentId', '==', user.uid));
+    const q = query(collection(db, `users/${user.uid}/pendingJoinRequests`));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const newPendingIds = new Set<string>();
         snapshot.forEach((doc) => {
-            // The classroom ID is the parent document's ID
-            newPendingIds.add(doc.ref.parent.parent!.id);
+            newPendingIds.add(doc.id);
         });
         setPendingRequestIds(newPendingIds);
         setIsLoadingRequests(false);
@@ -528,9 +525,11 @@ export default function ClassroomsPage() {
     }
     setRequestingToJoin(classroomId);
     try {
+        const batch = writeBatch(db);
+
+        // Add request to classroom's subcollection
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
-        
-        await setDoc(requestRef, {
+        batch.set(requestRef, {
             studentId: user.uid,
             studentName: user.displayName || 'Anonymous User',
             studentPhotoURL: user.photoURL || '',
@@ -538,6 +537,12 @@ export default function ClassroomsPage() {
             role: 'student',
             requestedAt: serverTimestamp()
         });
+
+        // Add a marker to the user's pending requests
+        const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
+        batch.set(userPendingRequestRef, { classroomId, requestedAt: serverTimestamp() });
+
+        await batch.commit();
 
         toast({ title: 'Request Sent!', description: `Your request to join as a student has been sent.` });
     } catch (error) {
@@ -552,8 +557,15 @@ export default function ClassroomsPage() {
     if (!user) return;
     setRequestingToJoin(classroomId);
     try {
+      const batch = writeBatch(db);
+      // Delete from classroom's joinRequests
       const joinRequestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
-      await deleteDoc(joinRequestRef);
+      batch.delete(joinRequestRef);
+      // Delete from user's pendingJoinRequests
+      const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
+      batch.delete(userPendingRequestRef);
+
+      await batch.commit();
 
       toast({ title: 'Request Canceled', description: 'Your join request has been withdrawn.' });
     } catch (error) {

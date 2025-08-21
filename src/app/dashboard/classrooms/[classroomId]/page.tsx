@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -144,8 +145,11 @@ const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 // --- Approval/Denial Functions ---
 const approveRequest = async (classroomId: string, request: JoinRequest) => {
   try {
+    const batch = writeBatch(db);
+
+    // 1. Add to participants subcollection
     const participantRef = doc(db, "classrooms", classroomId, "participants", request.studentId);
-    await setDoc(participantRef, {
+    batch.set(participantRef, {
       uid: request.studentId,
       name: request.studentName,
       photoURL: request.studentPhotoURL || "",
@@ -153,20 +157,62 @@ const approveRequest = async (classroomId: string, request: JoinRequest) => {
       joinedAt: serverTimestamp(),
     });
 
-    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", request.id);
-    await deleteDoc(requestRef);
+    // 2. Add to main classroom document array
+    const classroomRef = doc(db, "classrooms", classroomId);
+    if (request.role === 'teacher' && request.applicationData) {
+        batch.update(classroomRef, { teachers: arrayUnion({
+            uid: request.studentId,
+            name: request.studentName,
+            photoURL: request.studentPhotoURL || '',
+            subject: request.applicationData.subject,
+            qualification: request.applicationData.qualification,
+            experience: request.applicationData.experience,
+            availability: request.applicationData.availability,
+            resumeURL: request.resumeURL || '',
+        }) });
+    } else {
+        batch.update(classroomRef, { students: arrayUnion(request.studentId) });
+    }
 
+    // 3. Add to user's enrolled subcollection
+    const userEnrolledRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
+    const classroomSnap = await getDoc(classroomRef);
+    if(classroomSnap.exists()) {
+      const classroomData = classroomSnap.data();
+      batch.set(userEnrolledRef, {
+        classroomId: classroomId,
+        title: classroomData.title,
+        description: classroomData.description,
+        teacherName: classroomData.teacherName,
+        enrolledAt: serverTimestamp()
+      });
+    }
+
+    // 4. Delete the join request from both locations
+    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", request.studentId);
+    batch.delete(requestRef);
+    const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+    batch.delete(userPendingRequestRef);
+
+    await batch.commit();
     return { success: true };
+
   } catch (error: any) {
     console.error("Approval failed:", error);
     return { success: false, error: error.message };
   }
 };
 
-const denyRequest = async (classroomId: string, requestId: string) => {
+const denyRequest = async (classroomId: string, request: JoinRequest) => {
   try {
-    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", requestId);
-    await deleteDoc(requestRef);
+    const batch = writeBatch(db);
+    // Delete from classroom's joinRequests
+    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", request.studentId);
+    batch.delete(requestRef);
+    // Delete from user's pendingJoinRequests
+    const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+    batch.delete(userPendingRequestRef);
+    await batch.commit();
     return { success: true };
   } catch (error: any) {
     console.error("Denial failed:", error);
@@ -463,7 +509,7 @@ export default function ClassroomPage() {
         if (!isCreator || !user) return;
         setIsProcessingRequest(request.id);
 
-        const result = await denyRequest(classroomId, request.id);
+        const result = await denyRequest(classroomId, request);
 
         if (result.success) {
             toast({ title: 'Request Denied' });
