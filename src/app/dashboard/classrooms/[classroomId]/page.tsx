@@ -141,6 +141,40 @@ const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, rej
 });
 const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 
+// --- Approval/Denial Functions ---
+const approveRequest = async (classroomId: string, request: JoinRequest) => {
+  try {
+    const participantRef = doc(db, "classrooms", classroomId, "participants", request.studentId);
+    await setDoc(participantRef, {
+      uid: request.studentId,
+      name: request.studentName,
+      photoURL: request.studentPhotoURL || "",
+      role: request.role,
+      joinedAt: serverTimestamp(),
+    });
+
+    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", request.id);
+    await deleteDoc(requestRef);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Approval failed:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+const denyRequest = async (classroomId: string, requestId: string) => {
+  try {
+    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", requestId);
+    await deleteDoc(requestRef);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Denial failed:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+
 // --- Components ---
 
 const VanishDateTimePicker = ({ date, setDate }: { date: Date | undefined, setDate: (date: Date | undefined) => void }) => {
@@ -414,73 +448,29 @@ export default function ClassroomPage() {
         if (!isCreator || !user || !classroom) return;
         setIsProcessingRequest(request.id);
         
-        try {
-            const batch = writeBatch(db);
-
-            // Add to participants subcollection
-            const participantRef = doc(db, "classrooms", classroomId, "participants", request.studentId);
-            batch.set(participantRef, {
-                uid: request.studentId,
-                name: request.studentName,
-                photoURL: request.studentPhotoURL || '',
-                role: request.role,
-                joinedAt: serverTimestamp(),
-            });
-
-            // Update main classroom document based on role
-            if (request.role === 'teacher') {
-                const newTeacher: TeacherInfo = {
-                    uid: request.studentId,
-                    name: request.studentName,
-                    photoURL: request.studentPhotoURL || '',
-                    subject: request.applicationData?.subject || 'N/A',
-                    qualification: request.applicationData?.qualification || 'N/A',
-                    experience: request.applicationData?.experience || 'N/A',
-                    availability: request.applicationData?.availability || 'N/A',
-                    resumeURL: request.resumeURL || '',
-                };
-                batch.update(doc(db, "classrooms", classroomId), { teachers: arrayUnion(newTeacher) });
-            } else {
-                batch.update(doc(db, "classrooms", classroomId), { students: arrayUnion(request.studentId) });
-            }
-            
-            // Add enrollment record for the user
-            const enrolledClassroomRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
-            batch.set(enrolledClassroomRef, {
-                classroomId: classroomId,
-                title: classroom.title,
-                description: classroom.description,
-                teacherName: classroom.teacherName,
-                role: request.role,
-            });
-            
-            // Delete the join request
-            const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
-            batch.delete(requestRef);
-            
-            await batch.commit();
+        const result = await approveRequest(classroomId, request);
+        
+        if (result.success) {
             toast({ title: 'Request Approved!', description: `${request.studentName} has been added to the classroom.` });
-        } catch (error) {
-            console.error('Error approving request:', error);
-            toast({ variant: 'destructive', title: 'Approval Failed', description: 'An error occurred. Check Firestore rules and console for details.' });
-        } finally {
-            setIsProcessingRequest(null);
+        } else {
+            toast({ variant: 'destructive', title: 'Approval Failed', description: result.error || 'An error occurred. Check Firestore rules and console for details.' });
         }
+        
+        setIsProcessingRequest(null);
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
         if (!isCreator || !user) return;
         setIsProcessingRequest(request.id);
-        try {
-            const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
-            await deleteDoc(requestRef);
+
+        const result = await denyRequest(classroomId, request.id);
+
+        if (result.success) {
             toast({ title: 'Request Denied' });
-        } catch (error) {
-            console.error('Error denying request:', error);
-            toast({ variant: 'destructive', title: 'Action Failed' });
-        } finally {
-            setIsProcessingRequest(null);
+        } else {
+            toast({ variant: 'destructive', title: 'Action Failed', description: result.error || 'An error occurred.' });
         }
+        setIsProcessingRequest(null);
     };
     
     const onFeeSubmit = async (data: z.infer<typeof feeSchema>) => {
