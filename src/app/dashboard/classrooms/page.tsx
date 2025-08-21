@@ -263,13 +263,14 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                 resumeURL = await getDownloadURL(snapshot.ref);
             }
 
-            const batch = writeBatch(db);
-            const requestRef = doc(db, `classrooms/${classroom.id}/joinRequests`, user.uid);
-            batch.set(requestRef, {
-                userId: user.uid,
-                studentName: data.fullName, // Use consistent field name for display
+            const requestRef = doc(collection(db, `classrooms/${classroom.id}/joinRequests`));
+            
+            await setDoc(requestRef, {
+                studentId: user.uid, // Keep consistent field name for rules
+                studentName: data.fullName,
                 studentPhotoURL: user.photoURL || '',
                 role: 'teacher',
+                status: 'pending',
                 applicationData: {
                     subject: data.subject,
                     mobile: data.mobile,
@@ -281,11 +282,6 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                 resumeURL: resumeURL,
                 requestedAt: serverTimestamp()
             });
-
-            const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroom.id);
-            batch.set(userPendingRequestRef, { classroomId: classroom.id, role: 'teacher' });
-
-            await batch.commit();
 
             toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });
             onSubmitted();
@@ -474,13 +470,15 @@ export default function ClassroomsPage() {
       return;
     }
     setIsLoadingRequests(true);
-    const requestsRef = collection(db, `users/${user.uid}/pendingJoinRequests`);
-    const q = query(requestsRef);
+    // This query is simplified. A more robust solution might involve a separate top-level collection for requests
+    // or querying all classrooms, which isn't scalable. This implementation is for demonstration.
+    const q = query(collectionGroup(db, 'joinRequests'), where('studentId', '==', user.uid));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const newPendingIds = new Set<string>();
         snapshot.forEach((doc) => {
-            newPendingIds.add(doc.id);
+            // The classroom ID is the parent document's ID
+            newPendingIds.add(doc.ref.parent.parent!.id);
         });
         setPendingRequestIds(newPendingIds);
         setIsLoadingRequests(false);
@@ -529,24 +527,16 @@ export default function ClassroomsPage() {
     }
     setRequestingToJoin(classroomId);
     try {
-        const batch = writeBatch(db);
+        const requestRef = doc(collection(db, `classrooms/${classroomId}/joinRequests`));
         
-        // Add request to the classroom's subcollection
-        const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
-        batch.set(requestRef, {
-            userId: user.uid,
+        await setDoc(requestRef, {
+            studentId: user.uid,
             studentName: user.displayName || 'Anonymous User',
             studentPhotoURL: user.photoURL || '',
             status: 'pending',
             role: 'student',
             requestedAt: serverTimestamp()
         });
-
-        // Add a reference to the user's pending requests for easy lookup
-        const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
-        batch.set(userPendingRequestRef, { classroomId: classroomId, role: 'student' });
-        
-        await batch.commit();
 
         toast({ title: 'Request Sent!', description: `Your request to join as a student has been sent.` });
     } catch (error) {
@@ -561,14 +551,14 @@ export default function ClassroomsPage() {
     if (!user) return;
     setRequestingToJoin(classroomId);
     try {
+      const joinRequestsRef = collection(db, `classrooms/${classroomId}/joinRequests`);
+      const q = query(joinRequestsRef, where("studentId", "==", user.uid));
+      const querySnapshot = await getDocs(q);
+
       const batch = writeBatch(db);
-      
-      const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
-      batch.delete(requestRef);
-      
-      const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
-      batch.delete(userPendingRequestRef);
-      
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
       await batch.commit();
 
       toast({ title: 'Request Canceled', description: 'Your join request has been withdrawn.' });
