@@ -632,6 +632,24 @@ export default function ClassroomsPage() {
     const isRequesting = requestingToJoin === classroom.id;
     const isMyClass = user?.uid === classroom.teacherId;
     const hasPendingRequest = pendingRequestIds.has(classroom.id);
+    const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === classroom.id);
+    
+    if (isEnrolled) {
+      return (
+         <Card key={classroom.id} className="flex flex-col">
+          <CardHeader>
+              <CardTitle>{classroom.title}</CardTitle>
+              <CardDescription>{classroom.description || "No description."}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-grow">
+              <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
+          </CardContent>
+          <CardFooter className="flex-col items-stretch gap-2 pt-4">
+              <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+          </CardFooter>
+        </Card>
+      )
+    }
 
     return (
       <Card key={classroom.id} className="flex flex-col">
@@ -673,7 +691,7 @@ export default function ClassroomsPage() {
           </CardFooter>
     </Card>
     );
-  }, [user, requestingToJoin, handleRequestToJoinStudent, handleCancelRequest, pendingRequestIds]);
+  }, [user, requestingToJoin, handleRequestToJoinStudent, handleCancelRequest, pendingRequestIds, enrolledClasses]);
 
   const renderSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
