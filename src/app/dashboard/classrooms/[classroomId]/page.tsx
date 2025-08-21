@@ -143,11 +143,11 @@ const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, rej
 const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 
 // --- Approval/Denial Functions ---
-const approveRequest = async (classroomId: string, request: JoinRequest) => {
+export const approveRequest = async (classroomId: string, request: any) => {
   try {
     const batch = writeBatch(db);
 
-    // 1. Add to participants subcollection
+    // ✅ Step 1: Add participant
     const participantRef = doc(db, "classrooms", classroomId, "participants", request.studentId);
     batch.set(participantRef, {
       uid: request.studentId,
@@ -156,10 +156,10 @@ const approveRequest = async (classroomId: string, request: JoinRequest) => {
       role: request.role,
       joinedAt: serverTimestamp(),
     });
-
-    // 2. Add to main classroom document array
+    
+    // Add to main classroom document array
     const classroomRef = doc(db, "classrooms", classroomId);
-    if (request.role === 'teacher' && request.applicationData) {
+     if (request.role === 'teacher' && request.applicationData) {
         batch.update(classroomRef, { teachers: arrayUnion({
             uid: request.studentId,
             name: request.studentName,
@@ -173,8 +173,8 @@ const approveRequest = async (classroomId: string, request: JoinRequest) => {
     } else {
         batch.update(classroomRef, { students: arrayUnion(request.studentId) });
     }
-
-    // 3. Add to user's enrolled subcollection
+    
+    // Add to user's enrolled subcollection
     const userEnrolledRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
     const classroomSnap = await getDoc(classroomRef);
     if(classroomSnap.exists()) {
@@ -188,30 +188,30 @@ const approveRequest = async (classroomId: string, request: JoinRequest) => {
       });
     }
 
-    // 4. Delete the join request from both locations
+    // ✅ Step 2 & 3: Delete request
     const requestRef = doc(db, "classrooms", classroomId, "joinRequests", request.studentId);
     batch.delete(requestRef);
     const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
     batch.delete(userPendingRequestRef);
 
     await batch.commit();
-    return { success: true };
 
+    return { success: true };
   } catch (error: any) {
     console.error("Approval failed:", error);
     return { success: false, error: error.message };
   }
 };
 
-const denyRequest = async (classroomId: string, request: JoinRequest) => {
+export const denyRequest = async (classroomId: string, studentId: string) => {
   try {
     const batch = writeBatch(db);
-    // Delete from classroom's joinRequests
-    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", request.studentId);
+    const requestRef = doc(db, "classrooms", classroomId, "joinRequests", studentId);
     batch.delete(requestRef);
-    // Delete from user's pendingJoinRequests
-    const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+    
+    const userPendingRequestRef = doc(db, `users/${studentId}/pendingJoinRequests`, classroomId);
     batch.delete(userPendingRequestRef);
+
     await batch.commit();
     return { success: true };
   } catch (error: any) {
@@ -510,7 +510,7 @@ export default function ClassroomPage() {
         if (!isCreator || !user) return;
         setIsProcessingRequest(request.id);
 
-        const result = await denyRequest(classroomId, request);
+        const result = await denyRequest(classroomId, request.studentId);
 
         if (result.success) {
             toast({ title: 'Request Denied' });
@@ -846,10 +846,10 @@ export default function ClassroomPage() {
                         )}
                         {isTeacher && (
                         <Dialog>
-                           <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Manage Teachers</DropdownMenuItem></DialogTrigger>
+                           <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem></DialogTrigger>
                             <DialogContent className="sm:max-w-lg">
                                 <DialogHeader>
-                                    <DialogTitle>Manage Teachers</DialogTitle>
+                                    <DialogTitle>Subject Teachers</DialogTitle>
                                     <DialogDescription>Manage subject teachers for this classroom ({classroom.teachers?.length || 0}).</DialogDescription>
                                 </DialogHeader>
                                 <ScrollArea className="max-h-[60vh] p-4">
@@ -881,7 +881,7 @@ export default function ClassroomPage() {
                         )}
                         <DropdownMenuSeparator />
                         <Dialog>
-                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Manage Fees</DropdownMenuItem></DialogTrigger>
+                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Fees & Payment</DropdownMenuItem></DialogTrigger>
                              <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
                                     <DialogTitle>Fees & Payment</DialogTitle>
