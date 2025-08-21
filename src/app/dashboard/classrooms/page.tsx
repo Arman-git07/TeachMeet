@@ -227,12 +227,40 @@ const teacherApplicationSchema = z.object({
     resume: z.any().optional(),
 });
 
+type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
+
+async function submitTeacherApplication(classroomId: string, data: TeacherApplicationValues, resumeURL?: string) {
+    const { user } = auth;
+    if (!user) throw new Error("Not logged in");
+
+    // The joinRequests doc ID MUST be the applicant's UID
+    const ref = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
+
+    await setDoc(ref, {
+        studentId: user.uid, // keep field name consistent
+        studentName: data.fullName,
+        studentPhotoURL: user.photoURL || "",
+        role: "teacher",
+        status: "pending",
+        requestedAt: serverTimestamp(),
+        resumeURL: resumeURL || "",
+        applicationData: {
+            subject: data.subject,
+            qualification: data.qualification,
+            experience: data.experience,
+            availability: data.availability,
+            mobile: data.mobile,
+            message: data.message || ""
+        }
+    }, { merge: false });
+}
+
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
 
-    const form = useForm<z.infer<typeof teacherApplicationSchema>>({
+    const form = useForm<TeacherApplicationValues>({
         resolver: zodResolver(teacherApplicationSchema),
         defaultValues: {
             fullName: user?.displayName || '',
@@ -246,7 +274,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
         },
     });
 
-    const onSubmit = async (data: z.infer<typeof teacherApplicationSchema>) => {
+    const onSubmit = async (data: TeacherApplicationValues) => {
         if (!user) {
             toast({ variant: 'destructive', title: 'Not Authenticated' });
             return;
@@ -262,27 +290,8 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                 const snapshot = await uploadBytes(resumeRef, resumeFile);
                 resumeURL = await getDownloadURL(snapshot.ref);
             }
-
-            // Use the user's UID as the document ID for the join request
-            const requestRef = doc(db, `classrooms/${classroom.id}/joinRequests`, user.uid);
             
-            await setDoc(requestRef, {
-                studentId: user.uid, // Crucial for security rules
-                studentName: data.fullName,
-                studentPhotoURL: user.photoURL || '',
-                role: 'teacher',
-                status: 'pending',
-                applicationData: {
-                    subject: data.subject,
-                    mobile: data.mobile,
-                    qualification: data.qualification,
-                    experience: data.experience,
-                    availability: data.availability,
-                    message: data.message,
-                },
-                resumeURL: resumeURL,
-                requestedAt: serverTimestamp()
-            });
+            await submitTeacherApplication(classroom.id, data, resumeURL);
 
             toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });
             onSubmitted();
