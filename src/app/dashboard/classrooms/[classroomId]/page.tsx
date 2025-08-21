@@ -413,58 +413,56 @@ export default function ClassroomPage() {
     const handleApproveRequest = async (request: JoinRequest) => {
         if (!isCreator || !user || !classroom) return;
         setIsProcessingRequest(request.id);
-        const { studentId, studentName, studentPhotoURL, role, applicationData, resumeURL } = request;
         
         try {
             const batch = writeBatch(db);
-            const classroomRef = doc(db, 'classrooms', classroomId);
-            
-            // Add to main participants collection for easy querying of all members
-            const participantRef = doc(db, 'classrooms', classroomId, 'participants', studentId);
+
+            // Add to participants subcollection
+            const participantRef = doc(db, "classrooms", classroomId, "participants", request.studentId);
             batch.set(participantRef, {
-                uid: studentId,
-                name: studentName,
-                photoURL: studentPhotoURL || '',
-                role: role,
+                uid: request.studentId,
+                name: request.studentName,
+                photoURL: request.studentPhotoURL || '',
+                role: request.role,
                 joinedAt: serverTimestamp(),
             });
 
-            if (role === 'teacher') {
+            // Update main classroom document based on role
+            if (request.role === 'teacher') {
                 const newTeacher: TeacherInfo = {
-                    uid: studentId,
-                    name: studentName,
-                    photoURL: studentPhotoURL || '',
-                    subject: applicationData.subject || 'N/A',
-                    qualification: applicationData.qualification || 'N/A',
-                    experience: applicationData.experience || 'N/A',
-                    availability: applicationData.availability || 'N/A',
-                    resumeURL: resumeURL || '',
+                    uid: request.studentId,
+                    name: request.studentName,
+                    photoURL: request.studentPhotoURL || '',
+                    subject: request.applicationData?.subject || 'N/A',
+                    qualification: request.applicationData?.qualification || 'N/A',
+                    experience: request.applicationData?.experience || 'N/A',
+                    availability: request.applicationData?.availability || 'N/A',
+                    resumeURL: request.resumeURL || '',
                 };
-                batch.update(classroomRef, { teachers: arrayUnion(newTeacher) });
+                batch.update(doc(db, "classrooms", classroomId), { teachers: arrayUnion(newTeacher) });
             } else {
-                 batch.update(classroomRef, { students: arrayUnion(studentId) });
+                batch.update(doc(db, "classrooms", classroomId), { students: arrayUnion(request.studentId) });
             }
-
-            const enrolledClassroomRef = doc(db, `users/${studentId}/enrolled`, classroomId);
+            
+            // Add enrollment record for the user
+            const enrolledClassroomRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
             batch.set(enrolledClassroomRef, {
                 classroomId: classroomId,
                 title: classroom.title,
                 description: classroom.description,
                 teacherName: classroom.teacherName,
-                role: role,
+                role: request.role,
             });
             
+            // Delete the join request
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
             batch.delete(requestRef);
             
-            const userPendingRequestRef = doc(db, `users/${studentId}/pendingJoinRequests`, classroomId);
-            batch.delete(userPendingRequestRef);
-
             await batch.commit();
-            toast({ title: 'Request Approved!', description: `${studentName} has been added to the classroom.` });
+            toast({ title: 'Request Approved!', description: `${request.studentName} has been added to the classroom.` });
         } catch (error) {
             console.error('Error approving request:', error);
-            toast({ variant: 'destructive', title: 'Approval Failed' });
+            toast({ variant: 'destructive', title: 'Approval Failed', description: 'An error occurred. Check Firestore rules and console for details.' });
         } finally {
             setIsProcessingRequest(null);
         }
@@ -474,12 +472,8 @@ export default function ClassroomPage() {
         if (!isCreator || !user) return;
         setIsProcessingRequest(request.id);
         try {
-            const batch = writeBatch(db);
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
-            batch.delete(requestRef);
-            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
-            batch.delete(userPendingRequestRef);
-            await batch.commit();
+            await deleteDoc(requestRef);
             toast({ title: 'Request Denied' });
         } catch (error) {
             console.error('Error denying request:', error);
@@ -725,7 +719,7 @@ export default function ClassroomPage() {
                                                 <Card key={req.id} className="p-3 bg-muted/30">
                                                     <div className="flex items-start gap-4">
                                                         <Avatar className="mt-1">
-                                                            <AvatarImage src={req.studentPhotoURL} />
+                                                            <AvatarImage src={req.studentPhotoURL} data-ai-hint="avatar user"/>
                                                             <AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback>
                                                         </Avatar>
                                                         <div className="flex-grow">
@@ -762,7 +756,7 @@ export default function ClassroomPage() {
                                         <h4 className="font-medium text-sm text-muted-foreground px-1">Enrolled Participants ({participants.length})</h4>
                                         {participants.length > 0 ? participants.map(s => (
                                             <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
-                                                <Avatar><AvatarImage src={s.photoURL} /><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
+                                                <Avatar><AvatarImage src={s.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm">{s.name}</span>
                                                  <Badge variant={s.role === 'teacher' ? 'secondary' : 'default'} className="ml-auto capitalize">{s.role}</Badge>
                                             </div>
@@ -779,14 +773,14 @@ export default function ClassroomPage() {
                             <DialogContent className="sm:max-w-lg">
                                 <DialogHeader>
                                     <DialogTitle>Manage Teachers</DialogTitle>
-                                    <DialogDescription>Manage subject teachers for this classroom ({classroom.teachers?.length || 0}).</DialogDescription>
+                                    <DialogDescription>Manage subject teachers for this classroom ({classroom.teachers?.length || 0}).</DialogHeader>
                                 </DialogHeader>
                                 <ScrollArea className="max-h-[60vh] p-4">
                                     <div className="space-y-4">
                                     {classroom.teachers && classroom.teachers.length > 0 ? classroom.teachers.map(t => (
                                         <Card key={t.uid} className="p-4">
                                             <div className="flex items-start gap-4">
-                                                <Avatar className="h-12 w-12"><AvatarImage src={t.photoURL} /><AvatarFallback>{t.name.charAt(0)}</AvatarFallback></Avatar>
+                                                <Avatar className="h-12 w-12"><AvatarImage src={t.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{t.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <div className="flex-grow">
                                                     <CardTitle className="text-lg">{t.name}</CardTitle>
                                                     <CardDescription>{t.subject}</CardDescription>
@@ -1226,3 +1220,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
