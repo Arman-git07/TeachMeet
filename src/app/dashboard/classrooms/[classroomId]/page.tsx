@@ -54,7 +54,7 @@ interface Classroom {
     description: string;
     teacherId: string;
     teacherName: string;
-    students: string[]; // array of user IDs
+    students: string[]; // Keep for legacy/quick reference, but participants subcollection is source of truth
     teachers: TeacherInfo[]; // Array of teacher info objects
     feeAmount?: number;
     feeCurrency?: string;
@@ -330,8 +330,7 @@ export default function ClassroomPage() {
 
     // State Declarations
     const [classroom, setClassroom] = useState<Classroom | null>(null);
-    const [students, setStudents] = useState<UserProfile[]>([]);
-    // Teachers state is now handled by classroom.teachers directly
+    const [participants, setParticipants] = useState<UserProfile[]>([]);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
@@ -404,76 +403,63 @@ export default function ClassroomPage() {
         const examsQuery = query(collection(db, 'classrooms', classroomId, 'exams'), where('vanishAt', '>', new Date()), orderBy('vanishAt', 'desc'), orderBy('date', 'desc'));
         const unsubExams = onSnapshot(examsQuery, snap => setExams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam))));
         
-        return () => { unsubAnnouncements(); unsubAssignments(); unsubRequests(); unsubMaterials(); unsubExams(); };
+        const unsubParticipants = onSnapshot(query(collection(db, 'classrooms', classroomId, 'participants'), orderBy('joinedAt', 'desc')), snap => setParticipants(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile))));
+
+        return () => { unsubAnnouncements(); unsubAssignments(); unsubRequests(); unsubMaterials(); unsubExams(); unsubParticipants(); };
     }, [classroomId]);
 
-    // Fetch user profiles for students
-    useEffect(() => {
-        const fetchStudentProfiles = async () => {
-            if (!classroom || !classroom.students || classroom.students.length === 0) {
-                setStudents([]);
-                return;
-            }
-            
-            const studentIds = classroom.students;
-            const profiles: UserProfile[] = [];
-            // Firestore 'in' query supports up to 30 elements in the array since late 2023
-            for (let i = 0; i < studentIds.length; i += 30) {
-                const chunk = studentIds.slice(i, i + 30);
-                if(chunk.length > 0) {
-                    const q = query(collection(db, 'users'), where('__name__', 'in', chunk));
-                    const userDocs = await getDocs(q);
-                    userDocs.forEach(userDoc => {
-                        if (userDoc.exists()) {
-                            profiles.push({ id: userDoc.id, ...userDoc.data() } as UserProfile);
-                        }
-                    });
-                }
-            }
-            setStudents(profiles);
-        };
-
-        fetchStudentProfiles();
-    }, [classroom?.students]);
 
     const handleApproveRequest = async (request: JoinRequest) => {
         if (!isCreator || !user || !classroom) return;
+        const { studentId, studentName, studentPhotoURL, role, applicationData, resumeURL } = request;
+        
         try {
             const batch = writeBatch(db);
             const classroomRef = doc(db, 'classrooms', classroomId);
             
-            if (request.role === 'teacher') {
+            // Add to main participants collection for easy querying of all members
+            const participantRef = doc(db, 'classrooms', classroomId, 'participants', studentId);
+            batch.set(participantRef, {
+                uid: studentId,
+                name: studentName,
+                photoURL: studentPhotoURL || '',
+                role: role,
+                joinedAt: serverTimestamp(),
+            });
+
+            if (role === 'teacher') {
                 const newTeacher: TeacherInfo = {
-                    uid: request.studentId,
-                    name: request.studentName,
-                    photoURL: request.studentPhotoURL || '',
-                    subject: request.applicationData.subject || 'N/A',
-                    qualification: request.applicationData.qualification || 'N/A',
-                    experience: request.applicationData.experience || 'N/A',
-                    availability: request.applicationData.availability || 'N/A',
-                    resumeURL: request.resumeURL || '',
+                    uid: studentId,
+                    name: studentName,
+                    photoURL: studentPhotoURL || '',
+                    subject: applicationData.subject || 'N/A',
+                    qualification: applicationData.qualification || 'N/A',
+                    experience: applicationData.experience || 'N/A',
+                    availability: applicationData.availability || 'N/A',
+                    resumeURL: resumeURL || '',
                 };
                 batch.update(classroomRef, { teachers: arrayUnion(newTeacher) });
             } else {
-                batch.update(classroomRef, { students: arrayUnion(request.studentId) });
+                 batch.update(classroomRef, { students: arrayUnion(studentId) });
             }
 
-            const enrolledClassroomRef = doc(db, `users/${request.studentId}/enrolled`, classroomId);
+            const enrolledClassroomRef = doc(db, `users/${studentId}/enrolled`, classroomId);
             batch.set(enrolledClassroomRef, {
                 classroomId: classroomId,
                 title: classroom.title,
                 description: classroom.description,
                 teacherName: classroom.teacherName,
+                role: role,
             });
             
             const requestRef = doc(db, 'classrooms', classroomId, 'joinRequests', request.id);
             batch.delete(requestRef);
             
-            const userPendingRequestRef = doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId);
+            const userPendingRequestRef = doc(db, `users/${studentId}/pendingJoinRequests`, classroomId);
             batch.delete(userPendingRequestRef);
 
             await batch.commit();
-            toast({ title: 'Request Approved!', description: `${request.studentName} has been added to the classroom.` });
+            toast({ title: 'Request Approved!', description: `${studentName} has been added to the classroom.` });
         } catch (error) {
             console.error('Error approving request:', error);
             toast({ variant: 'destructive', title: 'Approval Failed' });
@@ -721,7 +707,7 @@ export default function ClassroomPage() {
                              <DialogContent className="sm:max-w-2xl">
                                 <DialogHeader>
                                 <DialogTitle>Manage Participants</DialogTitle>
-                                <DialogDescription>Approve requests and view enrolled students.</DialogDescription>
+                                <DialogDescription>Approve requests and view enrolled participants.</DialogDescription>
                                 </DialogHeader>
                                 <ScrollArea className="max-h-[60vh] -mx-6 px-6">
                                     <div className="space-y-4 py-4">
@@ -762,13 +748,13 @@ export default function ClassroomPage() {
                                         </div>
                                     )}
                                     <div className="space-y-2">
-                                        <h4 className="font-medium text-sm text-muted-foreground px-1">Enrolled Students ({students.length})</h4>
-                                        {students.length > 0 ? students.map(s => (
+                                        <h4 className="font-medium text-sm text-muted-foreground px-1">Enrolled Participants ({participants.length})</h4>
+                                        {participants.length > 0 ? participants.map(s => (
                                             <div key={s.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
                                                 <Avatar><AvatarImage src={s.photoURL} /><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm">{s.name}</span>
                                             </div>
-                                        )) : <p className="text-muted-foreground text-sm text-center pt-4">No students enrolled yet.</p>}
+                                        )) : <p className="text-muted-foreground text-sm text-center pt-4">No participants enrolled yet.</p>}
                                     </div>
                                     </div>
                                 </ScrollArea>
@@ -1228,3 +1214,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
