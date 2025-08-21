@@ -773,7 +773,7 @@ export default function ClassroomPage() {
                             <DialogContent className="sm:max-w-lg">
                                 <DialogHeader>
                                     <DialogTitle>Manage Teachers</DialogTitle>
-                                    <DialogDescription>Manage subject teachers for this classroom ({classroom.teachers?.length || 0}).</DialogHeader>
+                                    <DialogDescription>Manage subject teachers for this classroom ({classroom.teachers?.length || 0}).</DialogDescription>
                                 </DialogHeader>
                                 <ScrollArea className="max-h-[60vh] p-4">
                                     <div className="space-y-4">
@@ -1220,5 +1220,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    
