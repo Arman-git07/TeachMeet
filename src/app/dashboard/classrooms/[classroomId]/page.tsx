@@ -459,11 +459,12 @@ export default function ClassroomPage() {
         return classroom.teacherId === user.uid;
     }, [user, classroom]);
     
-    const isTeacher = useMemo(() => {
-        if (!user || !participants.length) return false;
+    const canPostAnnouncements = useMemo(() => {
+        if (!user || !participants.length || !classroom) return false;
+        if (user.uid === classroom.teacherId) return true; // Creator can always post
         const self = participants.find(p => p.uid === user.uid);
         return self?.role === 'teacher';
-    }, [user, participants]);
+    }, [user, participants, classroom]);
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
@@ -628,7 +629,7 @@ export default function ClassroomPage() {
     };
 
     const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
-        if (!isTeacher) return;
+        if (!canPostAnnouncements) return;
         try {
             const { submissionFile, ...assignmentData } = data;
             await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), { ...assignmentData, createdAt: serverTimestamp() });
@@ -674,7 +675,7 @@ export default function ClassroomPage() {
     };
     
     const handleGradeSubmission = async (assignmentId: string, submission: Submission, teacherFile: File) => {
-        if (!user || !isTeacher) return;
+        if (!user || !canPostAnnouncements) return;
         setIsGrading(submission.id);
         try {
             // Here we assume submission.fileUrl is a direct downloadable URL.
@@ -754,7 +755,7 @@ export default function ClassroomPage() {
     };
     
     const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
-        if (!isTeacher || !user) return;
+        if (!canPostAnnouncements || !user) return;
         examForm.clearErrors();
 
         const examFile = data.examFile?.[0];
@@ -881,7 +882,7 @@ export default function ClassroomPage() {
                             </DialogContent>
                         </Dialog>
                         )}
-                        {isTeacher && (
+                        {canPostAnnouncements && (
                         <Dialog>
                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem></DialogTrigger>
                             <DialogContent className="sm:max-w-lg">
@@ -924,7 +925,7 @@ export default function ClassroomPage() {
                                     <CardHeader>
                                         <div className="flex justify-between items-center">
                                             <CardTitle>Fees & Payment</CardTitle>
-                                            {isTeacher && (
+                                            {canPostAnnouncements && (
                                                 <Dialog>
                                                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Settings className="h-4 w-4" /></Button></DialogTrigger>
                                                     <DialogContent>
@@ -1049,7 +1050,7 @@ export default function ClassroomPage() {
                         <TabsContent value="announcements">
                             <Card><CardHeader><CardTitle>Announcements</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    {isTeacher && user && <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} />}
+                                    {canPostAnnouncements && user && <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} />}
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
@@ -1073,7 +1074,7 @@ export default function ClassroomPage() {
                                          <CardTitle>Assignments</CardTitle>
                                          <CardDescription>Manage and grade assignments here.</CardDescription>
                                      </div>
-                                     {isTeacher && (
+                                     {canPostAnnouncements && (
                                          <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
                                              <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4"/>Create Assignment</Button></DialogTrigger>
                                              <DialogContent>
@@ -1121,7 +1122,7 @@ export default function ClassroomPage() {
                                                     <p className="text-sm text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleDateString()}</p>
                                                     <p className="text-sm mt-1">{assignment.description}</p>
                                                 </div>
-                                                {!isTeacher && (
+                                                {!canPostAnnouncements && (
                                                     <div className="flex-shrink-0">
                                                         <Input type="file" id={`submission-upload-${assignment.id}`} className="hidden" onChange={(e) => handleAssignmentSubmission(assignment.id, e.target.files?.[0] || null)} />
                                                         <Label htmlFor={`submission-upload-${assignment.id}`} className={cn(buttonVariants(), "cursor-pointer")}>
@@ -1139,7 +1140,7 @@ export default function ClassroomPage() {
                                                                 <a href={sub.fileUrl} target="_blank" className="text-primary hover:underline font-medium text-sm">{sub.studentName}'s Submission</a>
                                                                 <span className="text-xs text-muted-foreground">({new Date(sub.submittedAt?.toDate()).toLocaleDateString()})</span>
                                                              </div>
-                                                             {isTeacher ? (
+                                                             {canPostAnnouncements ? (
                                                                 sub.grade !== undefined ? (
                                                                     <div className="text-right">
                                                                         <p className="font-bold text-lg text-primary">{sub.grade}/100</p>
@@ -1174,7 +1175,7 @@ export default function ClassroomPage() {
                             <Card>
                                 <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    {isTeacher && user && (
+                                    {canPostAnnouncements && user && (
                                         <Card className="p-4">
                                             <Tabs defaultValue="file">
                                                 <TabsList className="grid w-full grid-cols-2">
@@ -1231,7 +1232,7 @@ export default function ClassroomPage() {
                                         <CardTitle>Exams & Tests</CardTitle>
                                         <CardDescription>Manage and view scheduled exams.</CardDescription>
                                     </div>
-                                    {isTeacher && (
+                                    {canPostAnnouncements && (
                                         <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
                                             <DialogTrigger asChild>
                                                 <Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Exam</Button>
@@ -1345,3 +1346,4 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
