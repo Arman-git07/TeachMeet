@@ -56,7 +56,7 @@ interface Classroom {
     teacherId: string;
     teacherName: string;
     students: string[]; // Keep for legacy/quick reference, but participants subcollection is source of truth
-    teachers: TeacherInfo[]; // Array of teacher info objects
+    teachers: TeacherInfo[]; // This field seems unused now in favor of subcollection
     feeAmount?: number;
     feeCurrency?: string;
     paymentDetails?: { upiId: string; qrCodeUrl: string; };
@@ -149,19 +149,29 @@ export const handleTeacherRequest = async (classroomId: string, teacherId: strin
         const requestRef = doc(db, "classrooms", classroomId, "joinRequests", teacherId);
         
         if (action === "accept") {
+            const batch = writeBatch(db);
             const teacherRef = doc(db, "classrooms", classroomId, "teachers", teacherId);
-            await setDoc(teacherRef, {
+            batch.set(teacherRef, {
                 teacherId,
                 name: teacherData.studentName,
                 subject: teacherData.applicationData.subject,
                 availability: teacherData.applicationData.availability,
-                addedAt: new Date(),
+                addedAt: serverTimestamp(),
             });
-            await updateDoc(requestRef, { status: "accepted" });
-            await deleteDoc(requestRef); // Optional: clean up the request
+            const participantRef = doc(db, "classrooms", classroomId, "participants", teacherId);
+            batch.set(participantRef, {
+                uid: teacherId,
+                name: teacherData.studentName,
+                photoURL: teacherData.studentPhotoURL || "",
+                role: "teacher",
+                joinedAt: serverTimestamp(),
+            });
+            batch.update(requestRef, { status: "accepted" });
+            batch.delete(requestRef); 
+            await batch.commit();
         } else if (action === "deny") {
             await updateDoc(requestRef, { status: "denied" });
-            await deleteDoc(requestRef); // Optional: clean up the request
+            await deleteDoc(requestRef);
         }
         return { success: true };
     } catch (error: any) {
@@ -185,8 +195,7 @@ export const approveRequest = async (classroomId: string, request: any) => {
     
     const classroomRef = doc(db, "classrooms", classroomId);
      if (request.role === 'teacher') {
-        // This part might be superseded by the new handleTeacherRequest logic but kept for safety.
-        // It's better to handle teacher role via its specific flow.
+        // This part is handled by handleTeacherRequest now.
      } else {
         batch.update(classroomRef, { students: arrayUnion(request.studentId) });
     }
@@ -392,7 +401,7 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
             toast({ title: 'Announcement Posted!' });
         } catch (error) {
             console.error('Error posting announcement:', error);
-            toast({ variant: 'destructive', title: 'Failed to post announcement.' });
+            toast({ variant: 'destructive', title: 'Failed to post announcement.', description: 'Check Firestore rules and console for details.' });
         } finally {
             setIsLoading(false);
         }
@@ -445,15 +454,16 @@ export default function ClassroomPage() {
     const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
 
 
-    const isTeacher = useMemo(() => {
-        if (!user || !classroom) return false;
-        return classroom.teacherId === user.uid || (classroom.teachers && classroom.teachers.some(t => t.uid === user.uid));
-    }, [user, classroom]);
-
     const isCreator = useMemo(() => {
         if (!user || !classroom) return false;
         return classroom.teacherId === user.uid;
     }, [user, classroom]);
+    
+    const isTeacher = useMemo(() => {
+        if (!user || !participants.length) return false;
+        const self = participants.find(p => p.uid === user.uid);
+        return self?.role === 'teacher' || isCreator;
+    }, [user, participants, isCreator]);
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
@@ -1164,7 +1174,7 @@ export default function ClassroomPage() {
                             <Card>
                                 <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    {user && (
+                                    {isTeacher && user && (
                                         <Card className="p-4">
                                             <Tabs defaultValue="file">
                                                 <TabsList className="grid w-full grid-cols-2">
