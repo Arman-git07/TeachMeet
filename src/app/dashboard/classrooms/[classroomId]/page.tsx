@@ -461,7 +461,6 @@ export default function ClassroomPage() {
     
     const canPostAnnouncements = useMemo(() => {
         if (!user || !participants.length || !classroom) return false;
-        if (user.uid === classroom.teacherId) return true; // Creator can always post
         const self = participants.find(p => p.uid === user.uid);
         return self?.role === 'teacher';
     }, [user, participants, classroom]);
@@ -494,7 +493,7 @@ export default function ClassroomPage() {
     // Fetch subcollections data
     useEffect(() => {
         if (!classroomId) return;
-        const announcementsQuery = query(collection(db, 'classrooms', classroomId, 'announcements'), where('vanishAt', '>', new Date()), orderBy('vanishAt', 'desc'), orderBy('createdAt', 'desc'));
+        const announcementsQuery = query(collection(db, 'classrooms', classroomId, 'announcements'), orderBy('createdAt', 'desc'));
         const unsubAnnouncements = onSnapshot(announcementsQuery, snap => setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement))));
         
         const unsubAssignments = onSnapshot(query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('dueDate', 'desc')), async (snap) => {
@@ -509,7 +508,7 @@ export default function ClassroomPage() {
         });
         const unsubRequests = onSnapshot(query(collection(db, 'classrooms', classroomId, 'joinRequests'), orderBy('requestedAt', 'desc')), snap => setJoinRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest))));
         const unsubMaterials = onSnapshot(query(collection(db, 'classrooms', classroomId, 'materials'), orderBy('uploadedAt', 'desc')), snap => setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))));
-        const examsQuery = query(collection(db, 'classrooms', classroomId, 'exams'), where('vanishAt', '>', new Date()), orderBy('vanishAt', 'desc'), orderBy('date', 'desc'));
+        const examsQuery = query(collection(db, 'classrooms', classroomId, 'exams'), orderBy('date', 'desc'));
         const unsubExams = onSnapshot(examsQuery, snap => setExams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam))));
         
         const unsubParticipants = onSnapshot(query(collection(db, 'classrooms', classroomId, 'participants'), orderBy('joinedAt', 'desc')), snap => setParticipants(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile))));
@@ -1346,4 +1345,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
