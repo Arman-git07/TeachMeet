@@ -644,8 +644,29 @@ export default function ClassroomsPage() {
     const hasPendingRequest = pendingRequestIds.has(classroom.id);
     const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === classroom.id);
     
+    if (isEnrolled) {
+        // If the user is already enrolled, show the card with an "Enter Class" button.
+        // This handles the case where a request was just approved.
+        return (
+            <Card key={classroom.id} className="flex flex-col">
+                <CardHeader>
+                    <CardTitle>{classroom.title}</CardTitle>
+                    <CardDescription>{classroom.description || "No description."}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                    <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
+                </CardContent>
+                <CardFooter className="flex-col items-stretch gap-2 pt-4">
+                    <Button asChild className="w-full">
+                        <Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                    </Button>
+                </CardFooter>
+            </Card>
+        );
+    }
+    
+    // If it's the user's own class, show it with an "Enter Class" button.
     if (isMyClass) {
-      // Always render the user's own class with an "Enter" button.
        return (
           <Card key={classroom.id} className="flex flex-col">
               <CardHeader>
@@ -660,10 +681,6 @@ export default function ClassroomsPage() {
               </CardFooter>
           </Card>
         );
-    }
-    
-    if (isEnrolled) {
-      return null; // Don't show in Discover if already enrolled (will be in Enrolled tab)
     }
 
     return (
@@ -746,7 +763,8 @@ export default function ClassroomsPage() {
   const DiscoverClassesTab = () => {
     if (isLoadingDiscover || isLoadingRequests) return renderSkeleton();
   
-    // Filter out classes the user is already enrolled in
+    // Filter out classes the user is already enrolled in as a student or non-owner teacher.
+    // We still show classes the user owns.
     const discoverableClasses = discoverClasses.filter(publicClass => {
       if (!user) return true; // Show all public classes if not logged in
       const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
@@ -809,3 +827,4 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
