@@ -462,8 +462,8 @@ export default function ClassroomPage() {
     const isTeacher = useMemo(() => {
         if (!user || !participants.length) return false;
         const self = participants.find(p => p.uid === user.uid);
-        return self?.role === 'teacher' || isCreator;
-    }, [user, participants, isCreator]);
+        return self?.role === 'teacher';
+    }, [user, participants]);
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
