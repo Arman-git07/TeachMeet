@@ -454,16 +454,13 @@ export default function ClassroomPage() {
     const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
 
 
-    const isCreator = useMemo(() => {
-        if (!user || !classroom) return false;
-        return classroom.teacherId === user.uid;
-    }, [user, classroom]);
-    
     const canPostAnnouncements = useMemo(() => {
-        if (!user || !participants.length || !classroom) return false;
-        if (classroom.teacherId === user.uid) return true; // Creator can always post
-        const self = participants.find(p => p.uid === user.uid);
-        return self?.role === 'teacher';
+        if (!user || !classroom) return false;
+        // The original creator of the class can always post.
+        if (classroom.teacherId === user.uid) return true;
+        // Any approved teacher can also post.
+        const selfAsParticipant = participants.find(p => p.uid === user.uid);
+        return selfAsParticipant?.role === 'teacher';
     }, [user, participants, classroom]);
 
     // Forms
@@ -521,7 +518,7 @@ export default function ClassroomPage() {
 
 
     const handleApproveRequest = async (request: JoinRequest) => {
-        if (!isCreator || !user || !classroom) return;
+        if (!user || !classroom || classroom.teacherId !== user.uid) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -541,7 +538,7 @@ export default function ClassroomPage() {
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
-        if (!isCreator || !user) return;
+        if (!user || !classroom || classroom.teacherId !== user.uid) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -560,7 +557,8 @@ export default function ClassroomPage() {
     };
     
      const handleRemoveParticipant = async () => {
-        if (!isCreator || !participantToRemove) return;
+        if (!user || !classroom || classroom.teacherId !== user.uid || !participantToRemove) return;
+        
         const participant = participantToRemove;
         setParticipantToRemove(null); // Close dialog immediately
         
@@ -812,7 +810,7 @@ export default function ClassroomPage() {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        {isCreator && (
+                        {canPostAnnouncements && (
                         <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem></DialogTrigger>
                              <DialogContent className="sm:max-w-2xl">
@@ -869,7 +867,7 @@ export default function ClassroomPage() {
                                                 <Avatar><AvatarImage src={s.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm flex-grow">{s.name}</span>
                                                 <Badge variant={s.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{s.role}</Badge>
-                                                {isCreator && s.uid !== user?.uid && (
+                                                {canPostAnnouncements && s.uid !== user?.uid && (
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 rounded-full" onClick={() => setParticipantToRemove(s)}>
                                                         <UserX className="h-4 w-4" />
                                                     </Button>
@@ -1048,9 +1046,14 @@ export default function ClassroomPage() {
                     
                     <div className="flex-grow overflow-y-auto pt-4">
                         <TabsContent value="announcements">
-                            <Card><CardHeader><CardTitle>Announcements</CardTitle></CardHeader>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Announcements</CardTitle>
+                                </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {canPostAnnouncements && user && <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} />}
+                                    {canPostAnnouncements && user && (
+                                        <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} />
+                                    )}
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
