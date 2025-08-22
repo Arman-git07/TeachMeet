@@ -83,8 +83,10 @@ export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
   
   useEffect(() => {
+    // We only want to load activities once authentication is resolved.
+    if (authLoading) return;
+
     const loadActivities = () => {
-      if (authLoading) return;
       setIsLoading(true);
 
       const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
@@ -231,10 +233,10 @@ export default function HomePage() {
               <History className="mr-3 h-6 w-6" />
               Latest Activity
             </h2>
-            {isLoading || authLoading ? (
+            {authLoading ? (
                 <div className="flex justify-center items-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-primary"/>
-                  <p className="ml-2 text-muted-foreground">Loading activities...</p>
+                  <p className="ml-2 text-muted-foreground">Checking for activities...</p>
                 </div>
               ) : allActivity.length > 0 ? (
               <ul className="space-y-3 text-left">
