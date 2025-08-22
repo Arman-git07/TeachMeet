@@ -36,6 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
+import { postAnnouncement } from '@/lib/actions/announcements';
 
 // --- Interfaces ---
 interface TeacherInfo {
@@ -347,9 +348,12 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const hasText = text.trim();
+        if (!currentUser) {
+            toast({ variant: 'destructive', title: 'Not authenticated' });
+            return;
+        }
+        const hasText = text.trim().length > 0;
         const hasAudio = audioChunksRef.current.length > 0;
-
         if (!hasText && !hasAudio) {
             toast({ variant: 'destructive', title: 'Announcement cannot be empty.' });
             return;
@@ -357,7 +361,7 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
         setIsLoading(true);
 
         try {
-            let audioUrl: string | undefined = undefined;
+            let audioUrl: string | undefined;
             if (hasAudio) {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                 const audioFileRef = storageRef(storage, `classrooms/${classroomId}/announcements/${Date.now()}.webm`);
@@ -365,17 +369,14 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
                 audioUrl = await getDownloadURL(snapshot.ref);
             }
             
-            const announcementData = {
-                type: hasAudio ? 'audio' : 'text',
+            await postAnnouncement({
+                classId: classroomId,
                 text: hasText ? text : undefined,
                 audioUrl: audioUrl,
-                createdAt: serverTimestamp(),
-                vanishAt: vanishAt || null,
+                vanishAt: vanishAt,
                 creatorId: currentUser.uid,
                 creatorName: currentUser.displayName || "Teacher",
-            };
-
-            await addDoc(collection(db, 'classrooms', classroomId, 'announcements'), announcementData);
+            });
             
             try {
                 const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
