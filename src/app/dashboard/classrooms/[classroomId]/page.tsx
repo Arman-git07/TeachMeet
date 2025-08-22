@@ -461,6 +461,7 @@ export default function ClassroomPage() {
     
     const canPostAnnouncements = useMemo(() => {
         if (!user || !participants.length || !classroom) return false;
+        if (classroom.teacherId === user.uid) return true; // Creator can always post
         const self = participants.find(p => p.uid === user.uid);
         return self?.role === 'teacher';
     }, [user, participants, classroom]);
@@ -1345,3 +1346,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
