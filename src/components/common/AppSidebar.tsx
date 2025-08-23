@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
-import React, { memo } from 'react';
+import React from 'react';
 import {
   LogIn,
   UserPlus,
@@ -69,7 +69,7 @@ type NavItemProps = {
   target?: string;
 };
 
-const NavItem = memo(({
+const NavItem = ({
   href,
   icon: Icon,
   children,
@@ -180,8 +180,7 @@ const NavItem = memo(({
          </SidebarMenuButton>
      </SidebarMenuItem>
   );
-});
-NavItem.displayName = 'NavItem';
+};
 
 
 export function AppSidebar() {
