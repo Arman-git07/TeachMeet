@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
-import React, from 'react';
+import React, { memo } from 'react';
 import {
   LogIn,
   UserPlus,
@@ -69,7 +69,7 @@ type NavItemProps = {
   target?: string;
 };
 
-const NavItem = React.memo(({
+const NavItem = memo(({
   href,
   icon: Icon,
   children,
