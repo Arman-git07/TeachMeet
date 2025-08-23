@@ -54,13 +54,14 @@ interface Classroom {
     id: string;
     title: string;
     description: string;
-    teacherId: string;
+    teacherId: string; // Keep this as the original creator's ID
     teacherName: string;
-    students: string[]; // Keep for legacy/quick reference, but participants subcollection is source of truth
-    teachers: TeacherInfo[]; // This field seems unused now in favor of subcollection
+    students: string[]; 
+    teachers: TeacherInfo[]; 
     feeAmount?: number;
     feeCurrency?: string;
     paymentDetails?: { upiId: string; qrCodeUrl: string; };
+    createdBy: string; // The UID of the user who created the classroom
 }
 
 interface UserProfile { id: string; name: string; photoURL?: string; role: 'student' | 'teacher'; uid: string; }
@@ -73,6 +74,7 @@ interface Announcement {
   vanishAt?: any;
   creatorId: string;
   creatorName: string;
+  authorId: string;
 }
 interface Assignment { id: string; title: string; description: string; dueDate: any; submissionFile?: File | null; }
 interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
@@ -371,11 +373,13 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
             
             await postAnnouncement({
                 classId: classroomId,
-                text: hasText ? text : undefined,
-                audioUrl: audioUrl,
+                text: hasText ? text : audioUrl, // Use audioUrl as text if it exists
                 vanishAt: vanishAt,
                 creatorId: currentUser.uid,
                 creatorName: currentUser.displayName || "Teacher",
+                authorId: currentUser.uid, // Add authorId for security rules
+                isAudio: hasAudio,
+                audioUrl: audioUrl,
             });
             
             try {
@@ -458,7 +462,7 @@ export default function ClassroomPage() {
     const canPostAnnouncements = useMemo(() => {
         if (!user || !classroom) return false;
         // The original creator of the class can always post.
-        if (classroom.teacherId === user.uid) return true;
+        if (classroom.createdBy === user.uid) return true;
         // Any approved teacher can also post.
         const selfAsParticipant = participants.find(p => p.uid === user.uid);
         return selfAsParticipant?.role === 'teacher';
@@ -519,7 +523,7 @@ export default function ClassroomPage() {
 
 
     const handleApproveRequest = async (request: JoinRequest) => {
-        if (!user || !classroom || classroom.teacherId !== user.uid) return;
+        if (!user || !classroom || classroom.createdBy !== user.uid) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -539,7 +543,7 @@ export default function ClassroomPage() {
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
-        if (!user || !classroom || classroom.teacherId !== user.uid) return;
+        if (!user || !classroom || classroom.createdBy !== user.uid) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -558,7 +562,7 @@ export default function ClassroomPage() {
     };
     
      const handleRemoveParticipant = async () => {
-        if (!user || !classroom || classroom.teacherId !== user.uid || !participantToRemove) return;
+        if (!user || !classroom || classroom.createdBy !== user.uid || !participantToRemove) return;
         
         const participant = participantToRemove;
         setParticipantToRemove(null); // Close dialog immediately
@@ -1065,7 +1069,9 @@ export default function ClassroomPage() {
                                                   {a.vanishAt && ` | Vanishes on ${new Date(a.vanishAt?.toDate()).toLocaleString()}`}
                                                 </p>
                                             </div>
-                                        )) : <p className="text-muted-foreground text-center py-4">No announcements yet.</p>}
+                                        )) : (
+                                            <p className="text-muted-foreground text-center py-4">No announcements yet.</p>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>

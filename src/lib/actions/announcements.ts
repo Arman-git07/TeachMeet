@@ -11,23 +11,27 @@ type PostAnnouncementArgs = {
   vanishAt?: Date | null;
   creatorId: string;
   creatorName: string;
+  authorId: string; // Required for security rules
+  isAudio?: boolean;
 };
 
-export async function postAnnouncement({ classId, text, audioUrl, vanishAt, creatorId, creatorName }: PostAnnouncementArgs) {
+export async function postAnnouncement({ classId, text, audioUrl, vanishAt, creatorId, creatorName, authorId, isAudio }: PostAnnouncementArgs) {
   if (!creatorId) throw new Error("Not signed in.");
 
   const payload: any = {
     creatorId: creatorId,
     creatorName: creatorName,
     createdAt: serverTimestamp(),
+    authorId: authorId,
   };
 
-  if (text && text.trim()) {
-    payload.text = text.trim();
-    payload.type = 'text';
-  } else if (audioUrl) {
+  if (isAudio && audioUrl) {
     payload.audioUrl = audioUrl;
     payload.type = 'audio';
+    payload.text = text; // Can still contain the transcript or title
+  } else if (text && text.trim()) {
+    payload.text = text.trim();
+    payload.type = 'text';
   } else {
     throw new Error("Announcement content is empty.");
   }
