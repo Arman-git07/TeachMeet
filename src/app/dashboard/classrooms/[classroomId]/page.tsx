@@ -169,11 +169,9 @@ export const handleTeacherRequest = async (classroomId: string, teacherId: strin
                 role: "teacher",
                 joinedAt: serverTimestamp(),
             });
-            batch.update(requestRef, { status: "accepted" });
             batch.delete(requestRef); 
             await batch.commit();
         } else if (action === "deny") {
-            await updateDoc(requestRef, { status: "denied" });
             await deleteDoc(requestRef);
         }
         return { success: true };
@@ -373,11 +371,11 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
             
             await postAnnouncement({
                 classId: classroomId,
-                text: hasText ? text : audioUrl, // Use audioUrl as text if it exists
+                text: text,
                 vanishAt: vanishAt,
                 creatorId: currentUser.uid,
                 creatorName: currentUser.displayName || "Teacher",
-                authorId: currentUser.uid, // Add authorId for security rules
+                authorId: currentUser.uid, 
                 isAudio: hasAudio,
                 audioUrl: audioUrl,
             });
@@ -460,10 +458,9 @@ export default function ClassroomPage() {
 
 
     const canPostAnnouncements = useMemo(() => {
-        if (!user || !classroom) return false;
-        // The original creator of the class can always post.
+        if (!user || !classroom || !participants.length) return false;
         if (classroom.createdBy === user.uid) return true;
-        // Any approved teacher can also post.
+        
         const selfAsParticipant = participants.find(p => p.uid === user.uid);
         return selfAsParticipant?.role === 'teacher';
     }, [user, participants, classroom]);
@@ -1054,6 +1051,7 @@ export default function ClassroomPage() {
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Announcements</CardTitle>
+                                    <CardDescription>Stay updated with the latest news from your teacher.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {canPostAnnouncements && user && (
