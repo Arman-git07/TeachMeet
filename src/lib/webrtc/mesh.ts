@@ -31,9 +31,12 @@ export class MeshRTC {
 
   constructor(private opts: MeshOptions) {}
 
-  async init() {
+  async init(initialMicOn: boolean, initialCamOn: boolean) {
     if (this.initialized) return;
     this.initialized = true;
+
+    this.locals.mic = initialMicOn;
+    this.locals.cam = initialCamOn;
 
     // IMPORTANT: create socket once
     await fetch("/api/socket"); // boot API route
@@ -43,7 +46,7 @@ export class MeshRTC {
     this.userId = this.opts.userId;
 
     // Prepare local media before joining (permissions)
-    await this.ensureLocalStream(true, true);
+    await this.ensureLocalStream(this.locals.mic, this.locals.cam);
 
     this.registerSocketEvents();
     this.socket.emit("join-room", { roomId: this.roomId, userId: this.userId });
@@ -147,44 +150,26 @@ export class MeshRTC {
       video: wantCam ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
     };
 
-    if (!this.locals.stream) {
-      // first time
-      this.locals.stream = await navigator.mediaDevices.getUserMedia(constraints);
-      this.locals.mic = wantMic;
-      this.locals.cam = wantCam;
+    if (wantMic === false && wantCam === false) {
+      this.locals.stream?.getTracks().forEach(track => track.stop());
+      this.locals.stream = new MediaStream(); // Keep an empty stream object
       return this.locals.stream;
     }
 
-    // Toggle: enable/disable existing tracks (no renegotiation required)
-    this.locals.stream.getAudioTracks().forEach((t) => (t.enabled = wantMic));
-    this.locals.stream.getVideoTracks().forEach((t) => (t.enabled = wantCam));
-    this.locals.mic = wantMic;
-    this.locals.cam = wantCam;
-
-    // If you turned video ON and there was no video track yet, add one and replace on senders.
-    if (wantCam && this.locals.stream.getVideoTracks().length === 0) {
-      const cam = await navigator.mediaDevices.getUserMedia({ video: constraints.video });
-      const v = cam.getVideoTracks()[0];
-      this.locals.stream.addTrack(v);
-      this.remotes.forEach(({ pc }) => {
-        const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
-        if (sender) sender.replaceTrack(v);
-        else pc.addTrack(v, this.locals.stream!);
-      });
+    try {
+        this.locals.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        this.locals.mic = wantMic;
+        this.locals.cam = wantCam;
+    } catch (e) {
+        console.error("Could not get user media", e);
+        // If we fail, create an empty stream to avoid errors down the line
+        if (!this.locals.stream) {
+            this.locals.stream = new MediaStream();
+        }
+        this.locals.mic = false;
+        this.locals.cam = false;
     }
-
-    // Same for mic
-    if (wantMic && this.locals.stream.getAudioTracks().length === 0) {
-      const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const a = mic.getAudioTracks()[0];
-      this.locals.stream.addTrack(a);
-      this.remotes.forEach(({ pc }) => {
-        const sender = pc.getSenders().find((s) => s.track && s.track.kind === "audio");
-        if (sender) sender.replaceTrack(a);
-        else pc.addTrack(a, this.locals.stream!);
-      });
-    }
-
+    
     return this.locals.stream;
   }
 
@@ -193,11 +178,13 @@ export class MeshRTC {
   }
 
   async toggleMic(on: boolean) {
-    await this.ensureLocalStream(on, this.locals.cam);
+    this.locals.mic = on;
+    this.locals.stream?.getAudioTracks().forEach((t) => (t.enabled = on));
   }
 
   async toggleCam(on: boolean) {
-    await this.ensureLocalStream(this.locals.mic, on);
+    this.locals.cam = on;
+    this.locals.stream?.getVideoTracks().forEach((t) => (t.enabled = on));
   }
 
   leave() {
@@ -215,9 +202,11 @@ export class MeshRTC {
   // Attach convenience
   attachLocal(video: HTMLVideoElement) {
     const s = this.getLocalStream();
-    video.srcObject = s;
-    video.muted = true; // self-view muted to avoid echo
-    video.playsInline = true;
-    video.autoplay = true;
+    if (video && s) {
+      video.srcObject = s;
+      video.muted = true; // self-view muted to avoid echo
+      video.playsInline = true;
+      video.autoplay = true;
+    }
   }
 }
