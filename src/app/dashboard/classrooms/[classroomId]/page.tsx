@@ -454,7 +454,7 @@ export default function ClassroomPage() {
 
     // Fetch all subcollections data in a consolidated effect
     useEffect(() => {
-        if (!classroomId) return;
+        if (!classroomId || !classroom) return;
 
         const subcollectionMappings = [
             { path: 'announcements', setter: setAnnouncements, orderByField: 'createdAt' },
@@ -467,10 +467,11 @@ export default function ClassroomPage() {
 
         const unsubscribers = subcollectionMappings.map(({ path, setter, orderByField }) => {
             const q = query(collection(db, 'classrooms', classroomId, path), orderBy(orderByField, 'desc'));
-            return onSnapshot(q,
+            const unsub = onSnapshot(q,
                 (snap) => setter(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))),
                 (error) => console.error(`Error fetching ${path}:`, error)
             );
+            return unsub;
         });
 
         // Special handling for assignments and their submissions
@@ -479,7 +480,11 @@ export default function ClassroomPage() {
             const assignmentsData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Assignment));
             setAssignments(assignmentsData);
 
-            // Fetch all submissions in parallel after getting assignments
+            if (assignmentsData.length === 0) {
+              setSubmissions(new Map());
+              return;
+            }
+
             const submissionPromises = assignmentsData.map(assignment =>
                 getDocs(query(collection(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`), orderBy('submittedAt', 'desc')))
                     .then(subSnap => ({
@@ -488,19 +493,22 @@ export default function ClassroomPage() {
                     }))
             );
             
-            const results = await Promise.all(submissionPromises);
-            const newSubmissions = new Map<string, Submission[]>();
-            results.forEach(res => newSubmissions.set(res.assignmentId, res.submissions));
-            setSubmissions(newSubmissions);
+            try {
+                const results = await Promise.all(submissionPromises);
+                const newSubmissions = new Map<string, Submission[]>();
+                results.forEach(res => newSubmissions.set(res.assignmentId, res.submissions));
+                setSubmissions(newSubmissions);
+            } catch (error) {
+                console.error("Error fetching submissions in parallel:", error);
+            }
         }, error => console.error("Error fetching assignments:", error));
     
         unsubscribers.push(unsubAssignments);
     
-        // Cleanup function
         return () => {
             unsubscribers.forEach(unsub => unsub());
         };
-    }, [classroomId]);
+    }, [classroomId, classroom]);
 
 
     const handleApproveRequest = async (request: JoinRequest) => {
