@@ -458,9 +458,14 @@ export default function ClassroomPage() {
 
 
     const canPostAnnouncements = useMemo(() => {
-        if (!user || !classroom || !participants.length) return false;
+        if (!user || !classroom) return false;
         if (classroom.createdBy === user.uid) return true;
         
+        // Check if the user is in the teachers array by their UID
+        const isTeacher = classroom.teachers?.some(teacher => teacher.uid === user.uid);
+        if (isTeacher) return true;
+
+        // Fallback check on participants list
         const selfAsParticipant = participants.find(p => p.uid === user.uid);
         return selfAsParticipant?.role === 'teacher';
     }, [user, participants, classroom]);
