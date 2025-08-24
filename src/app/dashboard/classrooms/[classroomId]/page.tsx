@@ -471,7 +471,8 @@ export default function ClassroomPage() {
     // Fetch primary classroom data
     useEffect(() => {
         if (!classroomId) return;
-        const unsub = onSnapshot(doc(db, 'classrooms', classroomId), (docSnap) => {
+        const classroomDocRef = doc(db, 'classrooms', classroomId);
+        const unsub = onSnapshot(classroomDocRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = { id: docSnap.id, ...docSnap.data() } as Classroom;
                 setClassroom(data);
@@ -482,6 +483,10 @@ export default function ClassroomPage() {
                 router.push('/dashboard/classrooms');
             }
             setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching classroom data:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch classroom data.' });
+            setIsLoading(false);
         });
         return () => unsub();
     }, [classroomId, router, toast, feeForm, paymentDetailsForm]);
@@ -489,29 +494,42 @@ export default function ClassroomPage() {
     // Fetch subcollections data
     useEffect(() => {
         if (!classroomId) return;
-        const announcementsQuery = query(collection(db, 'classrooms', classroomId, 'announcements'), orderBy('createdAt', 'desc'));
-        const unsubAnnouncements = onSnapshot(announcementsQuery, snap => setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement))));
-        
-        const unsubAssignments = onSnapshot(query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('dueDate', 'desc')), async (snap) => {
+    
+        const subcollectionMappings = [
+            { path: 'announcements', setter: setAnnouncements, orderByField: 'createdAt' },
+            { path: 'joinRequests', setter: setJoinRequests, orderByField: 'requestedAt' },
+            { path: 'materials', setter: setMaterials, orderByField: 'uploadedAt' },
+            { path: 'exams', setter: setExams, orderByField: 'date' },
+            { path: 'participants', setter: setParticipants, orderByField: 'joinedAt' },
+            { path: 'teachers', setter: setSubjectTeachers, orderByField: 'addedAt' },
+        ];
+    
+        const unsubscribers = subcollectionMappings.map(({ path, setter, orderByField }) => {
+            const q = query(collection(db, 'classrooms', classroomId, path), orderBy(orderByField, 'desc'));
+            return onSnapshot(q, 
+                snap => setter(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))),
+                error => console.error(`Error fetching ${path}:`, error) // Log errors without toasts for internal state
+            );
+        });
+    
+        const assignmentsQuery = query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('dueDate', 'desc'));
+        const unsubAssignments = onSnapshot(assignmentsQuery, async (snap) => {
             const assignmentsData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Assignment));
             setAssignments(assignmentsData);
+            // This part can still be complex, consider lazy-loading submissions if performance is an issue.
             const newSubmissions = new Map<string, Submission[]>();
             for (const assignment of assignmentsData) {
                 const subSnap = await getDocs(query(collection(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`), orderBy('submittedAt', 'desc')));
                 newSubmissions.set(assignment.id, subSnap.docs.map(s => ({ id: s.id, ...s.data() } as Submission)));
             }
             setSubmissions(newSubmissions);
-        });
-        const unsubRequests = onSnapshot(query(collection(db, 'classrooms', classroomId, 'joinRequests'), orderBy('requestedAt', 'desc')), snap => setJoinRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest))));
-        const unsubMaterials = onSnapshot(query(collection(db, 'classrooms', classroomId, 'materials'), orderBy('uploadedAt', 'desc')), snap => setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))));
-        const examsQuery = query(collection(db, 'classrooms', classroomId, 'exams'), orderBy('date', 'desc'));
-        const unsubExams = onSnapshot(examsQuery, snap => setExams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam))));
-        
-        const unsubParticipants = onSnapshot(query(collection(db, 'classrooms', classroomId, 'participants'), orderBy('joinedAt', 'desc')), snap => setParticipants(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile))));
-        
-        const unsubTeachers = onSnapshot(query(collection(db, 'classrooms', classroomId, 'teachers'), orderBy('addedAt', 'desc')), snap => setSubjectTeachers(snap.docs.map(d => ({ ...d.data() } as SubjectTeacher))));
-
-        return () => { unsubAnnouncements(); unsubAssignments(); unsubRequests(); unsubMaterials(); unsubExams(); unsubParticipants(); unsubTeachers(); };
+        }, error => console.error("Error fetching assignments:", error));
+    
+        unsubscribers.push(unsubAssignments);
+    
+        return () => {
+            unsubscribers.forEach(unsub => unsub());
+        };
     }, [classroomId]);
 
 
@@ -1344,3 +1362,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
