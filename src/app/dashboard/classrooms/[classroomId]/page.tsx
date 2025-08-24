@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -23,7 +22,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, Calendar as CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus, UserX } from 'lucide-react';
-import { EnrolledClassroomInfo } from '../page';
 import { cn } from '@/lib/utils';
 import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
@@ -54,14 +52,14 @@ interface Classroom {
     id: string;
     title: string;
     description: string;
-    teacherId: string; // Keep this as the original creator's ID
+    teacherId: string;
     teacherName: string;
     students: string[]; 
     teachers: TeacherInfo[]; 
     feeAmount?: number;
     feeCurrency?: string;
     paymentDetails?: { upiId: string; qrCodeUrl: string; };
-    createdBy: string; // The UID of the user who created the classroom
+    createdBy: string;
 }
 
 interface UserProfile { id: string; name: string; photoURL?: string; role: 'student' | 'teacher'; uid: string; }
@@ -91,7 +89,7 @@ interface Exam {
   title: string; 
   date: any; 
   type: 'file' | 'text'; 
-  content?: ExamQuestion[]; // Updated to structured content
+  content?: ExamQuestion[];
   fileUrl?: string; 
   vanishAt?: any; 
 }
@@ -196,7 +194,6 @@ export const approveRequest = async (classroomId: string, request: any) => {
     
     const classroomRef = doc(db, "classrooms", classroomId);
      if (request.role === 'teacher') {
-        // This part is handled by handleTeacherRequest now.
      } else {
         batch.update(classroomRef, { students: arrayUnion(request.studentId) });
     }
@@ -234,7 +231,7 @@ export const denyRequest = async (classroomId: string, studentId: string) => {
     const requestRef = doc(db, "classrooms", classroomId, "joinRequests", studentId);
     batch.delete(requestRef);
     
-    const userPendingRequestRef = doc(db, `users/${studentId}/pendingJoinRequests`, classroomId);
+    const userPendingRequestRef = doc(db, `users/${studentId}/pendingJoinRequests`, studentId);
     batch.delete(userPendingRequestRef);
 
     await batch.commit();
@@ -420,7 +417,7 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classr
                 {audioChunksRef.current.length > 0 && !isRecording && <span className="text-sm text-muted-foreground flex items-center gap-1"><AudioLines className="h-4 w-4"/> Audio recorded.</span>}
                 <VanishDateTimePicker date={vanishAt} setDate={setVanishAt} />
                 {vanishAt && <Button variant="ghost" size="sm" onClick={() => setVanishAt(undefined)}>Clear</Button>}
-                <Button type="submit" disabled={isLoading} className="ml-auto">
+                <Button type="submit" disabled={isLoading || (!text.trim() && !audioChunksRef.current.length)} className="ml-auto">
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Post Announcement
                 </Button>
@@ -460,12 +457,6 @@ export default function ClassroomPage() {
     const canPostAnnouncements = useMemo(() => {
         if (!user || !classroom) return false;
         if (classroom.createdBy === user.uid) return true;
-        
-        // Check if the user is in the teachers array by their UID
-        const isTeacher = classroom.teachers?.some(teacher => teacher.uid === user.uid);
-        if (isTeacher) return true;
-
-        // Fallback check on participants list
         const selfAsParticipant = participants.find(p => p.uid === user.uid);
         return selfAsParticipant?.role === 'teacher';
     }, [user, participants, classroom]);
@@ -567,25 +558,21 @@ export default function ClassroomPage() {
         if (!user || !classroom || classroom.createdBy !== user.uid || !participantToRemove) return;
         
         const participant = participantToRemove;
-        setParticipantToRemove(null); // Close dialog immediately
+        setParticipantToRemove(null);
         
         const batch = writeBatch(db);
         
-        // 1. Delete from participants subcollection
         const participantRef = doc(db, "classrooms", classroomId, "participants", participant.uid);
         batch.delete(participantRef);
         
-        // 2. Remove from main classroom document array (if applicable)
         if (participant.role === 'student') {
             const classroomRef = doc(db, "classrooms", classroomId);
             batch.update(classroomRef, { students: arrayRemove(participant.uid) });
         } else if (participant.role === 'teacher') {
-            // Also remove from the teachers subcollection
             const teacherRef = doc(db, "classrooms", classroomId, "teachers", participant.uid);
             batch.delete(teacherRef);
         }
         
-        // 3. Delete from user's enrolled subcollection
         const userEnrolledRef = doc(db, `users/${participant.uid}/enrolled`, classroomId);
         batch.delete(userEnrolledRef);
         
@@ -683,8 +670,6 @@ export default function ClassroomPage() {
         if (!user || !canPostAnnouncements) return;
         setIsGrading(submission.id);
         try {
-            // Here we assume submission.fileUrl is a direct downloadable URL.
-            // For AI, we need to fetch it and convert to data URI.
             const studentFileResponse = await fetch(submission.fileUrl);
             const studentFileBlob = await studentFileResponse.blob();
             const studentSubmissionDataUri = await new Promise<string>((resolve, reject) => {
@@ -1359,5 +1344,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    

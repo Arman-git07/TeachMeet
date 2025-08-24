@@ -3,38 +3,53 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Default deny all
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
-    
-    // Allow authenticated users to upload their own avatars.
-    // Max size: 5MB
-    match /avatars/{userId}/{fileName} {
-      allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-    }
-    
-    // Allow users to read their own and public files in the documents folder.
-    match /documents/{userId}/{access}/{fileName} {
-      allow read: if access == 'public' || (request.auth != null && request.auth.uid == userId);
-      allow write: if request.auth != null && request.auth.uid == userId 
-                   && request.resource.size < 25 * 1024 * 1024; // 25MB limit
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Allow users to read their own and public files in the recordings folder.
-     match /recordings/{userId}/{access}/{fileName} {
-      allow read: if access == 'public' || (request.auth != null && request.auth.uid == userId);
-      allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 200 * 1024 * 1024; // 200MB limit
+    function isClassCreator(classId) {
+      let classroomDoc = get(/databases/(default)/documents/classrooms/$(classId));
+      return isSignedIn() && 
+        (classroomDoc.data.creatorId == request.auth.uid || 
+         classroomDoc.data.createdBy == request.auth.uid ||
+         classroomDoc.data.teacherId == request.auth.uid);
+    }
+    
+    function isClassParticipant(classId) {
+        return isSignedIn() && exists(/databases/(default)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
     }
 
-    // Allow public read access to all avatars, documents, and recordings
-    // This simplifies linking to files. Write access is still restricted above.
-    match /{folder}/{userId}/{access}/{fileName} 
-      where folder in ['avatars', 'documents', 'recordings'] {
-      allow read: if true;
+    function isTeacher(classId) {
+        let participantDoc = get(/databases/(default)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
+        return isClassParticipant(classId) && participantDoc.data.role == 'teacher';
+    }
+
+    function isTeacherOrCreator(classId) {
+        return isClassCreator(classId) || isTeacher(classId);
+    }
+
+    // General user documents
+    match /documents/{userId}/{allPaths=**} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // Classroom specific files
+    match /classrooms/{classId}/{allPaths=**} {
+      // Teachers/Creators can write anything.
+      // Enrolled participants can read anything.
+      allow read: if isClassParticipant(classId);
+      allow write: if isTeacherOrCreator(classId);
+    }
+
+    // Student assignment submissions need special write rule for students
+    match /classrooms/{classId}/assignments/{assignmentId}/{studentId}/{fileName} {
+      allow write: if isSignedIn() && request.auth.uid == studentId;
+    }
+    
+    // User avatars
+    match /avatars/{userId}/{allPaths=**} {
+        allow read;
+        allow write: if isSignedIn() && request.auth.uid == userId;
     }
   }
 }
