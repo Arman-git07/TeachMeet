@@ -245,8 +245,6 @@ export const denyRequest = async (classroomId: string, studentId: string) => {
 // --- Components ---
 
 const VanishDateTimePicker = ({ date, setDate, disabled }: { date: string | null, setDate: (date: string | null) => void, disabled?: boolean }) => {
-    const displayValue = date ? format(new Date(date), 'PPP p') : 'Set vanish date & time';
-
     return (
         <Input
             type="datetime-local"
@@ -258,7 +256,7 @@ const VanishDateTimePicker = ({ date, setDate, disabled }: { date: string | null
     );
 };
 
-const AnnouncementForm = ({ classroomId, classroomTitle, currentUser, canPost }: { classroomId: string; classroomTitle: string; currentUser: any; canPost: boolean }) => {
+const AnnouncementForm = ({ classroomId, currentUser, canPost }: { classroomId: string; currentUser: any; canPost: boolean }) => {
     const [text, setText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [vanishDate, setVanishDate] = useState<string | null>(null);
@@ -272,7 +270,7 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser, canPost }:
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
+            const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
             setAudioUrl(null); 
             audioChunksRef.current = [];
 
@@ -288,8 +286,9 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser, canPost }:
             };
             
             recorder.start();
-            setRecording(true);
+            setIsRecording(true);
             mediaRecorderRef.current = recorder;
+            toast({ title: 'Recording started...' });
         } catch (err) {
             console.error("Mic error:", err);
             toast({ variant: "destructive", title: "Microphone Access Denied" });
@@ -297,9 +296,10 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser, canPost }:
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current) {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
-            setRecording(false);
+            setIsRecording(false);
+            toast({ title: 'Recording stopped.' });
         }
     };
 
@@ -317,18 +317,31 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser, canPost }:
         setIsLoading(true);
 
         try {
-            await addDoc(collection(db, "classrooms", classroomId, "announcements"), {
+            const announcementData: any = {
                 text: text.trim(),
-                audioUrl: audioUrl,
-                vanishAt: vanishDate ? new Date(vanishDate) : null,
-                createdBy: currentUser.uid,
+                vanishAt: vanishDate ? Timestamp.fromDate(new Date(vanishDate)) : null,
+                creatorId: currentUser.uid,
                 creatorName: currentUser.displayName || 'Teacher',
+                authorId: currentUser.uid, // For security rules
                 createdAt: serverTimestamp(),
-            });
+            };
+
+            if (audioUrl) {
+                const audioBlob = await fetch(audioUrl).then(r => r.blob());
+                const audioFileRef = storageRef(storage, `classrooms/${classroomId}/announcements/${Date.now()}.webm`);
+                await uploadBytes(audioFileRef, audioBlob);
+                announcementData.audioUrl = await getDownloadURL(audioFileRef);
+                announcementData.type = 'audio';
+            } else {
+                announcementData.type = 'text';
+            }
+
+            await addDoc(collection(db, "classrooms", classroomId, "announcements"), announcementData);
 
             setText('');
             setAudioUrl(null);
             setVanishDate(null);
+            audioChunksRef.current = [];
             toast({ title: 'Announcement Posted!' });
         } catch (error) {
             console.error('Failed to post announcement:', error);
@@ -353,11 +366,11 @@ const AnnouncementForm = ({ classroomId, classroomTitle, currentUser, canPost }:
             <div className="flex flex-wrap items-center gap-2">
                 {!isRecording ? (
                     <Button type="button" onClick={startRecording} variant="outline" size="sm" className="rounded-lg">
-                        <Mic className="mr-2 h-4 w-4" /> Record
+                        <Mic className="mr-2 h-4 w-4" /> Record Voice
                     </Button>
                 ) : (
                     <Button type="button" onClick={stopRecording} variant="destructive" size="sm" className="rounded-lg">
-                        <StopCircle className="mr-2 h-4 w-4" /> Stop
+                        <StopCircle className="mr-2 h-4 w-4" /> Stop Recording
                     </Button>
                 )}
                 <div className="flex-grow">
@@ -402,11 +415,11 @@ export default function ClassroomPage() {
 
 
     const canPostAnnouncements = useMemo(() => {
-        if (!user || !classroom) return false;
+        if (!user || !classroom || !participants) return false;
         if (classroom.createdBy === user.uid) return true;
-        // Check if user is in the `teachers` array by their UID.
-        return classroom.teachers?.some(teacher => teacher.uid === user.uid) ?? false;
-    }, [user, classroom]);
+        const currentUserParticipant = participants.find(p => p.uid === user.uid);
+        return currentUserParticipant?.role === 'teacher';
+    }, [user, classroom, participants]);
     
 
     // Forms
@@ -675,7 +688,7 @@ export default function ClassroomPage() {
         setIsUploadingMaterial(true);
         try {
             const fileRef = storageRef(storage, `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`);
-            const snapshot = await uploadBytes(fileRef, fileRef);
+            const snapshot = await uploadBytes(fileRef, materialFile);
             const url = await getDownloadURL(snapshot.ref);
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), { 
                 name: materialFile.name, 
@@ -1019,7 +1032,7 @@ export default function ClassroomPage() {
                                     <CardDescription>Stay updated with the latest news from your teacher.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} canPost={canPostAnnouncements} />
+                                    <AnnouncementForm classroomId={classroomId} currentUser={user} canPost={canPostAnnouncements} />
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
