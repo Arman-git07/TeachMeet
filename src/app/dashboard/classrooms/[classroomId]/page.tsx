@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, getDocs, writeBatch, deleteDoc, arrayUnion, arrayRemove, orderBy, getDoc, where, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, getDocs, writeBatch, deleteDoc, arrayUnion, arrayRemove, orderBy, getDoc, where, setDoc, Timestamp } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
-import { postAnnouncement } from '@/lib/actions/announcements';
 
 // --- Interfaces ---
 interface TeacherInfo {
@@ -245,183 +244,131 @@ export const denyRequest = async (classroomId: string, studentId: string) => {
 
 // --- Components ---
 
-const VanishDateTimePicker = ({ date, setDate }: { date: Date | undefined, setDate: (date: Date | undefined) => void }) => {
-    const [time, setTime] = useState({ hour: date?.getHours() ?? 0, minute: date?.getMinutes() ?? 0 });
-    
-    useEffect(() => {
-      if (date) {
-        setTime({ hour: date.getHours(), minute: date.getMinutes() });
-      }
-    }, [date]);
-
-    const handleDateSelect = (selectedDate: Date | undefined) => {
-        if (!selectedDate) {
-            setDate(undefined);
-            return;
-        }
-        const newDate = setHours(setMinutes(setSeconds(selectedDate, 0), time.minute), time.hour);
-        setDate(newDate);
-    };
-    
-    const handleTimeChange = (type: 'hour' | 'minute', value: string) => {
-        const numericValue = parseInt(value, 10);
-        if (isNaN(numericValue)) return;
-        
-        let newTime = { ...time };
-        if (type === 'hour') newTime.hour = Math.max(0, Math.min(23, numericValue));
-        if (type === 'minute') newTime.minute = Math.max(0, Math.min(59, numericValue));
-        
-        setTime(newTime);
-        
-        if (date) {
-            const newDate = setHours(setMinutes(date, newTime.minute), newTime.hour);
-            setDate(newDate);
-        }
-    };
-    
-    const displayValue = date ? `${format(date, 'PPP')} at ${format(date, 'p')}` : 'Set vanish date & time';
+const VanishDateTimePicker = ({ date, setDate, disabled }: { date: string | null, setDate: (date: string | null) => void, disabled?: boolean }) => {
+    const displayValue = date ? format(new Date(date), 'PPP p') : 'Set vanish date & time';
 
     return (
-        <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal rounded-lg", !date && "text-muted-foreground")}>
-                    <Clock className="mr-2 h-4 w-4" />
-                    {displayValue}
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 rounded-xl" align="start">
-                <Calendar mode="single" selected={date} onSelect={handleDateSelect} initialFocus />
-                <div className="p-3 border-t">
-                    <p className="text-sm font-medium mb-2">Vanish Time</p>
-                    <div className="flex items-center gap-2">
-                        <Input type="number" value={String(time.hour).padStart(2,'0')} onChange={e => handleTimeChange('hour', e.target.value)} className="w-16" min="0" max="23" /> :
-                        <Input type="number" value={String(time.minute).padStart(2,'0')} onChange={e => handleTimeChange('minute', e.target.value)} className="w-16" min="0" max="59"/>
-                    </div>
-                </div>
-            </PopoverContent>
-        </Popover>
+        <Input
+            type="datetime-local"
+            value={date || ""}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded-lg bg-background/50 p-2"
+            disabled={disabled}
+        />
     );
 };
 
-const AnnouncementForm = ({ classroomId, classroomTitle, currentUser }: { classroomId: string; classroomTitle: string; currentUser: any }) => {
+const AnnouncementForm = ({ classroomId, classroomTitle, currentUser, canPost }: { classroomId: string; classroomTitle: string; currentUser: any; canPost: boolean }) => {
     const [text, setText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [vanishAt, setVanishAt] = useState<Date | undefined>();
+    const [vanishDate, setVanishDate] = useState<string | null>(null);
     const { toast } = useToast();
 
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
 
-    const handleToggleRecording = async () => {
-        if (isRecording) {
-            mediaRecorderRef.current?.stop();
-            setIsRecording(false);
-            return;
-        }
-
+    const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream);
+            const recorder = new MediaRecorder(stream);
+            setAudioUrl(null); 
             audioChunksRef.current = [];
 
-            mediaRecorderRef.current.ondataavailable = (event) => {
-                audioChunksRef.current.push(event.data);
+            recorder.ondataavailable = (e) => {
+              audioChunksRef.current.push(e.data);
             };
 
-            mediaRecorderRef.current.onstop = () => {
+            recorder.onstop = () => {
+                const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+                const url = URL.createObjectURL(blob);
+                setAudioUrl(url);
                 stream.getTracks().forEach(track => track.stop());
-                toast({ title: "Recording Stopped", description: "Your voice message is ready to be posted." });
             };
-
-            mediaRecorderRef.current.start();
-            setIsRecording(true);
-            toast({ title: "Recording Started..." });
-        } catch (error) {
-            console.error("Mic access error:", error);
+            
+            recorder.start();
+            setRecording(true);
+            mediaRecorderRef.current = recorder;
+        } catch (err) {
+            console.error("Mic error:", err);
             toast({ variant: "destructive", title: "Microphone Access Denied" });
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.stop();
+            setRecording(false);
         }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentUser) {
-            toast({ variant: 'destructive', title: 'Not authenticated' });
-            return;
-        }
-        const hasText = text.trim().length > 0;
-        const hasAudio = audioChunksRef.current.length > 0;
-        if (!hasText && !hasAudio) {
+        if (!text.trim() && !audioUrl) {
             toast({ variant: 'destructive', title: 'Announcement cannot be empty.' });
             return;
         }
+        if (!currentUser) {
+             toast({ variant: 'destructive', title: 'Not authenticated' });
+            return;
+        }
+
         setIsLoading(true);
 
         try {
-            let audioUrl: string | undefined;
-            if (hasAudio) {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                const audioFileRef = storageRef(storage, `classrooms/${classroomId}/announcements/${Date.now()}.webm`);
-                const snapshot = await uploadBytes(audioFileRef, audioBlob);
-                audioUrl = await getDownloadURL(snapshot.ref);
-            }
-            
-            await postAnnouncement({
-                classId: classroomId,
-                text: text,
-                vanishAt: vanishAt,
-                creatorId: currentUser.uid,
-                creatorName: currentUser.displayName || "Teacher",
-                authorId: currentUser.uid, 
-                isAudio: hasAudio,
+            await addDoc(collection(db, "classrooms", classroomId, "announcements"), {
+                text: text.trim(),
                 audioUrl: audioUrl,
+                vanishAt: vanishDate ? new Date(vanishDate) : null,
+                createdBy: currentUser.uid,
+                creatorName: currentUser.displayName || 'Teacher',
+                createdAt: serverTimestamp(),
             });
-            
-            try {
-                const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-                let activities = rawActivity ? JSON.parse(rawActivity) : [];
-                if (!Array.isArray(activities)) activities = [];
-                const newNotification = {
-                  id: `announcement-${Date.now()}`,
-                  type: 'announcement',
-                  title: `New announcement in "${classroomTitle}"`,
-                  timestamp: Date.now(),
-                  classroomId,
-                };
-                activities.unshift(newNotification);
-                localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
-                window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-            } catch (e) {
-                console.error("Failed to update latest activity:", e);
-            }
 
             setText('');
-            setVanishAt(undefined);
-            audioChunksRef.current = [];
+            setAudioUrl(null);
+            setVanishDate(null);
             toast({ title: 'Announcement Posted!' });
         } catch (error) {
-            console.error('Error posting announcement:', error);
+            console.error('Failed to post announcement:', error);
             toast({ variant: 'destructive', title: 'Failed to post announcement.', description: 'Check Firestore rules and console for details.' });
         } finally {
             setIsLoading(false);
         }
     };
+    
+    if (!canPost) return null;
 
     return (
         <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded-lg bg-muted/30">
-            <Textarea placeholder="Type your announcement here..." value={text} onChange={(e) => setText(e.target.value)} disabled={isLoading || isRecording} rows={3} />
+            <Textarea 
+              placeholder="Write announcement..." 
+              value={text} 
+              onChange={(e) => setText(e.target.value)} 
+              disabled={isLoading}
+              rows={3}
+              className="w-full p-2 rounded-md bg-background text-foreground"
+            />
             <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" size="icon" onClick={handleToggleRecording} disabled={isLoading || !!text.trim()} className={cn(isRecording && "bg-destructive text-destructive-foreground")}>
-                    {isRecording ? <StopCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                </Button>
-                {audioChunksRef.current.length > 0 && !isRecording && <span className="text-sm text-muted-foreground flex items-center gap-1"><AudioLines className="h-4 w-4"/> Audio recorded.</span>}
-                <VanishDateTimePicker date={vanishAt} setDate={setVanishAt} />
-                {vanishAt && <Button variant="ghost" size="sm" onClick={() => setVanishAt(undefined)}>Clear</Button>}
-                <Button type="submit" disabled={isLoading || (!text.trim() && !audioChunksRef.current.length)} className="ml-auto">
+                {!isRecording ? (
+                    <Button type="button" onClick={startRecording} variant="outline" size="sm" className="rounded-lg">
+                        <Mic className="mr-2 h-4 w-4" /> Record
+                    </Button>
+                ) : (
+                    <Button type="button" onClick={stopRecording} variant="destructive" size="sm" className="rounded-lg">
+                        <StopCircle className="mr-2 h-4 w-4" /> Stop
+                    </Button>
+                )}
+                <div className="flex-grow">
+                  <VanishDateTimePicker date={vanishDate} setDate={setVanishDate} disabled={isLoading} />
+                </div>
+                <Button type="submit" disabled={isLoading || (!text.trim() && !audioUrl)} className="ml-auto btn-gel">
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Post Announcement
                 </Button>
             </div>
+            {audioUrl && <audio controls src={audioUrl} className="w-full mt-2" />}
         </form>
     );
 };
@@ -457,9 +404,10 @@ export default function ClassroomPage() {
     const canPostAnnouncements = useMemo(() => {
         if (!user || !classroom) return false;
         if (classroom.createdBy === user.uid) return true;
-        const selfAsParticipant = participants.find(p => p.uid === user.uid);
-        return selfAsParticipant?.role === 'teacher';
-    }, [user, participants, classroom]);
+        // Check if user is in the `teachers` array by their UID.
+        return classroom.teachers?.some(teacher => teacher.uid === user.uid) ?? false;
+    }, [user, classroom]);
+    
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
@@ -1071,14 +1019,12 @@ export default function ClassroomPage() {
                                     <CardDescription>Stay updated with the latest news from your teacher.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {canPostAnnouncements && user && (
-                                        <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} />
-                                    )}
+                                    <AnnouncementForm classroomId={classroomId} classroomTitle={classroom.title} currentUser={user} canPost={canPostAnnouncements} />
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
-                                                {a.type === 'text' && <p className="text-sm">{a.text}</p>}
-                                                {a.type === 'audio' && a.audioUrl && <audio controls src={a.audioUrl} className="w-full" />}
+                                                {a.text && <p className="text-sm">{a.text}</p>}
+                                                {a.audioUrl && <audio controls src={a.audioUrl} className="w-full mt-2" />}
                                                 <p className="text-xs text-muted-foreground mt-2">
                                                   Posted by {a.creatorName} on {new Date(a.createdAt?.toDate()).toLocaleString()}
                                                   {a.vanishAt && ` | Vanishes on ${new Date(a.vanishAt?.toDate()).toLocaleString()}`}
@@ -1276,12 +1222,16 @@ export default function ClassroomPage() {
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div className="space-y-2">
                                                             <Label>Exam Date & Time</Label>
-                                                            <Controller control={examForm.control} name="date" render={({ field }) => <VanishDateTimePicker date={field.value} setDate={field.onChange} />} />
+                                                            <Controller control={examForm.control} name="date" render={({ field }) => (
+                                                               <Input type="datetime-local" onChange={field.onChange} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
+                                                            )} />
                                                             {examForm.formState.errors.date && <p className="text-destructive text-sm">{examForm.formState.errors.date.message}</p>}
                                                         </div>
                                                         <div className="space-y-2">
                                                             <Label>Vanish Time (Optional)</Label>
-                                                            <Controller control={examForm.control} name="vanishAt" render={({ field }) => <VanishDateTimePicker date={field.value} setDate={field.onChange} />} />
+                                                             <Controller control={examForm.control} name="vanishAt" render={({ field }) => (
+                                                               <Input type="datetime-local" onChange={field.onChange} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
+                                                             )} />
                                                              {examForm.formState.errors.vanishAt && <p className="text-destructive text-sm">{examForm.formState.errors.vanishAt.message}</p>}
                                                         </div>
                                                     </div>
@@ -1371,6 +1321,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    
-    
