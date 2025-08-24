@@ -491,10 +491,10 @@ export default function ClassroomPage() {
         return () => unsub();
     }, [classroomId, router, toast, feeForm, paymentDetailsForm]);
 
-    // Fetch subcollections data
+    // Fetch all subcollections data in a consolidated effect
     useEffect(() => {
         if (!classroomId) return;
-    
+
         const subcollectionMappings = [
             { path: 'announcements', setter: setAnnouncements, orderByField: 'createdAt' },
             { path: 'joinRequests', setter: setJoinRequests, orderByField: 'requestedAt' },
@@ -503,30 +503,39 @@ export default function ClassroomPage() {
             { path: 'participants', setter: setParticipants, orderByField: 'joinedAt' },
             { path: 'teachers', setter: setSubjectTeachers, orderByField: 'addedAt' },
         ];
-    
+
         const unsubscribers = subcollectionMappings.map(({ path, setter, orderByField }) => {
             const q = query(collection(db, 'classrooms', classroomId, path), orderBy(orderByField, 'desc'));
-            return onSnapshot(q, 
-                snap => setter(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))),
-                error => console.error(`Error fetching ${path}:`, error) // Log errors without toasts for internal state
+            return onSnapshot(q,
+                (snap) => setter(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))),
+                (error) => console.error(`Error fetching ${path}:`, error)
             );
         });
-    
+
+        // Special handling for assignments and their submissions
         const assignmentsQuery = query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('dueDate', 'desc'));
         const unsubAssignments = onSnapshot(assignmentsQuery, async (snap) => {
             const assignmentsData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Assignment));
             setAssignments(assignmentsData);
-            // This part can still be complex, consider lazy-loading submissions if performance is an issue.
+
+            // Fetch all submissions in parallel after getting assignments
+            const submissionPromises = assignmentsData.map(assignment =>
+                getDocs(query(collection(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`), orderBy('submittedAt', 'desc')))
+                    .then(subSnap => ({
+                        assignmentId: assignment.id,
+                        submissions: subSnap.docs.map(s => ({ id: s.id, ...s.data() } as Submission))
+                    }))
+            );
+            
+            const results = await Promise.all(submissionPromises);
             const newSubmissions = new Map<string, Submission[]>();
-            for (const assignment of assignmentsData) {
-                const subSnap = await getDocs(query(collection(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`), orderBy('submittedAt', 'desc')));
-                newSubmissions.set(assignment.id, subSnap.docs.map(s => ({ id: s.id, ...s.data() } as Submission)));
-            }
+            results.forEach(res => newSubmissions.set(res.assignmentId, res.submissions));
             setSubmissions(newSubmissions);
         }, error => console.error("Error fetching assignments:", error));
     
         unsubscribers.push(unsubAssignments);
     
+        // Cleanup function
         return () => {
             unsubscribers.forEach(unsub => unsub());
         };
@@ -1363,4 +1372,5 @@ export default function ClassroomPage() {
     );
 }
 
+    
     
