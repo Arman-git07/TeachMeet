@@ -614,7 +614,7 @@ export default function ClassroomsPage() {
             </div>
         </CardContent>
         <CardFooter className="flex justify-between items-center">
-            <Button asChild><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+            <Button asChild><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class</Link></Button>
             <div className="flex items-center">
                 <Button variant="ghost" size="icon" onClick={() => handleEdit(classroom)}><Edit className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => setClassroomToDelete(classroom)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -633,7 +633,7 @@ export default function ClassroomsPage() {
         <p className="text-sm text-muted-foreground">Taught by: {classroomInfo.teacherName}</p>
       </CardContent>
       <CardFooter>
-        <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroomInfo.classroomId}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+        <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroomInfo.classroomId}`}>Enter Class</Link></Button>
       </CardFooter>
     </Card>
   ), []);
@@ -658,7 +658,7 @@ export default function ClassroomsPage() {
                 </CardContent>
                 <CardFooter className="flex-col items-stretch gap-2 pt-4">
                     <Button asChild className="w-full">
-                        <Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                        <Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class</Link>
                     </Button>
                 </CardFooter>
             </Card>
@@ -677,7 +677,7 @@ export default function ClassroomsPage() {
                   <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
               </CardContent>
               <CardFooter className="flex-col items-stretch gap-2 pt-4">
-                 <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+                 <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class</Link></Button>
               </CardFooter>
           </Card>
         );
@@ -827,4 +827,5 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
 
