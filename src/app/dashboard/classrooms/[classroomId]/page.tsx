@@ -74,7 +74,7 @@ interface Announcement {
   creatorName: string;
   authorId: string;
 }
-interface Assignment { id: string; title: string; description: string; dueDate: any; submissionFile?: File | null; }
+interface Assignment { id: string; title: string; description: string; dueDate: any; answerKeyUrl?: string; }
 interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
 interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
 
@@ -111,7 +111,7 @@ const assignmentSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   dueDate: z.date(),
-  submissionFile: z.any().optional(),
+  answerKeyFile: z.any().optional(),
 });
 
 
@@ -505,37 +505,93 @@ export default function ClassroomPage() {
     };
 
     const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
-        if (!canPostAnnouncements) return;
+        if (!canPostAnnouncements || !user) return;
+        
+        const assignmentToastId = toast({
+            title: "Creating Assignment...",
+            description: "Please wait while we upload the files.",
+        });
+
         try {
-            const { submissionFile, ...assignmentData } = data;
-            await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), { ...assignmentData, createdAt: serverTimestamp() });
-            toast({ title: "Assignment Created!" });
+            const { answerKeyFile, ...assignmentData } = data;
+            const docRef = await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), { 
+                ...assignmentData, 
+                answerKeyUrl: null, // Set to null initially
+                creatorId: user.uid,
+                createdAt: serverTimestamp(),
+            });
+
+            let answerKeyUrl = '';
+            if (answerKeyFile?.[0]) {
+                const file = answerKeyFile[0];
+                const filePath = `classrooms/${classroomId}/assignments/${docRef.id}/answer_key_${file.name}`;
+                const fileRef = storageRef(storage, filePath);
+                await uploadBytes(fileRef, file);
+                answerKeyUrl = await getDownloadURL(fileRef);
+                await updateDoc(docRef, { answerKeyUrl });
+            }
+
+            toast({ id: assignmentToastId.id, title: "Assignment Created!", description: "The new assignment is now available for students." });
             setIsAssignmentDialogOpen(false);
             assignmentForm.reset();
         } catch (error) {
             console.error("Error creating assignment:", error);
-            toast({ variant: 'destructive', title: "Creation Failed" });
+            toast({ id: assignmentToastId.id, variant: 'destructive', title: "Creation Failed" });
+        }
+    };
+    
+    const handleGradeSubmission = async (assignment: Assignment, submission: Submission) => {
+        if (!user || !canPostAnnouncements) return;
+        if (!assignment.answerKeyUrl) {
+            toast({ variant: 'destructive', title: "Missing Answer Key", description: "The teacher did not upload an answer key for this assignment." });
+            return;
+        }
+        
+        setIsGrading(submission.id);
+        const gradingToastId = toast({ title: "AI Grading in Progress...", description: `Analyzing submission from ${submission.studentName}.`});
+
+        try {
+            // Fetch and convert student submission
+            const studentFileResponse = await fetch(submission.fileUrl);
+            const studentFileBlob = await studentFileResponse.blob();
+            const studentSubmissionDataUri = await fileToDataUri(studentFileBlob);
+
+            // Fetch and convert teacher answer key
+            const teacherFileResponse = await fetch(assignment.answerKeyUrl);
+            const teacherFileBlob = await teacherFileResponse.blob();
+            const teacherAssignmentDataUri = await fileToDataUri(teacherFileBlob);
+
+            const result = await gradeAssignment({ studentSubmissionDataUri, teacherAssignmentDataUri });
+            
+            const submissionRef = doc(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`, submission.id);
+            await updateDoc(submissionRef, { grade: result.score, feedback: result.feedback });
+
+            toast({ id: gradingToastId, title: `Graded ${submission.studentName}'s Assignment`, description: `Score: ${result.score}` });
+        } catch (error) {
+            console.error("Error grading submission:", error);
+            toast({ id: gradingToastId, variant: 'destructive', title: "AI Grading Failed" });
+        } finally {
+            setIsGrading(null);
         }
     };
 
-    const handleAssignmentSubmission = async (assignmentId: string, submissionFile: File | null) => {
+    const handleAssignmentSubmission = async (assignment: Assignment, submissionFile: File | null) => {
         if (!submissionFile || !user) {
             toast({ variant: "destructive", title: "No file selected." });
             return;
         }
 
-        const submissionToastId = toast({
-            title: "Uploading Submission...",
-            description: "Please wait.",
-        });
-
+        const submissionToastId = toast({ title: "Uploading Submission...", description: "Please wait." });
+        const submissionRef = doc(collection(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`));
+        
         try {
-            const filePath = `classrooms/${classroomId}/assignments/${assignmentId}/${user.uid}/${submissionFile.name}`;
+            // 1. Upload the student's file
+            const filePath = `classrooms/${classroomId}/assignments/${assignment.id}/submissions/${user.uid}/${submissionFile.name}`;
             const fileRef = storageRef(storage, filePath);
             await uploadBytes(fileRef, submissionFile);
             const fileUrl = await getDownloadURL(fileRef);
 
-            const submissionRef = doc(collection(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`));
+            // 2. Save the submission details to Firestore
             await setDoc(submissionRef, {
                 studentId: user.uid,
                 studentName: user.displayName,
@@ -543,41 +599,24 @@ export default function ClassroomPage() {
                 submittedAt: serverTimestamp(),
             });
 
-            toast({ id: submissionToastId.id, title: "Submission successful!", description: "Your assignment has been submitted." });
+            toast({ id: submissionToastId.id, title: "Submission successful!", description: "Your assignment is being automatically graded." });
+            
+            // 3. Immediately trigger grading after successful upload
+            const submissionData: Submission = {
+                id: submissionRef.id,
+                studentId: user.uid,
+                studentName: user.displayName || 'Student',
+                fileUrl,
+                submittedAt: Timestamp.now()
+            };
+            await handleGradeSubmission(assignment, submissionData);
+
         } catch (error) {
             console.error("Error submitting assignment:", error);
             toast({ id: submissionToastId.id, variant: "destructive", title: "Submission Failed" });
         }
     };
-    
-    const handleGradeSubmission = async (assignmentId: string, submission: Submission, teacherFile: File) => {
-        if (!user || !canPostAnnouncements) return;
-        setIsGrading(submission.id);
-        try {
-            const studentFileResponse = await fetch(submission.fileUrl);
-            const studentFileBlob = await studentFileResponse.blob();
-            const studentSubmissionDataUri = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(studentFileBlob);
-            });
 
-            const teacherAssignmentDataUri = await fileToDataUri(teacherFile);
-
-            const result = await gradeAssignment({ studentSubmissionDataUri, teacherAssignmentDataUri });
-            
-            const submissionRef = doc(db, `classrooms/${classroomId}/assignments/${assignmentId}/submissions`, submission.id);
-            await updateDoc(submissionRef, { grade: result.score, feedback: result.feedback });
-
-            toast({ title: `Graded ${submission.studentName}'s Assignment`, description: `Score: ${result.score}` });
-        } catch (error) {
-            console.error("Error grading submission:", error);
-            toast({ variant: 'destructive', title: "AI Grading Failed" });
-        } finally {
-            setIsGrading(null);
-        }
-    };
 
     const handleMaterialUpload = async () => {
         if (!materialFile || !user) return;
@@ -995,6 +1034,10 @@ export default function ClassroomPage() {
                                                          <Textarea id="description" {...assignmentForm.register('description')} />
                                                      </div>
                                                      <div className="space-y-2">
+                                                        <Label htmlFor="answerKeyFile">Answer Key / Assignment File (Optional)</Label>
+                                                        <Input id="answerKeyFile" type="file" {...assignmentForm.register('answerKeyFile')} />
+                                                     </div>
+                                                     <div className="space-y-2">
                                                          <Label>Due Date</Label>
                                                           <Controller name="dueDate" control={assignmentForm.control} render={({ field }) => (
                                                              <Popover>
@@ -1029,7 +1072,7 @@ export default function ClassroomPage() {
                                                 </div>
                                                 {!canPostAnnouncements && (
                                                     <div className="flex-shrink-0">
-                                                        <Input type="file" id={`submission-upload-${assignment.id}`} className="hidden" onChange={(e) => handleAssignmentSubmission(assignment.id, e.target.files?.[0] || null)} />
+                                                        <Input type="file" id={`submission-upload-${assignment.id}`} className="hidden" onChange={(e) => handleAssignmentSubmission(assignment, e.target.files?.[0] || null)} />
                                                         <Label htmlFor={`submission-upload-${assignment.id}`} className={cn(buttonVariants(), "cursor-pointer")}>
                                                             <Upload className="mr-2 h-4 w-4"/> Submit Work
                                                         </Label>
@@ -1053,10 +1096,10 @@ export default function ClassroomPage() {
                                                                     </div>
                                                                 ) : (
                                                                      <div className="flex items-center gap-2">
-                                                                        <Input type="file" id={`teacher-key-${sub.id}`} className="hidden" onChange={(e) => handleGradeSubmission(assignment.id, sub, e.target.files![0])} />
-                                                                        <Label htmlFor={`teacher-key-${sub.id}`} className={cn(buttonVariants({variant: 'outline', size: 'sm'}), "cursor-pointer")}>
-                                                                            {isGrading === sub.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BrainCircuit className="mr-2 h-4 w-4"/>} Grade with AI
-                                                                        </Label>
+                                                                        <Button onClick={() => handleGradeSubmission(assignment, sub)} disabled={isGrading === sub.id} size="sm" variant="outline">
+                                                                           {isGrading === sub.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BrainCircuit className="mr-2 h-4 w-4"/>} 
+                                                                           Grade with AI
+                                                                        </Button>
                                                                      </div>
                                                                 )
                                                              ) : (
