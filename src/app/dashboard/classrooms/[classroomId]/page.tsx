@@ -21,9 +21,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Megaphone, BookUser, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, FileUp, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, Calendar as CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus, UserX } from 'lucide-react';
+import { Megaphone, Users, CreditCard, Loader2, ArrowLeft, PlusCircle, Trash2, Edit, Check, X, Upload, IndianRupee, DollarSign, Euro, PoundSterling, MessageSquare, Briefcase, FileText, ClipboardCheck, BrainCircuit, Star, Settings, MoreVertical, Mic, StopCircle, Calendar as CalendarIcon, AudioLines, Link as LinkIcon, AlertTriangle, Clock, Copy, Award, Book, Phone, UserPlus, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { gradeAssignment } from '@/ai/flows/grade-assignment-flow';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -74,8 +73,6 @@ interface Announcement {
   creatorName: string;
   authorId: string;
 }
-interface Assignment { id: string; title: string; description: string; dueDate: any; answerKeyUrl?: string; }
-interface Submission { id: string; studentId: string; studentName: string; fileUrl: string; submittedAt: any; grade?: number; feedback?: string; }
 interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
 
 // --- Exam Interfaces & Schemas ---
@@ -105,13 +102,6 @@ const feeSchema = z.object({
 const paymentDetailsSchema = z.object({
   upiId: z.string().optional(),
   qrCode: z.any().optional(),
-});
-
-const assignmentSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().optional(),
-  dueDate: z.date(),
-  answerKeyFile: z.any().optional(),
 });
 
 
@@ -268,15 +258,11 @@ export default function ClassroomPage() {
     const [participants, setParticipants] = useState<UserProfile[]>([]);
     const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-    const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
     const [exams, setExams] = useState<Exam[]>([]);
-    const [submissions, setSubmissions] = useState<Map<string, Submission[]>>(new Map());
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
     const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
-    const [isGrading, setIsGrading] = useState<string | null>(null);
     const [materialFile, setMaterialFile] = useState<File | null>(null);
     const [materialLink, setMaterialLink] = useState('');
     const [materialName, setMaterialName] = useState('');
@@ -298,7 +284,6 @@ export default function ClassroomPage() {
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
     const paymentDetailsForm = useForm<z.infer<typeof paymentDetailsSchema>>({ resolver: zodResolver(paymentDetailsSchema), defaultValues: { upiId: '', qrCode: null } });
-    const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
     const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema) });
     const { fields, append, remove } = useFieldArray({ control: examForm.control, name: "questions" });
 
@@ -346,37 +331,6 @@ export default function ClassroomPage() {
             );
             return unsub;
         });
-
-        // Special handling for assignments and their submissions
-        const assignmentsQuery = query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('dueDate', 'desc'));
-        const unsubAssignments = onSnapshot(assignmentsQuery, async (snap) => {
-            const assignmentsData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Assignment));
-            setAssignments(assignmentsData);
-
-            if (assignmentsData.length === 0) {
-              setSubmissions(new Map());
-              return;
-            }
-
-            const submissionPromises = assignmentsData.map(assignment =>
-                getDocs(query(collection(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`), orderBy('submittedAt', 'desc')))
-                    .then(subSnap => ({
-                        assignmentId: assignment.id,
-                        submissions: subSnap.docs.map(s => ({ id: s.id, ...s.data() } as Submission))
-                    }))
-            );
-            
-            try {
-                const results = await Promise.all(submissionPromises);
-                const newSubmissions = new Map<string, Submission[]>();
-                results.forEach(res => newSubmissions.set(res.assignmentId, res.submissions));
-                setSubmissions(newSubmissions);
-            } catch (error) {
-                console.error("Error fetching submissions in parallel:", error);
-            }
-        }, error => console.error("Error fetching assignments:", error));
-    
-        unsubscribers.push(unsubAssignments);
     
         return () => {
             unsubscribers.forEach(unsub => unsub());
@@ -503,120 +457,6 @@ export default function ClassroomPage() {
             toast({ variant: 'destructive', title: 'Update Failed' });
         }
     };
-
-    const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
-        if (!canPostAnnouncements || !user) return;
-        
-        const assignmentToastId = toast({
-            title: "Creating Assignment...",
-            description: "Please wait while we upload the files.",
-        });
-
-        try {
-            const { answerKeyFile, ...assignmentData } = data;
-            const docRef = await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), { 
-                ...assignmentData, 
-                answerKeyUrl: null, // Set to null initially
-                creatorId: user.uid,
-                createdAt: serverTimestamp(),
-            });
-
-            let answerKeyUrl = '';
-            if (answerKeyFile?.[0]) {
-                const file = answerKeyFile[0];
-                const filePath = `classrooms/${classroomId}/assignments/${docRef.id}/answer_key_${file.name}`;
-                const fileRef = storageRef(storage, filePath);
-                await uploadBytes(fileRef, file);
-                answerKeyUrl = await getDownloadURL(fileRef);
-                await updateDoc(docRef, { answerKeyUrl });
-            }
-
-            toast({ id: assignmentToastId.id, title: "Assignment Created!", description: "The new assignment is now available for students." });
-            setIsAssignmentDialogOpen(false);
-            assignmentForm.reset();
-        } catch (error) {
-            console.error("Error creating assignment:", error);
-            toast({ id: assignmentToastId.id, variant: 'destructive', title: "Creation Failed" });
-        }
-    };
-    
-    const handleGradeSubmission = async (assignment: Assignment, submission: Submission) => {
-        if (!user || !canPostAnnouncements) return;
-        if (!assignment.answerKeyUrl) {
-            toast({ variant: 'destructive', title: "Missing Answer Key", description: "The teacher did not upload an answer key for this assignment." });
-            return;
-        }
-        
-        setIsGrading(submission.id);
-        const gradingToastId = toast({ title: "AI Grading in Progress...", description: `Analyzing submission from ${submission.studentName}.`});
-
-        try {
-            // Fetch and convert student submission
-            const studentFileResponse = await fetch(submission.fileUrl);
-            const studentFileBlob = await studentFileResponse.blob();
-            const studentSubmissionDataUri = await fileToDataUri(studentFileBlob);
-
-            // Fetch and convert teacher answer key
-            const teacherFileResponse = await fetch(assignment.answerKeyUrl);
-            const teacherFileBlob = await teacherFileResponse.blob();
-            const teacherAssignmentDataUri = await fileToDataUri(teacherFileBlob);
-
-            const result = await gradeAssignment({ studentSubmissionDataUri, teacherAssignmentDataUri });
-            
-            const submissionRef = doc(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`, submission.id);
-            await updateDoc(submissionRef, { grade: result.score, feedback: result.feedback });
-
-            toast({ id: gradingToastId, title: `Graded ${submission.studentName}'s Assignment`, description: `Score: ${result.score}` });
-        } catch (error) {
-            console.error("Error grading submission:", error);
-            toast({ id: gradingToastId, variant: 'destructive', title: "AI Grading Failed" });
-        } finally {
-            setIsGrading(null);
-        }
-    };
-
-    const handleAssignmentSubmission = async (assignment: Assignment, submissionFile: File | null) => {
-        if (!submissionFile || !user) {
-            toast({ variant: "destructive", title: "No file selected." });
-            return;
-        }
-
-        const submissionToastId = toast({ title: "Uploading Submission...", description: "Please wait." });
-        const submissionRef = doc(collection(db, `classrooms/${classroomId}/assignments/${assignment.id}/submissions`));
-        
-        try {
-            // 1. Upload the student's file
-            const filePath = `classrooms/${classroomId}/assignments/${assignment.id}/submissions/${user.uid}/${submissionFile.name}`;
-            const fileRef = storageRef(storage, filePath);
-            await uploadBytes(fileRef, submissionFile);
-            const fileUrl = await getDownloadURL(fileRef);
-
-            // 2. Save the submission details to Firestore
-            await setDoc(submissionRef, {
-                studentId: user.uid,
-                studentName: user.displayName,
-                fileUrl: fileUrl,
-                submittedAt: serverTimestamp(),
-            });
-
-            toast({ id: submissionToastId.id, title: "Submission successful!", description: "Your assignment is being automatically graded." });
-            
-            // 3. Immediately trigger grading after successful upload
-            const submissionData: Submission = {
-                id: submissionRef.id,
-                studentId: user.uid,
-                studentName: user.displayName || 'Student',
-                fileUrl,
-                submittedAt: Timestamp.now()
-            };
-            await handleGradeSubmission(assignment, submissionData);
-
-        } catch (error) {
-            console.error("Error submitting assignment:", error);
-            toast({ id: submissionToastId.id, variant: "destructive", title: "Submission Failed" });
-        }
-    };
-
 
     const handleMaterialUpload = async () => {
         if (!materialFile || !user) return;
@@ -968,7 +808,6 @@ export default function ClassroomPage() {
                     <div className="w-full whitespace-nowrap rounded-lg border-b flex-shrink-0">
                         <TabsList className="inline-flex h-auto">
                             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
-                            <TabsTrigger value="assignments"><BookUser className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
                             <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
                             <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
                         </TabsList>
@@ -1010,114 +849,6 @@ export default function ClassroomPage() {
                                 </CardContent>
                             </Card>
                         </TabsContent>
-                        
-                        <TabsContent value="assignments">
-                             <Card>
-                                 <CardHeader className="flex flex-row items-center justify-between">
-                                     <div>
-                                         <CardTitle>Assignments</CardTitle>
-                                         <CardDescription>Manage and grade assignments here.</CardDescription>
-                                     </div>
-                                     {canPostAnnouncements && (
-                                         <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-                                             <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4"/>Create Assignment</Button></DialogTrigger>
-                                             <DialogContent>
-                                                 <DialogHeader><DialogTitle>New Assignment</DialogTitle></DialogHeader>
-                                                 <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
-                                                     <div className="space-y-2">
-                                                         <Label htmlFor="title">Title</Label>
-                                                         <Input id="title" {...assignmentForm.register('title')} />
-                                                         {assignmentForm.formState.errors.title && <p className="text-destructive text-sm">{assignmentForm.formState.errors.title.message}</p>}
-                                                     </div>
-                                                     <div className="space-y-2">
-                                                         <Label htmlFor="description">Description</Label>
-                                                         <Textarea id="description" {...assignmentForm.register('description')} />
-                                                     </div>
-                                                     <div className="space-y-2">
-                                                        <Label htmlFor="answerKeyFile">Answer Key / Assignment File (Optional)</Label>
-                                                        <Input id="answerKeyFile" type="file" {...assignmentForm.register('answerKeyFile')} />
-                                                     </div>
-                                                     <div className="space-y-2">
-                                                         <Label>Due Date</Label>
-                                                          <Controller name="dueDate" control={assignmentForm.control} render={({ field }) => (
-                                                             <Popover>
-                                                                 <PopoverTrigger asChild>
-                                                                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                         {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                                     </Button>
-                                                                 </PopoverTrigger>
-                                                                 <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
-                                                             </Popover>
-                                                          )} />
-                                                          {assignmentForm.formState.errors.dueDate && <p className="text-destructive text-sm">{assignmentForm.formState.errors.dueDate.message}</p>}
-                                                     </div>
-                                                     <DialogFooter>
-                                                        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                                                        <Button type="submit">Create</Button>
-                                                     </DialogFooter>
-                                                 </form>
-                                             </DialogContent>
-                                         </Dialog>
-                                     )}
-                                 </CardHeader>
-                                 <CardContent className="space-y-6">
-                                     {assignments.length > 0 ? assignments.map(assignment => (
-                                         <div key={assignment.id} className="p-4 border rounded-lg">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h4 className="font-semibold">{assignment.title}</h4>
-                                                    <p className="text-sm text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleDateString()}</p>
-                                                    <p className="text-sm mt-1">{assignment.description}</p>
-                                                </div>
-                                                {!canPostAnnouncements && (
-                                                    <div className="flex-shrink-0">
-                                                        <Input type="file" id={`submission-upload-${assignment.id}`} className="hidden" onChange={(e) => handleAssignmentSubmission(assignment, e.target.files?.[0] || null)} />
-                                                        <Label htmlFor={`submission-upload-${assignment.id}`} className={cn(buttonVariants(), "cursor-pointer")}>
-                                                            <Upload className="mr-2 h-4 w-4"/> Submit Work
-                                                        </Label>
-                                                    </div>
-                                                )}
-                                            </div>
-                                             <div className="mt-4 pt-4 border-t">
-                                                 <h5 className="text-sm font-medium">Submissions ({submissions.get(assignment.id)?.length || 0})</h5>
-                                                 <div className="space-y-2 mt-2">
-                                                     {submissions.get(assignment.id)?.map(sub => (
-                                                         <div key={sub.id} className="flex justify-between items-center p-2 bg-muted/50 rounded-lg">
-                                                             <div className="flex items-center gap-2">
-                                                                <a href={sub.fileUrl} target="_blank" className="text-primary hover:underline font-medium text-sm">{sub.studentName}'s Submission</a>
-                                                                <span className="text-xs text-muted-foreground">({new Date(sub.submittedAt?.toDate()).toLocaleDateString()})</span>
-                                                             </div>
-                                                             {canPostAnnouncements ? (
-                                                                sub.grade !== undefined ? (
-                                                                    <div className="text-right">
-                                                                        <p className="font-bold text-lg text-primary">{sub.grade}/100</p>
-                                                                        <p className="text-xs text-muted-foreground">{sub.feedback}</p>
-                                                                    </div>
-                                                                ) : (
-                                                                     <div className="flex items-center gap-2">
-                                                                        <Button onClick={() => handleGradeSubmission(assignment, sub)} disabled={isGrading === sub.id} size="sm" variant="outline">
-                                                                           {isGrading === sub.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BrainCircuit className="mr-2 h-4 w-4"/>} 
-                                                                           Grade with AI
-                                                                        </Button>
-                                                                     </div>
-                                                                )
-                                                             ) : (
-                                                                sub.grade !== undefined ? (
-                                                                     <p className="font-bold text-lg text-primary">{sub.grade}/100</p>
-                                                                ) : (
-                                                                     <p className="text-sm text-muted-foreground">Pending Grade</p>
-                                                                )
-                                                             )}
-                                                         </div>
-                                                     ))}
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     )) : <p className="text-muted-foreground text-center py-4">No assignments created yet.</p>}
-                                 </CardContent>
-                             </Card>
-                         </TabsContent>
                         
                         <TabsContent value="materials">
                             <Card>
@@ -1298,4 +1029,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
