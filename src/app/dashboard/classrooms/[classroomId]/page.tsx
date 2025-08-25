@@ -108,7 +108,7 @@ const paymentDetailsSchema = z.object({
 
 const assignmentSchema = z.object({
   title: z.string().min(1, "Assignment title is required"),
-  dueDate: z.date({ required_error: "Due date is required" }),
+  dueDate: z.coerce.date({ required_error: "Due date is required" }),
   answerKeyFile: z.any().optional(),
 });
 
@@ -919,13 +919,14 @@ export default function ClassroomPage() {
                                                     <div className="space-y-2">
                                                         <Label>Due Date</Label>
                                                         <Controller control={assignmentForm.control} name="dueDate" render={({ field }) => (
-                                                            <Input type="datetime-local" onChange={field.onChange} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
+                                                            <Input type="datetime-local" onChange={(e) => field.onChange(e.target.valueAsDate)} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
                                                         )} />
                                                         {assignmentForm.formState.errors.dueDate && <p className="text-destructive text-sm">{assignmentForm.formState.errors.dueDate.message}</p>}
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <Label htmlFor="assignment-file">Answer Key File (Optional)</Label>
+                                                        <Label htmlFor="assignment-file">Answer Key File (Required)</Label>
                                                         <Input id="assignment-file" type="file" {...assignmentForm.register('answerKeyFile')} />
+                                                        {assignmentForm.formState.errors.answerKeyFile && <p className="text-destructive text-sm">{assignmentForm.formState.errors.answerKeyFile.message as string}</p>}
                                                     </div>
                                                     <DialogFooter>
                                                         <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
