@@ -286,11 +286,12 @@ export default function ClassroomPage() {
 
 
     const canPostAnnouncements = useMemo(() => {
-        if (!user || !classroom || !participants) return false;
+        if (!user || !classroom) return false;
         if (classroom.createdBy === user.uid) return true;
-        const currentUserParticipant = participants.find(p => p.uid === user.uid);
-        return currentUserParticipant?.role === 'teacher';
-    }, [user, classroom, participants]);
+        // The `teachers` array on the classroom doc contains objects like {uid: '...', name: '...'}.
+        // We need to check if the user's uid is in that array.
+        return classroom.teachers?.some(teacher => teacher.uid === user.uid);
+    }, [user, classroom]);
     
 
     // Forms

@@ -1,7 +1,8 @@
+
 "use client";
 
 import React from "react";
-import { db, storage, auth } from "@/lib/firebase"; // <-- keep your existing exports
+import { db, storage, auth } from "@/lib/firebase";
 import {
   addDoc,
   collection,
