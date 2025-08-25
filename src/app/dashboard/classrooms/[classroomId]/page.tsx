@@ -34,6 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
+import AnnouncementComposer from '@/components/classroom/AnnouncementComposer';
 
 // --- Interfaces ---
 interface TeacherInfo {
@@ -253,136 +254,6 @@ const VanishDateTimePicker = ({ date, setDate, disabled }: { date: string | null
             className="rounded-lg bg-background/50 p-2"
             disabled={disabled}
         />
-    );
-};
-
-const AnnouncementForm = ({ classroomId, currentUser, canPost }: { classroomId: string; currentUser: any; canPost: boolean }) => {
-    const [text, setText] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [vanishDate, setVanishDate] = useState<string | null>(null);
-    const { toast } = useToast();
-
-    const [isRecording, setIsRecording] = useState(false);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-            setAudioUrl(null); 
-            audioChunksRef.current = [];
-
-            recorder.ondataavailable = (e) => {
-              audioChunksRef.current.push(e.data);
-            };
-
-            recorder.onstop = () => {
-                const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-                const url = URL.createObjectURL(blob);
-                setAudioUrl(url);
-                stream.getTracks().forEach(track => track.stop());
-            };
-            
-            recorder.start();
-            setIsRecording(true);
-            mediaRecorderRef.current = recorder;
-            toast({ title: 'Recording started...' });
-        } catch (err) {
-            console.error("Mic error:", err);
-            toast({ variant: "destructive", title: "Microphone Access Denied" });
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            toast({ title: 'Recording stopped.' });
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!text.trim() && !audioUrl) {
-            toast({ variant: 'destructive', title: 'Announcement cannot be empty.' });
-            return;
-        }
-        if (!currentUser) {
-             toast({ variant: 'destructive', title: 'Not authenticated' });
-            return;
-        }
-
-        setIsLoading(true);
-
-        try {
-            const announcementData: any = {
-                text: text.trim(),
-                vanishAt: vanishDate ? Timestamp.fromDate(new Date(vanishDate)) : null,
-                creatorId: currentUser.uid,
-                creatorName: currentUser.displayName || 'Teacher',
-                authorId: currentUser.uid, // For security rules
-                createdAt: serverTimestamp(),
-            };
-
-            if (audioUrl) {
-                const audioBlob = await fetch(audioUrl).then(r => r.blob());
-                const audioFileRef = storageRef(storage, `classrooms/${classroomId}/announcements/${Date.now()}.webm`);
-                await uploadBytes(audioFileRef, audioBlob);
-                announcementData.audioUrl = await getDownloadURL(audioFileRef);
-                announcementData.type = 'audio';
-            } else {
-                announcementData.type = 'text';
-            }
-
-            await addDoc(collection(db, "classrooms", classroomId, "announcements"), announcementData);
-
-            setText('');
-            setAudioUrl(null);
-            setVanishDate(null);
-            audioChunksRef.current = [];
-            toast({ title: 'Announcement Posted!' });
-        } catch (error) {
-            console.error('Failed to post announcement:', error);
-            toast({ variant: 'destructive', title: 'Failed to post announcement.', description: 'Check Firestore rules and console for details.' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    if (!canPost) return null;
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded-lg bg-muted/30">
-            <Textarea 
-              placeholder="Write announcement..." 
-              value={text} 
-              onChange={(e) => setText(e.target.value)} 
-              disabled={isLoading}
-              rows={3}
-              className="w-full p-2 rounded-md bg-background text-foreground"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-                {!isRecording ? (
-                    <Button type="button" onClick={startRecording} variant="outline" size="sm" className="rounded-lg">
-                        <Mic className="mr-2 h-4 w-4" /> Record Voice
-                    </Button>
-                ) : (
-                    <Button type="button" onClick={stopRecording} variant="destructive" size="sm" className="rounded-lg">
-                        <StopCircle className="mr-2 h-4 w-4" /> Stop Recording
-                    </Button>
-                )}
-                <div className="flex-grow">
-                  <VanishDateTimePicker date={vanishDate} setDate={setVanishDate} disabled={isLoading} />
-                </div>
-                <Button type="submit" disabled={isLoading || (!text.trim() && !audioUrl)} className="ml-auto btn-gel">
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Post Announcement
-                </Button>
-            </div>
-            {audioUrl && <audio controls src={audioUrl} className="w-full mt-2" />}
-        </form>
     );
 };
 
@@ -1040,7 +911,7 @@ export default function ClassroomPage() {
                                     <CardDescription>Stay updated with the latest news from your teacher.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <AnnouncementForm classroomId={classroomId} currentUser={user} canPost={canPostAnnouncements} />
+                                    <AnnouncementComposer classId={classroomId} canPost={canPostAnnouncements} />
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
