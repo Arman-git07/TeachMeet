@@ -812,7 +812,6 @@ export default function ClassroomPage() {
                     <div className="w-full whitespace-nowrap rounded-lg border-b flex-shrink-0">
                         <TabsList className="inline-flex h-auto">
                             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
-                            <TabsTrigger value="assignments"><ClipboardCheck className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
                             <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
                             <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
                         </TabsList>
@@ -855,20 +854,6 @@ export default function ClassroomPage() {
                             </Card>
                         </TabsContent>
                         
-                        <TabsContent value="assignments">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Assignments</CardTitle>
-                                    <CardDescription>View upcoming assignments here.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        <p className="text-muted-foreground text-center py-4">Assignment features are under development.</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
                         <TabsContent value="materials">
                             <Card>
                                 <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
