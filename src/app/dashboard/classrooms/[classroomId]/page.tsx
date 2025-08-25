@@ -911,7 +911,7 @@ export default function ClassroomPage() {
                                     <CardDescription>Stay updated with the latest news from your teacher.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <AnnouncementComposer classId={classroomId} canPost={canPostAnnouncements} />
+                                    {user && <AnnouncementComposer classId={classroomId} canPost={canPostAnnouncements} />}
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
