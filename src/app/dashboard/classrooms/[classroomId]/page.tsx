@@ -109,7 +109,7 @@ const paymentDetailsSchema = z.object({
 const assignmentSchema = z.object({
   title: z.string().min(1, "Assignment title is required"),
   dueDate: z.coerce.date({ required_error: "Due date is required" }),
-  answerKeyFile: z.any().optional(),
+  answerKeyFile: z.any().refine(files => files?.length == 1, "Answer Key file is required."),
 });
 
 
@@ -337,11 +337,10 @@ export default function ClassroomPage() {
 
         const unsubscribers = subcollectionMappings.map(({ path, setter, orderByField }) => {
             const q = query(collection(db, 'classrooms', classroomId, path), orderBy(orderByField, 'desc'));
-            const unsub = onSnapshot(q,
+            return onSnapshot(q,
                 (snap) => setter(snap.docs.map(d => ({ id: d.id, ...d.data() } as any))),
                 (error) => console.error(`Error fetching ${path}:`, error)
             );
-            return unsub;
         });
     
         return () => {
@@ -524,6 +523,7 @@ export default function ClassroomPage() {
     
         const answerKeyFile = data.answerKeyFile?.[0];
         if (!answerKeyFile) {
+            // This should be caught by zod, but double-check.
             toast({ variant: 'destructive', title: 'Answer Key Required', description: 'You must upload an answer key file.' });
             return;
         }
@@ -924,7 +924,7 @@ export default function ClassroomPage() {
                                                         {assignmentForm.formState.errors.dueDate && <p className="text-destructive text-sm">{assignmentForm.formState.errors.dueDate.message}</p>}
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <Label htmlFor="assignment-file">Answer Key File (Required)</Label>
+                                                        <Label htmlFor="assignment-file">Answer Key File</Label>
                                                         <Input id="assignment-file" type="file" {...assignmentForm.register('answerKeyFile')} />
                                                         {assignmentForm.formState.errors.answerKeyFile && <p className="text-destructive text-sm">{assignmentForm.formState.errors.answerKeyFile.message as string}</p>}
                                                     </div>
