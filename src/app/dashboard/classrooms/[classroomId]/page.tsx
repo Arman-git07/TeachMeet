@@ -34,7 +34,6 @@ import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import AnnouncementComposer from '@/components/classroom/AnnouncementComposer';
-import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 
 // --- Interfaces ---
 interface TeacherInfo {
@@ -75,7 +74,6 @@ interface Announcement {
   authorId: string;
 }
 interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
-interface Assignment { id: string; title: string; dueDate: any; answerKeyUrl?: string; submissions?: any[]; }
 
 // --- Exam Interfaces & Schemas ---
 interface QAQuestion { type: 'qa'; question: string; answer: string; }
@@ -104,12 +102,6 @@ const feeSchema = z.object({
 const paymentDetailsSchema = z.object({
   upiId: z.string().optional(),
   qrCode: z.any().optional(),
-});
-
-const assignmentSchema = z.object({
-    title: z.string().min(3, "Title must be at least 3 characters."),
-    dueDate: z.date({ required_error: "Due date is required."}),
-    answerKeyFile: z.any().refine(files => files?.length > 0, "Answer key file is required."),
 });
 
 const examQuestionSchema = z.object({
@@ -265,12 +257,10 @@ export default function ClassroomPage() {
     const [participants, setParticipants] = useState<UserProfile[]>([]);
     const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-    const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
     const [exams, setExams] = useState<Exam[]>([]);
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
     const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
     const [materialFile, setMaterialFile] = useState<File | null>(null);
     const [materialLink, setMaterialLink] = useState('');
@@ -293,7 +283,6 @@ export default function ClassroomPage() {
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
     const paymentDetailsForm = useForm<z.infer<typeof paymentDetailsSchema>>({ resolver: zodResolver(paymentDetailsSchema), defaultValues: { upiId: '', qrCode: null } });
-    const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
     const examForm = useForm<z.infer<typeof examSchema>>({ resolver: zodResolver(examSchema) });
     const { fields, append, remove } = useFieldArray({ control: examForm.control, name: "questions" });
 
@@ -326,7 +315,6 @@ export default function ClassroomPage() {
 
         const subcollectionMappings = [
             { path: 'announcements', setter: setAnnouncements, orderByField: 'createdAt' },
-            { path: 'assignments', setter: setAssignments, orderByField: 'createdAt' },
             { path: 'joinRequests', setter: setJoinRequests, orderByField: 'requestedAt' },
             { path: 'materials', setter: setMaterials, orderByField: 'uploadedAt' },
             { path: 'exams', setter: setExams, orderByField: 'date' },
@@ -523,32 +511,6 @@ export default function ClassroomPage() {
         }
     };
 
-    const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
-        if (!canPostAnnouncements) return;
-        
-        try {
-            const file = data.answerKeyFile[0];
-            const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${Date.now()}-${file.name}`);
-            const snapshot = await uploadBytes(fileRef, file);
-            const answerKeyUrl = await getDownloadURL(snapshot.ref);
-
-            await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), {
-                title: data.title,
-                dueDate: data.dueDate,
-                answerKeyUrl,
-                submissions: [],
-                createdAt: serverTimestamp(),
-            });
-
-            toast({ title: "Assignment Posted!" });
-            setIsAssignmentDialogOpen(false);
-            assignmentForm.reset();
-        } catch (error) {
-            console.error("Error posting assignment:", error);
-            toast({ variant: 'destructive', title: "Post Failed", description: "Could not post the assignment." });
-        }
-    };
-    
     const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
         if (!canPostAnnouncements || !user) return;
         examForm.clearErrors();
@@ -895,47 +857,9 @@ export default function ClassroomPage() {
                         
                         <TabsContent value="assignments">
                             <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle>Assignments</CardTitle>
-                                        <CardDescription>Manage and grade assignments here.</CardDescription>
-                                    </div>
-                                    {canPostAnnouncements && (
-                                        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button><PlusCircle className="mr-2 h-4 w-4" /> Create Assignment</Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Create New Assignment</DialogTitle>
-                                                    <DialogDescription>Fill out the assignment details below.</DialogDescription>
-                                                </DialogHeader>
-                                                <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4 py-4">
-                                                    <div>
-                                                        <Label htmlFor="assignment-title">Title</Label>
-                                                        <Input id="assignment-title" {...assignmentForm.register('title')} />
-                                                        {assignmentForm.formState.errors.title && <p className="text-destructive text-sm">{assignmentForm.formState.errors.title.message}</p>}
-                                                    </div>
-                                                     <div>
-                                                        <Label htmlFor="assignment-due">Due Date</Label>
-                                                        <Controller control={assignmentForm.control} name="dueDate" render={({ field }) => (
-                                                            <Input type="datetime-local" onChange={field.onChange} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
-                                                        )} />
-                                                        {assignmentForm.formState.errors.dueDate && <p className="text-destructive text-sm">{assignmentForm.formState.errors.dueDate.message}</p>}
-                                                    </div>
-                                                     <div>
-                                                        <Label htmlFor="assignment-file">Answer Key File</Label>
-                                                        <Input id="assignment-file" type="file" {...assignmentForm.register('answerKeyFile')} />
-                                                        {assignmentForm.formState.errors.answerKeyFile && <p className="text-destructive text-sm">{assignmentForm.formState.errors.answerKeyFile.message}</p>}
-                                                    </div>
-                                                    <DialogFooter>
-                                                        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                                                        <Button type="submit">Post Assignment</Button>
-                                                    </DialogFooter>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
-                                    )}
+                                <CardHeader>
+                                    <CardTitle>Assignments</CardTitle>
+                                    <CardDescription>View upcoming assignments here.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-3">
