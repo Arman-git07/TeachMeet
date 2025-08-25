@@ -283,6 +283,7 @@ export default function ClassroomPage() {
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
     const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
     const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
+    const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
 
 
     const canPostAnnouncements = useMemo(() => {
@@ -452,6 +453,21 @@ export default function ClassroomPage() {
             toast({ variant: 'destructive', title: 'Removal Failed', description: 'Could not remove the participant. Check Firestore rules and console for details.' });
         }
     };
+
+    const onDeleteAnnouncement = async () => {
+        if (!announcementToDelete) return;
+        const { id } = announcementToDelete;
+        setAnnouncementToDelete(null);
+
+        try {
+            await deleteDoc(doc(db, 'classrooms', classroomId, 'announcements', id));
+            toast({ title: 'Announcement Deleted' });
+        } catch (error) {
+            console.error("Error deleting announcement:", error);
+            toast({ variant: 'destructive', title: 'Deletion Failed', description: 'Could not delete the announcement.' });
+        }
+    };
+
 
     const onFeeSubmit = async (data: z.infer<typeof feeSchema>) => {
         try {
@@ -892,6 +908,21 @@ export default function ClassroomPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            
+            <AlertDialog open={!!announcementToDelete} onOpenChange={(isOpen) => !isOpen && setAnnouncementToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Announcement?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this announcement? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={onDeleteAnnouncement} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
                 <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
@@ -915,13 +946,23 @@ export default function ClassroomPage() {
                                     {user && <AnnouncementComposer classId={classroomId} canPost={canPostAnnouncements} />}
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
-                                            <div key={a.id} className="p-3 bg-muted/50 rounded-lg">
+                                            <div key={a.id} className="p-3 bg-muted/50 rounded-lg group relative">
                                                 {a.text && <p className="text-sm">{a.text}</p>}
                                                 {a.audioUrl && <audio controls src={a.audioUrl} className="w-full mt-2" />}
                                                 <p className="text-xs text-muted-foreground mt-2">
                                                   Posted by {a.creatorName} on {new Date(a.createdAt?.toDate()).toLocaleString()}
                                                   {a.vanishAt && ` | Vanishes on ${new Date(a.vanishAt?.toDate()).toLocaleString()}`}
                                                 </p>
+                                                {(canPostAnnouncements || user?.uid === a.creatorId) && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => setAnnouncementToDelete(a)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4"/>
+                                                    </Button>
+                                                )}
                                             </div>
                                         )) : (
                                             <p className="text-muted-foreground text-center py-4">No announcements yet.</p>
