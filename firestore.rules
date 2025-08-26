@@ -1,108 +1,115 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions to check user roles based on classroom data
-    function isCreator(classId, userId) {
-      let classroomData = get(/databases/$(database)/documents/classrooms/$(classId)).data;
-      // Check multiple possible fields for the creator's ID
-      return userId == classroomData.get('createdBy', null) ||
-             userId == classroomData.get('creatorId', null) ||
-             userId == classroomData.get('ownerId', null) ||
-             userId == classroomData.get('teacherId', null); // Legacy field
+    function cls(path) {
+      return get(/databases/$(database)/documents/$(path)).data;
     }
+    function isCreator(classId) {
+      let c = cls("classrooms/" + classId);
+      return request.auth != null && (
+        c.createdBy == request.auth.uid ||
+        c.creatorId == request.auth.uid ||
+        c.teacherId == request.auth.uid
+      );
+    }
+    function isSubjectTeacher(classId) {
+      let c = cls("classrooms/" + classId);
+      return request.auth != null && (
+        (c.teachers is list && request.auth.uid in c.teachers.map(t => t.uid)) ||
+        exists(/databases/$(database)/documents/classrooms/$(classId)/teachers/$(request.auth.uid))
+      );
+    }
+    function isStudent(classId) {
+      let c = cls("classrooms/" + classId);
+      return request.auth != null && (
+        (c.students is list && request.auth.uid in c.students) ||
+         exists(/databases/$(database)/documents/classrooms/$(classId)/participants/$(request.auth.uid))
+      );
+    }
+    function isParticipant(classId) {
+      return isCreator(classId) || isSubjectTeacher(classId) || isStudent(classId);
+    }
+    function canPost(classId) { return isCreator(classId) || isSubjectTeacher(classId); }
+    function canManage(classId) { return isCreator(classId) || isSubjectTeacher(classId); }
 
-    function isTeacher(classId, userId) {
-      let classroomData = get(/databases/$(database)/documents/classrooms/$(classId)).data;
-      // Check if user is in the 'teachers' array (either as string UID or object with UID)
-      let teachersList = classroomData.get('teachers', []);
-      return (teachersList is list && userId in teachersList) || 
-             (teachersList is list && teachersList.hasAny([{'uid': userId}])) ||
-             exists(/databases/$(database)/documents/classrooms/$(classId)/teachers/$(userId)); // Check subcollection
-    }
-    
-    function isStudent(classId, userId) {
-       let classroomData = get(/databases/$(database)/documents/classrooms/$(classId)).data;
-       return userId in classroomData.get('students', []);
-    }
-
-    function canPost(classId, userId) {
-      return isCreator(classId, userId) || isTeacher(classId, userId);
-    }
-
-    // Rules for classrooms collection
-    match /classrooms/{classroomId} {
-      allow read: if true; // Publicly readable, adjust if necessary
+    match /classrooms/{classId} {
+      allow read: if isParticipant(classId);
       allow create: if request.auth != null && request.resource.data.teacherId == request.auth.uid;
-      allow update, delete: if isCreator(classroomId, request.auth.uid);
+      allow update: if canManage(classId);
+      allow delete: if isCreator(classId);
 
-      // Rules for subcollections
-      match /announcements/{announcementId} {
-        allow read: if true;
-        allow create, update, delete: if canPost(classroomId, request.auth.uid);
+      match /announcements/{annId} {
+        allow read: if isParticipant(classId);
+        allow create: if canPost(classId) && request.resource.data.authorId == request.auth.uid;
+        allow delete: if canPost(classId) || (resource.data.creatorId == request.auth.uid);
       }
 
       match /materials/{materialId} {
-        allow read: if true;
-        allow create, update: if canPost(classroomId, request.auth.uid);
-        // Only the uploader or the classroom creator can delete
-        allow delete: if request.auth != null && (request.auth.uid == resource.data.uploaderId || isCreator(classroomId, request.auth.uid));
+        allow read: if isParticipant(classId);
+        allow create: if canPost(classId) && request.resource.data.uploaderId == request.auth.uid;
+        allow delete: if request.auth != null && (
+          request.auth.uid == resource.data.uploaderId || isCreator(classId)
+        );
       }
-      
-      match /assignments/{assignmentId} {
-        allow read: if true;
-        allow create, update, delete: if canPost(classroomId, request.auth.uid);
-        
-        match /submissions/{submissionId} {
-            allow create: if isStudent(classroomId, request.auth.uid) && request.auth.uid == request.resource.data.studentId;
-            allow read, update: if canPost(classroomId, request.auth.uid) || request.auth.uid == resource.data.studentId;
-            allow delete: if isCreator(classroomId, request.auth.uid) || request.auth.uid == resource.data.studentId;
+
+      match /assignments/{assId} {
+        allow read: if isParticipant(classId);
+        allow create: if canPost(classId) && request.resource.data.creatorId == request.auth.uid;
+        allow delete: if canPost(classId) || (resource.data.creatorId == request.auth.uid);
+
+        match /submissions/{studentId} {
+            allow read: if canManage(classId) || request.auth.uid == studentId;
+            allow create, update: if request.auth.uid == studentId;
+            allow delete: if canManage(classId);
         }
       }
-      
+
       match /exams/{examId} {
-        allow read: if true;
-        allow create, update, delete: if canPost(classroomId, request.auth.uid);
+        allow read: if isParticipant(classId);
+        allow create: if canPost(classId) && request.resource.data.creatorId == request.auth.uid;
+        allow delete: if canPost(classId) || (resource.data.creatorId == request.auth.uid);
       }
       
-      match /participants/{participantId} {
-        allow read: if true;
-        allow create, update, delete: if canPost(classroomId, request.auth.uid);
+      match /joinRequests/{userId} {
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow read, delete: if canManage(classId) || request.auth.uid == userId;
+      }
+
+      match /participants/{userId} {
+        allow read: if isParticipant(classId);
+        allow create, delete: if canManage(classId);
       }
       
-      match /joinRequests/{requestId} {
-        allow read, delete: if canPost(classroomId, request.auth.uid) || request.auth.uid == requestId;
-        allow create: if request.auth != null;
-      }
-      
-      match /teachers/{teacherId} {
-        allow read: if true;
-        allow create, update, delete: if isCreator(classroomId, request.auth.uid);
+      match /teachers/{userId} {
+        allow read: if isParticipant(classId);
+        allow create, delete: if canManage(classId);
       }
     }
-
-    // Rules for top-level user collections
+    
+    match /documents/{docId} {
+        allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
+        allow create: if request.auth.uid == request.resource.data.uploaderId;
+        allow delete: if request.auth.uid == resource.data.uploaderId;
+    }
+    
+    match /recordings/{recId} {
+        allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
+        allow create: if request.auth.uid == request.resource.data.uploaderId;
+        allow delete: if request.auth.uid == resource.data.uploaderId;
+    }
+    
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      match /enrolled/{classroomId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      match /pendingJoinRequests/{classroomId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-    
-    match /documents/{documentId} {
-        allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.uploaderId;
-        allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-    
-     match /recordings/{recordingId} {
-        allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.uploaderId;
-        allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+        allow read: if request.auth != null;
+        match /enrolled/{classroomId} {
+            allow read: if request.auth.uid == userId;
+            allow delete: if request.auth.uid == userId;
+            allow create: if get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
+        }
+        match /pendingJoinRequests/{classroomId} {
+            allow read, delete: if request.auth.uid == userId;
+            allow create: if request.auth.uid == userId;
+        }
     }
   }
 }
