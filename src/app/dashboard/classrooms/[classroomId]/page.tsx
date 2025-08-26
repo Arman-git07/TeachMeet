@@ -62,7 +62,9 @@ interface Classroom {
     createdBy: string;
 }
 
-interface UserProfile { id: string; name: string; photoURL?: string; role: 'student' | 'teacher'; uid: string; }
+type UserRole = 'creator' | 'teacher' | 'student' | 'none';
+
+interface UserProfile { id: string; name: string; photoURL?: string; role: UserRole; uid: string; }
 interface Announcement {
   id: string;
   type: 'text' | 'audio';
@@ -303,11 +305,15 @@ export default function ClassroomPage() {
     const submissionFormRef = useRef<HTMLFormElement>(null);
 
 
-    const canManageClassroom = useMemo(() => {
-        if (!user || !classroom) return false;
-        if (classroom.createdBy === user.uid) return true;
-        return participants.some(p => p.uid === user.uid && p.role === 'teacher');
-    }, [user, classroom, participants]);
+    const userRole: UserRole = useMemo(() => {
+        if (!user || !classroom) return 'none';
+        if (classroom.createdBy === user.uid) return 'creator';
+        if (subjectTeachers.some(t => t.teacherId === user.uid)) return 'teacher';
+        if (participants.some(p => p.uid === user.uid && p.role === 'student')) return 'student';
+        return 'none';
+    }, [user, classroom, participants, subjectTeachers]);
+
+    const canManageClassroom = userRole === 'creator' || userRole === 'teacher';
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
@@ -1155,10 +1161,12 @@ export default function ClassroomPage() {
                                                                 </DialogContent>
                                                             </Dialog>
                                                         ) : (
-                                                            <form ref={submissionFormRef} onSubmit={(e) => handleStudentSubmission(e, assignment.id, user!.uid, user!.displayName || 'Student')}>
-                                                                <Input type="file" required />
-                                                                <Button type="submit" size="sm" className="mt-2">Submit</Button>
-                                                            </form>
+                                                            userRole === 'student' && (
+                                                                <form ref={submissionFormRef} onSubmit={(e) => handleStudentSubmission(e, assignment.id, user!.uid, user!.displayName || 'Student')}>
+                                                                    <Input type="file" required />
+                                                                    <Button type="submit" size="sm" className="mt-2">Submit</Button>
+                                                                </form>
+                                                            )
                                                         )}
                                                     </div>
                                                 </Card>
@@ -1296,3 +1304,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    
