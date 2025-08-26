@@ -92,7 +92,9 @@ interface Exam {
   type: 'file' | 'text'; 
   content?: ExamQuestion[];
   fileUrl?: string; 
-  vanishAt?: any; 
+  vanishAt?: any;
+  creatorId: string;
+  storagePath?: string;
 }
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; }
 interface SubjectTeacher { teacherId: string; name: string; subject: string; availability: string; }
@@ -316,7 +318,9 @@ export default function ClassroomPage() {
     const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
     const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
     const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
+    const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
     const [assignmentToGrade, setAssignmentToGrade] = useState<Assignment | null>(null);
+    const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
     const [isGrading, setIsGrading] = useState(false);
     const submissionFormRef = useRef<HTMLFormElement>(null);
 
@@ -478,14 +482,7 @@ export default function ClassroomPage() {
 
     const onDeleteAnnouncement = async () => {
         if (!announcementToDelete) return;
-        const { id, authorId } = announcementToDelete;
-
-        // Check if user is creator of announcement OR is a classroom manager
-        if (user?.uid !== authorId && !canUserManage) {
-             toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete your own announcements.' });
-             setAnnouncementToDelete(null);
-             return;
-        }
+        const { id } = announcementToDelete;
 
         setAnnouncementToDelete(null);
 
@@ -592,20 +589,13 @@ export default function ClassroomPage() {
     };
 
     const handleDeleteMaterial = async () => {
-        if (!materialToDelete || !user) return;
-        if (user.uid !== materialToDelete.uploaderId) {
-            toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete materials you have uploaded.' });
-            return;
-        }
-        
+        if (!materialToDelete) return;
         const { id, name, type, storagePath } = materialToDelete;
-        setMaterialToDelete(null); // Close dialog immediately
+        setMaterialToDelete(null); 
 
         try {
-            // Delete Firestore document
             await deleteDoc(doc(db, 'classrooms', classroomId, 'materials', id));
             
-            // If it's a file, delete from Storage
             if (type === 'file' && storagePath) {
                 const fileRef = storageRef(storage, storagePath);
                 await deleteObject(fileRef);
@@ -631,17 +621,20 @@ export default function ClassroomPage() {
         }
 
         try {
+            const path = `classrooms/${classroomId}/exams/${Date.now()}-${examFile.name}`;
+            const fileRef = storageRef(storage, path);
             let examData: any = {
                 title: data.title,
                 date: data.date,
                 vanishAt: data.vanishAt || null,
+                creatorId: user.uid,
             };
 
             if (examFile) {
                 examData.type = 'file';
-                const fileRef = storageRef(storage, `classrooms/${classroomId}/exams/${Date.now()}-${examFile.name}`);
                 const snapshot = await uploadBytes(fileRef, examFile);
                 examData.fileUrl = await getDownloadURL(snapshot.ref);
+                examData.storagePath = path;
             } else {
                 examData.type = 'text';
                 examData.content = data.questions;
@@ -654,6 +647,26 @@ export default function ClassroomPage() {
         } catch (error) {
             console.error("Error creating exam:", error);
             toast({ variant: 'destructive', title: "Creation Failed" });
+        }
+    };
+    
+    const handleDeleteExam = async () => {
+        if (!examToDelete) return;
+        const { id, title, type, storagePath } = examToDelete;
+        setExamToDelete(null);
+
+        try {
+            await deleteDoc(doc(db, 'classrooms', classroomId, 'exams', id));
+
+            if (type === 'file' && storagePath) {
+                const fileRef = storageRef(storage, storagePath);
+                await deleteObject(fileRef);
+            }
+
+            toast({ title: 'Exam Deleted', description: `"${title}" has been removed.` });
+        } catch (error) {
+            console.error("Error deleting exam:", error);
+            toast({ variant: 'destructive', title: "Deletion Failed", description: "Could not delete the exam." });
         }
     };
 
@@ -687,6 +700,21 @@ export default function ClassroomPage() {
         } catch (error) {
             console.error("Error creating assignment:", error);
             toast.update(toastId, { variant: 'destructive', title: "Creation Failed", description: "Could not create the assignment." });
+        }
+    };
+
+    const handleDeleteAssignment = async () => {
+        if (!assignmentToDelete) return;
+        setAssignmentToDelete(null);
+        try {
+            // Note: This only deletes the assignment record.
+            // Associated submissions and the answer key in Storage would also need to be deleted
+            // for a complete cleanup, which is a more complex operation.
+            await deleteDoc(doc(db, 'classrooms', classroomId, 'assignments', assignmentToDelete.id));
+            toast({ title: "Assignment Deleted", description: `"${assignmentToDelete.title}" has been removed.` });
+        } catch (error) {
+            console.error("Error deleting assignment:", error);
+            toast({ variant: 'destructive', title: 'Deletion Failed', description: 'Could not delete the assignment.' });
         }
     };
 
@@ -1037,6 +1065,36 @@ export default function ClassroomPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            
+            <AlertDialog open={!!examToDelete} onOpenChange={(isOpen) => !isOpen && setExamToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete the exam "{examToDelete?.title}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteExam} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={!!assignmentToDelete} onOpenChange={(isOpen) => !isOpen && setAssignmentToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Assignment?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete the assignment "{assignmentToDelete?.title}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteAssignment} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
                 <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
@@ -1135,7 +1193,7 @@ export default function ClassroomPage() {
                                                       <span className="text-xs text-muted-foreground ml-6">Shared by {m.uploaderName} on {new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
                                                   </div>
                                                 </a>
-                                                 {user?.uid === m.uploaderId && (
+                                                 {(canUserManage || user?.uid === m.uploaderId) && (
                                                     <Button
                                                       variant="ghost"
                                                       size="icon"
@@ -1197,53 +1255,65 @@ export default function ClassroomPage() {
                                     {assignments.length > 0 ? (
                                         <div className="space-y-4">
                                             {assignments.map(assignment => (
-                                                <Card key={assignment.id} className="p-4">
+                                                <Card key={assignment.id} className="p-4 group">
                                                     <div className="flex justify-between items-start">
                                                         <div>
                                                             <h3 className="font-semibold">{assignment.title}</h3>
                                                             <p className="text-sm text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleString()}</p>
                                                         </div>
-                                                         {canUserManage ? (
-                                                            <Dialog>
-                                                                <DialogTrigger asChild><Button>View Submissions</Button></DialogTrigger>
-                                                                <DialogContent className="max-w-2xl">
-                                                                    <DialogHeader>
-                                                                        <DialogTitle>Submissions for: {assignment.title}</DialogTitle>
-                                                                    </DialogHeader>
-                                                                    <ScrollArea className="max-h-[60vh] -mx-6 px-6">
-                                                                        <div className="py-4 space-y-2">
-                                                                            {submissions.filter(s => s.assignmentId === assignment.id).length > 0 ? submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
-                                                                                <Card key={sub.id} className="p-3">
-                                                                                    <div className="flex justify-between items-center">
-                                                                                        <div>
-                                                                                            <p className="font-medium">{sub.studentName}</p>
-                                                                                            <a href={sub.submissionUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants({ variant: "link" }), "p-0 h-auto text-xs")}>View Submission</a>
+                                                        <div className="flex items-center gap-2">
+                                                            {canUserManage ? (
+                                                                <Dialog>
+                                                                    <DialogTrigger asChild><Button>View Submissions</Button></DialogTrigger>
+                                                                    <DialogContent className="max-w-2xl">
+                                                                        <DialogHeader>
+                                                                            <DialogTitle>Submissions for: {assignment.title}</DialogTitle>
+                                                                        </DialogHeader>
+                                                                        <ScrollArea className="max-h-[60vh] -mx-6 px-6">
+                                                                            <div className="py-4 space-y-2">
+                                                                                {submissions.filter(s => s.assignmentId === assignment.id).length > 0 ? submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
+                                                                                    <Card key={sub.id} className="p-3">
+                                                                                        <div className="flex justify-between items-center">
+                                                                                            <div>
+                                                                                                <p className="font-medium">{sub.studentName}</p>
+                                                                                                <a href={sub.submissionUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants({ variant: "link" }), "p-0 h-auto text-xs")}>View Submission</a>
+                                                                                            </div>
+                                                                                            <div className="text-right">
+                                                                                                {sub.grade !== undefined && sub.grade !== null ? (
+                                                                                                    <Badge className="text-lg">{sub.grade}/100</Badge>
+                                                                                                ) : (
+                                                                                                    <Button size="sm" onClick={() => handleGradeAssignment(assignment, sub)} disabled={sub.isGrading}>
+                                                                                                        {sub.isGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Grading...</> : <><BrainCircuit className="mr-2 h-4 w-4"/> Grade with AI</>}
+                                                                                                    </Button>
+                                                                                                )}
+                                                                                            </div>
                                                                                         </div>
-                                                                                        <div className="text-right">
-                                                                                            {sub.grade !== undefined && sub.grade !== null ? (
-                                                                                                <Badge className="text-lg">{sub.grade}/100</Badge>
-                                                                                            ) : (
-                                                                                                <Button size="sm" onClick={() => handleGradeAssignment(assignment, sub)} disabled={sub.isGrading}>
-                                                                                                    {sub.isGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Grading...</> : <><BrainCircuit className="mr-2 h-4 w-4"/> Grade with AI</>}
-                                                                                                </Button>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    {sub.feedback && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {sub.feedback}</p>}
-                                                                                </Card>
-                                                                            )) : <p className="text-center text-muted-foreground">No submissions yet.</p>}
-                                                                        </div>
-                                                                    </ScrollArea>
-                                                                </DialogContent>
-                                                            </Dialog>
-                                                        ) : (
-                                                            userRole === 'student' && user && (
-                                                                <form ref={submissionFormRef} onSubmit={(e) => handleStudentSubmission(e, assignment.id, user.uid, user.displayName || 'Student')}>
-                                                                    <Input type="file" required />
-                                                                    <Button type="submit" size="sm" className="mt-2">Submit</Button>
-                                                                </form>
-                                                            )
-                                                        )}
+                                                                                        {sub.feedback && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {sub.feedback}</p>}
+                                                                                    </Card>
+                                                                                )) : <p className="text-center text-muted-foreground">No submissions yet.</p>}
+                                                                            </div>
+                                                                        </ScrollArea>
+                                                                    </DialogContent>
+                                                                </Dialog>
+                                                            ) : (
+                                                                userRole === 'student' && user && (
+                                                                    <form ref={submissionFormRef} onSubmit={(e) => handleStudentSubmission(e, assignment.id, user.uid, user.displayName || 'Student')}>
+                                                                        <Input type="file" required />
+                                                                        <Button type="submit" size="sm" className="mt-2">Submit</Button>
+                                                                    </form>
+                                                                )
+                                                            )}
+                                                            {(canUserManage || user?.uid === assignment.creatorId) && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    onClick={() => setAssignmentToDelete(assignment)}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </Card>
                                             ))}
@@ -1347,13 +1417,25 @@ export default function ClassroomPage() {
                                 <CardContent>
                                     <div className="space-y-3">
                                         {exams.length > 0 ? exams.map(exam => (
-                                            <div key={exam.id} className="p-4 border rounded-lg">
+                                            <div key={exam.id} className="p-4 border rounded-lg group">
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <h4 className="font-semibold">{exam.title}</h4>
                                                         <p className="text-sm text-muted-foreground">Scheduled for: {new Date(exam.date.toDate()).toLocaleString()}</p>
                                                     </div>
-                                                    <Button size="sm" className="btn-gel">Take Exam</Button>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button size="sm" className="btn-gel">Take Exam</Button>
+                                                        {(canUserManage || user?.uid === exam.creatorId) && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={() => setExamToDelete(exam)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 {exam.vanishAt && <p className="text-xs text-destructive mt-1">Vanishes on: {new Date(exam.vanishAt.toDate()).toLocaleString()}</p>}
                                             </div>
