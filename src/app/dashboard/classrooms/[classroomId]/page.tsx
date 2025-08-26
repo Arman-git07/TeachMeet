@@ -35,6 +35,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import AnnouncementComposer from '@/components/classroom/AnnouncementComposer';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
+import { resolveRoleForUser, canPost, canManage, type Role } from "@/lib/roles";
+
 
 // --- Interfaces ---
 interface TeacherInfo {
@@ -62,9 +64,7 @@ interface Classroom {
     createdBy: string;
 }
 
-type UserRole = 'creator' | 'teacher' | 'student' | 'none';
-
-interface UserProfile { id: string; name: string; photoURL?: string; role: UserRole; uid: string; }
+interface UserProfile { id: string; name: string; photoURL?: string; role: Role; uid: string; }
 interface Announcement {
   id: string;
   type: 'text' | 'audio';
@@ -170,7 +170,7 @@ export const handleTeacherRequest = async (classroomId: string, teacherId: strin
             const batch = writeBatch(db);
             const teacherRef = doc(db, "classrooms", classroomId, "teachers", teacherId);
             batch.set(teacherRef, {
-                teacherId,
+                uid: teacherId, // ensure uid is set
                 name: teacherData.studentName,
                 subject: teacherData.applicationData.subject,
                 availability: teacherData.applicationData.availability,
@@ -184,6 +184,17 @@ export const handleTeacherRequest = async (classroomId: string, teacherId: strin
                 role: "teacher",
                 joinedAt: serverTimestamp(),
             });
+
+            // also update top-level teachers array
+            const classroomRef = doc(db, 'classrooms', classroomId);
+            batch.update(classroomRef, {
+                teachers: arrayUnion({
+                    uid: teacherId,
+                    name: teacherData.studentName,
+                    photoURL: teacherData.studentPhotoURL || "",
+                })
+            });
+
             batch.delete(requestRef); 
             await batch.commit();
         } else if (action === "deny") {
@@ -211,6 +222,7 @@ export const approveRequest = async (classroomId: string, request: any) => {
     
     const classroomRef = doc(db, "classrooms", classroomId);
      if (request.role === 'teacher') {
+         // Teacher logic is now separate
      } else {
         batch.update(classroomRef, { students: arrayUnion(request.studentId) });
     }
@@ -282,6 +294,8 @@ export default function ClassroomPage() {
 
     // State Declarations
     const [classroom, setClassroom] = useState<Classroom | null>(null);
+    const [userRole, setUserRole] = useState<Role>('none');
+    
     const [participants, setParticipants] = useState<UserProfile[]>([]);
     const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -304,16 +318,33 @@ export default function ClassroomPage() {
     const [isGrading, setIsGrading] = useState(false);
     const submissionFormRef = useRef<HTMLFormElement>(null);
 
+    // New role resolution effect
+    useEffect(() => {
+        if (authLoading) return;
+        let cancelled = false;
+        (async () => {
+          if (!classroomId) return;
+          const { role, classroom: fetchedClassroom } = await resolveRoleForUser(String(classroomId), user?.uid);
+          if (!cancelled) {
+            setUserRole(role);
+            setClassroom(fetchedClassroom);
+            if (fetchedClassroom) {
+              feeForm.reset({ amount: fetchedClassroom.feeAmount || 0, currency: fetchedClassroom.feeCurrency || 'INR' });
+              paymentDetailsForm.reset({ upiId: fetchedClassroom.paymentDetails?.upiId || '', qrCode: null });
+            } else {
+              toast({ variant: 'destructive', title: 'Classroom not found.' });
+              router.push('/dashboard/classrooms');
+            }
+            setIsLoading(false);
+          }
+        })();
+        return () => {
+          cancelled = true;
+        };
+    }, [classroomId, user?.uid, authLoading]);
 
-    const userRole: UserRole = useMemo(() => {
-        if (!user || !classroom) return 'none';
-        if (classroom.createdBy === user.uid) return 'creator';
-        if (subjectTeachers.some(t => t.teacherId === user.uid)) return 'teacher';
-        if (participants.some(p => p.uid === user.uid && p.role === 'student')) return 'student';
-        return 'none';
-    }, [user, classroom, participants, subjectTeachers]);
 
-    const canManageClassroom = userRole === 'creator' || userRole === 'teacher';
+    const canUserManage = canManage(userRole);
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
@@ -322,29 +353,6 @@ export default function ClassroomPage() {
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema), });
 
     const { fields, append, remove } = useFieldArray({ control: examForm.control, name: "questions" });
-
-    // Fetch primary classroom data
-    useEffect(() => {
-        if (!classroomId) return;
-        const classroomDocRef = doc(db, 'classrooms', classroomId);
-        const unsub = onSnapshot(classroomDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = { id: docSnap.id, ...docSnap.data() } as Classroom;
-                setClassroom(data);
-                feeForm.reset({ amount: data.feeAmount || 0, currency: data.feeCurrency || 'INR' });
-                paymentDetailsForm.reset({ upiId: data.paymentDetails?.upiId || '', qrCode: null });
-            } else {
-                toast({ variant: 'destructive', title: 'Classroom not found.' });
-                router.push('/dashboard/classrooms');
-            }
-            setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching classroom data:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch classroom data.' });
-            setIsLoading(false);
-        });
-        return () => unsub();
-    }, [classroomId, router, toast, feeForm, paymentDetailsForm]);
 
     // Fetch all subcollections data in a consolidated effect
     useEffect(() => {
@@ -394,7 +402,7 @@ export default function ClassroomPage() {
 
 
     const handleApproveRequest = async (request: JoinRequest) => {
-        if (!canManageClassroom) return;
+        if (!canUserManage) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -414,7 +422,7 @@ export default function ClassroomPage() {
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
-        if (!canManageClassroom) return;
+        if (!canUserManage) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -433,7 +441,7 @@ export default function ClassroomPage() {
     };
     
      const handleRemoveParticipant = async () => {
-        if (!canManageClassroom || !participantToRemove) return;
+        if (!canUserManage || !participantToRemove) return;
         
         const participant = participantToRemove;
         setParticipantToRemove(null);
@@ -447,7 +455,10 @@ export default function ClassroomPage() {
             const classroomRef = doc(db, "classrooms", classroomId);
             batch.update(classroomRef, { students: arrayRemove(participant.uid) });
         } else if (participant.role === 'teacher') {
+            const classroomRef = doc(db, "classrooms", classroomId);
             const teacherRef = doc(db, "classrooms", classroomId, "teachers", participant.uid);
+            // Also remove from top-level teachers array
+            batch.update(classroomRef, { teachers: arrayRemove({ uid: participant.uid, name: participant.name, photoURL: participant.photoURL || ""}) });
             batch.delete(teacherRef);
         }
         
@@ -468,7 +479,7 @@ export default function ClassroomPage() {
         const { id, authorId } = announcementToDelete;
 
         // Check if user is creator of announcement OR is a classroom manager
-        if (user?.uid !== authorId && !canManageClassroom) {
+        if (user?.uid !== authorId && !canUserManage) {
              toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete your own announcements.' });
              setAnnouncementToDelete(null);
              return;
@@ -571,7 +582,7 @@ export default function ClassroomPage() {
     };
 
     const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
-        if (!canManageClassroom || !user) return;
+        if (!canUserManage || !user) return;
         examForm.clearErrors();
 
         const examFile = data.examFile?.[0];
@@ -609,7 +620,7 @@ export default function ClassroomPage() {
     };
 
     const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
-        if (!canManageClassroom || !user) return;
+        if (!canUserManage || !user) return;
         const answerKeyFile = data.answerKey?.[0];
         if (!answerKeyFile) {
             toast({ variant: "destructive", title: "File Required", description: "Please upload an answer key file." });
@@ -680,7 +691,7 @@ export default function ClassroomPage() {
     };
 
     const handleGradeAssignment = async (assignment: Assignment, submission: Submission) => {
-        if (!canManageClassroom || !assignment.answerKeyUrl || !submission.submissionUrl) return;
+        if (!canUserManage || !assignment.answerKeyUrl || !submission.submissionUrl) return;
 
         const submissionRef = doc(db, "classrooms", classroomId, "assignments", assignment.id, "submissions", submission.studentId);
         
@@ -718,7 +729,7 @@ export default function ClassroomPage() {
     };
 
 
-    if (isLoading || authLoading) return <div className="container mx-auto p-4"><Skeleton className="h-64 w-full" /></div>;
+    if (isLoading) return <div className="container mx-auto p-4"><Skeleton className="h-64 w-full" /></div>;
     if (!classroom) return <div className="container mx-auto p-4">Classroom not found.</div>;
 
     const currencySymbols: { [key: string]: React.ReactNode } = {
@@ -738,7 +749,7 @@ export default function ClassroomPage() {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        {canManageClassroom && (
+                        {canUserManage && (
                         <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem></DialogTrigger>
                              <DialogContent className="sm:max-w-2xl">
@@ -795,7 +806,7 @@ export default function ClassroomPage() {
                                                 <Avatar><AvatarImage src={s.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm flex-grow">{s.name}</span>
                                                 <Badge variant={s.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{s.role}</Badge>
-                                                {canManageClassroom && s.uid !== user?.uid && (
+                                                {canUserManage && s.uid !== user?.uid && (
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 rounded-full" onClick={() => setParticipantToRemove(s)}>
                                                         <UserX className="h-4 w-4" />
                                                     </Button>
@@ -849,7 +860,7 @@ export default function ClassroomPage() {
                                     <CardHeader>
                                         <div className="flex justify-between items-center">
                                             <CardTitle>Fees & Payment</CardTitle>
-                                            {canManageClassroom && (
+                                            {canUserManage && (
                                                 <Dialog>
                                                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Settings className="h-4 w-4" /></Button></DialogTrigger>
                                                     <DialogContent>
@@ -993,7 +1004,7 @@ export default function ClassroomPage() {
                                     <CardDescription>Stay updated with the latest news from your teacher.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {user && <AnnouncementComposer classId={classroomId} canPost={canManageClassroom} />}
+                                    {user && <AnnouncementComposer classId={classroomId} canPost={canPost(userRole)} />}
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg group relative">
@@ -1003,7 +1014,7 @@ export default function ClassroomPage() {
                                                   Posted by {a.creatorName} on {new Date(a.createdAt?.toDate()).toLocaleString()}
                                                   {a.vanishAt && ` | Vanishes on ${new Date(a.vanishAt?.toDate()).toLocaleString()}`}
                                                 </p>
-                                                {(canManageClassroom || user?.uid === a.creatorId) && (
+                                                {(canUserManage || user?.uid === a.creatorId) && (
                                                     <Button 
                                                         variant="ghost" 
                                                         size="icon" 
@@ -1026,7 +1037,7 @@ export default function ClassroomPage() {
                             <Card>
                                 <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    {canManageClassroom && user && (
+                                    {canUserManage && user && (
                                         <Card className="p-4">
                                             <Tabs defaultValue="file">
                                                 <TabsList className="grid w-full grid-cols-2">
@@ -1083,7 +1094,7 @@ export default function ClassroomPage() {
                                         <CardTitle>Assignments</CardTitle>
                                         <CardDescription>Manage and grade assignments here.</CardDescription>
                                     </div>
-                                    {canManageClassroom && (
+                                    {canUserManage && (
                                         <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
                                             <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4"/>Create Assignment</Button></DialogTrigger>
                                             <DialogContent>
@@ -1127,7 +1138,7 @@ export default function ClassroomPage() {
                                                             <h3 className="font-semibold">{assignment.title}</h3>
                                                             <p className="text-sm text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleString()}</p>
                                                         </div>
-                                                         {canManageClassroom ? (
+                                                         {canUserManage ? (
                                                             <Dialog>
                                                                 <DialogTrigger asChild><Button>View Submissions</Button></DialogTrigger>
                                                                 <DialogContent className="max-w-2xl">
@@ -1161,8 +1172,8 @@ export default function ClassroomPage() {
                                                                 </DialogContent>
                                                             </Dialog>
                                                         ) : (
-                                                            userRole === 'student' && (
-                                                                <form ref={submissionFormRef} onSubmit={(e) => handleStudentSubmission(e, assignment.id, user!.uid, user!.displayName || 'Student')}>
+                                                            userRole === 'student' && user && (
+                                                                <form ref={submissionFormRef} onSubmit={(e) => handleStudentSubmission(e, assignment.id, user.uid, user.displayName || 'Student')}>
                                                                     <Input type="file" required />
                                                                     <Button type="submit" size="sm" className="mt-2">Submit</Button>
                                                                 </form>
@@ -1186,7 +1197,7 @@ export default function ClassroomPage() {
                                         <CardTitle>Exams & Tests</CardTitle>
                                         <CardDescription>Manage and view scheduled exams.</CardDescription>
                                     </div>
-                                    {canManageClassroom && (
+                                    {canUserManage && (
                                         <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
                                             <DialogTrigger asChild>
                                                 <Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Exam</Button>
@@ -1304,5 +1315,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    
