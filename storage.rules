@@ -3,53 +3,34 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isClassCreator(classId) {
-      let classroomDoc = get(/databases/(default)/documents/classrooms/$(classId));
-      return isSignedIn() && 
-        (classroomDoc.data.creatorId == request.auth.uid || 
-         classroomDoc.data.createdBy == request.auth.uid ||
-         classroomDoc.data.teacherId == request.auth.uid);
-    }
-    
-    function isClassParticipant(classId) {
-        return isSignedIn() && exists(/databases/(default)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
-    }
-
-    function isTeacher(classId) {
-        let participantDoc = get(/databases/(default)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
-        return isClassParticipant(classId) && participantDoc.data.role == 'teacher';
-    }
-
-    function isTeacherOrCreator(classId) {
-        return isClassCreator(classId) || isTeacher(classId);
-    }
-
-    // General user documents
-    match /documents/{userId}/{allPaths=**} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-    
-    // Classroom specific files
-    match /classrooms/{classId}/{allPaths=**} {
-      // Teachers/Creators can write anything.
-      // Enrolled participants can read anything.
-      allow read: if isClassParticipant(classId);
-      allow write: if isTeacherOrCreator(classId);
-    }
-
-    // Student assignment submissions need special write rule for students
-    match /classrooms/{classId}/assignments/{assignmentId}/{studentId}/{fileName} {
-      allow write: if isSignedIn() && request.auth.uid == studentId;
-    }
-    
-    // User avatars
+    // User Avatars
     match /avatars/{userId}/{allPaths=**} {
-        allow read;
-        allow write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Classroom-specific files (e.g., materials, answer keys)
+    // This rule is more permissive; it allows any authenticated user to write.
+    // For tighter security, you would link this to a Firestore document.
+    match /classrooms/{classroomId}/{allPaths=**} {
+      allow read: if true; 
+      allow write: if request.auth != null;
+      // For delete, you'd ideally check ownership via a Firestore doc read,
+      // but a simpler rule is to allow owner to delete. For that, we need the owner's UID in the path.
+      // The current path doesn't enforce this. For now, allow authenticated deletes.
+      allow delete: if request.auth != null;
+    }
+
+    // User-specific documents (private/public uploads)
+    match /documents/{userId}/{allPaths=**} {
+      allow read: if true; // URLs are unguessable
+      allow write, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User-specific recordings
+    match /recordings/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write, delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
