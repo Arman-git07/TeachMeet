@@ -590,21 +590,29 @@ export default function ClassroomPage() {
 
     const handleDeleteMaterial = async () => {
         if (!materialToDelete) return;
-        const { id, name, type, storagePath } = materialToDelete;
-        setMaterialToDelete(null); 
+        const { id, type, storagePath, name } = materialToDelete;
+        setMaterialToDelete(null);
 
         try {
-            await deleteDoc(doc(db, 'classrooms', classroomId, 'materials', id));
-            
+            // If the material is a file, delete it from Storage first
             if (type === 'file' && storagePath) {
                 const fileRef = storageRef(storage, storagePath);
-                await deleteObject(fileRef);
+                await deleteObject(fileRef).catch(error => {
+                    // If the file doesn't exist, we can still proceed to delete the doc
+                    if (error.code !== 'storage/object-not-found') {
+                        throw error;
+                    }
+                    console.warn(`Storage object not found at path: ${storagePath}, but proceeding to delete Firestore document.`);
+                });
             }
             
+            // Delete the document from Firestore
+            await deleteDoc(doc(db, 'classrooms', classroomId, 'materials', id));
+            
             toast({ title: 'Material Deleted', description: `"${name}" has been removed.` });
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error deleting material:", error);
-            toast({ variant: "destructive", title: "Deletion Failed", description: "Could not remove the material. Check console and Firestore rules." });
+            toast({ variant: "destructive", title: "Deletion Failed", description: error.message || "Could not remove the material. Check console and permissions." });
         }
     };
 
