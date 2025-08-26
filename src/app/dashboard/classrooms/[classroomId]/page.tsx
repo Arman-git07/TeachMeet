@@ -76,6 +76,8 @@ interface Announcement {
   creatorId: string;
   creatorName: string;
   authorId: string;
+  storagePath?: string; 
+  uploaderId?: string;
 }
 interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; uploaderId: string; storagePath: string; }
 
@@ -95,6 +97,7 @@ interface Exam {
   vanishAt?: any;
   creatorId: string;
   storagePath?: string;
+  uploaderId?: string;
 }
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; }
 interface SubjectTeacher { teacherId: string; name: string; subject: string; availability: string; }
@@ -105,6 +108,8 @@ interface Assignment {
   dueDate: any;
   answerKeyUrl: string;
   creatorId: string;
+  storagePath?: string;
+  uploaderId?: string;
 }
 
 interface Submission {
@@ -289,6 +294,35 @@ const VanishDateTimePicker = ({ date, setDate, disabled }: { date: string | null
     );
 };
 
+export async function handleDeleteItem(
+  classId: string,
+  collectionName: "materials" | "assignments" | "exams" | "announcements",
+  item: any
+) {
+  if (!confirm(`Delete this ${collectionName.slice(0, -1)}? This cannot be undone.`)) return;
+
+  try {
+    // Delete file from storage if path exists
+    if (item.storagePath) {
+      const fileRef = storageRef(storage, item.storagePath);
+      await deleteObject(fileRef).catch(err => {
+        // If file is not found, we can still proceed to delete the doc.
+        // Re-throw other errors.
+        if (err.code !== "storage/object-not-found") throw err;
+        console.warn("Storage object not found, but proceeding with Firestore deletion:", item.storagePath);
+      });
+    }
+
+    // Delete Firestore document
+    const itemRef = doc(db, "classrooms", classId, collectionName, item.id);
+    await deleteDoc(itemRef);
+
+  } catch (error) {
+    console.error(`❌ Failed to delete item from ${collectionName}:`, error);
+    // Consider showing a toast message to the user here
+  }
+}
+
 export default function ClassroomPage() {
     const { classroomId } = useParams() as { classroomId: string };
     const { user, loading: authLoading } = useAuth();
@@ -316,11 +350,9 @@ export default function ClassroomPage() {
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
     const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
     const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
-    const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
-    const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
-    const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
+    
     const [assignmentToGrade, setAssignmentToGrade] = useState<Assignment | null>(null);
-    const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
+    
     const [isGrading, setIsGrading] = useState(false);
     const submissionFormRef = useRef<HTMLFormElement>(null);
 
@@ -480,22 +512,6 @@ export default function ClassroomPage() {
         }
     };
 
-    const onDeleteAnnouncement = async () => {
-        if (!announcementToDelete) return;
-        const { id } = announcementToDelete;
-
-        setAnnouncementToDelete(null);
-
-        try {
-            await deleteDoc(doc(db, 'classrooms', classroomId, 'announcements', id));
-            toast({ title: 'Announcement Deleted' });
-        } catch (error) {
-            console.error("Error deleting announcement:", error);
-            toast({ variant: 'destructive', title: 'Deletion Failed', description: 'Could not delete the announcement.' });
-        }
-    };
-
-
     const onFeeSubmit = async (data: z.infer<typeof feeSchema>) => {
         try {
             await updateDoc(doc(db, 'classrooms', classroomId), {
@@ -588,35 +604,6 @@ export default function ClassroomPage() {
         }
     };
 
-    const handleDeleteMaterial = async () => {
-        if (!materialToDelete) return;
-        const { id, type, storagePath, name } = materialToDelete;
-        setMaterialToDelete(null);
-
-        try {
-            // If the material is a file, delete it from Storage first
-            if (type === 'file' && storagePath) {
-                const fileRef = storageRef(storage, storagePath);
-                await deleteObject(fileRef).catch(error => {
-                    // If the file doesn't exist, we can still proceed to delete the doc
-                    if (error.code !== 'storage/object-not-found') {
-                        throw error;
-                    }
-                    console.warn(`Storage object not found at path: ${storagePath}, but proceeding to delete Firestore document.`);
-                });
-            }
-            
-            // Delete the document from Firestore
-            await deleteDoc(doc(db, 'classrooms', classroomId, 'materials', id));
-            
-            toast({ title: 'Material Deleted', description: `"${name}" has been removed.` });
-        } catch (error: any) {
-            console.error("Error deleting material:", error);
-            toast({ variant: "destructive", title: "Deletion Failed", description: error.message || "Could not remove the material. Check console and permissions." });
-        }
-    };
-
-
     const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
         if (!canUserManage || !user) return;
         examForm.clearErrors();
@@ -628,19 +615,23 @@ export default function ClassroomPage() {
             return;
         }
 
+        const toastId = `exam-upload-${Date.now()}`;
+        toast({ id: toastId, title: 'Creating Exam...', description: 'Please wait...' });
+
         try {
-            const path = `classrooms/${classroomId}/exams/${Date.now()}-${examFile.name}`;
-            const fileRef = storageRef(storage, path);
             let examData: any = {
                 title: data.title,
                 date: data.date,
                 vanishAt: data.vanishAt || null,
                 creatorId: user.uid,
+                uploaderId: user.uid,
             };
 
             if (examFile) {
-                examData.type = 'file';
+                const path = `classrooms/${classroomId}/exams/${Date.now()}-${examFile.name}`;
+                const fileRef = storageRef(storage, path);
                 const snapshot = await uploadBytes(fileRef, examFile);
+                examData.type = 'file';
                 examData.fileUrl = await getDownloadURL(snapshot.ref);
                 examData.storagePath = path;
             } else {
@@ -649,35 +640,15 @@ export default function ClassroomPage() {
             }
 
             await addDoc(collection(db, 'classrooms', classroomId, 'exams'), examData);
-            toast({ title: "Exam Created!" });
+            toast.update(toastId, { title: "Exam Created!" });
             setIsExamDialogOpen(false);
             examForm.reset({ questions: [] });
         } catch (error) {
             console.error("Error creating exam:", error);
-            toast({ variant: 'destructive', title: "Creation Failed" });
+            toast.update(toastId, { variant: 'destructive', title: "Creation Failed" });
         }
     };
     
-    const handleDeleteExam = async () => {
-        if (!examToDelete) return;
-        const { id, title, type, storagePath } = examToDelete;
-        setExamToDelete(null);
-
-        try {
-            await deleteDoc(doc(db, 'classrooms', classroomId, 'exams', id));
-
-            if (type === 'file' && storagePath) {
-                const fileRef = storageRef(storage, storagePath);
-                await deleteObject(fileRef);
-            }
-
-            toast({ title: 'Exam Deleted', description: `"${title}" has been removed.` });
-        } catch (error) {
-            console.error("Error deleting exam:", error);
-            toast({ variant: 'destructive', title: "Deletion Failed", description: "Could not delete the exam." });
-        }
-    };
-
     const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
         if (!canUserManage || !user) return;
         const answerKeyFile = data.answerKey?.[0];
@@ -690,7 +661,8 @@ export default function ClassroomPage() {
         toast({ id: toastId, title: "Creating Assignment...", description: "Uploading answer key, please wait." });
 
         try {
-            const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${Date.now()}-${answerKeyFile.name}`);
+            const path = `classrooms/${classroomId}/assignments/${Date.now()}-${answerKeyFile.name}`;
+            const fileRef = storageRef(storage, path);
             const snapshot = await uploadBytes(fileRef, answerKeyFile);
             const answerKeyUrl = await getDownloadURL(snapshot.ref);
 
@@ -699,7 +671,9 @@ export default function ClassroomPage() {
                 dueDate: Timestamp.fromDate(data.dueDate),
                 answerKeyUrl,
                 creatorId: user.uid,
+                uploaderId: user.uid,
                 createdAt: serverTimestamp(),
+                storagePath: path,
             });
 
             toast.update(toastId, { title: "Assignment Created!", description: `"${data.title}" is now available for students.` });
@@ -708,21 +682,6 @@ export default function ClassroomPage() {
         } catch (error) {
             console.error("Error creating assignment:", error);
             toast.update(toastId, { variant: 'destructive', title: "Creation Failed", description: "Could not create the assignment." });
-        }
-    };
-
-    const handleDeleteAssignment = async () => {
-        if (!assignmentToDelete) return;
-        setAssignmentToDelete(null);
-        try {
-            // Note: This only deletes the assignment record.
-            // Associated submissions and the answer key in Storage would also need to be deleted
-            // for a complete cleanup, which is a more complex operation.
-            await deleteDoc(doc(db, 'classrooms', classroomId, 'assignments', assignmentToDelete.id));
-            toast({ title: "Assignment Deleted", description: `"${assignmentToDelete.title}" has been removed.` });
-        } catch (error) {
-            console.error("Error deleting assignment:", error);
-            toast({ variant: 'destructive', title: 'Deletion Failed', description: 'Could not delete the assignment.' });
         }
     };
 
@@ -1044,66 +1003,6 @@ export default function ClassroomPage() {
                 </AlertDialogContent>
             </AlertDialog>
             
-            <AlertDialog open={!!announcementToDelete} onOpenChange={(isOpen) => !isOpen && setAnnouncementToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Announcement?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete this announcement? This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={onDeleteAnnouncement} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            
-            <AlertDialog open={!!materialToDelete} onOpenChange={(isOpen) => !isOpen && setMaterialToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Material?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete the material "{materialToDelete?.name}"? This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteMaterial} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            
-            <AlertDialog open={!!examToDelete} onOpenChange={(isOpen) => !isOpen && setExamToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete the exam "{examToDelete?.title}"? This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteExam} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog open={!!assignmentToDelete} onOpenChange={(isOpen) => !isOpen && setAssignmentToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Assignment?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete the assignment "{assignmentToDelete?.title}"? This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteAssignment} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
                 <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
                     <div className="w-full whitespace-nowrap rounded-lg border-b flex-shrink-0">
@@ -1138,7 +1037,7 @@ export default function ClassroomPage() {
                                                         variant="ghost" 
                                                         size="icon" 
                                                         className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => setAnnouncementToDelete(a)}
+                                                        onClick={() => handleDeleteItem(classroomId, 'announcements', a)}
                                                     >
                                                         <Trash2 className="h-4 w-4"/>
                                                     </Button>
@@ -1206,7 +1105,7 @@ export default function ClassroomPage() {
                                                       variant="ghost"
                                                       size="icon"
                                                       className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                      onClick={() => setMaterialToDelete(m)}
+                                                      onClick={() => handleDeleteItem(classroomId, 'materials', m)}
                                                     >
                                                       <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -1316,7 +1215,7 @@ export default function ClassroomPage() {
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    onClick={() => setAssignmentToDelete(assignment)}
+                                                                    onClick={() => handleDeleteItem(classroomId, 'assignments', assignment)}
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -1438,7 +1337,7 @@ export default function ClassroomPage() {
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => setExamToDelete(exam)}
+                                                                onClick={() => handleDeleteItem(classroomId, 'exams', exam)}
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
