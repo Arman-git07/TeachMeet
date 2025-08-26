@@ -271,14 +271,13 @@ export default function ClassroomPage() {
     const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
 
 
-    const canPostAnnouncements = useMemo(() => {
+    const canManageClassroom = useMemo(() => {
         if (!user || !classroom) return false;
+        // The creator of the classroom can always manage it.
         if (classroom.createdBy === user.uid) return true;
-        // The `teachers` array on the classroom doc contains objects like {uid: '...', name: '...'}.
-        // We need to check if the user's uid is in that array.
-        return classroom.teachers?.some(teacher => teacher.uid === user.uid);
-    }, [user, classroom]);
-    
+        // Check if the user is in the `teachers` subcollection.
+        return participants.some(p => p.uid === user.uid && p.role === 'teacher');
+    }, [user, classroom, participants]);
 
     // Forms
     const feeForm = useForm<z.infer<typeof feeSchema>>({ resolver: zodResolver(feeSchema), defaultValues: { amount: 0, currency: 'INR' } });
@@ -337,7 +336,7 @@ export default function ClassroomPage() {
 
 
     const handleApproveRequest = async (request: JoinRequest) => {
-        if (!user || !classroom || classroom.createdBy !== user.uid) return;
+        if (!canManageClassroom) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -357,7 +356,7 @@ export default function ClassroomPage() {
     };
     
     const handleDenyRequest = async (request: JoinRequest) => {
-        if (!user || !classroom || classroom.createdBy !== user.uid) return;
+        if (!canManageClassroom) return;
         setIsProcessingRequest(request.id);
         
         let result;
@@ -376,7 +375,7 @@ export default function ClassroomPage() {
     };
     
      const handleRemoveParticipant = async () => {
-        if (!user || !classroom || classroom.createdBy !== user.uid || !participantToRemove) return;
+        if (!canManageClassroom || !participantToRemove) return;
         
         const participant = participantToRemove;
         setParticipantToRemove(null);
@@ -407,9 +406,11 @@ export default function ClassroomPage() {
     };
 
     const onDeleteAnnouncement = async () => {
-        if (!announcementToDelete || !canPostAnnouncements) return;
+        if (!announcementToDelete) return;
         const { id, authorId } = announcementToDelete;
-        if (user?.uid !== authorId) {
+
+        // Check if user is creator of announcement OR is a classroom manager
+        if (user?.uid !== authorId && !canManageClassroom) {
              toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete your own announcements.' });
              setAnnouncementToDelete(null);
              return;
@@ -512,7 +513,7 @@ export default function ClassroomPage() {
     };
 
     const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
-        if (!canPostAnnouncements || !user) return;
+        if (!canManageClassroom || !user) return;
         examForm.clearErrors();
 
         const examFile = data.examFile?.[0];
@@ -569,7 +570,7 @@ export default function ClassroomPage() {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        {canPostAnnouncements && (
+                        {canManageClassroom && (
                         <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem></DialogTrigger>
                              <DialogContent className="sm:max-w-2xl">
@@ -626,7 +627,7 @@ export default function ClassroomPage() {
                                                 <Avatar><AvatarImage src={s.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{s.name.charAt(0)}</AvatarFallback></Avatar>
                                                 <span className="text-sm flex-grow">{s.name}</span>
                                                 <Badge variant={s.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{s.role}</Badge>
-                                                {canPostAnnouncements && s.uid !== user?.uid && (
+                                                {canManageClassroom && s.uid !== user?.uid && (
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 rounded-full" onClick={() => setParticipantToRemove(s)}>
                                                         <UserX className="h-4 w-4" />
                                                     </Button>
@@ -680,7 +681,7 @@ export default function ClassroomPage() {
                                     <CardHeader>
                                         <div className="flex justify-between items-center">
                                             <CardTitle>Fees & Payment</CardTitle>
-                                            {canPostAnnouncements && (
+                                            {canManageClassroom && (
                                                 <Dialog>
                                                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Settings className="h-4 w-4" /></Button></DialogTrigger>
                                                     <DialogContent>
@@ -823,7 +824,7 @@ export default function ClassroomPage() {
                                     <CardDescription>Stay updated with the latest news from your teacher.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {user && <AnnouncementComposer classId={classroomId} canPost={canPostAnnouncements} />}
+                                    {user && <AnnouncementComposer classId={classroomId} canPost={canManageClassroom} />}
                                     <div className="space-y-3">
                                         {announcements.length > 0 ? announcements.map(a => (
                                             <div key={a.id} className="p-3 bg-muted/50 rounded-lg group relative">
@@ -833,7 +834,7 @@ export default function ClassroomPage() {
                                                   Posted by {a.creatorName} on {new Date(a.createdAt?.toDate()).toLocaleString()}
                                                   {a.vanishAt && ` | Vanishes on ${new Date(a.vanishAt?.toDate()).toLocaleString()}`}
                                                 </p>
-                                                {(canPostAnnouncements || user?.uid === a.creatorId) && (
+                                                {(canManageClassroom || user?.uid === a.creatorId) && (
                                                     <Button 
                                                         variant="ghost" 
                                                         size="icon" 
@@ -856,7 +857,7 @@ export default function ClassroomPage() {
                             <Card>
                                 <CardHeader><CardTitle>Class Materials</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    {canPostAnnouncements && user && (
+                                    {canManageClassroom && user && (
                                         <Card className="p-4">
                                             <Tabs defaultValue="file">
                                                 <TabsList className="grid w-full grid-cols-2">
@@ -913,7 +914,7 @@ export default function ClassroomPage() {
                                         <CardTitle>Exams & Tests</CardTitle>
                                         <CardDescription>Manage and view scheduled exams.</CardDescription>
                                     </div>
-                                    {canPostAnnouncements && (
+                                    {canManageClassroom && (
                                         <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
                                             <DialogTrigger asChild>
                                                 <Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Exam</Button>
