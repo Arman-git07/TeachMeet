@@ -34,6 +34,7 @@ import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import AnnouncementComposer from '@/components/classroom/AnnouncementComposer';
+import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 
 // --- Interfaces ---
 interface TeacherInfo {
@@ -92,6 +93,24 @@ interface Exam {
 }
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; }
 interface SubjectTeacher { teacherId: string; name: string; subject: string; availability: string; }
+
+interface Assignment {
+  id: string;
+  title: string;
+  dueDate: any;
+  answerKeyUrl: string;
+}
+
+interface Submission {
+    id: string;
+    studentId: string;
+    studentName: string;
+    submittedAt: any;
+    submissionUrl: string;
+    grade?: number;
+    feedback?: string;
+    isGrading?: boolean;
+}
 
 // --- Zod Schemas ---
 const feeSchema = z.object({
@@ -260,6 +279,7 @@ export default function ClassroomPage() {
     const [materials, setMaterials] = useState<Material[]>([]);
     const [exams, setExams] = useState<Exam[]>([]);
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+    const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExamDialogOpen, setIsExamDialogOpen] = useState(false);
     const [materialFile, setMaterialFile] = useState<File | null>(null);
@@ -319,6 +339,7 @@ export default function ClassroomPage() {
             { path: 'exams', setter: setExams, orderByField: 'date' },
             { path: 'participants', setter: setParticipants, orderByField: 'joinedAt' },
             { path: 'teachers', setter: setSubjectTeachers, orderByField: 'addedAt' },
+            { path: 'assignments', setter: setAssignments, orderByField: 'dueDate' },
         ];
 
         const unsubscribers = subcollectionMappings.map(({ path, setter, orderByField }) => {
@@ -812,6 +833,7 @@ export default function ClassroomPage() {
                         <TabsList className="inline-flex h-auto">
                             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
                             <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
+                            <TabsTrigger value="assignments"><Book className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
                             <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
                         </TabsList>
                     </div>
@@ -903,6 +925,21 @@ export default function ClassroomPage() {
                                             </a>
                                         )) : <p className="text-muted-foreground text-center py-6">No materials shared yet. Be the first!</p>}
                                     </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="assignments">
+                             <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <div>
+                                        <CardTitle>Assignments</CardTitle>
+                                        <CardDescription>Manage and grade assignments here.</CardDescription>
+                                    </div>
+                                    {/* Placeholder for 'Create Assignment' button */}
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-muted-foreground text-center py-4">No assignments posted yet.</p>
                                 </CardContent>
                             </Card>
                         </TabsContent>
