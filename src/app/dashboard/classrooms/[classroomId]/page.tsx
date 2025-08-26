@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -6,7 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, getDocs, writeBatch, deleteDoc, arrayUnion, arrayRemove, orderBy, getDoc, where, setDoc, Timestamp } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,7 +77,7 @@ interface Announcement {
   creatorName: string;
   authorId: string;
 }
-interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; }
+interface Material { id: string; name: string; url: string; uploadedAt: any; uploaderName: string; type: 'file' | 'link'; uploaderId: string; storagePath: string; }
 
 // --- Exam Interfaces & Schemas ---
 interface QAQuestion { type: 'qa'; question: string; answer: string; }
@@ -314,6 +315,7 @@ export default function ClassroomPage() {
     const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
     const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
     const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
+    const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
     const [assignmentToGrade, setAssignmentToGrade] = useState<Assignment | null>(null);
     const [isGrading, setIsGrading] = useState(false);
     const submissionFormRef = useRef<HTMLFormElement>(null);
@@ -531,26 +533,32 @@ export default function ClassroomPage() {
             toast({ variant: 'destructive', title: 'Update Failed' });
         }
     };
-
+    
     const handleMaterialUpload = async () => {
         if (!materialFile || !user) return;
         setIsUploadingMaterial(true);
+        const toastId = `upload-${Date.now()}`;
+        toast({ id: toastId, title: "Uploading...", description: "Please wait while your file is uploaded." });
+
         try {
-            const fileRef = storageRef(storage, `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`);
+            const path = `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`;
+            const fileRef = storageRef(storage, path);
             const snapshot = await uploadBytes(fileRef, materialFile);
             const url = await getDownloadURL(snapshot.ref);
-            await addDoc(collection(db, 'classrooms', classroomId, 'materials'), { 
-                name: materialFile.name, 
-                url, 
-                uploadedAt: serverTimestamp(), 
+            await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
+                name: materialFile.name,
+                url,
+                uploadedAt: serverTimestamp(),
+                uploaderId: user.uid,
                 uploaderName: user.displayName || 'Anonymous',
                 type: 'file',
+                storagePath: path,
             });
-            toast({ title: "Material Uploaded!" });
+            toast.update(toastId, { title: "Material Uploaded!" });
             setMaterialFile(null);
-        } catch(error) {
+        } catch (error) {
             console.error("Error uploading material:", error);
-            toast({ variant: "destructive", title: "Upload Failed" });
+            toast.update(toastId, { variant: "destructive", title: "Upload Failed" });
         } finally {
             setIsUploadingMaterial(false);
         }
@@ -567,8 +575,10 @@ export default function ClassroomPage() {
                 name: materialName.trim(), 
                 url: materialLink.trim(), 
                 uploadedAt: serverTimestamp(),
+                uploaderId: user.uid,
                 uploaderName: user.displayName || 'Anonymous',
                 type: 'link',
+                storagePath: '',
             });
             toast({ title: "Link Shared!" });
             setMaterialLink('');
@@ -580,6 +590,34 @@ export default function ClassroomPage() {
             setIsUploadingMaterial(false);
         }
     };
+
+    const handleDeleteMaterial = async () => {
+        if (!materialToDelete || !user) return;
+        if (user.uid !== materialToDelete.uploaderId) {
+            toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete materials you have uploaded.' });
+            return;
+        }
+        
+        const { id, name, type, storagePath } = materialToDelete;
+        setMaterialToDelete(null); // Close dialog immediately
+
+        try {
+            // Delete Firestore document
+            await deleteDoc(doc(db, 'classrooms', classroomId, 'materials', id));
+            
+            // If it's a file, delete from Storage
+            if (type === 'file' && storagePath) {
+                const fileRef = storageRef(storage, storagePath);
+                await deleteObject(fileRef);
+            }
+            
+            toast({ title: 'Material Deleted', description: `"${name}" has been removed.` });
+        } catch (error) {
+            console.error("Error deleting material:", error);
+            toast({ variant: "destructive", title: "Deletion Failed", description: "Could not remove the material. Check console and Firestore rules." });
+        }
+    };
+
 
     const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
         if (!canUserManage || !user) return;
@@ -984,6 +1022,21 @@ export default function ClassroomPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            
+            <AlertDialog open={!!materialToDelete} onOpenChange={(isOpen) => !isOpen && setMaterialToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Material?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete the material "{materialToDelete?.name}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteMaterial} className={cn(buttonVariants({ variant: 'destructive' }))}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
                 <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
@@ -1075,12 +1128,24 @@ export default function ClassroomPage() {
                                     )}
                                     <div className="space-y-2">
                                         {materials.length > 0 ? materials.map(m => (
-                                            <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted">
-                                                <div>
-                                                    <span className="font-medium flex items-center gap-2">{m.type === 'link' ? <LinkIcon className="h-4 w-4"/> : <FileText className="h-4 w-4"/>}{m.name}</span>
-                                                    <span className="text-xs text-muted-foreground ml-6">Shared by {m.uploaderName} on {new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
-                                                </div>
-                                            </a>
+                                            <div key={m.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group">
+                                                <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 min-w-0 flex-grow">
+                                                  <div>
+                                                      <span className="font-medium flex items-center gap-2">{m.type === 'link' ? <LinkIcon className="h-4 w-4"/> : <FileText className="h-4 w-4"/>}{m.name}</span>
+                                                      <span className="text-xs text-muted-foreground ml-6">Shared by {m.uploaderName} on {new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
+                                                  </div>
+                                                </a>
+                                                 {user?.uid === m.uploaderId && (
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                      onClick={() => setMaterialToDelete(m)}
+                                                    >
+                                                      <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         )) : <p className="text-muted-foreground text-center py-6">No materials shared yet. Be the first!</p>}
                                     </div>
                                 </CardContent>
