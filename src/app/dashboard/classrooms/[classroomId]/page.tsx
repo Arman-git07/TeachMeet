@@ -639,7 +639,6 @@ export default function ClassroomPage() {
                             </DialogContent>
                         </Dialog>
                         )}
-                        {canPostAnnouncements && (
                         <Dialog>
                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem></DialogTrigger>
                             <DialogContent className="sm:max-w-lg">
@@ -669,7 +668,6 @@ export default function ClassroomPage() {
                                 </ScrollArea>
                             </DialogContent>
                         </Dialog>
-                        )}
                         <DropdownMenuSeparator />
                         <Dialog>
                             <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Fees & Payment</DropdownMenuItem></DialogTrigger>
@@ -935,14 +933,14 @@ export default function ClassroomPage() {
                                                         <div className="space-y-2">
                                                             <Label>Exam Date & Time</Label>
                                                             <Controller control={examForm.control} name="date" render={({ field }) => (
-                                                               <Input type="datetime-local" onChange={field.onChange} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
+                                                               <Input type="datetime-local" onChange={(e) => field.onChange(new Date(e.target.value))} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
                                                             )} />
                                                             {examForm.formState.errors.date && <p className="text-destructive text-sm">{examForm.formState.errors.date.message}</p>}
                                                         </div>
                                                         <div className="space-y-2">
                                                             <Label>Vanish Time (Optional)</Label>
                                                              <Controller control={examForm.control} name="vanishAt" render={({ field }) => (
-                                                               <Input type="datetime-local" onChange={field.onChange} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
+                                                               <Input type="datetime-local" onChange={(e) => field.onChange(new Date(e.target.value))} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
                                                              )} />
                                                              {examForm.formState.errors.vanishAt && <p className="text-destructive text-sm">{examForm.formState.errors.vanishAt.message}</p>}
                                                         </div>
