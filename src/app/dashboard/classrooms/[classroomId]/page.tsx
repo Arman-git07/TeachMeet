@@ -299,7 +299,12 @@ export async function handleDeleteItem(
   collectionName: "materials" | "assignments" | "exams" | "announcements",
   item: any
 ) {
-  if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}? This action cannot be undone.`)) return;
+  if (!item?.id) {
+    alert("⚠️ Cannot delete: item has no ID");
+    return;
+  }
+  const confirmDelete = window.confirm("Are you sure you want to delete this item?");
+  if (!confirmDelete) return;
 
   try {
     // Delete file from storage if path exists
@@ -316,10 +321,11 @@ export async function handleDeleteItem(
     // Delete Firestore document
     const itemRef = doc(db, "classrooms", classId, collectionName, item.id);
     await deleteDoc(itemRef);
-
-  } catch (error) {
+    
+    alert("✅ Deleted successfully");
+  } catch (error: any) {
     console.error(`❌ Failed to delete item from ${collectionName}:`, error);
-    // Consider showing a toast message to the user here
+    alert("Delete failed: " + (error as any).message);
   }
 }
 
@@ -1369,3 +1375,5 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
+    

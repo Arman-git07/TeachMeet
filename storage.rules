@@ -1,12 +1,19 @@
-
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow read/write for all authenticated users for simplicity during development.
-    // In a production app, you would want to tighten these rules.
+    // Allow read access to all files
     match /{allPaths=**} {
       allow read: if true;
-      allow write, delete: if request.auth != null;
+      
+      // Allow write access only for authenticated users
+      allow write: if request.auth != null;
+      
+      // Allow delete access only for authenticated users
+      // This is a broad rule for simplicity. In production, you'd want this
+      // to be more specific, e.g., only the uploader or a specific role can delete.
+      allow delete: if request.auth != null;
     }
   }
 }
+
+    
