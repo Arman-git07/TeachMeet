@@ -299,7 +299,7 @@ export async function handleDeleteItem(
   collectionName: "materials" | "assignments" | "exams" | "announcements",
   item: any
 ) {
-  if (!confirm(`Delete this ${collectionName.slice(0, -1)}? This cannot be undone.`)) return;
+  if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}? This action cannot be undone.`)) return;
 
   try {
     // Delete file from storage if path exists
