@@ -29,19 +29,19 @@ async function handleJoinAsHost(meetingId: string) {
   }
 
   try {
-    // Create meeting doc
-    await setDoc(doc(db, "meetings", meetingId), {
+    // Firestore write (don’t wait for redirect)
+    setDoc(doc(db, "meetings", meetingId), {
       hostId: user.uid,
       hostName: user.displayName || "Host",
       createdAt: Date.now(),
       isActive: true,
     }, { merge: true });
 
-    // Redirect to meeting page
-    window.location.href = `/dashboard/meeting/${meetingId}`;
+    // Redirect immediately
+    window.location.assign(`/dashboard/meeting/${meetingId}`);
   } catch (err) {
     console.error("Failed to start meeting:", err);
-    alert("Failed to start meeting. Please try again.");
+    alert("Failed to start meeting.");
   }
 }
 
