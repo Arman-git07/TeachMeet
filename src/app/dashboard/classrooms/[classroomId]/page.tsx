@@ -279,15 +279,37 @@ export const denyRequest = async (classroomId: string, studentId: string) => {
   }
 };
 
-async function handleDelete(classroomId: string, section: string, id: string) {
+async function handleDeleteItem(
+  classId: string,
+  collectionName: "materials" | "assignments" | "exams" | "announcements",
+  item: any
+) {
+  if (!item.id) {
+    alert("Item is missing an ID. Cannot delete.");
+    return;
+  }
   if (!window.confirm("Are you sure you want to delete this item?")) return;
+
   try {
-    console.log("🟢 Deleting:", classroomId, section, id);
-    await deleteDoc(doc(db, "classrooms", classroomId, section, id));
-    alert("✅ Deleted successfully!");
+    console.log("🟢 Deleting:", { classId, collectionName, id: item.id });
+    // Delete file from storage if path exists
+    if (item.storagePath) {
+      const fileRef = storageRef(storage, item.storagePath);
+      await deleteObject(fileRef).catch(err => {
+        // if file not found, we can continue; but other errors rethrow
+        if (err.code !== 'storage/object-not-found') throw err;
+      });
+    }
+
+    // Delete Firestore document
+    const itemRef = doc(db, "classrooms", classId, collectionName, item.id);
+    await deleteDoc(itemRef);
+
+    console.log("✅ Deleted successfully");
+    alert("Item deleted successfully!");
   } catch (err: any) {
     console.error("❌ Error deleting:", err.message);
-    alert("Delete failed: " + err.message);
+    alert("Failed to delete: " + err.message);
   }
 }
 
@@ -1019,7 +1041,7 @@ export default function ClassroomPage() {
                                                         variant="ghost" 
                                                         size="icon" 
                                                         className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => handleDelete(classroomId, 'announcements', a.id)}
+                                                        onClick={() => handleDeleteItem(classroomId, 'announcements', a)}
                                                     >
                                                         <Trash2 className="h-4 w-4"/>
                                                     </Button>
@@ -1087,7 +1109,7 @@ export default function ClassroomPage() {
                                                       variant="ghost"
                                                       size="icon"
                                                       className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                      onClick={() => handleDelete(classroomId, 'materials', m.id)}
+                                                      onClick={() => handleDeleteItem(classroomId, 'materials', m)}
                                                     >
                                                       <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -1197,7 +1219,7 @@ export default function ClassroomPage() {
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    onClick={() => handleDelete(classroomId, 'assignments', assignment.id)}
+                                                                    onClick={() => handleDeleteItem(classroomId, 'assignments', assignment)}
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -1319,7 +1341,7 @@ export default function ClassroomPage() {
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => handleDelete(classroomId, 'exams', exam.id)}
+                                                                onClick={() => handleDeleteItem(classroomId, 'exams', exam)}
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
