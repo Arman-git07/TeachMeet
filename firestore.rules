@@ -1,55 +1,79 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Classrooms collection
+    
     match /classrooms/{classId} {
       allow read: if true;
 
-      // Only the classroom creator can update or delete the classroom
+      // Classroom creator can always manage their class
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null &&
-        request.auth.uid == resource.data.createdBy;
+      allow update, delete: if request.auth != null
+        && request.auth.uid == resource.data.createdBy;
 
-      // Shared collections
-      match /{collectionName}/{docId} where 
-        collectionName in ['announcements', 'materials', 'assignments', 'exams'] {
+      // Announcements subcollection
+      match /announcements/{announcementId} {
         allow read: if true;
+
+        // Create: any signed-in user can post (you can restrict later if needed)
         allow create: if request.auth != null;
-        
-        // ✅ Delete allowed if:
-        // 1. The item was uploaded by the user (uploaderId)
-        // 2. The classroom was created by the user (createdBy in parent doc)
+
+        // Delete: allowed if user is either
+        // 1. the one who uploaded/posted this material (uploaderId)
+        // 2. the creator of the classroom (createdBy field in parent doc)
         allow delete: if request.auth != null && (
           request.auth.uid == resource.data.uploaderId ||
           request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
         );
       }
-      
-      // Submissions subcollection
-      match /assignments/{assignmentId}/submissions/{submissionId} {
-         allow read, write: if request.auth != null;
+
+      // Materials subcollection
+      match /materials/{materialId} {
+        allow read: if true;
+
+        // Create: any signed-in user can post (you can restrict later if needed)
+        allow create: if request.auth != null;
+
+        // Delete: allowed if user is either
+        // 1. the one who uploaded/posted this material (uploaderId)
+        // 2. the creator of the classroom (createdBy field in parent doc)
+        allow delete: if request.auth != null && (
+          request.auth.uid == resource.data.uploaderId ||
+          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
+        );
       }
-    }
 
-    // Other top-level collections
-    match /users/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
+      // Assignments subcollection
+      match /assignments/{assignmentId} {
+        allow read: if true;
 
-    match /documents/{docId} {
-       allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-       allow write, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-    
-    match /recordings/{recId} {
-       allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-       allow write, delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
+        // Create: any signed-in user can post (you can restrict later if needed)
+        allow create: if request.auth != null;
 
-    match /meetings/{meetingId}/{allPaths=**} {
-        allow read, write: if request.auth != null;
+        // Delete: allowed if user is either
+        // 1. the one who uploaded/posted this material (uploaderId)
+        // 2. the creator of the classroom (createdBy field in parent doc)
+        allow delete: if request.auth != null && (
+          request.auth.uid == resource.data.uploaderId ||
+          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
+        );
+      }
+
+       // Exams subcollection
+      match /exams/{examId} {
+        allow read: if true;
+
+        // Create: any signed-in user can post (you can restrict later if needed)
+        allow create: if request.auth != null;
+
+        // Delete: allowed if user is either
+        // 1. the one who uploaded/posted this material (uploaderId)
+        // 2. the creator of the classroom (createdBy field in parent doc)
+        allow delete: if request.auth != null && (
+          request.auth.uid == resource.data.uploaderId ||
+          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
+        );
+      }
     }
   }
 }
-    

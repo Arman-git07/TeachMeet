@@ -310,17 +310,6 @@ export async function handleDeleteItem(
     const ref = doc(db, "classrooms", classId, collectionName, item.id);
 
     if (window.confirm("Are you sure you want to delete this item?")) {
-      // Delete file from storage if path exists
-      if (item.storagePath) {
-        const fileRef = storageRef(storage, item.storagePath);
-        await deleteObject(fileRef).catch(err => {
-          // If file is not found, we can still proceed to delete the doc.
-          // Re-throw other errors.
-          if (err.code !== "storage/object-not-found") throw err;
-          console.warn("Storage object not found, but proceeding with Firestore deletion:", item.storagePath);
-        });
-      }
-      
       await deleteDoc(ref);
       console.log("✅ Deleted successfully");
     }
@@ -1044,7 +1033,7 @@ export default function ClassroomPage() {
                                                         variant="ghost" 
                                                         size="icon" 
                                                         className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => console.log("🟢 Announcement delete clicked", a)}
+                                                        onClick={() => handleDeleteItem(classroomId, 'announcements', a)}
                                                     >
                                                         <Trash2 className="h-4 w-4"/>
                                                     </Button>
@@ -1112,7 +1101,7 @@ export default function ClassroomPage() {
                                                       variant="ghost"
                                                       size="icon"
                                                       className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                      onClick={() => console.log("🟢 Material delete clicked", m)}
+                                                      onClick={() => handleDeleteItem(classroomId, 'materials', m)}
                                                     >
                                                       <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -1222,7 +1211,7 @@ export default function ClassroomPage() {
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    onClick={() => console.log("🟢 Assignment delete clicked", assignment)}
+                                                                    onClick={() => handleDeleteItem(classroomId, 'assignments', assignment)}
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -1344,7 +1333,7 @@ export default function ClassroomPage() {
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => console.log("🟢 Exam delete clicked", exam)}
+                                                                onClick={() => handleDeleteItem(classroomId, 'exams', exam)}
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
