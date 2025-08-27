@@ -37,6 +37,7 @@ import { Calendar } from '@/components/ui/calendar';
 import AnnouncementComposer from '@/components/classroom/AnnouncementComposer';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 import { resolveRoleForUser, canPost, canManage, type Role } from "@/lib/roles";
+import MaterialItemDebug from '@/components/classroom/MaterialItemDebug';
 
 
 // --- Interfaces ---
@@ -284,32 +285,28 @@ async function handleDeleteItem(
   collectionName: "materials" | "assignments" | "exams" | "announcements",
   item: any
 ) {
-  if (!item.id) {
-    alert("Item is missing an ID. Cannot delete.");
-    return;
-  }
-  if (!window.confirm("Are you sure you want to delete this item?")) return;
-
   try {
-    console.log("🟢 Deleting:", { classId, collectionName, id: item.id });
-    // Delete file from storage if path exists
-    if (item.storagePath) {
-      const fileRef = storageRef(storage, item.storagePath);
-      await deleteObject(fileRef).catch(err => {
-        // if file not found, we can continue; but other errors rethrow
-        if (err.code !== 'storage/object-not-found') throw err;
-      });
+    console.log("🟢 Deleting:", { classId, subCollection: collectionName, item });
+    if (!item.id) {
+      alert("Item is missing an ID. Cannot delete.");
+      return;
     }
-
-    // Delete Firestore document
-    const itemRef = doc(db, "classrooms", classId, collectionName, item.id);
-    await deleteDoc(itemRef);
-
-    console.log("✅ Deleted successfully");
-    alert("Item deleted successfully!");
-  } catch (err: any) {
-    console.error("❌ Error deleting:", err.message);
-    alert("Failed to delete: " + err.message);
+    const ref = doc(db, "classrooms", classId, collectionName, item.id);
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      // Delete file from storage if path exists
+      if (item.storagePath) {
+        const fileRef = storageRef(storage, item.storagePath);
+        await deleteObject(fileRef).catch(err => {
+          // if file not found, we can continue; but other errors rethrow
+          if (err.code !== 'storage/object-not-found') throw err;
+        });
+      }
+      await deleteDoc(ref);
+      console.log("✅ Deleted successfully");
+    }
+  } catch (error: any) {
+    console.error("❌ Error deleting:", error);
+    alert(`Failed to delete: ${error.message}`);
   }
 }
 
@@ -1097,24 +1094,13 @@ export default function ClassroomPage() {
                                     )}
                                     <div className="space-y-2">
                                         {materials.length > 0 ? materials.map(m => (
-                                            <div key={m.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group">
-                                                <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 min-w-0 flex-grow">
-                                                  <div>
-                                                      <span className="font-medium flex items-center gap-2">{m.type === 'link' ? <LinkIcon className="h-4 w-4"/> : <FileText className="h-4 w-4"/>}{m.name}</span>
-                                                      <span className="text-xs text-muted-foreground ml-6">Shared by {m.uploaderName} on {new Date(m.uploadedAt?.toDate()).toLocaleDateString()}</span>
-                                                  </div>
-                                                </a>
-                                                 {(canUserManage || user?.uid === m.uploaderId) && (
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="icon"
-                                                      className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                      onClick={() => handleDeleteItem(classroomId, 'materials', m)}
-                                                    >
-                                                      <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </div>
+                                             <MaterialItemDebug
+                                                key={m.id}
+                                                classroomId={classroomId}
+                                                m={m}
+                                                canUserManage={canUserManage}
+                                                user={user}
+                                            />
                                         )) : <p className="text-muted-foreground text-center py-6">No materials shared yet. Be the first!</p>}
                                     </div>
                                 </CardContent>
@@ -1373,3 +1359,4 @@ export default function ClassroomPage() {
         </div>
     );
 }
+
