@@ -96,9 +96,8 @@ interface Exam {
   content?: ExamQuestion[];
   fileUrl?: string; 
   vanishAt?: any;
-  creatorId: string;
+  authorId: string;
   storagePath?: string;
-  uploaderId?: string;
 }
 interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; }
 interface SubjectTeacher { teacherId: string; name: string; subject: string; availability: string; }
@@ -639,8 +638,7 @@ export default function ClassroomPage() {
                 title: data.title,
                 date: data.date,
                 vanishAt: data.vanishAt || null,
-                creatorId: user.uid,
-                uploaderId: user.uid,
+                authorId: user.uid, // Use authorId for consistency
             };
 
             if (examFile) {
@@ -1342,7 +1340,7 @@ export default function ClassroomPage() {
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <Button size="sm" className="btn-gel">Take Exam</Button>
-                                                        {(canUserManage || user?.uid === exam.creatorId) && (
+                                                        {(canUserManage || user?.uid === exam.authorId) && (
                                                              <AlertDialogTrigger asChild>
                                                                 <Button
                                                                     variant="ghost"
