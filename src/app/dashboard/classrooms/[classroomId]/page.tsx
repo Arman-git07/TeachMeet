@@ -421,10 +421,9 @@ export default function ClassroomPage() {
         const { collectionName, item } = itemToDelete;
         
         try {
-            console.log("🟢 Deleting:", { classroomId, subCollection: collectionName, item });
             if (!item.id) {
-              alert("Item is missing an ID. Cannot delete.");
-              return;
+                toast({ variant: 'destructive', title: "Deletion Failed", description: "Item is missing an ID. Cannot delete."});
+                return;
             }
             const ref = doc(db, "classrooms", classroomId, collectionName, item.id);
 
@@ -432,14 +431,15 @@ export default function ClassroomPage() {
             if (item.storagePath) {
               const fileRef = storageRef(storage, item.storagePath);
               await deleteObject(fileRef).catch(err => {
-                if (err.code !== 'storage/object-not-found') throw err;
+                if (err.code !== 'storage/object-not-found') {
+                    console.error("Storage deletion error, but proceeding to delete doc:", err);
+                }
               });
             }
             await deleteDoc(ref);
             toast({ title: "Item Deleted", description: "The item has been successfully removed."});
-            console.log("✅ Deleted successfully");
         } catch (error: any) {
-            console.error("❌ Error deleting:", error);
+            console.error("❌ Error deleting item:", error);
             toast({ variant: 'destructive', title: "Deletion Failed", description: error.message });
         } finally {
             setItemToDelete(null);
@@ -1334,7 +1334,7 @@ export default function ClassroomPage() {
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <Button size="sm" className="btn-gel">Take Exam</Button>
-                                                        {(canUserManage || user?.uid === exam.creatorId) && (
+                                                        {(canUserManage || user?.uid === exam.uploaderId) && (
                                                              <AlertDialogTrigger asChild>
                                                                 <Button
                                                                     variant="ghost"
