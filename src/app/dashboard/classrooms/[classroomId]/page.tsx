@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
@@ -122,6 +122,11 @@ interface Submission {
     grade?: number;
     feedback?: string;
     isGrading?: boolean;
+}
+
+type DeletableItem = {
+    collectionName: "materials" | "assignments" | "exams" | "announcements";
+    item: { id: string; storagePath?: string };
 }
 
 // --- Zod Schemas ---
@@ -280,35 +285,6 @@ export const denyRequest = async (classroomId: string, studentId: string) => {
   }
 };
 
-async function handleDeleteItem(
-  classId: string,
-  collectionName: "materials" | "assignments" | "exams" | "announcements",
-  item: any
-) {
-  try {
-    console.log("🟢 Deleting:", { classId, subCollection: collectionName, item });
-    if (!item.id) {
-      alert("Item is missing an ID. Cannot delete.");
-      return;
-    }
-    const ref = doc(db, "classrooms", classId, collectionName, item.id);
-    if (window.confirm("Are you sure you want to delete this item?")) {
-      // Delete file from storage if path exists
-      if (item.storagePath) {
-        const fileRef = storageRef(storage, item.storagePath);
-        await deleteObject(fileRef).catch(err => {
-          // if file not found, we can continue; but other errors rethrow
-          if (err.code !== 'storage/object-not-found') throw err;
-        });
-      }
-      await deleteDoc(ref);
-      console.log("✅ Deleted successfully");
-    }
-  } catch (error: any) {
-    console.error("❌ Error deleting:", error);
-    alert(`Failed to delete: ${error.message}`);
-  }
-}
 
 // --- Components ---
 
@@ -351,6 +327,7 @@ export default function ClassroomPage() {
     const [isUploadingMaterial, setIsUploadingMaterial] = useState(false);
     const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
     const [participantToRemove, setParticipantToRemove] = useState<UserProfile | null>(null);
+    const [itemToDelete, setItemToDelete] = useState<DeletableItem | null>(null);
     
     const [assignmentToGrade, setAssignmentToGrade] = useState<Assignment | null>(null);
     
@@ -438,6 +415,36 @@ export default function ClassroomPage() {
             unsubscribers.forEach(unsub => unsub());
         };
     }, [classroomId, classroom, assignments]);
+
+    async function handleDeleteItem() {
+        if (!itemToDelete) return;
+        const { collectionName, item } = itemToDelete;
+        
+        try {
+            console.log("🟢 Deleting:", { classroomId, subCollection: collectionName, item });
+            if (!item.id) {
+              alert("Item is missing an ID. Cannot delete.");
+              return;
+            }
+            const ref = doc(db, "classrooms", classroomId, collectionName, item.id);
+
+            // Delete file from storage if path exists
+            if (item.storagePath) {
+              const fileRef = storageRef(storage, item.storagePath);
+              await deleteObject(fileRef).catch(err => {
+                if (err.code !== 'storage/object-not-found') throw err;
+              });
+            }
+            await deleteDoc(ref);
+            toast({ title: "Item Deleted", description: "The item has been successfully removed."});
+            console.log("✅ Deleted successfully");
+        } catch (error: any) {
+            console.error("❌ Error deleting:", error);
+            toast({ variant: 'destructive', title: "Deletion Failed", description: error.message });
+        } finally {
+            setItemToDelete(null);
+        }
+    }
 
 
     const handleApproveRequest = async (request: JoinRequest) => {
@@ -772,6 +779,7 @@ export default function ClassroomPage() {
     };
 
     return (
+    <AlertDialog open={!!itemToDelete} onOpenChange={(isOpen) => !isOpen && setItemToDelete(null)}>
         <div className="flex flex-1 flex-col overflow-hidden">
              <header className="mb-6 px-4 md:px-8 flex items-center justify-between flex-shrink-0">
                 <div>
@@ -1034,14 +1042,16 @@ export default function ClassroomPage() {
                                                   {a.vanishAt && ` | Vanishes on ${new Date(a.vanishAt?.toDate()).toLocaleString()}`}
                                                 </p>
                                                 {(canUserManage || user?.uid === a.creatorId) && (
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => handleDeleteItem(classroomId, 'announcements', a)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4"/>
-                                                    </Button>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            onClick={() => setItemToDelete({ collectionName: 'announcements', item: a})}
+                                                        >
+                                                            <Trash2 className="h-4 w-4"/>
+                                                        </Button>
+                                                    </AlertDialogTrigger>
                                                 )}
                                             </div>
                                         )) : (
@@ -1201,14 +1211,16 @@ export default function ClassroomPage() {
                                                                 )
                                                             )}
                                                             {(canUserManage || user?.uid === assignment.creatorId) && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    onClick={() => handleDeleteItem(classroomId, 'assignments', assignment)}
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        onClick={() => setItemToDelete({ collectionName: 'assignments', item: assignment })}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </AlertDialogTrigger>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1323,14 +1335,16 @@ export default function ClassroomPage() {
                                                     <div className="flex items-center gap-2">
                                                         <Button size="sm" className="btn-gel">Take Exam</Button>
                                                         {(canUserManage || user?.uid === exam.creatorId) && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => handleDeleteItem(classroomId, 'exams', exam)}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
+                                                             <AlertDialogTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    onClick={() => setItemToDelete({ collectionName: 'exams', item: exam })}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1357,6 +1371,19 @@ export default function ClassroomPage() {
                 </Link>
             </Button>
         </div>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently delete the item. This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteItem}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     );
 }
 
