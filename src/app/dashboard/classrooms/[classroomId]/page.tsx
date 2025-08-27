@@ -279,6 +279,17 @@ export const denyRequest = async (classroomId: string, studentId: string) => {
   }
 };
 
+async function handleDelete(classroomId: string, section: string, id: string) {
+  if (!window.confirm("Are you sure you want to delete this item?")) return;
+  try {
+    console.log("🟢 Deleting:", classroomId, section, id);
+    await deleteDoc(doc(db, "classrooms", classroomId, section, id));
+    alert("✅ Deleted successfully!");
+  } catch (err: any) {
+    console.error("❌ Error deleting:", err.message);
+    alert("Delete failed: " + err.message);
+  }
+}
 
 // --- Components ---
 
@@ -293,31 +304,6 @@ const VanishDateTimePicker = ({ date, setDate, disabled }: { date: string | null
         />
     );
 };
-
-export async function handleDeleteItem(
-  classId: string,
-  collectionName: "materials" | "assignments" | "exams" | "announcements",
-  item: any
-) {
-  try {
-    console.log("🟢 Deleting:", { classId, collectionName, item });
-
-    if (!item.id) {
-      alert("Item is missing an ID. Cannot delete.");
-      return;
-    }
-
-    const ref = doc(db, "classrooms", classId, collectionName, item.id);
-
-    if (window.confirm("Are you sure you want to delete this item?")) {
-      await deleteDoc(ref);
-      console.log("✅ Deleted successfully");
-    }
-  } catch (error: any) {
-    console.error("❌ Error deleting:", error);
-    alert(`Failed to delete: ${error.message}`);
-  }
-}
 
 export default function ClassroomPage() {
     const { classroomId } = useParams() as { classroomId: string };
@@ -1033,7 +1019,7 @@ export default function ClassroomPage() {
                                                         variant="ghost" 
                                                         size="icon" 
                                                         className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => handleDeleteItem(classroomId, 'announcements', a)}
+                                                        onClick={() => handleDelete(classroomId, 'announcements', a.id)}
                                                     >
                                                         <Trash2 className="h-4 w-4"/>
                                                     </Button>
@@ -1101,7 +1087,7 @@ export default function ClassroomPage() {
                                                       variant="ghost"
                                                       size="icon"
                                                       className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                      onClick={() => handleDeleteItem(classroomId, 'materials', m)}
+                                                      onClick={() => handleDelete(classroomId, 'materials', m.id)}
                                                     >
                                                       <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -1211,7 +1197,7 @@ export default function ClassroomPage() {
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    onClick={() => handleDeleteItem(classroomId, 'assignments', assignment)}
+                                                                    onClick={() => handleDelete(classroomId, 'assignments', assignment.id)}
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -1333,7 +1319,7 @@ export default function ClassroomPage() {
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => handleDeleteItem(classroomId, 'exams', exam)}
+                                                                onClick={() => handleDelete(classroomId, 'exams', exam.id)}
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
@@ -1365,5 +1351,3 @@ export default function ClassroomPage() {
         </div>
     );
 }
-
-    
