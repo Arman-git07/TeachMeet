@@ -9,40 +9,64 @@ service cloud.firestore {
       match /announcements/{announcementId} {
         allow read: if true;
         allow create: if request.auth != null;
-        allow delete: if request.auth != null && (
-          request.auth.uid == resource.data.creatorId ||
-          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
-        );
+        allow delete: if request.auth.uid == resource.data.creatorId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy;
       }
-
+      
       match /materials/{materialId} {
         allow read: if true;
         allow create: if request.auth != null;
-        allow delete: if request.auth != null && (
-          request.auth.uid == resource.data.uploaderId ||
-          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
-        );
+        allow delete: if request.auth.uid == resource.data.uploaderId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy;
       }
-
+      
       match /assignments/{assignmentId} {
         allow read: if true;
         allow create: if request.auth != null;
-        allow delete: if request.auth != null && (
-          request.auth.uid == resource.data.creatorId ||
-          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
-        );
+        allow delete: if request.auth.uid == resource.data.creatorId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy;
       }
-      
+
       match /exams/{examId} {
         allow read: if true;
         allow create: if request.auth != null;
-        // CORRECTED: Check for uploaderId, which matches the field saved in the onExamSubmit function.
-        // Also added check for classroom creator.
         allow delete: if request.auth != null && (
-          request.auth.uid == resource.data.uploaderId ||
-          request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
-        );
+            request.auth.uid == resource.data.uploaderId ||
+            request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy
+          );
       }
+
+      match /joinRequests/{requestId} {
+        allow read, create, delete: if request.auth != null;
+      }
+      
+      match /participants/{participantId} {
+        allow read: if true;
+        allow create, delete: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy == request.auth.uid;
+      }
+
+      match /teachers/{teacherId} {
+        allow read: if true;
+        allow create, delete: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy == request.auth.uid;
+      }
+
+    }
+
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /documents/{docId} {
+      allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+    }
+    
+    match /recordings/{recId} {
+      allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
+    }
+    
+     match /meetings/{meetingId}/{collection}/{docId} {
+        allow read, write: if request.auth != null;
     }
   }
 }
