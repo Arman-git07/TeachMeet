@@ -417,7 +417,7 @@ export default function ClassroomPage() {
     }, [classroomId, classroom, assignments]);
 
     async function handleDeleteItem() {
-        if (!itemToDelete) return;
+        if (!itemToDelete || !classroomId) return;
         const { collectionName, item } = itemToDelete;
         
         try {
@@ -425,23 +425,31 @@ export default function ClassroomPage() {
                 toast({ variant: 'destructive', title: "Deletion Failed", description: "Item is missing an ID. Cannot delete."});
                 return;
             }
-            const ref = doc(db, "classrooms", classroomId, collectionName, item.id);
-
-            // Delete file from storage if path exists
+            
+            // Delete associated file from storage if a path exists.
             if (item.storagePath) {
               const fileRef = storageRef(storage, item.storagePath);
-              await deleteObject(fileRef).catch(err => {
-                if (err.code !== 'storage/object-not-found') {
-                    console.error("Storage deletion error, but proceeding to delete doc:", err);
-                }
-              });
+              try {
+                  await deleteObject(fileRef);
+              } catch (storageError: any) {
+                  // If the file doesn't exist, we can ignore the error and proceed to delete the database record.
+                  // This handles cases where a storage delete might have partially failed before.
+                  if (storageError.code !== 'storage/object-not-found') {
+                      console.error("Storage deletion error, but proceeding to delete doc:", storageError);
+                  }
+              }
             }
-            await deleteDoc(ref);
+            
+            // Delete the Firestore document.
+            const docRef = doc(db, "classrooms", classroomId, collectionName, item.id);
+            await deleteDoc(docRef);
+
             toast({ title: "Item Deleted", description: "The item has been successfully removed."});
         } catch (error: any) {
             console.error("❌ Error deleting item:", error);
             toast({ variant: 'destructive', title: "Deletion Failed", description: error.message });
         } finally {
+            // Reset the state to close the dialog.
             setItemToDelete(null);
         }
     }
@@ -1334,7 +1342,7 @@ export default function ClassroomPage() {
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <Button size="sm" className="btn-gel">Take Exam</Button>
-                                                        {(canUserManage || user?.uid === exam.uploaderId) && (
+                                                        {(canUserManage || user?.uid === exam.creatorId) && (
                                                              <AlertDialogTrigger asChild>
                                                                 <Button
                                                                     variant="ghost"
@@ -1386,4 +1394,3 @@ export default function ClassroomPage() {
     </AlertDialog>
     );
 }
-
