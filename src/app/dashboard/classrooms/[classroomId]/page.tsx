@@ -1044,7 +1044,7 @@ export default function ClassroomPage() {
                                                         variant="ghost" 
                                                         size="icon" 
                                                         className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => handleDeleteItem(classroomId, 'announcements', a)}
+                                                        onClick={() => console.log("🟢 Announcement delete clicked", a)}
                                                     >
                                                         <Trash2 className="h-4 w-4"/>
                                                     </Button>
@@ -1112,7 +1112,7 @@ export default function ClassroomPage() {
                                                       variant="ghost"
                                                       size="icon"
                                                       className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                      onClick={() => handleDeleteItem(classroomId, 'materials', m)}
+                                                      onClick={() => console.log("🟢 Material delete clicked", m)}
                                                     >
                                                       <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -1222,7 +1222,7 @@ export default function ClassroomPage() {
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    onClick={() => handleDeleteItem(classroomId, 'assignments', assignment)}
+                                                                    onClick={() => console.log("🟢 Assignment delete clicked", assignment)}
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -1344,7 +1344,7 @@ export default function ClassroomPage() {
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => handleDeleteItem(classroomId, 'exams', exam)}
+                                                                onClick={() => console.log("🟢 Exam delete clicked", exam)}
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
