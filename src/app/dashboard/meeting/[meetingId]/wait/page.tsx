@@ -21,6 +21,30 @@ import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'fir
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
 
+async function handleJoinAsHost(meetingId: string) {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Please sign in first.");
+    return;
+  }
+
+  try {
+    // Create meeting doc
+    await setDoc(doc(db, "meetings", meetingId), {
+      hostId: user.uid,
+      hostName: user.displayName || "Host",
+      createdAt: Date.now(),
+      isActive: true,
+    }, { merge: true });
+
+    // Redirect to meeting page
+    window.location.href = `/dashboard/meeting/${meetingId}`;
+  } catch (err) {
+    console.error("Failed to start meeting:", err);
+    alert("Failed to start meeting. Please try again.");
+  }
+}
+
 export default function WaitingAreaPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
   const searchParams = useSearchParams();
@@ -222,42 +246,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
-  const handleJoinAction = async () => {
+  const handleGuestJoinAction = async () => {
     localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
     
     if (!user) {
         toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
-        return;
-    }
-
-    if (isHost) {
-        const meetingDocRef = doc(db, "meetings", meetingId);
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        try {
-            await setDoc(meetingDocRef, {
-                creatorId: user.uid,
-                topic: topic || "Untitled Meeting",
-                createdAt: serverTimestamp(),
-            }, { merge: true });
-
-            // Host also adds themselves as a participant immediately
-            await setDoc(participantDocRef, {
-                name: user.displayName || userName,
-                photoURL: user.photoURL,
-                isMicMuted: !isMicActive,
-                isCameraOff: !isCameraActive,
-                isHandRaised: false,
-                isScreenSharing: false,
-                joinedAt: serverTimestamp(),
-            });
-
-            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
-        } catch (error) {
-            console.error("Host failed to create/update meeting document:", error);
-            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
-        }
         return;
     }
 
@@ -286,7 +280,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       const disabled = !agreedToTerms;
-      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
+      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: () => handleJoinAsHost(meetingId) };
     }
 
     let text = "Ask to Join";
@@ -301,11 +295,11 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         text, 
         disabled, 
         showSpinner: false, 
-        onClick: () => { setJoinStatus('idle'); handleJoinAction(); }
+        onClick: () => { setJoinStatus('idle'); handleGuestJoinAction(); }
       };
     }
     
-    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
+    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleGuestJoinAction };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
