@@ -299,33 +299,34 @@ export async function handleDeleteItem(
   collectionName: "materials" | "assignments" | "exams" | "announcements",
   item: any
 ) {
-  if (!item?.id) {
-    alert("⚠️ Cannot delete: item has no ID");
-    return;
-  }
-  const confirmDelete = window.confirm("Are you sure you want to delete this item?");
-  if (!confirmDelete) return;
-
   try {
-    // Delete file from storage if path exists
-    if (item.storagePath) {
-      const fileRef = storageRef(storage, item.storagePath);
-      await deleteObject(fileRef).catch(err => {
-        // If file is not found, we can still proceed to delete the doc.
-        // Re-throw other errors.
-        if (err.code !== "storage/object-not-found") throw err;
-        console.warn("Storage object not found, but proceeding with Firestore deletion:", item.storagePath);
-      });
+    console.log("🟢 Deleting:", { classId, collectionName, item });
+
+    if (!item.id) {
+      alert("Item is missing an ID. Cannot delete.");
+      return;
     }
 
-    // Delete Firestore document
-    const itemRef = doc(db, "classrooms", classId, collectionName, item.id);
-    await deleteDoc(itemRef);
-    
-    alert("✅ Deleted successfully");
+    const ref = doc(db, "classrooms", classId, collectionName, item.id);
+
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      // Delete file from storage if path exists
+      if (item.storagePath) {
+        const fileRef = storageRef(storage, item.storagePath);
+        await deleteObject(fileRef).catch(err => {
+          // If file is not found, we can still proceed to delete the doc.
+          // Re-throw other errors.
+          if (err.code !== "storage/object-not-found") throw err;
+          console.warn("Storage object not found, but proceeding with Firestore deletion:", item.storagePath);
+        });
+      }
+      
+      await deleteDoc(ref);
+      console.log("✅ Deleted successfully");
+    }
   } catch (error: any) {
-    console.error(`❌ Failed to delete item from ${collectionName}:`, error);
-    alert("Delete failed: " + (error as any).message);
+    console.error("❌ Error deleting:", error);
+    alert(`Failed to delete: ${error.message}`);
   }
 }
 
