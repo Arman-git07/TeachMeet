@@ -244,38 +244,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
   const handleJoinAction = async () => {
-    localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
-    localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
-    
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
-        return;
-    }
-
-    if (isHost) {
-        const joinNowLinkPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`;
-        router.push(joinNowLinkPath);
-        return;
-    }
-
-    // Guest Logic: Send a join request by creating a document in the subcollection.
-    const requestData = {
-        userId: user.uid,
-        name: user.displayName || userName,
-        photoURL: user.photoURL,
-        requestedAt: serverTimestamp(),
-        status: 'pending',
-    };
-
-    try {
-      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), requestData);
-      setJoinStatus('pending');
-      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
-    } catch (error: any) {
-        console.error("Join request failed:", error.code, error.message);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. The meeting may not exist or there may be a permissions issue.'});
-        setJoinStatus('idle');
-    }
+    // This function is now empty to remove the button's features.
   };
 
   const getButtonState = () => {
