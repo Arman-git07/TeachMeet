@@ -220,7 +220,6 @@ export default function MeetingPage() {
       }
     }).catch(error => {
       console.error("[MeetingPage] Error fetching meeting document:", error);
-      toast({ variant: "destructive", title: "Error Fetching Meeting Details" });
     });
 
     // Listen for realtime participant changes
@@ -242,7 +241,6 @@ export default function MeetingPage() {
       setIsLoadingParticipants(false);
     }, (error) => {
       console.error("[MeetingPage] Error fetching participants:", error);
-      toast({ variant: "destructive", title: "Participant List Error" });
       setIsLoadingParticipants(false);
     });
 
@@ -278,7 +276,7 @@ export default function MeetingPage() {
     return null;
   }
   
-  const backToDashboard = () => router.push('/dashboard/classrooms');
+  const backToHomepage = () => router.push('/');
   const isCurrentUserTheHost = currentUserId === meetingCreatorId;
 
   return (
@@ -378,7 +376,7 @@ export default function MeetingPage() {
             variant="destructive"
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
-            onClick={backToDashboard}
+            onClick={backToHomepage}
             aria-label="Leave meeting"
           >
             <Phone className="h-6 w-6" />
