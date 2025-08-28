@@ -221,16 +221,22 @@ export class MeshRTC {
         const senders = remote.pc.getSenders();
         const newTracks = this.locals.stream?.getTracks() || [];
         
-        // Remove old tracks
+        // Replace tracks for existing senders
         for (const sender of senders) {
-            if (sender.track && !newTracks.some(t => t.kind === sender.track!.kind)) {
-                try {
+            const newTrack = newTracks.find(t => t.kind === sender.track?.kind);
+            if (newTrack) {
+                if(sender.track?.id !== newTrack.id) {
+                    await sender.replaceTrack(newTrack);
+                }
+            } else if (sender.track) {
+                // If there's no new track of this kind, remove the track
+                 try {
                     remote.pc.removeTrack(sender);
                 } catch(e) { console.error("Error removing track", e); }
             }
         }
         
-        // Add new tracks
+        // Add new tracks for new kinds
         for (const track of newTracks) {
             if (!senders.some(s => s.track && s.track.kind === track.kind)) {
                 try {
