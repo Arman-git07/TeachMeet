@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db, auth } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc, collection, addDoc } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -253,21 +253,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+        const joinNowLinkPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`;
         router.push(joinNowLinkPath);
         return;
     }
 
-    // Guest Logic
-    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
+    // Guest Logic: Send a join request by creating a document in the subcollection.
     const requestData = {
         name: user.displayName || userName,
         photoURL: user.photoURL,
         requestedAt: serverTimestamp(),
+        status: 'pending', // Important for host UI
     };
 
     try {
-      await setDoc(requestRef, requestData);
+      // Use addDoc to create a new request document with a random ID.
+      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), {
+        ...requestData,
+        userId: user.uid, // Add user's ID for identification
+      });
       setJoinStatus('pending');
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
     } catch (error: any) {
