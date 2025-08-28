@@ -3,6 +3,9 @@
 
 import React from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { VideoOff } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 type Props = { 
   meetingId: string; 
@@ -14,6 +17,7 @@ type Props = {
 
 export default function MeetingClient({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined }: Props) {
   const localRef = React.useRef<HTMLVideoElement>(null);
+  const { user } = useAuth();
   const [rtc] = React.useState(() => new MeshRTC({
     roomId: meetingId,
     userId,
@@ -21,6 +25,10 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
       // create/attach a remote video tile
       let el = document.getElementById(`remote-${socketId}`) as HTMLVideoElement | null;
       if (!el) {
+        const container = document.createElement("div");
+        container.id = `remote-container-${socketId}`;
+        container.className = "w-full h-full aspect-video bg-muted rounded-2xl overflow-hidden shadow-lg relative";
+
         el = document.createElement("video");
         el.id = `remote-${socketId}`;
         el.autoplay = true;
@@ -30,11 +38,7 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
         el.style.width = "100%";
         el.style.height = "100%";
         el.style.objectFit = "cover";
-        el.style.borderRadius = "16px";
         
-        const container = document.createElement("div");
-        container.id = `remote-container-${socketId}`;
-        container.className = "aspect-video bg-muted rounded-2xl overflow-hidden";
         container.appendChild(el);
         document.getElementById("remotes")?.appendChild(container);
       }
@@ -55,7 +59,7 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
     let mounted = true;
     (async () => {
       // Load initial state from localStorage
-      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
+      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') === 'on';
       const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') === 'on';
 
       setCamOn(desiredCamState);
@@ -86,7 +90,15 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
     setCamOn(next);
     onCamToggle(next);
     await rtc.toggleCam(next);
+    if (next && localRef.current) {
+        // If turning camera on, re-attach the stream
+        rtc.attachLocal(localRef.current);
+    }
   };
+
+  const userName = user?.displayName || user?.email?.split('@')[0] || "User";
+  const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
+  const userFallback = userName.charAt(0).toUpperCase();
 
   return (
     <div className="w-full h-full relative">
@@ -96,15 +108,28 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
         
         {/* Local video tile */}
         <div className="w-full h-full col-span-1 row-span-1 flex items-center justify-center">
-            <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg">
-                <video
+            <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg relative">
+                 <video
                     ref={localRef}
                     id="local"
                     className="w-full h-full object-cover"
                     muted
                     playsInline
                     autoPlay
+                    style={{ display: camOn ? 'block' : 'none' }}
                 />
+                {!camOn && (
+                    <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
+                        <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
+                            <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                            <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex items-center gap-2">
+                           <VideoOff className="h-5 w-5" />
+                           <p>Camera is off</p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
       </div>

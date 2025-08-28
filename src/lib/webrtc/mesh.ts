@@ -202,13 +202,45 @@ export class MeshRTC {
 
   async toggleMic(on: boolean) {
     this.locals.mic = on;
-    this.locals.stream?.getAudioTracks().forEach((t) => (t.enabled = on));
+    await this.updateStream();
   }
 
   async toggleCam(on: boolean) {
     this.locals.cam = on;
-    this.locals.stream?.getVideoTracks().forEach((t) => (t.enabled = on));
+    await this.updateStream();
   }
+  
+  private async updateStream() {
+    if (this.locals.stream) {
+        this.locals.stream.getTracks().forEach(track => track.stop());
+    }
+
+    await this.ensureLocalStream(this.locals.mic, this.locals.cam);
+
+    for (const remote of this.remotes.values()) {
+        const senders = remote.pc.getSenders();
+        const newTracks = this.locals.stream?.getTracks() || [];
+        
+        // Remove old tracks
+        for (const sender of senders) {
+            if (sender.track && !newTracks.some(t => t.kind === sender.track!.kind)) {
+                try {
+                    remote.pc.removeTrack(sender);
+                } catch(e) { console.error("Error removing track", e); }
+            }
+        }
+        
+        // Add new tracks
+        for (const track of newTracks) {
+            if (!senders.some(s => s.track && s.track.kind === track.kind)) {
+                try {
+                    remote.pc.addTrack(track, this.locals.stream!);
+                } catch(e) { console.error("Error adding track", e); }
+            }
+        }
+    }
+  }
+
 
   leave() {
     try {
