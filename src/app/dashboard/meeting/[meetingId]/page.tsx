@@ -59,7 +59,19 @@ export default function MeetingPage() {
                 <Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5"/></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`)}>
+                <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/whiteboard?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+                    <Brush className="mr-2 h-4 w-4"/>
+                    <span>Whiteboard</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => { /* Implement screen share logic */ }} className="cursor-pointer">
+                    <MonitorUp className="mr-2 h-4 w-4"/>
+                    <span>Share Screen</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+                    <MessageSquare className="mr-2 h-4 w-4"/>
+                    <span>Chat</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4"/>
                     <span>Meeting Settings</span>
                 </DropdownMenuItem>
@@ -112,9 +124,9 @@ export default function MeetingPage() {
 
       {/* Control Bar */}
       <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
-        <div className="bg-black/40 backdrop-blur-md rounded-2xl p-3 flex items-center justify-center gap-2 md:gap-4 max-w-2xl mx-auto">
+        <div className="bg-black/40 backdrop-blur-md rounded-2xl p-3 flex items-center justify-center gap-2 md:gap-4 max-w-lg mx-auto">
           <Button
-            variant={micOn ? 'success' : 'destructive'}
+            variant={micOn ? 'default' : 'destructive'}
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
             onClick={() => triggerControl('meeting-client-mic-toggle')}
@@ -123,7 +135,7 @@ export default function MeetingPage() {
             {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
           </Button>
           <Button
-            variant={camOn ? 'success' : 'destructive'}
+            variant={camOn ? 'default' : 'destructive'}
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
             onClick={() => triggerControl('meeting-client-cam-toggle')}
@@ -137,19 +149,10 @@ export default function MeetingPage() {
           <Button asChild variant="ghost" size="icon" className="rounded-full w-12 h-12 md:w-14 md:h-14 text-white hover:bg-white/10 hover:text-white" aria-label="Participants">
              <Link href={`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`}><Users className="h-6 w-6" /></Link>
           </Button>
-          <Button asChild variant="ghost" size="icon" className="rounded-full w-12 h-12 md:w-14 md-h-14 text-white hover:bg-white/10 hover:text-white" aria-label="Chat">
-            <Link href={`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`}><MessageSquare className="h-6 w-6" /></Link>
-          </Button>
           <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 md:w-14 md:h-14 text-white hover:bg-white/10 hover:text-white" aria-label="Raise hand">
             <Hand className="h-6 w-6" />
           </Button>
-           <Button asChild variant="ghost" size="icon" className="rounded-full w-12 h-12 md:w-14 md:h-14 text-white hover:bg-white/10 hover:text-white" aria-label="Whiteboard">
-            <Link href={`/dashboard/meeting/${meetingId}/whiteboard?topic=${encodeURIComponent(topic)}`}><Brush className="h-6 w-6" /></Link>
-          </Button>
-           <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 md:w-14 md:h-14 text-white hover:bg-white/10 hover:text-white" aria-label="Share screen">
-            <MonitorUp className="h-6 w-6" />
-          </Button>
-
+           
           <div className="w-px h-8 bg-white/20 mx-1 md:mx-3" />
 
           <Button
@@ -166,4 +169,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
