@@ -7,6 +7,7 @@ type Remote = {
   pc: RTCPeerConnection;
   stream: MediaStream;
   videoEl?: HTMLVideoElement | null;
+  negotiating: boolean; // Add this flag
 };
 
 type MeshOptions = {
@@ -64,7 +65,19 @@ export class MeshRTC {
     });
 
     this.socket.on("signal:offer", async ({ from, sdp }) => {
-      const { pc } = await this.makePeerIfMissing(from, false);
+      const { pc, negotiating } = await this.makePeerIfMissing(from, false);
+
+      const isPolite = this.socket.id > from;
+      if (negotiating || pc.signalingState !== "stable") {
+        if (isPolite) {
+           console.log("Backing off as polite peer", this.socket.id, "vs", from);
+           return;
+        } else {
+           console.log("Ignoring offer as impolite peer", this.socket.id, "vs", from);
+           // Allow our own offer to proceed
+        }
+      }
+
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -98,6 +111,9 @@ export class MeshRTC {
     const pc = new RTCPeerConnection({ iceServers: ICE });
     const remoteStream = new MediaStream();
 
+    remote = { pc, stream: remoteStream, negotiating: false };
+    this.remotes.set(remoteSocketId, remote);
+
     // Forward local tracks to this peer
     this.locals.stream?.getTracks().forEach((t) => pc.addTrack(t, this.locals.stream!));
 
@@ -118,21 +134,26 @@ export class MeshRTC {
         });
       }
     };
+    
+    pc.onnegotiationneeded = async () => {
+        try {
+            remote!.negotiating = true;
+            const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            if (pc.signalingState !== "stable") return;
+            await pc.setLocalDescription(offer);
+            this.socket.emit("signal:offer", {
+                roomId: this.roomId,
+                to: remoteSocketId,
+                from: this.socket.id,
+                sdp: pc.localDescription,
+            });
+        } catch (err) {
+            console.error(err);
+        } finally {
+            remote!.negotiating = false;
+        }
+    };
 
-    // Negotiate (caller creates offer)
-    if (isCaller) {
-      const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-      await pc.setLocalDescription(offer);
-      this.socket.emit("signal:offer", {
-        roomId: this.roomId,
-        to: remoteSocketId,
-        from: this.socket.id,
-        sdp: pc.localDescription,
-      });
-    }
-
-    remote = { pc, stream: remoteStream };
-    this.remotes.set(remoteSocketId, remote);
     return remote;
   }
 
