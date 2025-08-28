@@ -114,7 +114,7 @@ export default function MeetingPage() {
       <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
         <div className="bg-black/40 backdrop-blur-md rounded-2xl p-3 flex items-center justify-center gap-2 md:gap-4 max-w-2xl mx-auto">
           <Button
-            variant={micOn ? 'secondary' : 'destructive'}
+            variant={micOn ? 'success' : 'destructive'}
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
             onClick={() => triggerControl('meeting-client-mic-toggle')}
@@ -123,7 +123,7 @@ export default function MeetingPage() {
             {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
           </Button>
           <Button
-            variant={camOn ? 'secondary' : 'destructive'}
+            variant={camOn ? 'success' : 'destructive'}
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
             onClick={() => triggerControl('meeting-client-cam-toggle')}
