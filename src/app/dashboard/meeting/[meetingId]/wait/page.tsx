@@ -225,25 +225,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const handleHostJoin = async () => {
     if (!user) return;
     try {
-        const batch = writeBatch(db);
         const meetingDocRef = doc(db, "meetings", meetingId);
-        batch.set(meetingDocRef, {
+        await setDoc(meetingDocRef, {
             creatorId: user.uid,
             topic: topic || "Untitled Meeting",
             createdAt: serverTimestamp(),
         });
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        batch.set(participantDocRef, {
-            name: user.displayName || userName,
-            photoURL: user.photoURL,
-            isMicMuted: !isMicActive,
-            isCameraOff: !isCameraActive,
-            isHandRaised: false,
-            isScreenSharing: false,
-            joinedAt: serverTimestamp(),
-        });
-        await batch.commit();
-
+        
         const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
         router.push(joinNowLinkPath);
 
