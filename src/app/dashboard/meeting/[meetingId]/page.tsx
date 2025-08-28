@@ -140,8 +140,8 @@ export default function MeetingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const [micOn, setMicOn] = useState(false);
+  const [camOn, setCamOn] = useState(false);
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
   // --- State for Participants Sheet ---
@@ -153,11 +153,7 @@ export default function MeetingPage() {
   // ---
 
   useEffect(() => {
-    // Load initial device state from localStorage
-    const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
-    const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') === 'on';
-    setCamOn(desiredCamState);
-    setMicOn(desiredMicState);
+    // This effect now does nothing, defaulting states to 'off' (false).
   }, []);
   
   useEffect(() => {
