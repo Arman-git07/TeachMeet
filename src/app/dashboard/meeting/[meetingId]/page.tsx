@@ -142,6 +142,7 @@ export default function MeetingPage() {
 
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
+  const [isHandRaised, setIsHandRaised] = useState(false);
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
   // --- State for Participants Sheet ---
@@ -342,7 +343,13 @@ export default function MeetingPage() {
             </SheetContent>
           </Sheet>
 
-          <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 md:w-14 md:h-14 text-white hover:bg-white/10 hover:text-white" aria-label="Raise hand">
+          <Button 
+            variant={isHandRaised ? 'default' : 'destructive'}
+            size="icon" 
+            className="rounded-full w-12 h-12 md:w-14 md:h-14" 
+            aria-label="Raise hand"
+            onClick={() => setIsHandRaised(!isHandRaised)}
+          >
             <Hand className="h-6 w-6" />
           </Button>
            
