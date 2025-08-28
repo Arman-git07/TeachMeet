@@ -6,6 +6,7 @@ import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { VideoOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 type Props = { 
   meetingId: string; 
@@ -18,6 +19,8 @@ type Props = {
 export default function MeetingClient({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined }: Props) {
   const localRef = React.useRef<HTMLVideoElement>(null);
   const { user } = useAuth();
+  const [remoteParticipantCount, setRemoteParticipantCount] = React.useState(0);
+
   const [rtc] = React.useState(() => new MeshRTC({
     roomId: meetingId,
     userId,
@@ -45,10 +48,14 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
       el.srcObject = stream;
     },
     onRemoteLeft: (socketId) => {
+      setRemoteParticipantCount(prev => Math.max(0, prev - 1));
       const el = document.getElementById(`remote-container-${socketId}`);
       if (el?.parentElement) el.parentElement.removeChild(el);
     },
-    onUserJoined,
+    onUserJoined: (socketId: string) => {
+      setRemoteParticipantCount(prev => prev + 1);
+      onUserJoined(socketId);
+    },
   }));
 
   const [micOn, setMicOn] = React.useState(true);
@@ -100,14 +107,31 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
   const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
   const userFallback = userName.charAt(0).toUpperCase();
 
+  const hasRemotes = remoteParticipantCount > 0;
+
   return (
     <div className="w-full h-full relative">
-      <div className="absolute top-0 left-0 w-full h-full grid grid-cols-1 md:grid-cols-4 grid-rows-4 md:grid-rows-1 gap-2 md:gap-4 p-2 md:p-4">
-        {/* Remote videos container */}
-        <div id="remotes" className="w-full h-full col-span-1 row-span-3 md:col-span-3 md:row-span-1 grid grid-cols-2 grid-rows-2 sm:grid-cols-3 gap-2 md:gap-4" />
+      <div className={cn(
+        "absolute top-0 left-0 w-full h-full p-2 md:p-4 transition-all duration-300",
+        hasRemotes
+          ? "grid grid-cols-1 md:grid-cols-4 grid-rows-4 md:grid-rows-1 gap-2 md:gap-4"
+          : "flex items-center justify-center"
+      )}>
+        {/* Remote videos container - only shown if there are remotes */}
+        {hasRemotes && (
+          <div 
+            id="remotes"
+            className="w-full h-full col-span-1 row-span-3 md:col-span-3 md:row-span-1 grid grid-cols-2 grid-rows-2 sm:grid-cols-3 gap-2 md:gap-4"
+          />
+        )}
         
-        {/* Local video tile */}
-        <div className="w-full h-full col-span-1 row-span-1 flex items-center justify-center">
+        {/* Local video tile - styling adjusts based on remote presence */}
+        <div className={cn(
+          "flex items-center justify-center",
+          hasRemotes
+            ? "w-full h-full col-span-1 row-span-1"
+            : "w-full h-full max-w-4xl" // Takes up more space when alone
+        )}>
             <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg relative">
                  <video
                     ref={localRef}
