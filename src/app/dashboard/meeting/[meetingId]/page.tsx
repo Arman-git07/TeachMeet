@@ -150,6 +150,7 @@ export default function MeetingPage() {
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const currentUserId = auth.currentUser?.uid;
   const { toast } = useToast();
+  const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
   // ---
 
   useEffect(() => {
@@ -300,9 +301,14 @@ export default function MeetingPage() {
           <div className="w-px h-8 bg-white/20 mx-1 md:mx-3" />
 
           {/* Participants Sheet Trigger */}
-          <Sheet>
+          <Sheet open={isParticipantsPanelOpen} onOpenChange={setIsParticipantsPanelOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 md:w-14 md:h-14 text-white hover:bg-white/10 hover:text-white" aria-label="Participants">
+               <Button
+                variant={isParticipantsPanelOpen ? 'default' : 'destructive'}
+                size="icon"
+                className="rounded-full w-12 h-12 md:w-14 md:h-14"
+                aria-label="Participants"
+              >
                 <Users className="h-6 w-6" />
               </Button>
             </SheetTrigger>
