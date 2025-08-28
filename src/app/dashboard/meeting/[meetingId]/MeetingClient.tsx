@@ -9,9 +9,10 @@ type Props = {
   userId: string;
   onMicToggle: (isOn: boolean) => void;
   onCamToggle: (isOn: boolean) => void;
+  onUserJoined: (socketId: string) => void;
 };
 
-export default function MeetingClient({ meetingId, userId, onMicToggle, onCamToggle }: Props) {
+export default function MeetingClient({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined }: Props) {
   const localRef = React.useRef<HTMLVideoElement>(null);
   const [rtc] = React.useState(() => new MeshRTC({
     roomId: meetingId,
@@ -43,6 +44,7 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
       const el = document.getElementById(`remote-container-${socketId}`);
       if (el?.parentElement) el.parentElement.removeChild(el);
     },
+    onUserJoined,
   }));
 
   const [micOn, setMicOn] = React.useState(true);

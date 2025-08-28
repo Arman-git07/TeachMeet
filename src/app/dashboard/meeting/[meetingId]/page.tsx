@@ -152,6 +152,7 @@ export default function MeetingPage() {
   const currentUserId = auth.currentUser?.uid;
   const { toast } = useToast();
   const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
+  const [isParticipantJoining, setIsParticipantJoining] = useState(false);
   // ---
 
   useEffect(() => {
@@ -179,6 +180,11 @@ export default function MeetingPage() {
                 <DropdownMenuItem onSelect={() => { /* Implement screen share logic */ }} className="cursor-pointer">
                     <MonitorUp className="mr-2 h-4 w-4"/>
                     <span>Share Screen</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setIsParticipantsPanelOpen(true)} className="cursor-pointer">
+                  <UserCog className="mr-2 h-4 w-4" />
+                  <span>Manage Participants</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
                     <MessageSquare className="mr-2 h-4 w-4"/>
@@ -255,6 +261,14 @@ export default function MeetingPage() {
 
   const userId = user?.uid;
 
+  const handleUserJoined = useCallback(() => {
+    setIsParticipantJoining(true);
+    setTimeout(() => {
+        setIsParticipantJoining(false);
+    }, 2000); // Animation duration
+  }, []);
+
+
   if (loading) {
     return <div className="w-full h-full flex items-center justify-center bg-[#1e2a38] text-white">Loading...</div>;
   }
@@ -274,6 +288,7 @@ export default function MeetingPage() {
             userId={userId} 
             onMicToggle={handleMicToggle} 
             onCamToggle={handleCamToggle}
+            onUserJoined={handleUserJoined}
         />
       </div>
 
@@ -307,7 +322,10 @@ export default function MeetingPage() {
                <Button
                 variant={isParticipantsPanelOpen ? 'default' : 'destructive'}
                 size="icon"
-                className="rounded-full w-12 h-12 md:w-14 md:h-14"
+                className={cn(
+                  "rounded-full w-12 h-12 md:w-14 md:h-14",
+                  isParticipantJoining && 'animate-blink-success'
+                )}
                 aria-label="Participants"
               >
                 <Users className="h-6 w-6" />

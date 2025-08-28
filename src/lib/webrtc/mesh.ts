@@ -15,6 +15,7 @@ type MeshOptions = {
   userId: string;
   onRemoteStream: (remoteSocketId: string, stream: MediaStream) => void;
   onRemoteLeft: (remoteSocketId: string) => void;
+  onUserJoined?: (remoteSocketId: string) => void;
 };
 
 const ICE: RTCIceServer[] = [
@@ -55,6 +56,7 @@ export class MeshRTC {
 
   private registerSocketEvents() {
     this.socket.on("user-joined", async ({ socketId }) => {
+      this.opts.onUserJoined?.(socketId);
       // create offer to the newcomer
       await this.makePeerIfMissing(socketId, true);
     });

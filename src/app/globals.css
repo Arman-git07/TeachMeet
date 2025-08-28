@@ -167,6 +167,18 @@ html, body, #__next {
   animation: blink-border-effect 1s ease-in-out 2; /* Blinks twice for 1s each */
 }
 
+/* Participant join blink animation */
+@keyframes blink-success-bg {
+  50% {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+}
+.animate-blink-success {
+  animation: blink-success-bg 1s ease-in-out 2;
+}
+
+
 /* Video Mirroring */
 .video-mirror {
   transform: scaleX(-1);
