@@ -224,21 +224,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   
   const handleHostJoin = async () => {
     if (!user) return;
-    try {
-        const meetingDocRef = doc(db, "meetings", meetingId);
-        await setDoc(meetingDocRef, {
-            creatorId: user.uid,
-            topic: topic || "Untitled Meeting",
-            createdAt: serverTimestamp(),
-        });
-        
-        const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-        router.push(joinNowLinkPath);
-
-    } catch (error) {
-        console.error("Host failed to create/update meeting document:", error);
-        toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
-    }
+    const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+    router.push(joinNowLinkPath);
   }
 
   const handleGuestJoinAction = async () => {
