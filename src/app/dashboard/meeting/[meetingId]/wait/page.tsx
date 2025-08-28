@@ -253,10 +253,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
+        // The meeting doc is already created by the useEffect hook for the host.
+        // Host now just adds themselves as a participant and joins.
         const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
         try {
-            // The meeting document is already created by the useEffect hook.
-            // Host now just adds themselves as a participant and joins.
             await setDoc(participantDocRef, {
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
@@ -479,5 +479,3 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
-
-    

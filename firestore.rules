@@ -1,102 +1,55 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Classroom Rules
-    match /classrooms/{classId} {
-      allow read;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.createdBy;
-      
-      // Subcollection Rules for Classroom
-      match /announcements/{announcementId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
-        allow delete: if request.auth != null && (request.auth.uid == resource.data.creatorId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy);
-      }
-      
-      match /materials/{materialId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.uploaderId;
-        allow delete: if request.auth != null && (request.auth.uid == resource.data.uploaderId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy);
-      }
-      
-      match /assignments/{assignmentId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.creatorId;
-        allow delete: if request.auth != null && (request.auth.uid == resource.data.creatorId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy);
-        
-        match /submissions/{submissionId} {
-            allow read, write: if request.auth != null;
-        }
-      }
-
-      match /exams/{examId} {
-          allow read: if request.auth != null;
-          allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
-          allow delete: if request.auth != null && (request.auth.uid == resource.data.authorId || request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classId)).data.createdBy);
-      }
-      
-      match /joinRequests/{requestId} {
-          allow read, create, delete: if request.auth != null;
-      }
-      
-       match /participants/{participantId} {
-          allow read, create, delete: if request.auth != null;
-      }
-
-      match /teachers/{teacherId} {
-          allow read, create, delete: if request.auth != null;
-      }
-    }
-    
-    // User data rules
-    match /users/{userId} {
-        allow read;
-        allow write: if request.auth != null && request.auth.uid == userId;
-        
-        match /enrolled/{classroomId} {
-            allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-        }
-        match /pendingJoinRequests/{classroomId} {
-            allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-        }
-    }
-    
-    // Documents & Recordings Rules
-    match /documents/{documentId} {
-        allow read;
-        allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
-    }
-    
-    match /recordings/{recordingId} {
-        allow read;
-        allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
-    }
-    
-    // FCM Tokens
-    match /fcmTokens/{userId} {
-        allow write: if request.auth != null && request.auth.uid == userId;
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // Meeting Rules
-    match /meetings/{meetingId} {
-      allow create: if request.auth != null && request.resource.data.hostId == request.auth.uid;
+    // Allow logged-in users to manage their own data
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Classroom rules
+    match /classrooms/{classroomId} {
       allow read: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.hostId == request.auth.uid;
-      
-      match /participants/{participantId} {
-        allow read: if request.auth != null;
-        allow create, update, delete: if request.auth != null;
-      }
+      allow create: if request.auth != null && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.teacherId == request.auth.uid;
+    }
 
-      match /joinRequests/{joinRequestId} {
-          allow read: if request.auth != null;
-          allow create: if request.auth != null;
-          allow delete: if request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId || request.auth.uid == joinRequestId);
-      }
+    match /classrooms/{classroomId}/{subcollection}/{documentId} {
+      // Allow any authenticated user to send a join request
+      allow create: if request.auth != null && subcollection == 'joinRequests';
+      // Creator/teacher can read/write everything else
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
+    }
+    
+    // Meeting rules
+    match /meetings/{meetingId} {
+      allow read: if request.auth != null;
+      // Allow creation only if the creatorId in the new doc matches the user's ID
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+    }
+    
+    match /meetings/{meetingId}/{subcollection}/{documentId} {
+       // Allow any authenticated user to create a join request
+      allow create: if request.auth != null && subcollection == 'joinRequests';
+      // The host can read/write everything in their meeting's subcollections
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId == request.auth.uid;
+    }
+
+    // Documents & Recordings rules
+    match /documents/{docId} {
+      allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+      allow read: if request.resource.data.isPrivate == false || (request.auth != null && request.resource.data.uploaderId == request.auth.uid);
+      allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
+    }
+
+    match /recordings/{recId} {
+      allow create: if request.auth != null && request.resource.data.uploaderId == request.auth.uid;
+      allow read: if request.resource.data.isPrivate == false || (request.auth != null && request.resource.data.uploaderId == request.auth.uid);
+      allow update, delete: if request.auth != null && resource.data.uploaderId == request.auth.uid;
     }
   }
 }
