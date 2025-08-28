@@ -113,24 +113,25 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
     <div className="w-full h-full relative">
       <div className={cn(
         "absolute top-0 left-0 w-full h-full p-2 md:p-4 transition-all duration-300",
-        hasRemotes
-          ? "grid grid-cols-1 md:grid-cols-4 grid-rows-4 md:grid-rows-1 gap-2 md:gap-4"
-          : "flex items-center justify-center"
+        hasRemotes && "grid grid-cols-1 md:grid-cols-4 grid-rows-4 md:grid-rows-1 gap-2 md:gap-4"
       )}>
         {/* Remote videos container - only shown if there are remotes */}
-        {hasRemotes && (
-          <div 
+        <div 
             id="remotes"
-            className="w-full h-full col-span-1 row-span-3 md:col-span-3 md:row-span-1 grid grid-cols-2 grid-rows-2 sm:grid-cols-3 gap-2 md:gap-4"
+            className={cn(
+              "w-full h-full",
+              hasRemotes 
+                ? "col-span-1 row-span-3 md:col-span-3 md:row-span-1 grid grid-cols-2 grid-rows-2 sm:grid-cols-3 gap-2 md:gap-4" 
+                : "hidden"
+            )}
           />
-        )}
         
         {/* Local video tile - styling adjusts based on remote presence */}
         <div className={cn(
           "flex items-center justify-center",
           hasRemotes
-            ? "w-full h-full col-span-1 row-span-1"
-            : "w-full h-full max-w-4xl" // Takes up more space when alone
+            ? "w-full h-full col-span-1 row-span-1" // Small tile in grid view
+            : "w-full h-full" // Full screen when alone
         )}>
             <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg relative">
                  <video
