@@ -143,6 +143,9 @@ export default function MeetingPage() {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [isHandRaised, setIsHandRaised] = useState(false);
+  const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
+  const [isParticipantJoining, setIsParticipantJoining] = useState(false);
+
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
   // --- State for Participants Sheet ---
@@ -151,8 +154,6 @@ export default function MeetingPage() {
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
   const currentUserId = auth.currentUser?.uid;
   const { toast } = useToast();
-  const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
-  const [isParticipantJoining, setIsParticipantJoining] = useState(false);
   // ---
 
   useEffect(() => {
