@@ -16,34 +16,10 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db, auth } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
-
-async function handleJoinAsHost(meetingId: string) {
-  const user = auth.currentUser;
-  if (!user) {
-    alert("Please sign in first.");
-    return;
-  }
-
-  try {
-    // Firestore write (don’t wait for redirect)
-    setDoc(doc(db, "meetings", meetingId), {
-      hostId: user.uid,
-      hostName: user.displayName || "Host",
-      createdAt: Date.now(),
-      isActive: true,
-    }, { merge: true });
-
-    // Redirect immediately
-    window.location.assign(`/dashboard/meeting/${meetingId}`);
-  } catch (err) {
-    console.error("Failed to start meeting:", err);
-    alert("Failed to start meeting.");
-  }
-}
 
 export default function WaitingAreaPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -246,6 +222,37 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
+  const handleHostJoin = async () => {
+    if (!user) return;
+    try {
+        const batch = writeBatch(db);
+        const meetingDocRef = doc(db, "meetings", meetingId);
+        batch.set(meetingDocRef, {
+            creatorId: user.uid,
+            topic: topic || "Untitled Meeting",
+            createdAt: serverTimestamp(),
+        });
+        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
+        batch.set(participantDocRef, {
+            name: user.displayName || userName,
+            photoURL: user.photoURL,
+            isMicMuted: !isMicActive,
+            isCameraOff: !isCameraActive,
+            isHandRaised: false,
+            isScreenSharing: false,
+            joinedAt: serverTimestamp(),
+        });
+        await batch.commit();
+
+        const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+        router.push(joinNowLinkPath);
+
+    } catch (error) {
+        console.error("Host failed to create/update meeting document:", error);
+        toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
+    }
+  }
+
   const handleGuestJoinAction = async () => {
     localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
@@ -280,7 +287,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       const disabled = !agreedToTerms;
-      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: () => handleJoinAsHost(meetingId) };
+      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleHostJoin };
     }
 
     let text = "Ask to Join";
