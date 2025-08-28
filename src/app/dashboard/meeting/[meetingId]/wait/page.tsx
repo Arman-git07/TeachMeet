@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db, auth } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -78,26 +78,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       setIsLoadingMeetingData(false);
     }
   }, [meetingId, user, authLoading, isExplicitHost]);
-
-  // Host action: Create meeting document as soon as they land in the waiting room
-  useEffect(() => {
-      if (isHost && user && !isLoadingMeetingData) {
-          const meetingDocRef = doc(db, 'meetings', meetingId);
-          getDoc(meetingDocRef).then(docSnap => {
-              if (!docSnap.exists()) {
-                  setDoc(meetingDocRef, {
-                      creatorId: user.uid,
-                      topic: topic || "Untitled Meeting",
-                      createdAt: serverTimestamp(),
-                      status: "waiting", // A host is waiting
-                  }).catch(error => {
-                      console.error("Host failed to create initial meeting document:", error);
-                      toast({ variant: 'destructive', title: 'Failed to Prepare Room', description: 'Could not create the meeting room. Check Firestore rules.'});
-                  });
-              }
-          });
-      }
-  }, [isHost, user, meetingId, topic, isLoadingMeetingData, toast]);
 
 
   // Listener for guests awaiting approval.
@@ -253,11 +233,22 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        // The meeting doc is already created by the useEffect hook for the host.
-        // Host now just adds themselves as a participant and joins.
+        const meetingDocRef = doc(db, "meetings", meetingId);
         const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
         try {
-            await setDoc(participantDocRef, {
+            // Use a batch write to ensure atomicity
+            const batch = writeBatch(db);
+
+            // Step 1: Create the main meeting document WITH the creatorId
+            batch.set(meetingDocRef, {
+                creatorId: user.uid, // This is the crucial field for security rules
+                topic: topic || "Untitled Meeting",
+                createdAt: serverTimestamp(),
+                status: "active", // Host is joining, so it's active
+            });
+
+            // Step 2: Add the host as a participant in the same batch
+            batch.set(participantDocRef, {
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
                 isMicMuted: !isMicActive,
@@ -267,11 +258,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 joinedAt: serverTimestamp(),
             });
 
+            await batch.commit(); // Commit both operations together
+
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
-            console.error("Host failed to join meeting:", error);
-            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not add you to the meeting room. Check Firestore rules.'});
+            console.error("Host failed to create meeting:", error);
+            toast({ variant: 'destructive', title: 'Failed to Start Meeting', description: 'Could not create the meeting room. Please check Firestore rules and console logs for details.'});
         }
         return;
     }
