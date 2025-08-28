@@ -133,6 +133,8 @@ const ParticipantItem = React.memo(({
 ParticipantItem.displayName = 'ParticipantItem';
 // --- End of Participant List Logic ---
 
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+
 export default function MeetingPage() {
   const { meetingId } = useParams() as { meetingId: string };
   const searchParams = useSearchParams();
@@ -276,7 +278,24 @@ export default function MeetingPage() {
     return null;
   }
   
-  const backToHomepage = () => router.push('/');
+  const backToHomepage = () => {
+    try {
+      const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+      if (startedMeetingsRaw) {
+        let startedMeetings = JSON.parse(startedMeetingsRaw);
+        if (Array.isArray(startedMeetings)) {
+          // Remove the current meeting from the list
+          const updatedMeetings = startedMeetings.filter(m => m.id !== meetingId);
+          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
+          window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update ongoing meetings in localStorage:", error);
+    }
+    router.push('/');
+  };
+  
   const isCurrentUserTheHost = currentUserId === meetingCreatorId;
 
   return (
@@ -319,7 +338,7 @@ export default function MeetingPage() {
           <Sheet open={isParticipantsPanelOpen} onOpenChange={setIsParticipantsPanelOpen}>
             <SheetTrigger asChild>
                <Button
-                variant={isParticipantsPanelOpen ? 'default' : 'destructive'}
+                variant={'destructive'}
                 size="icon"
                 className={cn(
                   "rounded-full w-12 h-12 md:w-14 md:h-14",
