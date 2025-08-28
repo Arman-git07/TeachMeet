@@ -244,8 +244,54 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
   const handleJoinAction = async () => {
-    // Removed all features from this function as requested.
-    return;
+    localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
+    localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
+    
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
+        return;
+    }
+
+    if (isHost) {
+        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
+        try {
+            // The meeting document is already created by the useEffect hook.
+            // Host now just adds themselves as a participant and joins.
+            await setDoc(participantDocRef, {
+                name: user.displayName || userName,
+                photoURL: user.photoURL,
+                isMicMuted: !isMicActive,
+                isCameraOff: !isCameraActive,
+                isHandRaised: false,
+                isScreenSharing: false,
+                joinedAt: serverTimestamp(),
+            });
+
+            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+            router.push(joinNowLinkPath);
+        } catch (error) {
+            console.error("Host failed to join meeting:", error);
+            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not add you to the meeting room. Check Firestore rules.'});
+        }
+        return;
+    }
+
+    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
+    const requestData = {
+        name: user.displayName || userName,
+        photoURL: user.photoURL,
+        requestedAt: serverTimestamp(),
+    };
+
+    try {
+      await setDoc(requestRef, requestData);
+      setJoinStatus('pending');
+      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
+    } catch (error: any) {
+        console.error("Join request failed:", error.code, error.message);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. The meeting may not exist or there may be a permissions issue.'});
+        setJoinStatus('idle');
+    }
   };
 
   const getButtonState = () => {
@@ -433,3 +479,5 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
+
+    
