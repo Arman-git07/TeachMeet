@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db, auth } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
@@ -98,15 +98,22 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         console.error("Error listening to participant document:", error);
     });
     
-    // Instead of listening to joinRequests (which may be deleted), we listen for our *own* participant document
-    // to be created. This is a more reliable signal of approval.
-    // The denial logic is tricky without a clear signal. We can assume if our request is deleted, it's a denial.
-    // However, for this to work, we'd need to know the classroom ID.
-    // The meetingId is used for the P2P connection, but join requests should logically be tied to a classroom.
-    // This part of the code needs to be re-evaluated for a full app. For now, the approval flow is primary.
-    
+    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+    const unsubscribeDenial = onSnapshot(requestDocRef, (requestSnap) => {
+        // If the request document that we are listening to is deleted, it means we were denied.
+        if (!requestSnap.exists() && joinStatus === 'pending') {
+            // A short delay helps prevent race conditions where we get approved and the doc is deleted in quick succession.
+            setTimeout(() => {
+                if (joinStatus === 'pending') {
+                    setJoinStatus('denied');
+                }
+            }, 1500);
+        }
+    });
+
     return () => {
         unsubscribe();
+        unsubscribeDenial();
     };
   }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
 
@@ -217,13 +224,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
-  const handleHostJoin = async () => {
-    if (!user) return;
-    const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-    router.push(joinNowLinkPath);
-  }
-
-  const handleGuestJoinAction = async () => {
+  const handleJoinAction = async () => {
     localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
     
@@ -232,25 +233,34 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
-    const classroomId = searchParams.get('classroomId'); // A classroom context is needed for requests
-    if (!classroomId) {
-        toast({ variant: 'destructive', title: 'Classroom context missing', description: 'Cannot send a join request without a classroom context.'});
+    if (isHost) {
+        const meetingDocRef = doc(db, "meetings", meetingId);
+        try {
+            await setDoc(meetingDocRef, {
+                creatorId: user.uid,
+                topic: topic || "Untitled Meeting",
+                createdAt: serverTimestamp(),
+            });
+            // The host no longer adds themselves as a participant here.
+            // This will be handled by the on-connection logic in the meeting page.
+            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+            router.push(joinNowLinkPath);
+        } catch (error) {
+            console.error("Host failed to create/update meeting document:", error);
+            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
+        }
         return;
     }
 
-    // Join requests are now sent to the CLASSROOM, not the meeting document.
-    const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
+    // Guest Logic
+    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
-        studentId: user.uid,
-        studentName: user.displayName || userName,
-        studentPhotoURL: user.photoURL || '',
-        role: 'student', // Assuming guests are students for meeting purposes
+        name: user.displayName || userName,
+        photoURL: user.photoURL,
         requestedAt: serverTimestamp(),
     };
 
     try {
-      // This pattern assumes users have permission to write to a 'joinRequests' subcollection
-      // within a classroom, which is a more reasonable security rule setup.
       await setDoc(requestRef, requestData);
       setJoinStatus('pending');
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
@@ -268,7 +278,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
       const disabled = !agreedToTerms;
-      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleHostJoin };
+      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
 
     let text = "Ask to Join";
@@ -283,11 +293,11 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         text, 
         disabled, 
         showSpinner: false, 
-        onClick: () => { setJoinStatus('idle'); handleGuestJoinAction(); }
+        onClick: () => { setJoinStatus('idle'); handleJoinAction(); }
       };
     }
     
-    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleGuestJoinAction };
+    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
