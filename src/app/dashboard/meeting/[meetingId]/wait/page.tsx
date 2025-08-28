@@ -259,10 +259,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             await setDoc(meetingDocRef, {
                 creatorId: user.uid,
                 topic: topic || "Untitled Meeting",
-                createdAt: serverTimestamp(),
+                status: "active",
             }, { merge: true });
 
-            // Host also adds themselves as a participant immediately
             await setDoc(participantDocRef, {
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
@@ -485,5 +484,3 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
-
-    
