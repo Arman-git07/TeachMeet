@@ -260,18 +260,15 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     // Guest Logic: Send a join request by creating a document in the subcollection.
     const requestData = {
+        userId: user.uid,
         name: user.displayName || userName,
         photoURL: user.photoURL,
         requestedAt: serverTimestamp(),
-        status: 'pending', // Important for host UI
+        status: 'pending',
     };
 
     try {
-      // Use addDoc to create a new request document with a random ID.
-      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), {
-        ...requestData,
-        userId: user.uid, // Add user's ID for identification
-      });
+      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), requestData);
       setJoinStatus('pending');
       toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
     } catch (error: any) {
