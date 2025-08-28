@@ -14,6 +14,7 @@ import {
   Phone,
   Settings,
   MoreVertical,
+  UserCog,
 } from 'lucide-react';
 import React, { useEffect, useState, useCallback, use } from 'react';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,10 @@ export default function MeetingPage() {
                 <DropdownMenuItem onSelect={() => { /* Implement screen share logic */ }} className="cursor-pointer">
                     <MonitorUp className="mr-2 h-4 w-4"/>
                     <span>Share Screen</span>
+                </DropdownMenuItem>
+                 <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+                    <UserCog className="mr-2 h-4 w-4"/>
+                    <span>Manage Participants</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
                     <MessageSquare className="mr-2 h-4 w-4"/>
