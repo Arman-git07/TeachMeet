@@ -79,6 +79,27 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
   }, [meetingId, user, authLoading, isExplicitHost]);
 
+  // Host action: Create meeting document as soon as they land in the waiting room
+  useEffect(() => {
+      if (isHost && user && !isLoadingMeetingData) {
+          const meetingDocRef = doc(db, 'meetings', meetingId);
+          getDoc(meetingDocRef).then(docSnap => {
+              if (!docSnap.exists()) {
+                  setDoc(meetingDocRef, {
+                      creatorId: user.uid,
+                      topic: topic || "Untitled Meeting",
+                      createdAt: serverTimestamp(),
+                      status: "waiting", // A host is waiting
+                  }).catch(error => {
+                      console.error("Host failed to create initial meeting document:", error);
+                      toast({ variant: 'destructive', title: 'Failed to Prepare Room', description: 'Could not create the meeting room. Check Firestore rules.'});
+                  });
+              }
+          });
+      }
+  }, [isHost, user, meetingId, topic, isLoadingMeetingData, toast]);
+
+
   // Listener for guests awaiting approval.
   useEffect(() => {
     if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
@@ -100,9 +121,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     
     const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const unsubscribeDenial = onSnapshot(requestDocRef, (requestSnap) => {
-        // If the request document that we are listening to is deleted, it means we were denied.
         if (!requestSnap.exists() && joinStatus === 'pending') {
-            // A short delay helps prevent race conditions where we get approved and the doc is deleted in quick succession.
             setTimeout(() => {
                 if (joinStatus === 'pending') {
                     setJoinStatus('denied');
@@ -234,21 +253,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        const meetingDocRef = doc(db, "meetings", meetingId);
-        try {
-            await setDoc(meetingDocRef, {
-                creatorId: user.uid,
-                topic: topic || "Untitled Meeting",
-                createdAt: serverTimestamp(),
-            });
-            // The host no longer adds themselves as a participant here.
-            // This will be handled by the on-connection logic in the meeting page.
-            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
-        } catch (error) {
-            console.error("Host failed to create/update meeting document:", error);
-            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
-        }
+        const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+        router.push(joinNowLinkPath);
         return;
     }
 
