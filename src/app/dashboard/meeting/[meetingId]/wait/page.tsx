@@ -198,7 +198,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         currentMicStreamRef.current = stream;
-        setHasMicPermission(true);
+        setHasCameraPermission(true);
         setIsMicActive(true);
         toast({
           title: "Microphone On",
