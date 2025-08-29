@@ -1,19 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // Meetings collection
     match /meetings/{meetingId} {
-      // Host can create the meeting
-      allow create: if request.auth != null
-                    && request.auth.uid == request.resource.data.hostId;
+      // Host can create/update the meeting document
+      allow create, update: if request.auth != null
+                            && request.auth.uid == request.resource.data.hostId;
 
       // Anyone signed in can read meeting
       allow read: if request.auth != null;
 
-      // Only host can update or delete
-      allow update, delete: if request.auth != null
-                            && request.auth.uid == resource.data.hostId;
+      // Only host can delete the meeting
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.hostId;
 
       // Participants subcollection
       match /participants/{participantId} {
@@ -26,41 +25,41 @@ service cloud.firestore {
 
         // User can update/delete only their own participant doc
         allow update, delete: if request.auth != null
-                              && request.auth.uid == resource.data.uid;
+                              && request.auth.uid == participantId;
+      }
+    }
+
+    // Classrooms collection
+    match /classrooms/{classroomId} {
+      // Public classrooms are readable by anyone, private only by members
+      allow read: if resource.data.isPublic == true || request.auth.uid in resource.data.students || request.auth.uid == resource.data.teacherId;
+
+      // Only the teacher can create/update/delete
+      allow create, update, delete: if request.auth != null && request.auth.uid == resource.data.teacherId;
+      
+      // Subcollections within a classroom
+      match /{subcollection}/{docId} {
+        // Teachers can do anything
+        allow read, write: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
       }
       
-      // Join requests subcollection inside meetings
       match /joinRequests/{requestId} {
-          allow create: if request.auth != null; // any signed-in user can send a join request
-          allow read, update, delete: if request.auth != null && get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid;
+        // Allow any authenticated user to create a join request
+        allow create: if request.auth != null;
+        // Allow teacher to read/delete requests
+        allow read, delete: if request.auth != null && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
       }
     }
     
-    // User data collections
+    // User-specific data
     match /users/{userId}/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Classroom collections
-    match /classrooms/{classroomId}/{document=**} {
-        allow read, write: if request.auth != null; // Broad access for prototype
-    }
-    
-    // Documents & Recordings
-    match /documents/{docId} {
-      allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uploaderId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-    match /recordings/{recId} {
-      allow read: if resource.data.isPrivate == false || (request.auth != null && request.auth.uid == resource.data.uploaderId);
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uploaderId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.uploaderId;
-    }
-
-    // Fallback security rule - deny all other access
-    match /{path=**}/documents/{wildcard} {
-        allow read, write: if false;
-    }
+    // Default deny all other collections
+    // Note: this block is commented out as the final user-provided rules did not have it.
+    // match /{path=**}/documents/{docId} {
+    //   allow read, write: if false;
+    // }
   }
 }
