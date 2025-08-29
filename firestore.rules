@@ -1,44 +1,50 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     // Meetings collection
     match /meetings/{meetingId} {
-      // Allow a signed-in user to create a meeting document if they set themselves as the host.
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.hostId;
-
-      // Allow any signed-in user to read the main meeting document.
+      // Host can create the meeting document
+      allow create: if request.auth != null && request.resource.data.hostId == request.auth.uid;
+      
+      // Anyone signed in can read the meeting details
       allow read: if request.auth != null;
 
-      // Only allow the host to update or delete the meeting document.
-      // This checks the *existing* document's data.
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.hostId;
+      // Only the host can update or delete the meeting document
+      allow update, delete: if request.auth != null && resource.data.hostId == request.auth.uid;
 
       // Participants subcollection
       match /participants/{participantId} {
-        // Allow a user to add themselves as a participant.
-        // Also, allow the host of the meeting to add any participant. This is crucial for the host's initial batched write.
-        allow create: if request.auth != null && (request.auth.uid == participantId || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+        // A user can create their OWN participant document. The host can add themselves.
+        allow create: if request.auth != null && request.auth.uid == participantId;
 
-        // Allow any signed-in user to read the list of participants.
+        // Anyone signed in to the meeting can see who else is in it
         allow read: if request.auth != null;
 
-        // Allow a user to update or remove themselves.
-        // Also, allow the host to update or remove any participant.
-        allow update, delete: if request.auth != null && (request.auth.uid == participantId || request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+        // A user can only update or delete their own participant document
+        allow update, delete: if request.auth != null && request.auth.uid == participantId;
       }
-      
-      // Join requests subcollection
-      match /joinRequests/{requestId} {
-        // Any signed-in user can request to join.
-        allow create: if request.auth != null;
-        
-        // Only the host can read or delete join requests.
-        allow read, delete: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId;
+
+      // Join Requests subcollection
+      match /joinRequests/{userId} {
+        // Any signed-in user can request to join
+        allow create: if request.auth != null && request.auth.uid == userId;
+
+        // The host can read and delete join requests
+        allow read, delete: if request.auth != null && get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid;
       }
     }
+    
+    // Classrooms collection
+    match /classrooms/{classroomId} {
+        allow read, write: if true; // Keeping this open for now to avoid breaking other features
+        match /{document=**} {
+            allow read, write: if true;
+        }
+    }
 
-    // Default deny all other reads/writes to collections not explicitly defined.
-    match /{path=**}/documents {
+    // Default deny all other collections
+    match /{document=**} {
       allow read, write: if false;
     }
   }
