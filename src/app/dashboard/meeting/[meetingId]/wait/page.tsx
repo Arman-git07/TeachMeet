@@ -43,6 +43,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
   const [isLoading, setIsLoading] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoStreamRef = useRef<MediaStream | null>(null);
@@ -50,10 +51,33 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const { toast } = useToast();
   
   useEffect(() => {
-    if (isExplicitHost) {
+    // Determine host status. Prioritize the explicit URL flag.
+    if (isExplicitHost && user) {
       setIsHost(true);
+      setIsLoadingMeetingData(false);
+    } else if (user && !authLoading) {
+      // If not explicitly a host, check the database for existing meeting.
+      const meetingDocRef = doc(db, 'meetings', meetingId);
+      getDoc(meetingDocRef).then(docSnap => {
+        if (docSnap.exists()) {
+          setIsHost(docSnap.data().hostId === user.uid);
+        } else {
+          // If doc doesn't exist and they don't have the flag, they are a guest.
+          setIsHost(false);
+        }
+      }).catch(err => {
+        console.error("Error checking host status:", err);
+        setIsHost(false);
+      }).finally(() => {
+        setIsLoadingMeetingData(false);
+      });
     }
-  }, [isExplicitHost]);
+    // If not logged in, they cannot be the host.
+    if (!user && !authLoading) {
+      setIsHost(false);
+      setIsLoadingMeetingData(false);
+    }
+  }, [meetingId, user, authLoading, isExplicitHost]);
 
 
   // Listener for guests awaiting approval.
@@ -272,7 +296,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   };
 
   const getButtonState = () => {
-    if (authLoading) {
+    if (authLoading || isLoadingMeetingData) {
       return { text: "Loading...", disabled: true, showSpinner: true, onClick: () => {} };
     }
 
@@ -457,5 +481,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
+
 
 
