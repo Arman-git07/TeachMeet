@@ -242,15 +242,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             const meetingDocRef = doc(db, "meetings", meetingId);
             const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
             
-            // 1. Create the meeting document with the hostId
             batch.set(meetingDocRef, {
                 hostId: user.uid,
-                hostName: user.displayName || "Host",
+                hostName: user.displayName || userName,
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            }, { merge: true }); // Use merge:true to ensure create/update works with rules
+            }, { merge: true });
 
-            // 2. Add the host to the participants subcollection
             batch.set(participantDocRef, {
                 uid: user.uid,
                 name: user.displayName || userName,
@@ -262,17 +260,14 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 joinedAt: serverTimestamp(),
             });
             
-            // 3. Commit both operations atomically
             await batch.commit();
-
-            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
-
         } catch (error) {
-            console.error("Host failed to create/update meeting document:", error);
+            console.error("Firestore error, but redirecting anyway:", error);
             toast({ variant: 'destructive', title: 'Failed to Start Meeting', description: 'Could not create the meeting room. Please check Firestore rules and console logs for details.'});
-            setIsLoading(false);
         }
+        
+        const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+        router.push(joinNowLinkPath);
         return;
     }
 
@@ -483,8 +478,3 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
-
-
-
-
-
