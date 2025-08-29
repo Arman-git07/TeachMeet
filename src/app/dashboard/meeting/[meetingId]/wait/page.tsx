@@ -248,7 +248,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 hostName: user.displayName || "Host",
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-            });
+            }, { merge: true }); // Use merge:true to ensure create/update works with rules
 
             // 2. Add the host to the participants subcollection
             batch.set(participantDocRef, {
@@ -483,6 +483,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
+
 
 
 
