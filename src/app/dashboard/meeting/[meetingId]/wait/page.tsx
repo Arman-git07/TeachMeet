@@ -41,43 +41,19 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
-  const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isHost, setIsHost] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoStreamRef = useRef<MediaStream | null>(null);
   const currentMicStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  const [isHost, setIsHost] = useState(false);
-
   useEffect(() => {
-    // Determine host status. Prioritize the explicit URL flag.
-    if (isExplicitHost && user) {
+    if (isExplicitHost) {
       setIsHost(true);
-      setIsLoadingMeetingData(false);
-    } else if (user && !authLoading) {
-      // If not explicitly a host, check the database for existing meeting.
-      const meetingDocRef = doc(db, 'meetings', meetingId);
-      getDoc(meetingDocRef).then(docSnap => {
-        if (docSnap.exists()) {
-          setIsHost(docSnap.data().creatorId === user.uid);
-        } else {
-          // If doc doesn't exist and they don't have the flag, they are a guest.
-          setIsHost(false);
-        }
-      }).catch(err => {
-        console.error("Error checking host status:", err);
-        setIsHost(false);
-      }).finally(() => {
-        setIsLoadingMeetingData(false);
-      });
     }
-    // If not logged in, they cannot be the host.
-    if (!user && !authLoading) {
-      setIsHost(false);
-      setIsLoadingMeetingData(false);
-    }
-  }, [meetingId, user, authLoading, isExplicitHost]);
+  }, [isExplicitHost]);
 
 
   // Listener for guests awaiting approval.
@@ -224,31 +200,26 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const displayTitle = topic ? `${topic}` : `Meeting ID: ${meetingId}`;
   
   const handleJoinAction = async () => {
+    setIsLoading(true);
     localStorage.setItem('teachmeet-desired-camera-state', isCameraActive ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', isMicActive ? 'on' : 'off');
     
     if (!user) {
         toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to join a meeting.'});
+        setIsLoading(false);
         return;
     }
 
     if (isHost) {
-        const meetingDocRef = doc(db, "meetings", meetingId);
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
         try {
-            // Use a batch write to ensure atomicity
-            const batch = writeBatch(db);
-
-            // Step 1: Create the main meeting document WITH the creatorId
-            batch.set(meetingDocRef, {
-                creatorId: user.uid, // This is the crucial field for security rules
+            await setDoc(doc(db, "meetings", meetingId), {
+                hostId: user.uid,
+                hostName: user.displayName || "Host",
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
-                status: "active", // Host is joining, so it's active
             });
-
-            // Step 2: Add the host as a participant in the same batch
-            batch.set(participantDocRef, {
+            // Host also adds themselves as a participant immediately
+            await setDoc(doc(db, "meetings", meetingId, "participants", user.uid), {
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
                 isMicMuted: !isMicActive,
@@ -257,18 +228,17 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 isScreenSharing: false,
                 joinedAt: serverTimestamp(),
             });
-
-            await batch.commit(); // Commit both operations together
-
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
         } catch (error) {
-            console.error("Host failed to create meeting:", error);
+            console.error("Host failed to create/update meeting document:", error);
             toast({ variant: 'destructive', title: 'Failed to Start Meeting', description: 'Could not create the meeting room. Please check Firestore rules and console logs for details.'});
+            setIsLoading(false);
         }
         return;
     }
 
+    // Guest Logic
     const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
         name: user.displayName || userName,
@@ -284,36 +254,39 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         console.error("Join request failed:", error.code, error.message);
         toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. The meeting may not exist or there may be a permissions issue.'});
         setJoinStatus('idle');
+    } finally {
+        setIsLoading(false);
     }
   };
 
   const getButtonState = () => {
-    if (authLoading || isLoadingMeetingData) {
+    if (authLoading) {
       return { text: "Loading...", disabled: true, showSpinner: true, onClick: () => {} };
     }
 
+    let disabled = !agreedToTerms || isLoading;
+
     if (isHost) {
-      const disabled = !agreedToTerms;
-      return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
+      return { text: "Join Now as Host", disabled, showSpinner: isLoading, onClick: handleJoinAction };
     }
 
     let text = "Ask to Join";
-    let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
+    disabled = disabled || joinStatus === 'pending' || joinStatus === 'approved';
 
     if (joinStatus === 'pending') text = "Waiting for Host...";
     if (joinStatus === 'approved') text = "Joining...";
     if (joinStatus === 'denied') {
       text = "Request Denied. Ask again?";
-      disabled = !agreedToTerms;
+      disabled = !agreedToTerms || isLoading;
       return { 
         text, 
         disabled, 
-        showSpinner: false, 
+        showSpinner: isLoading, 
         onClick: () => { setJoinStatus('idle'); handleJoinAction(); }
       };
     }
     
-    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
+    return { text, disabled, showSpinner: isLoading, onClick: handleJoinAction };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
