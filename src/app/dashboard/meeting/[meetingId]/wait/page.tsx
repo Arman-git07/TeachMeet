@@ -52,10 +52,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   
   useEffect(() => {
     // Determine host status. Prioritize the explicit URL flag.
+    if (authLoading) return;
+    
     if (isExplicitHost && user) {
       setIsHost(true);
       setIsLoadingMeetingData(false);
-    } else if (user && !authLoading) {
+    } else if (user) {
       // If not explicitly a host, check the database for existing meeting.
       const meetingDocRef = doc(db, 'meetings', meetingId);
       getDoc(meetingDocRef).then(docSnap => {
@@ -481,6 +483,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
+
 
 
 
