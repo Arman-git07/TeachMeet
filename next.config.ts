@@ -12,6 +12,9 @@ const nextConfig = {
   //     },
   //   ],
   // },
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
 };
 
 // Incrementing this comment to force a cache clear: 4

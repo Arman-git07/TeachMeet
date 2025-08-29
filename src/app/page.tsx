@@ -1,9 +1,8 @@
 
-
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -82,48 +81,48 @@ export default function HomePage() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   
+  const loadActivities = useCallback(() => {
+    setIsLoading(true);
+
+    const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
+    const dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
+    
+    const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+    let ongoingMeetings: MeetingActivityItem[] = [];
+
+    if (user && startedMeetingsRaw) {
+      let storedMeetings = JSON.parse(startedMeetingsRaw);
+      if (Array.isArray(storedMeetings)) {
+        const now = Date.now();
+        const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < THIRTY_MINUTES_IN_MS));
+        
+        if(validMeetings.length < storedMeetings.length) {
+          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(validMeetings));
+        }
+
+        ongoingMeetings = validMeetings.map((m: any) => ({
+          ...m,
+          type: 'meeting',
+          id: `meeting-${m.id}`,
+          timestamp: m.startedAt,
+        }));
+      }
+    }
+    
+    const latestActivityRaw = localStorage.getItem(LATEST_ACTIVITY_KEY);
+    const otherActivities = latestActivityRaw ? JSON.parse(latestActivityRaw) : [];
+
+    const combined = [...ongoingMeetings, ...otherActivities]
+      .filter(item => !dismissedItemIds.includes(item.id))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    setAllActivity(combined);
+    setIsLoading(false);
+  }, [user]);
+
   useEffect(() => {
     // We only want to load activities once authentication is resolved.
     if (authLoading) return;
-
-    const loadActivities = () => {
-      setIsLoading(true);
-
-      const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
-      const dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
-      
-      const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-      let ongoingMeetings: MeetingActivityItem[] = [];
-
-      if (user && startedMeetingsRaw) {
-        let storedMeetings = JSON.parse(startedMeetingsRaw);
-        if (Array.isArray(storedMeetings)) {
-          const now = Date.now();
-          const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < THIRTY_MINUTES_IN_MS));
-          
-          if(validMeetings.length < storedMeetings.length) {
-            localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(validMeetings));
-          }
-
-          ongoingMeetings = validMeetings.map((m: any) => ({
-            ...m,
-            type: 'meeting',
-            id: `meeting-${m.id}`,
-            timestamp: m.startedAt,
-          }));
-        }
-      }
-      
-      const latestActivityRaw = localStorage.getItem(LATEST_ACTIVITY_KEY);
-      const otherActivities = latestActivityRaw ? JSON.parse(latestActivityRaw) : [];
-
-      const combined = [...ongoingMeetings, ...otherActivities]
-        .filter(item => !dismissedItemIds.includes(item.id))
-        .sort((a, b) => b.timestamp - a.timestamp);
-
-      setAllActivity(combined);
-      setIsLoading(false);
-    };
 
     loadActivities();
 
@@ -146,7 +145,7 @@ export default function HomePage() {
       window.removeEventListener('teachmeet_meeting_ended', loadActivities);
       window.removeEventListener('teachmeet_activity_updated', loadActivities);
     };
-  }, [user, authLoading]);
+  }, [authLoading, loadActivities]);
 
 
   const tmVisibleDuration = 350;
@@ -233,7 +232,7 @@ export default function HomePage() {
               <History className="mr-3 h-6 w-6" />
               Latest Activity
             </h2>
-            {authLoading ? (
+            {isLoading || authLoading ? (
                 <div className="flex justify-center items-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-primary"/>
                   <p className="ml-2 text-muted-foreground">Checking for activities...</p>

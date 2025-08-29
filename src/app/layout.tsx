@@ -16,10 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${geistSansFont.variable} ${geistMonoFont.variable}`}>
+      <head>
+        
+      </head>
       <body className={cn(
-        geistSansFont.variable,
-        geistMonoFont.variable,
         'font-sans antialiased min-h-screen flex flex-col' 
       )}>
         <Providers>
