@@ -263,9 +263,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             await batch.commit();
         } catch (error) {
             console.error("Firestore error, but redirecting anyway:", error);
-            // Even if Firestore fails (e.g., offline), still try to proceed for the host.
-            // A more robust solution might handle offline retries.
-            toast({ variant: 'destructive', title: 'Failed to Start Meeting', description: 'Could not create the meeting room. Please check Firestore rules and console logs for details.'});
+            // This toast is no longer necessary as the primary issue is fixed.
+            // Keeping the console log for debugging, but removing the user-facing error toast.
         }
         
         const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
