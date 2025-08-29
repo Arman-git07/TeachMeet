@@ -263,6 +263,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             await batch.commit();
         } catch (error) {
             console.error("Firestore error, but redirecting anyway:", error);
+            // Even if Firestore fails (e.g., offline), still try to proceed for the host.
+            // A more robust solution might handle offline retries.
             toast({ variant: 'destructive', title: 'Failed to Start Meeting', description: 'Could not create the meeting room. Please check Firestore rules and console logs for details.'});
         }
         
