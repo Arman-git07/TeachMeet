@@ -212,14 +212,20 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
     if (isHost) {
         try {
-            await setDoc(doc(db, "meetings", meetingId), {
+            const batch = writeBatch(db);
+            const meetingDocRef = doc(db, "meetings", meetingId);
+            const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
+            
+            // Create the meeting document with the hostId
+            batch.set(meetingDocRef, {
                 hostId: user.uid,
                 hostName: user.displayName || "Host",
                 topic: topic || "Untitled Meeting",
                 createdAt: serverTimestamp(),
             });
-            // Host also adds themselves as a participant immediately
-            await setDoc(doc(db, "meetings", meetingId, "participants", user.uid), {
+
+            // Add the host to the participants subcollection
+            batch.set(participantDocRef, {
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
                 isMicMuted: !isMicActive,
@@ -228,8 +234,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 isScreenSharing: false,
                 joinedAt: serverTimestamp(),
             });
+
+            await batch.commit();
+
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
             router.push(joinNowLinkPath);
+
         } catch (error) {
             console.error("Host failed to create/update meeting document:", error);
             toast({ variant: 'destructive', title: 'Failed to Start Meeting', description: 'Could not create the meeting room. Please check Firestore rules and console logs for details.'});
