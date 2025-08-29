@@ -216,7 +216,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             const meetingDocRef = doc(db, "meetings", meetingId);
             const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
             
-            // Create the meeting document with the hostId
+            // 1. Create the meeting document with the hostId
             batch.set(meetingDocRef, {
                 hostId: user.uid,
                 hostName: user.displayName || "Host",
@@ -224,8 +224,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 createdAt: serverTimestamp(),
             });
 
-            // Add the host to the participants subcollection
+            // 2. Add the host to the participants subcollection
             batch.set(participantDocRef, {
+                uid: user.uid,
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
                 isMicMuted: !isMicActive,
@@ -234,7 +235,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 isScreenSharing: false,
                 joinedAt: serverTimestamp(),
             });
-
+            
+            // 3. Commit both operations atomically
             await batch.commit();
 
             const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
@@ -455,4 +457,5 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
+
 
