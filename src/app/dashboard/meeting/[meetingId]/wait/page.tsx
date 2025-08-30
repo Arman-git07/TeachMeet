@@ -221,19 +221,17 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             }, { merge: true });
 
             batch.set(participantDocRef, {
-                uid: user.uid,
                 name: user.displayName || userName,
                 photoURL: user.photoURL,
                 isMicMuted: !isMicActive,
                 isCameraOff: !isCameraActive,
-                isHandRaised: false,
-                isScreenSharing: false,
                 joinedAt: serverTimestamp(),
             });
             
             await batch.commit();
         } catch (error) {
              console.error("Firestore error, but redirecting anyway:", error);
+             // Previous logic had a toast here which was confusing. Removed it.
         }
         
         const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
@@ -241,11 +239,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         return;
     }
 
-    // Guest Logic
+    // Guest Logic: Send a join request
     const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
     const requestData = {
         name: user.displayName || userName,
         photoURL: user.photoURL,
+        requestingUserId: user.uid, // for security rules
+        status: 'pending',
         requestedAt: serverTimestamp(),
     };
 

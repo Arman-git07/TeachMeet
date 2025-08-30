@@ -21,6 +21,7 @@ import {
   Maximize,
   UserX,
   Loader2,
+  Bell,
 } from 'lucide-react';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
@@ -31,15 +32,44 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription, SheetClose } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { db, auth } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, getDoc, DocumentData } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, DocumentData, updateDoc, deleteDoc } from 'firebase/firestore';
 
 
-// --- Participant List Logic (Moved from participants/page.tsx) ---
+// --- Join Request Logic ---
+interface JoinRequest {
+  id: string;
+  name: string;
+  photoURL?: string;
+  requestingUserId: string;
+}
+
+const JoinRequestItem = React.memo(({ request, onAccept, onDeny }: { request: JoinRequest; onAccept: (req: JoinRequest) => void; onDeny: (req: JoinRequest) => void; }) => (
+  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+    <div className="flex items-center gap-3">
+      <Avatar className="h-10 w-10">
+        <AvatarImage src={request.photoURL} alt={request.name} data-ai-hint="avatar user"/>
+        <AvatarFallback>{request.name.charAt(0)}</AvatarFallback>
+      </Avatar>
+      <div>
+        <p className="text-sm font-medium text-foreground">{request.name}</p>
+        <p className="text-xs text-muted-foreground">Wants to join</p>
+      </div>
+    </div>
+    <div className="flex items-center gap-2">
+      <Button size="sm" variant="destructive" onClick={() => onDeny(request)}>Deny</Button>
+      <Button size="sm" onClick={() => onAccept(request)}>Admit</Button>
+    </div>
+  </div>
+));
+JoinRequestItem.displayName = 'JoinRequestItem';
+
+
+// --- Participant List Logic ---
 interface Participant {
   id: string;
   name: string;
@@ -51,11 +81,13 @@ interface Participant {
 const ParticipantItem = React.memo(({
   participant, 
   isCurrentUserHost, 
-  isThisParticipantTheHost 
+  isThisParticipantTheHost,
+  onRemove,
 }: { 
   participant: Participant, 
   isCurrentUserHost: boolean,
-  isThisParticipantTheHost: boolean
+  isThisParticipantTheHost: boolean,
+  onRemove: (participant: Participant) => void;
 }) => {
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
@@ -101,28 +133,16 @@ const ParticipantItem = React.memo(({
                 <MessageSquare className="mr-2 h-4 w-4" />
                 <span>Chat Privately</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleActionClick('Pin', participant.name)} className="cursor-pointer">
-                <Pin className="mr-2 h-4 w-4" />
-                <span>Pin User</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleActionClick('Full Screen for', participant.name)} className="cursor-pointer">
-                <Maximize className="mr-2 h-4 w-4" />
-                <span>Full Screen</span>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {isCurrentUserHost && !isThisParticipantTheHost && ( 
                 <DropdownMenuItem 
-                  onSelect={() => handleActionClick('Remove', participant.name)} 
+                  onSelect={() => onRemove(participant)} 
                   className="text-destructive focus:text-destructive cursor-pointer"
                 >
                   <UserX className="mr-2 h-4 w-4" />
                   <span>Remove Participant</span>
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onSelect={() => handleActionClick('Report', participant.name)} className="text-destructive focus:text-destructive cursor-pointer">
-                <AlertCircle className="mr-2 h-4 w-4" />
-                <span>Report User</span>
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -153,15 +173,12 @@ export default function MeetingPage() {
   
   // --- State for Participants Sheet ---
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
-  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [hostId, setHostId] = useState<string | null>(null);
   const currentUserId = auth.currentUser?.uid;
   const { toast } = useToast();
   // ---
-
-  useEffect(() => {
-    // This effect now does nothing, defaulting states to 'off' (false).
-  }, []);
   
   useEffect(() => {
     setHeaderContent(
@@ -181,10 +198,6 @@ export default function MeetingPage() {
                     <Brush className="mr-2 h-4 w-4"/>
                     <span>Whiteboard</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => { /* Implement screen share logic */ }} className="cursor-pointer">
-                    <MonitorUp className="mr-2 h-4 w-4"/>
-                    <span>Share Screen</span>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => setIsParticipantsPanelOpen(true)} className="cursor-pointer">
                   <UserCog className="mr-2 h-4 w-4" />
@@ -193,10 +206,6 @@ export default function MeetingPage() {
                 <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
                     <MessageSquare className="mr-2 h-4 w-4"/>
                     <span>Chat</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4"/>
-                    <span>Meeting Settings</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -209,17 +218,17 @@ export default function MeetingPage() {
   }, [setHeaderContent, setHeaderAction, topic, meetingId, router]);
 
 
-  // --- Effect to fetch participants for the sheet ---
+  // --- Effect to fetch data for the sheet ---
   useEffect(() => {
     if (!meetingId) return;
 
-    setIsLoadingParticipants(true);
+    setIsLoadingData(true);
     const meetingDocRef = doc(db, "meetings", meetingId);
     
-    // Fetch one-time meeting details
+    // Fetch one-time meeting details to get hostId
     getDoc(meetingDocRef).then(docSnap => {
       if (docSnap.exists()) {
-        setMeetingCreatorId(docSnap.data().creatorId);
+        setHostId(docSnap.data().hostId);
       }
     }).catch(error => {
       console.error("[MeetingPage] Error fetching meeting document:", error);
@@ -227,29 +236,80 @@ export default function MeetingPage() {
 
     // Listen for realtime participant changes
     const participantsColRef = collection(db, "meetings", meetingId, "participants");
-    const q = query(participantsColRef);
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const fetchedParticipants: Participant[] = [];
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data() as DocumentData;
-        fetchedParticipants.push({
-          id: docSnap.id, 
-          name: data.name || "Guest", 
-          photoURL: data.photoURL,
-          isMicMuted: data.isMicMuted,
-          isCameraOff: data.isCameraOff,
-        });
-      });
+    const unsubParticipants = onSnapshot(query(participantsColRef), (snapshot) => {
+      const fetchedParticipants: Participant[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Participant));
       setParticipants(fetchedParticipants);
-      setIsLoadingParticipants(false);
+      if (isLoadingData) setIsLoadingData(false);
     }, (error) => {
       console.error("[MeetingPage] Error fetching participants:", error);
-      setIsLoadingParticipants(false);
+      if (isLoadingData) setIsLoadingData(false);
     });
 
-    return () => unsubscribe();
-  }, [meetingId, toast]);
+    // Listen for join requests if current user is the host
+    const unsubRequests = currentUserId === hostId
+      ? onSnapshot(query(collection(db, "meetings", meetingId, "joinRequests")), (snapshot) => {
+          const fetchedRequests: JoinRequest[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JoinRequest));
+          setJoinRequests(fetchedRequests);
+        }, (error) => console.error("[MeetingPage] Error fetching join requests:", error))
+      : () => {};
+
+
+    return () => { 
+      unsubParticipants();
+      unsubRequests();
+    };
+  }, [meetingId, hostId, currentUserId]);
   // ---
+  
+  const handleAcceptRequest = async (request: JoinRequest) => {
+    const { requestingUserId, name, photoURL } = request;
+    try {
+        const batch = auth.currentUser && writeBatch(db);
+        if (!batch) throw new Error("Not authenticated");
+
+        const participantDocRef = doc(db, `meetings/${meetingId}/participants`, requestingUserId);
+        batch.set(participantDocRef, {
+            name: name,
+            photoURL: photoURL,
+            isMicMuted: true,
+            isCameraOff: true,
+            joinedAt: serverTimestamp(),
+        });
+        
+        const requestDocRef = doc(db, `meetings/${meetingId}/joinRequests`, requestingUserId);
+        batch.delete(requestDocRef);
+
+        await batch.commit();
+        toast({ title: "Participant Admitted", description: `${name} has joined the meeting.` });
+    } catch(err) {
+        console.error("Error admitting participant:", err);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not admit participant.'});
+    }
+  };
+  
+  const handleDenyRequest = async (request: JoinRequest) => {
+    try {
+        await deleteDoc(doc(db, `meetings/${meetingId}/joinRequests`, request.requestingUserId));
+        toast({ title: "Request Denied" });
+    } catch (err) {
+        console.error("Error denying request:", err);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not deny the request.'});
+    }
+  };
+  
+  const handleRemoveParticipant = async (participant: Participant) => {
+      if (participant.id === hostId) {
+          toast({ variant: 'destructive', title: "Cannot Remove Host" });
+          return;
+      }
+      try {
+        await deleteDoc(doc(db, `meetings/${meetingId}/participants`, participant.id));
+        toast({ title: "Participant Removed", description: `${participant.name} has been removed from the meeting.`});
+      } catch (err) {
+        console.error("Error removing participant:", err);
+        toast({ variant: 'destructive', title: 'Error', description: `Could not remove ${participant.name}.`});
+      }
+  };
 
 
   const handleMicToggle = useCallback((isOn: boolean) => setMicOn(isOn), []);
@@ -291,7 +351,7 @@ export default function MeetingPage() {
     router.push('/');
   };
   
-  const isCurrentUserTheHost = currentUserId === meetingCreatorId;
+  const isCurrentUserTheHost = currentUserId === hostId;
 
   return (
     <div className="w-full h-full flex flex-col bg-[#1e2a38] text-white overflow-hidden">
@@ -337,41 +397,66 @@ export default function MeetingPage() {
                 variant={'destructive'}
                 size="icon"
                 className={cn(
-                  "rounded-full w-12 h-12 md:w-14 md:h-14",
+                  "rounded-full w-12 h-12 md:w-14 md:h-14 relative",
                   isParticipantJoining && 'animate-blink-success'
                 )}
                 aria-label="Participants"
               >
                 <Users className="h-6 w-6" />
+                 {joinRequests.length > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 w-5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-5 w-5 bg-destructive items-center justify-center text-xs text-white">{joinRequests.length}</span>
+                    </span>
+                 )}
               </Button>
             </SheetTrigger>
             <SheetContent side="bottom" className="text-foreground bg-background rounded-t-xl h-[70vh] flex flex-col">
               <SheetHeader className="p-4 border-b">
                 <SheetTitle>Participants ({participants.length})</SheetTitle>
-                <SheetDescription>Manage participants and their settings.</SheetDescription>
+                <SheetDescription>Manage participants and view join requests.</SheetDescription>
               </SheetHeader>
               <ScrollArea className="flex-grow">
-                <div className="p-4 space-y-1">
-                   {isLoadingParticipants ? (
+                <div className="p-4 space-y-4">
+                   {isLoadingData ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                       <Loader2 className="w-12 h-12 animate-spin mb-4 text-primary" />
                     </div>
-                  ) : participants.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                      <Users className="w-16 h-16 mb-4" />
-                    </div>
                   ) : (
-                    participants.map((participant) => (
-                      <ParticipantItem 
-                        key={participant.id} 
-                        participant={participant} 
-                        isCurrentUserHost={isCurrentUserTheHost}
-                        isThisParticipantTheHost={participant.id === meetingCreatorId}
-                      />
-                    ))
+                    <>
+                      {isCurrentUserTheHost && joinRequests.length > 0 && (
+                        <div className="space-y-2">
+                           <h3 className="text-sm font-medium text-muted-foreground px-1 flex items-center gap-2"><Bell className="h-4 w-4 text-primary"/> Join Requests</h3>
+                           {joinRequests.map(req => <JoinRequestItem key={req.id} request={req} onAccept={handleAcceptRequest} onDeny={handleDenyRequest} />)}
+                           <div className="pt-2 border-b"></div>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-1">
+                        {participants.length === 0 ? (
+                           <div className="flex flex-col items-center justify-center text-muted-foreground py-8">
+                            <Users className="w-16 h-16 mb-4" />
+                            <p>You're the first one here!</p>
+                           </div>
+                         ) : participants.map((participant) => (
+                           <ParticipantItem 
+                             key={participant.id} 
+                             participant={participant} 
+                             isCurrentUserHost={isCurrentUserTheHost}
+                             isThisParticipantTheHost={participant.id === hostId}
+                             onRemove={handleRemoveParticipant}
+                           />
+                         ))}
+                      </div>
+                    </>
                   )}
                 </div>
               </ScrollArea>
+              <SheetFooter className="p-4 border-t">
+                  <SheetClose asChild>
+                    <Button variant="outline" className="w-full">Close</Button>
+                  </SheetClose>
+              </SheetFooter>
             </SheetContent>
           </Sheet>
 
