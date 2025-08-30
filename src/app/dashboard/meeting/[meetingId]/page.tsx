@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -226,11 +226,11 @@ export default function MeetingPage() {
     const meetingDocRef = doc(db, "meetings", meetingId);
     
     // Fetch one-time meeting details to get hostId
-    getDoc(meetingDocRef).then(docSnap => {
+    const unsubMeeting = onSnapshot(meetingDocRef, (docSnap) => {
       if (docSnap.exists()) {
         setHostId(docSnap.data().hostId);
       }
-    }).catch(error => {
+    }, (error) => {
       console.error("[MeetingPage] Error fetching meeting document:", error);
     });
 
@@ -246,41 +246,31 @@ export default function MeetingPage() {
     });
 
     // Listen for join requests if current user is the host
-    const unsubRequests = currentUserId === hostId
-      ? onSnapshot(query(collection(db, "meetings", meetingId, "joinRequests")), (snapshot) => {
-          const fetchedRequests: JoinRequest[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JoinRequest));
+    const isCurrentUserTheHost = auth.currentUser?.uid === hostId;
+    let unsubRequests = () => {};
+    if (isCurrentUserTheHost) {
+      unsubRequests = onSnapshot(query(collection(db, "meetings", meetingId, "joinRequests")), (snapshot) => {
+          const fetchedRequests: JoinRequest[] = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as JoinRequest))
+            .filter(req => req.status === 'pending'); // Only show pending requests
           setJoinRequests(fetchedRequests);
         }, (error) => console.error("[MeetingPage] Error fetching join requests:", error))
-      : () => {};
-
+    }
 
     return () => { 
+      unsubMeeting();
       unsubParticipants();
       unsubRequests();
     };
-  }, [meetingId, hostId, currentUserId]);
+  }, [meetingId, hostId]);
   // ---
   
   const handleAcceptRequest = async (request: JoinRequest) => {
-    const { requestingUserId, name, photoURL } = request;
     try {
-        const batch = auth.currentUser && writeBatch(db);
-        if (!batch) throw new Error("Not authenticated");
-
-        const participantDocRef = doc(db, `meetings/${meetingId}/participants`, requestingUserId);
-        batch.set(participantDocRef, {
-            name: name,
-            photoURL: photoURL,
-            isMicMuted: true,
-            isCameraOff: true,
-            joinedAt: serverTimestamp(),
+        await updateDoc(doc(db, "meetings", meetingId, "joinRequests", request.id), {
+          status: "accepted",
         });
-        
-        const requestDocRef = doc(db, `meetings/${meetingId}/joinRequests`, requestingUserId);
-        batch.delete(requestDocRef);
-
-        await batch.commit();
-        toast({ title: "Participant Admitted", description: `${name} has joined the meeting.` });
+        toast({ title: "Participant Admitted", description: `${request.name} will now join the meeting.` });
     } catch(err) {
         console.error("Error admitting participant:", err);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not admit participant.'});
@@ -289,7 +279,7 @@ export default function MeetingPage() {
   
   const handleDenyRequest = async (request: JoinRequest) => {
     try {
-        await deleteDoc(doc(db, `meetings/${meetingId}/joinRequests`, request.requestingUserId));
+        await deleteDoc(doc(db, `meetings/${meetingId}/joinRequests`, request.id));
         toast({ title: "Request Denied" });
     } catch (err) {
         console.error("Error denying request:", err);
@@ -403,7 +393,7 @@ export default function MeetingPage() {
                 aria-label="Participants"
               >
                 <Users className="h-6 w-6" />
-                 {joinRequests.length > 0 && (
+                 {joinRequests.length > 0 && isCurrentUserTheHost && (
                     <span className="absolute -top-1 -right-1 flex h-5 w-5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-5 w-5 bg-destructive items-center justify-center text-xs text-white">{joinRequests.length}</span>
