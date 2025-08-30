@@ -122,7 +122,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     // --- SOLO VIEW ---
     return (
       <div className="w-full h-full flex items-center justify-center bg-black p-4">
-        <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg relative">
+        <div className="w-full h-full bg-black rounded-2xl overflow-hidden shadow-lg relative">
           <video
               ref={localRef}
               id="local"
