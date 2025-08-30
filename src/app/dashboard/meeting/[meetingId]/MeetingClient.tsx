@@ -118,28 +118,37 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
   const totalParticipants = remoteParticipantCount + 1;
 
-  if (totalParticipants === 1) {
-    // --- SOLO VIEW ---
+  if (totalParticipants > 2) {
+    // --- GRID VIEW (3+ participants) ---
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black p-4">
-        <div className="w-full h-full bg-black rounded-2xl overflow-hidden shadow-lg relative">
-          <video
-              ref={localRef}
-              id="local"
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              autoPlay
-              style={{ display: camOn ? 'block' : 'none' }}
-          />
-          {!camOn && (
-              <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-                  <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
-                      <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                      <AvatarFallback className="text-6xl">{userFallback}</AvatarFallback>
-                  </Avatar>
-              </div>
-          )}
+      <div className="w-full h-full p-2 md:p-4">
+        <div 
+          id="remotes"
+          className="w-full h-full grid gap-2 md:gap-4"
+          style={{ gridTemplateColumns: `repeat(auto-fit, minmax(280px, 1fr))`}}
+        >
+          {/* Local video is now part of the grid */}
+          <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg relative">
+              <video
+                ref={localRef}
+                id="local"
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+                autoPlay
+                style={{ display: camOn ? 'block' : 'none' }}
+              />
+              {!camOn && (
+                <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
+                    <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
+                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                        <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
+                    </Avatar>
+                    <p className="mt-2 font-medium">You</p>
+                </div>
+              )}
+          </div>
+          {/* Remote videos will be appended here by the WebRTC logic */}
         </div>
       </div>
     );
@@ -178,36 +187,27 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     );
   }
 
-  // --- GRID VIEW (3+ participants) ---
+  // --- SOLO VIEW (Default) ---
   return (
-    <div className="w-full h-full p-2 md:p-4">
-      <div 
-        id="remotes"
-        className="w-full h-full grid gap-2 md:gap-4"
-        style={{ gridTemplateColumns: `repeat(auto-fit, minmax(280px, 1fr))`}}
-      >
-        {/* Local video is now part of the grid */}
-        <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg relative">
-            <video
-              ref={localRef}
-              id="local"
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              autoPlay
-              style={{ display: camOn ? 'block' : 'none' }}
-            />
-            {!camOn && (
-              <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-                  <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-                      <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                      <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
-                  </Avatar>
-                  <p className="mt-2 font-medium">You</p>
-              </div>
-            )}
-        </div>
-        {/* Remote videos will be appended here by the WebRTC logic */}
+    <div className="w-full h-full flex items-center justify-center bg-black p-4">
+      <div className="w-full h-full bg-black rounded-2xl overflow-hidden shadow-lg relative">
+        <video
+            ref={localRef}
+            id="local"
+            className="w-full h-full object-cover"
+            muted
+            playsInline
+            autoPlay
+            style={{ display: camOn ? 'block' : 'none' }}
+        />
+        {!camOn && (
+            <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
+                <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
+                    <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                    <AvatarFallback className="text-6xl">{userFallback}</AvatarFallback>
+                </Avatar>
+            </div>
+        )}
       </div>
     </div>
   );
