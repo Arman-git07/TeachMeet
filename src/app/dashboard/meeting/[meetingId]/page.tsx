@@ -22,7 +22,7 @@ import {
   UserX,
   Loader2,
 } from 'lucide-react';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import MeetingClient from './MeetingClient';
@@ -141,6 +141,7 @@ export default function MeetingPage() {
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
   const { user, loading } = useAuth();
   const router = useRouter();
+  const meetingClientRef = useRef<React.ElementRef<typeof MeetingClient>>(null);
 
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
@@ -254,12 +255,6 @@ export default function MeetingPage() {
   const handleMicToggle = useCallback((isOn: boolean) => setMicOn(isOn), []);
   const handleCamToggle = useCallback((isOn: boolean) => setCamOn(isOn), []);
   
-  const triggerControl = (controlId: string) => {
-    const button = document.getElementById(controlId) as HTMLButtonElement | null;
-    if (button) button.click();
-    else console.warn(`Control button with id "${controlId}" not found.`);
-  };
-
   const userId = user?.uid;
 
   const handleUserJoined = useCallback(() => {
@@ -302,6 +297,7 @@ export default function MeetingPage() {
     <div className="w-full h-full flex flex-col bg-[#1e2a38] text-white overflow-hidden">
       <div className="flex-grow relative">
         <MeetingClient 
+            ref={meetingClientRef}
             meetingId={meetingId} 
             userId={userId} 
             onMicToggle={handleMicToggle} 
@@ -317,7 +313,7 @@ export default function MeetingPage() {
             variant={micOn ? 'default' : 'destructive'}
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
-            onClick={() => triggerControl('meeting-client-mic-toggle')}
+            onClick={() => meetingClientRef.current?.toggleMic()}
             aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'}
           >
             {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
@@ -326,7 +322,7 @@ export default function MeetingPage() {
             variant={camOn ? 'default' : 'destructive'}
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
-            onClick={() => triggerControl('meeting-client-cam-toggle')}
+            onClick={() => meetingClientRef.current?.toggleCam()}
             aria-label={camOn ? 'Turn camera off' : 'Turn camera on'}
           >
             {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}

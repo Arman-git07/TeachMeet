@@ -1,12 +1,10 @@
 
 "use client";
 
-import React from "react";
+import React, { useImperativeHandle, forwardRef } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { VideoOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
 
 type Props = { 
   meetingId: string; 
@@ -16,11 +14,20 @@ type Props = {
   onUserJoined: (socketId: string) => void;
 };
 
-export default function MeetingClient({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined }: Props) {
+export interface MeetingClientRef {
+  toggleMic: () => void;
+  toggleCam: () => void;
+}
+
+const MeetingClient = forwardRef<MeetingClientRef, Props>(
+  ({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined }, ref) => {
   const localRef = React.useRef<HTMLVideoElement>(null);
   const { user } = useAuth();
   const [remoteParticipantCount, setRemoteParticipantCount] = React.useState(0);
   const [remoteSocketIds, setRemoteSocketIds] = React.useState<string[]>([]);
+
+  const [micOn, setMicOn] = React.useState(true);
+  const [camOn, setCamOn] = React.useState(true);
 
   const [rtc] = React.useState(() => new MeshRTC({
     roomId: meetingId,
@@ -61,8 +68,6 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
     },
   }));
 
-  const [micOn, setMicOn] = React.useState(true);
-  const [camOn, setCamOn] = React.useState(true);
 
   // Init once
   React.useEffect(() => {
@@ -87,24 +92,25 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const toggleMic = async () => {
-    const next = !micOn;
-    setMicOn(next);
-    onMicToggle(next);
-    await rtc.toggleMic(next);
-  };
-
-  const toggleCam = async () => {
-    const next = !camOn;
-    setCamOn(next);
-    onCamToggle(next);
-    await rtc.toggleCam(next);
-    if (next && localRef.current) {
-        // If turning camera on, re-attach the stream
-        rtc.attachLocal(localRef.current);
-    }
-  };
+  
+  useImperativeHandle(ref, () => ({
+    toggleMic: async () => {
+      const next = !micOn;
+      setMicOn(next);
+      onMicToggle(next);
+      await rtc.toggleMic(next);
+    },
+    toggleCam: async () => {
+      const next = !camOn;
+      setCamOn(next);
+      onCamToggle(next);
+      await rtc.toggleCam(next);
+      if (next && localRef.current) {
+          // If turning camera on, re-attach the stream
+          rtc.attachLocal(localRef.current);
+      }
+    },
+  }));
 
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
   const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
@@ -112,26 +118,6 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
 
   const totalParticipants = remoteParticipantCount + 1;
 
-  // This is the main view when there's more than one person
-  const MainStage = () => {
-    if (remoteSocketIds.length === 0) return null;
-    const mainStageSocketId = remoteSocketIds[0];
-    const el = document.getElementById(`remote-${mainStageSocketId}`);
-    // This is a bit of a hack, but we need to move the DOM element.
-    // In a more complex real-world app, you might use portals or a different rendering strategy.
-    if (el) {
-       const container = document.getElementById('main-stage-container');
-       if (container && !container.contains(el)) {
-           // Clear previous content and append the new main video
-           while(container.firstChild) {
-              container.removeChild(container.firstChild);
-           }
-           container.appendChild(el);
-       }
-    }
-    return <div id="main-stage-container" className="w-full h-full"></div>;
-  };
-  
   if (totalParticipants === 1) {
     // --- SOLO VIEW ---
     return (
@@ -225,4 +211,7 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
       </div>
     </div>
   );
-}
+});
+
+MeetingClient.displayName = 'MeetingClient';
+export default MeetingClient;
