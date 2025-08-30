@@ -20,6 +20,8 @@ import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc, writeBatch
 
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
+type PermissionStatus = 'prompt' | 'granted' | 'denied';
+
 
 export default function WaitingAreaPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -32,9 +34,9 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('prompt');
+
   const [appliedFilter, setAppliedFilter] = useState<string>("none");
   const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false);
   const [mirrorVideo, setMirrorVideo] = useState<boolean>(false);
@@ -46,8 +48,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [isLoadingMeetingData, setIsLoadingMeetingData] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const currentVideoStreamRef = useRef<MediaStream | null>(null);
-  const currentMicStreamRef = useRef<MediaStream | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -129,93 +130,63 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
     setMirrorVideo(localStorage.getItem('teachmeet-camera-mirror') === 'true');
   }, []);
+  
+  const getMediaPermissions = useCallback(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        mediaStreamRef.current = stream;
+        setPermissionStatus('granted');
+        
+        // By default, turn camera and mic off to start
+        stream.getVideoTracks().forEach(track => track.enabled = false);
+        stream.getAudioTracks().forEach(track => track.enabled = false);
 
-  useEffect(() => {
-    return () => {
-      if (currentVideoStreamRef.current) {
-        currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
+        if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+        }
+        setIsCameraActive(false);
+        setIsMicActive(false);
+      } catch (error) {
+        console.error("Error getting media permissions:", error);
+        setPermissionStatus('denied');
       }
-      if (currentMicStreamRef.current) {
-        currentMicStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
   }, []);
 
-  const handleToggleCamera = async () => {
-    if (isCameraActive) {
-      if (currentVideoStreamRef.current) {
-        currentVideoStreamRef.current.getTracks().forEach(track => track.stop());
-        currentVideoStreamRef.current = null;
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      setIsCameraActive(false);
-    } else {
-      if (hasCameraPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Camera Access Denied",
-          description: "Please enable camera permissions in your browser settings to use this feature.",
-        });
+  useEffect(() => {
+    getMediaPermissions();
+    return () => {
+      mediaStreamRef.current?.getTracks().forEach(track => track.stop());
+    };
+  }, [getMediaPermissions]);
+
+
+  const handleToggleCamera = () => {
+    if (permissionStatus !== 'granted' || !mediaStreamRef.current) {
+        toast({ variant: 'destructive', title: "Camera Not Available", description: "Please grant camera permissions first." });
         return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        currentVideoStreamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setHasCameraPermission(true);
-        setIsCameraActive(true);
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        setIsCameraActive(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Failed',
-          description: 'Could not access the camera. Please ensure it is not in use by another application and that permissions are allowed.',
-        });
-      }
+    }
+    const videoTrack = mediaStreamRef.current.getVideoTracks()[0];
+    if (videoTrack) {
+        const nextState = !videoTrack.enabled;
+        videoTrack.enabled = nextState;
+        setIsCameraActive(nextState);
     }
   };
 
-  const handleToggleMic = async () => {
-    if (isMicActive) {
-      if (currentMicStreamRef.current) {
-        currentMicStreamRef.current.getTracks().forEach(track => track.stop());
-        currentMicStreamRef.current = null;
-      }
-      setIsMicActive(false);
-    } else {
-      if (hasMicPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Microphone Access Denied",
-          description: "Please enable microphone permissions in your browser settings.",
-        });
+  const handleToggleMic = () => {
+    if (permissionStatus !== 'granted' || !mediaStreamRef.current) {
+        toast({ variant: 'destructive', title: "Microphone Not Available", description: "Please grant microphone permissions first." });
         return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        currentMicStreamRef.current = stream;
-        setHasCameraPermission(true);
-        setIsMicActive(true);
+    }
+    const audioTrack = mediaStreamRef.current.getAudioTracks()[0];
+    if (audioTrack) {
+        const nextState = !audioTrack.enabled;
+        audioTrack.enabled = nextState;
+        setIsMicActive(nextState);
         toast({
-          title: "Microphone On",
-          description: "Your microphone is now active.",
+          title: nextState ? "Microphone On" : "Microphone Off",
+          description: nextState ? "Your microphone is now active." : "Your microphone is now muted.",
         });
-      } catch (error) {
-        console.error('Error accessing microphone:', error);
-        setHasMicPermission(false);
-        setIsMicActive(false);
-        toast({
-          variant: 'destructive',
-          title: 'Microphone Access Failed',
-          description: 'Could not access the microphone. Please ensure it is not in use and permissions are allowed.',
-        });
-      }
     }
   };
 
@@ -262,9 +233,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             
             await batch.commit();
         } catch (error) {
-            console.error("Firestore error, but redirecting anyway:", error);
-            // This toast is no longer necessary as the primary issue is fixed.
-            // Keeping the console log for debugging, but removing the user-facing error toast.
+             console.error("Firestore error, but redirecting anyway:", error);
         }
         
         const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
@@ -358,7 +327,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         <CardContent className="space-y-6">
           <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
             <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
-            {(!isCameraActive || hasCameraPermission === false) && (
+            {(!isCameraActive || permissionStatus !== 'granted') && (
                <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                  {authLoading ? (
                       <p>Loading user info...</p>
@@ -368,11 +337,18 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                         <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
                       </Avatar>
                     )}
-                {hasCameraPermission === false && (
+                {permissionStatus === 'denied' && (
                   <>
                     <VideoOff className="h-8 w-8 mx-auto mb-1 text-destructive" />
-                    <p className="font-semibold">Camera permission denied</p>
+                    <p className="font-semibold">Permissions Denied</p>
                     <p className="text-xs">To use your camera, please allow access in your browser settings.</p>
+                  </>
+                )}
+                 {permissionStatus === 'prompt' && (
+                  <>
+                    <Loader2 className="h-8 w-8 mx-auto mb-1 animate-spin" />
+                    <p className="font-semibold">Awaiting Permissions...</p>
+                    <p className="text-xs">Please allow access to your camera and microphone.</p>
                   </>
                 )}
               </div>
@@ -384,6 +360,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 className="rounded-full shadow-md"
                 onClick={handleToggleMic}
                 aria-label={isMicActive ? "Mute microphone" : "Unmute microphone"}
+                disabled={permissionStatus !== 'granted'}
               >
                 {isMicActive ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
               </Button>
@@ -393,30 +370,20 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
                 className="rounded-full shadow-md"
                 onClick={handleToggleCamera}
                 aria-label={isCameraActive ? "Turn camera off" : "Turn camera on"}
+                disabled={permissionStatus !== 'granted'}
               >
                 {isCameraActive ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </Button>
             </div>
           </div>
 
-          {hasCameraPermission === false && (
+          {permissionStatus === 'denied' && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Camera Permission Required</AlertTitle>
+              <AlertTitle>Permissions Required</AlertTitle>
               <AlertDescription>
-                TeachMeet needs access to your camera to share your video.
-                Please enable camera permissions in your browser settings and refresh the page or try toggling the camera again.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {hasMicPermission === false && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Microphone Permission Required</AlertTitle>
-              <AlertDescription>
-                TeachMeet needs access to your microphone to share your audio.
-                Please enable microphone permissions in your browser settings and try toggling the microphone again.
+                TeachMeet needs access to your camera and microphone to continue.
+                Please enable permissions in your browser's site settings and refresh the page.
               </AlertDescription>
             </Alert>
           )}
@@ -479,3 +446,5 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     </div>
   );
 }
+
+    
