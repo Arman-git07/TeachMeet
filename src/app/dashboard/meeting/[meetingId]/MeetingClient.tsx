@@ -148,14 +148,10 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
           />
           {!camOn && (
               <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-                  <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
+                  <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
                       <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                      <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
+                      <AvatarFallback className="text-6xl">{userFallback}</AvatarFallback>
                   </Avatar>
-                  <div className="flex items-center gap-2">
-                      <VideoOff className="h-5 w-5" />
-                      <p>Camera is off</p>
-                  </div>
               </div>
           )}
         </div>
@@ -184,8 +180,10 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
               />
               {!camOn && (
                   <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground text-xs p-1">
-                      <VideoOff className="h-5 w-5 mb-1" />
-                      <p>You</p>
+                      <Avatar className="w-full h-full rounded-none">
+                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" className="object-cover"/>
+                        <AvatarFallback className="text-2xl rounded-none">{userFallback}</AvatarFallback>
+                      </Avatar>
                   </div>
               )}
           </div>
@@ -215,11 +213,11 @@ export default function MeetingClient({ meetingId, userId, onMicToggle, onCamTog
             />
             {!camOn && (
               <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-                  <Avatar className="w-16 h-16 mb-2 border-2 border-background">
+                  <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
                       <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                      <AvatarFallback className="text-2xl">{userFallback}</AvatarFallback>
+                      <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
                   </Avatar>
-                  <p>You</p>
+                  <p className="mt-2 font-medium">You</p>
               </div>
             )}
         </div>
