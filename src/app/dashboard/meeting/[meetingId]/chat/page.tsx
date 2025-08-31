@@ -71,7 +71,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       // For now, we can clear messages or show a system message
       setMessages([ { id: 'sys_public_switch', senderName: 'System', text: `Switched to Public Chat for ${topic}.`, timestamp: new Date(), isMe: false } ]);
     } else {
-      // This part will not be reachable with current UI as mock participants are removed
+      // This part will not be reachable with current UI as mockMeetingParticipants is removed
       // Kept for potential future use if participants are loaded dynamically
       // const targetUser = mockMeetingParticipants.find(p => p.id === value);
       // if (targetUser) {
@@ -91,10 +91,12 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-              {privateChatTarget ? `Chat with ${privateChatTarget.name}` : topic}
-            </h1>
-            <span className="text-sm text-muted-foreground"> (Meeting ID: {meetingId})</span>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
+                {privateChatTarget ? `Chat with ${privateChatTarget.name}` : topic}
+              </h1>
+              <p className="text-xs text-muted-foreground">Meeting ID: {meetingId}</p>
+            </div>
           </div>
           <Button asChild variant="outline" className="rounded-lg">
             <Link href={backToMeetingLink}>
