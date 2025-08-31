@@ -37,7 +37,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       if (!el) {
         const container = document.createElement("div");
         container.id = `remote-container-${socketId}`;
-        container.className = "w-full h-full aspect-video bg-muted rounded-2xl overflow-hidden shadow-lg relative";
+        container.className = "w-full h-full bg-muted rounded-2xl overflow-hidden shadow-lg relative";
 
         el = document.createElement("video");
         el.id = `remote-${socketId}`;
@@ -115,100 +115,64 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
   const totalParticipants = remoteSocketIds.length + 1;
 
+  const VideoTile = ({ isLocal = false }: { isLocal?: boolean }) => (
+    <div className="w-full h-full bg-black rounded-2xl overflow-hidden shadow-lg relative">
+      <video
+        ref={isLocal ? localRef : null}
+        id={isLocal ? "local" : ""}
+        className="w-full h-full object-cover"
+        muted={isLocal}
+        playsInline
+        autoPlay
+        style={{ display: isLocal ? (camOn ? 'block' : 'none') : 'block' }}
+      />
+      {isLocal && !camOn && (
+        <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
+          <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
+            <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" />
+            <AvatarFallback className="text-6xl">{userFallback}</AvatarFallback>
+          </Avatar>
+        </div>
+      )}
+    </div>
+  );
+  
+  const RemoteTile = ({ socketId }: { socketId: string }) => (
+    <div id={`remote-container-${socketId}`} className="w-full h-full bg-muted rounded-2xl overflow-hidden shadow-lg relative" />
+  );
+
+
   if (totalParticipants === 1) {
-    // --- SOLO VIEW ---
     return (
       <div className="w-full h-full flex items-center justify-center bg-black p-4">
-        <div className="w-full h-full bg-black rounded-2xl overflow-hidden shadow-lg relative">
-          <video
-              ref={localRef}
-              id="local"
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              autoPlay
-              style={{ display: camOn ? 'block' : 'none' }}
-          />
-          {!camOn && (
-              <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-                  <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
-                      <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                      <AvatarFallback className="text-6xl">{userFallback}</AvatarFallback>
-                  </Avatar>
-              </div>
-          )}
-        </div>
+        <VideoTile isLocal />
       </div>
     );
   }
 
   if (totalParticipants === 2) {
-    // --- DUO VIEW (PIP) ---
-    const remoteId = remoteSocketIds[0];
     return (
-      <div className="w-full h-full relative bg-black">
-        {/* Remote participant takes the main stage */}
-        <div className="w-full h-full" id={`remote-container-${remoteId}`} />
-        
-        {/* Local participant is in picture-in-picture */}
-        <div className="absolute bottom-4 right-4 w-1/4 max-w-[250px] z-10">
-          <div className="aspect-video bg-black rounded-lg overflow-hidden shadow-lg border-2 border-background relative">
-              <video
-                  ref={localRef}
-                  id="local"
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                  autoPlay
-                  style={{ display: camOn ? 'block' : 'none' }}
-              />
-              {!camOn && (
-                  <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground text-xs p-1">
-                      <Avatar className="w-full h-full max-w-[100px] max-h-[100px] rounded-full">
-                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" className="object-cover"/>
-                        <AvatarFallback className="text-2xl rounded-full">{userFallback}</AvatarFallback>
-                      </Avatar>
-                  </div>
-              )}
-          </div>
-        </div>
+      <div className="w-full h-full grid grid-cols-2 gap-2 p-2 bg-black">
+        <VideoTile isLocal />
+        <RemoteTile socketId={remoteSocketIds[0]} />
       </div>
     );
   }
 
-  // --- GRID VIEW (3+ participants) ---
-  return (
-    <div className="w-full h-full p-2 md:p-4">
-      <div 
-        className="w-full h-full grid gap-2 md:gap-4"
-        style={{ gridTemplateColumns: `repeat(auto-fit, minmax(280px, 1fr))`}}
-      >
-        {/* Local video is part of the grid */}
-        <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg relative">
-            <video
-              ref={localRef}
-              id="local"
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              autoPlay
-              style={{ display: camOn ? 'block' : 'none' }}
-            />
-            {!camOn && (
-              <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-                  <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-                      <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
-                      <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
-                  </Avatar>
-                  <p className="mt-2 font-medium">You</p>
-              </div>
-            )}
+  if (totalParticipants <= 4) {
+     return (
+        <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2 p-2 bg-black">
+          <VideoTile isLocal />
+          {remoteSocketIds.map(socketId => <RemoteTile key={socketId} socketId={socketId} />)}
         </div>
-        {/* Remote videos will be appended here */}
-        {remoteSocketIds.map(socketId => (
-            <div key={socketId} id={`remote-container-${socketId}`} className="w-full aspect-video bg-muted rounded-2xl overflow-hidden shadow-lg relative" />
-        ))}
-      </div>
+     );
+  }
+
+  // 5+ participants
+  return (
+    <div className="w-full h-full grid grid-cols-3 gap-2 p-2 bg-black">
+        <VideoTile isLocal />
+        {remoteSocketIds.map(socketId => <RemoteTile key={socketId} socketId={socketId} />)}
     </div>
   );
 });
