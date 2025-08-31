@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useImperativeHandle, forwardRef } from "react";
+import React, { useImperativeHandle, forwardRef, useMemo } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,9 +35,8 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       // create/attach a remote video tile
       let el = document.getElementById(`remote-${socketId}`) as HTMLVideoElement | null;
       if (!el) {
-        const container = document.createElement("div");
-        container.id = `remote-container-${socketId}`;
-        container.className = "w-full h-full bg-muted rounded-2xl overflow-hidden shadow-lg relative";
+        const container = document.getElementById(`remote-container-${socketId}`);
+        if (!container) return;
 
         el = document.createElement("video");
         el.id = `remote-${socketId}`;
@@ -50,14 +49,11 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
         el.style.objectFit = "cover";
         
         container.appendChild(el);
-        // The container is now positioned by the React render logic
       }
       el.srcObject = stream;
     },
     onRemoteLeft: (socketId) => {
       setRemoteSocketIds(prev => prev.filter(id => id !== socketId));
-      const el = document.getElementById(`remote-container-${socketId}`);
-      if (el?.parentElement) el.parentElement.removeChild(el);
     },
     onUserJoined: (socketId: string) => {
       setRemoteSocketIds(prev => [...prev, socketId]);
@@ -115,11 +111,11 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
   const totalParticipants = remoteSocketIds.length + 1;
 
-  const VideoTile = ({ isLocal = false }: { isLocal?: boolean }) => (
-    <div className="w-full h-full bg-black rounded-2xl overflow-hidden shadow-lg relative">
+  const VideoTile = ({ isLocal = false, socketId }: { isLocal?: boolean; socketId?: string }) => (
+    <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative">
       <video
         ref={isLocal ? localRef : null}
-        id={isLocal ? "local" : ""}
+        id={isLocal ? "local" : `remote-${socketId}`}
         className="w-full h-full object-cover"
         muted={isLocal}
         playsInline
@@ -128,51 +124,52 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       />
       {isLocal && !camOn && (
         <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-          <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
+          <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
             <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" />
-            <AvatarFallback className="text-6xl">{userFallback}</AvatarFallback>
+            <AvatarFallback className="text-4xl md:text-6xl">{userFallback}</AvatarFallback>
           </Avatar>
         </div>
       )}
+       {!isLocal && (
+        <div id={`remote-container-${socketId}`} className="w-full h-full" />
+      )}
     </div>
   );
-  
-  const RemoteTile = ({ socketId }: { socketId: string }) => (
-    <div id={`remote-container-${socketId}`} className="w-full h-full bg-muted rounded-2xl overflow-hidden shadow-lg relative" />
-  );
+
+  const gridCols = useMemo(() => {
+    const count = remoteSocketIds.length;
+    if (count < 1) return 1;
+    if (count === 1) return 1;
+    if (count <= 3) return 2; // for 2 or 3 remotes, use 2 columns
+    if (count <= 8) return 3; // for 4-8 remotes, use 3 columns
+    return 4; // for 9+ remotes, use 4 columns
+  }, [remoteSocketIds]);
 
 
   if (totalParticipants === 1) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black p-4">
+      <div className="w-full h-full flex items-center justify-center bg-black p-2">
         <VideoTile isLocal />
       </div>
     );
   }
 
-  if (totalParticipants === 2) {
-    return (
-      <div className="w-full h-full grid grid-cols-2 gap-2 p-2 bg-black">
-        <VideoTile isLocal />
-        <RemoteTile socketId={remoteSocketIds[0]} />
-      </div>
-    );
-  }
-
-  if (totalParticipants <= 4) {
-     return (
-        <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2 p-2 bg-black">
-          <VideoTile isLocal />
-          {remoteSocketIds.map(socketId => <RemoteTile key={socketId} socketId={socketId} />)}
-        </div>
-     );
-  }
-
-  // 5+ participants
   return (
-    <div className="w-full h-full grid grid-cols-3 gap-2 p-2 bg-black">
-        <VideoTile isLocal />
-        {remoteSocketIds.map(socketId => <RemoteTile key={socketId} socketId={socketId} />)}
+    <div className="relative w-full h-full bg-black">
+      {/* Grid for all remote participants */}
+      <div
+        className="grid gap-1 w-full h-full p-1"
+        style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}
+      >
+        {remoteSocketIds.map((socketId) => (
+          <VideoTile key={socketId} socketId={socketId} />
+        ))}
+      </div>
+
+      {/* Floating self-view in bottom right */}
+      <div className="absolute bottom-4 right-4 w-32 h-24 md:w-48 md:h-36 shadow-2xl border-2 border-white/50 rounded-lg overflow-hidden transition-all duration-300 hover:scale-110 z-10">
+         <VideoTile isLocal />
+      </div>
     </div>
   );
 });
