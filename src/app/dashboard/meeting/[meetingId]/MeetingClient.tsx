@@ -137,39 +137,37 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   );
 
   const gridCols = useMemo(() => {
-    const count = remoteSocketIds.length;
-    if (count < 1) return 1;
-    if (count === 1) return 1;
-    if (count <= 3) return 2; // for 2 or 3 remotes, use 2 columns
-    if (count <= 8) return 3; // for 4-8 remotes, use 3 columns
-    return 4; // for 9+ remotes, use 4 columns
-  }, [remoteSocketIds]);
-
+    return Math.ceil(Math.sqrt(totalParticipants));
+  }, [totalParticipants]);
 
   if (totalParticipants === 1) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black p-2">
+      <div className="w-full h-full flex items-center justify-center bg-black">
         <VideoTile isLocal />
       </div>
     );
   }
 
-  return (
-    <div className="relative w-full h-full bg-black">
-      {/* Grid for all remote participants */}
-      <div
-        className="grid gap-1 w-full h-full p-1"
-        style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}
-      >
+  if (totalParticipants === 2) {
+    return (
+      <div className="grid grid-cols-2 w-full h-full bg-black">
+        <VideoTile isLocal />
         {remoteSocketIds.map((socketId) => (
           <VideoTile key={socketId} socketId={socketId} />
         ))}
       </div>
+    );
+  }
 
-      {/* Floating self-view in bottom right */}
-      <div className="absolute bottom-4 right-4 w-32 h-24 md:w-48 md:h-36 shadow-2xl border-2 border-white/50 rounded-lg overflow-hidden transition-all duration-300 hover:scale-110 z-10">
-         <VideoTile isLocal />
-      </div>
+  return (
+    <div
+      className="grid w-full h-full bg-black"
+      style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}
+    >
+      <VideoTile isLocal />
+      {remoteSocketIds.map((socketId) => (
+        <VideoTile key={socketId} socketId={socketId} />
+      ))}
     </div>
   );
 });
