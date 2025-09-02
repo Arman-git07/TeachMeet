@@ -7,69 +7,75 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Meetings Collection
+    // Rules for the 'meetings' collection
     match /meetings/{meetingId} {
-      // Any authenticated user can create a meeting document.
+      // Any signed-in user can create a meeting document.
       allow create: if signedIn();
       
-      // Any authenticated user can read meeting details (e.g., to find the hostId).
+      // Any signed-in user can read meeting details (e.g., to find the hostId).
       allow read: if signedIn();
       
-      // Only the host can update or delete the meeting document.
+      // Only the user whose UID matches the 'hostId' in the document can update or delete it.
       allow update, delete: if signedIn() && request.auth.uid == resource.data.hostId;
-      
-      // Participants subcollection
-      match /participants/{participantId} {
-        // Any signed-in user can add themselves. The host can remove others.
-        allow read, write: if signedIn();
-      }
-      
-      // Join Requests subcollection
-      match /joinRequests/{userId} {
-        // A user can create their own join request.
-        allow create: if signedIn() && request.auth.uid == userId;
-        
-        // The user who made the request can read/delete it (cancel).
-        // The host can read/update/delete requests (accept/deny).
-        allow read, update, delete: if signedIn(); 
-      }
-    }
 
-    // Users Collection (for user profiles, etc.)
-    match /users/{userId} {
-      allow read;
-      allow write: if signedIn() && request.auth.uid == userId;
-      
-      // Subcollections for user-specific data
+      // Rules for subcollections within a meeting
       match /{subcollection}/{docId} {
-        allow read, write: if signedIn() && request.auth.uid == userId;
+        // Any signed-in user can create documents in subcollections (e.g., joinRequests, participants).
+        allow create, read, update, delete: if signedIn();
       }
     }
-    
-    // Classrooms Collection
-    match /classrooms/{classroomId} {
-        allow read: if true; // Public classrooms can be read by anyone
-        allow create: if signedIn();
-        allow update: if signedIn(); // More specific rules needed here in a real app
 
+    // Rules for the 'users' collection
+    match /users/{userId}/{document=**} {
+      // Users can read and write to their own documents.
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // Rules for the 'classrooms' collection
+    match /classrooms/{classroomId} {
+        // Public classrooms can be read by anyone, private ones require authentication.
+        allow read: if resource.data.isPublic == true || signedIn();
+        
+        // Only authenticated users can create classrooms.
+        allow create: if signedIn();
+
+        // Only the teacher/creator can update or delete the classroom.
+        allow update, delete: if signedIn() && request.auth.uid == resource.data.teacherId;
+
+        // Subcollection rules
         match /{subcollection}/{docId} {
             allow read, write: if signedIn();
         }
     }
-
-    // Documents and Recordings (public/private files)
+    
+    // Rules for the 'documents' collection
     match /documents/{docId} {
+        // Allow read if the document is not private, or if the user is the uploader.
         allow read: if resource.data.isPrivate == false || (signedIn() && request.auth.uid == resource.data.uploaderId);
+        
+        // Allow create for any signed-in user.
         allow create: if signedIn();
+        
+        // Allow delete only for the user who uploaded the document.
         allow delete: if signedIn() && request.auth.uid == resource.data.uploaderId;
     }
-     match /recordings/{docId} {
+
+    // Rules for the 'recordings' collection
+    match /recordings/{recId} {
+        // Allow read if the recording is not private, or if the user is the uploader.
         allow read: if resource.data.isPrivate == false || (signedIn() && request.auth.uid == resource.data.uploaderId);
+        
+        // Allow create for any signed-in user.
         allow create: if signedIn();
+        
+        // Allow delete only for the user who uploaded the recording.
         allow delete: if signedIn() && request.auth.uid == resource.data.uploaderId;
     }
-     match /fcmTokens/{userId} {
-        allow read, write: if signedIn() && request.auth.uid == userId;
+    
+    // Rules for FCM tokens
+    match /fcmTokens/{userId} {
+        // Allow users to write their own FCM token.
+        allow write: if signedIn() && request.auth.uid == userId;
     }
   }
 }

@@ -52,7 +52,6 @@ export default function WaitingAreaPage() {
     if (authLoading) return;
     
     if (!user) {
-        // If not logged in, redirect to sign-in, but pass along the meeting details
         const intendedUrl = `/dashboard/meeting/${meetingId}/wait?${searchParams.toString()}`;
         router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
         return;
@@ -61,7 +60,6 @@ export default function WaitingAreaPage() {
     setIsHost(isHostFromUrl);
     setIsLoadingMeetingData(false);
 
-    // Automatically check for device permissions
     const checkPermissions = async () => {
         try {
             await navigator.mediaDevices.getUserMedia({ video: true });
@@ -88,19 +86,19 @@ export default function WaitingAreaPage() {
     const unsubscribe = onSnapshot(requestRef, (snap) => {
         if (snap.exists()) {
             const status = snap.data().status as JoinRequestStatus;
-            setJoinStatus(status);
             if (status === 'approved') {
                 toast({ title: "Request Approved!", description: "You are now joining the meeting." });
                 const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
                 router.push(joinNowLinkPath);
             } else if (status === 'rejected') {
                 toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
-                setJoinStatus('denied'); // Explicitly set to denied
+                setJoinStatus('denied');
+            } else {
+                 setJoinStatus(status);
             }
         } else if (joinStatus === 'pending') {
-            // If doc is deleted, it means rejected
             setJoinStatus('denied');
-             toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
+            toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
         }
     });
 
@@ -214,6 +212,7 @@ export default function WaitingAreaPage() {
     }
 
     if (isHost) {
+        // The host already created the doc in the dialog, now they just navigate.
         const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
         router.push(joinNowLinkPath);
         return;
@@ -255,7 +254,7 @@ export default function WaitingAreaPage() {
             text: "Request Denied. Ask again?", 
             disabled: !agreedToTerms, 
             showSpinner: false, 
-            onClick: handleJoinAction // This will resubmit the request
+            onClick: handleJoinAction
         };
     }
     
