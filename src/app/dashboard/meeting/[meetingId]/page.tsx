@@ -38,7 +38,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { db, auth } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 
@@ -199,9 +199,23 @@ export default function MeetingPage() {
         const meetingSnap = await getDoc(meetingDocRef);
 
         if (!meetingSnap.exists()) {
-          toast({ variant: 'destructive', title: "Meeting not found" });
-          router.push('/');
-          return;
+           // If the document doesn't exist, but the user has the host flag, they should create it.
+           // This is a fallback for race conditions.
+           const isHostFromUrl = searchParams.get('host') === 'true';
+           if (isHostFromUrl) {
+                console.warn("Meeting document not found, creating as host...");
+                await setDoc(meetingDocRef, {
+                    hostId: user.uid,
+                    topic: topic,
+                    createdAt: serverTimestamp(),
+                });
+                setHostId(user.uid);
+                setStatusAndAddParticipant('accepted');
+           } else {
+             toast({ variant: 'destructive', title: "Meeting not found" });
+             router.push('/');
+           }
+           return;
         }
 
         const meetingData = meetingSnap.data();
@@ -215,7 +229,11 @@ export default function MeetingPage() {
           const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
           const requestSnap = await getDoc(requestRef);
           if (requestSnap.exists()) {
-            setJoinStatus(requestSnap.data().status);
+            const requestStatus = requestSnap.data().status;
+            setJoinStatus(requestStatus);
+            if (requestStatus === 'accepted') {
+                setStatusAndAddParticipant('accepted');
+            }
           } else {
             setJoinStatus('idle');
           }
@@ -227,7 +245,7 @@ export default function MeetingPage() {
       }
     };
     checkHostAndStatus();
-  }, [user, authLoading, meetingId, router, toast]);
+  }, [user, authLoading, meetingId, router, toast, searchParams, topic]);
 
   // Effect 2: Listen for changes to the user's own join request (for guests)
   useEffect(() => {
@@ -264,7 +282,7 @@ export default function MeetingPage() {
     const unsubRequests = onSnapshot(requestsQuery, (snapshot) => {
         const newRequests: JoinRequest[] = [];
         snapshot.forEach(doc => {
-          newRequests.push({ id: doc.id, ...doc.data() } as JoinRequest);
+          newRequests.push({ id: doc.id, userId: doc.id, ...doc.data() } as JoinRequest);
         });
         if (newRequests.length > joinRequests.length) {
             toast({ title: "New Join Request", description: "Someone wants to join the meeting." });

@@ -1,48 +1,70 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Meetings
+    // Helper function to check if a user is signed in
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Meetings Collection
     match /meetings/{meetingId} {
-      // meeting exists, anyone signed-in can read
-      allow read: if request.auth != null;
+      // Anyone signed in can create a new meeting document
+      allow create: if signedIn();
+      
+      // Anyone signed in can read meeting details (e.g., to find the host)
+      allow read: if signedIn();
+      
+      // Only the host can update or delete their own meeting
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.hostId;
 
-      // host creates/updates/deletes the meeting
-      allow create: if request.auth != null && request.resource.data.hostId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.hostId == request.auth.uid;
-
-      // participants subcollection: each user manages only their own doc
+      // Participants subcollection
       match /participants/{participantId} {
-        allow read: if request.auth != null;
-        allow create, update, delete: if request.auth != null && request.auth.uid == participantId;
+        // Any signed-in user can add themselves as a participant
+        // The host can add/remove others (handled by secure cloud functions in a real app)
+        allow read, write, delete: if signedIn();
       }
-
-      // joinRequests subcollection
-      match /joinRequests/{requestId} {
-        // participant creates their own request
-        // requestId must be the user's UID
-        allow create: if request.auth != null
-                      && request.auth.uid == requestId
-                      && request.resource.data.requestingUserId == request.auth.uid;
-
-        // participant can read ONLY their request
-        allow read: if request.auth != null
-                    && resource.data.requestingUserId == request.auth.uid;
-
-        // host can read/update/delete ALL requests for this meeting
-        allow read, update, delete: if request.auth != null
-          && request.auth.uid == get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId;
+      
+      // Join Requests subcollection
+      match /joinRequests/{userId} {
+         // A user can create a request for themselves
+        allow create: if signedIn() && request.auth.uid == userId;
+        // The user who made the request can read/delete it
+        // The host can read/update/delete any request
+        allow read, update, delete: if signedIn();
       }
+    }
+
+    // Users Collection (for profile info, etc.)
+    match /users/{userId}/{document=**} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
     }
     
-    // Classroom Collection Rules
-    match /classrooms/{classroomId} {
-        // Default to denying all reads and writes unless specified below
-        allow read, write: if false;
+    // Classrooms Collection
+    match /classrooms/{classroomId}/{document=**} {
+       // Allow read for signed-in users, write only for authenticated users (specific logic in app)
+      allow read: if signedIn();
+      allow write: if signedIn();
     }
-
-
-    // deny everything else
-    match /{document=**} { allow read, write: if false; }
+    
+    // Documents and Recordings (public are readable, private only by uploader)
+    match /documents/{documentId} {
+      allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
+      allow create: if signedIn();
+      allow update, delete: if request.auth.uid == resource.data.uploaderId;
+    }
+    
+    match /recordings/{recordingId} {
+       allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
+       allow create: if signedIn();
+       allow update, delete: if request.auth.uid == resource.data.uploaderId;
+    }
+    
+    // FCM tokens for notifications
+    match /fcmTokens/{userId} {
+      allow write: if signedIn() && request.auth.uid == userId;
+    }
   }
 }

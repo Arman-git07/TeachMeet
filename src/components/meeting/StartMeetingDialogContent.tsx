@@ -17,6 +17,9 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
+import { db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
@@ -104,32 +107,53 @@ export function StartMeetingDialogContent() {
     setIsJoining(true);
     const trimmedMeetingTitle = meetingTitle.trim();
     
-    // Pass a special flag to the wait room to identify the host.
-    const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}&host=true`;
-    router.push(waitRoomPath);
+    try {
+        // FIRST, create the meeting document in Firestore. This is the critical step.
+        const meetingDocRef = doc(db, "meetings", meetingDetails.id);
+        await setDoc(meetingDocRef, {
+            hostId: user.uid,
+            topic: trimmedMeetingTitle,
+            createdAt: serverTimestamp(),
+        });
+        
+        // THEN, proceed with local state and redirection.
+        const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}&host=true`;
+        router.push(waitRoomPath);
 
-    setTimeout(() => {
-      try {
-        const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-        let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
-        if (!Array.isArray(startedMeetings)) startedMeetings = [];
-        
-        const newMeeting = {
-          id: meetingDetails.id,
-          title: trimmedMeetingTitle,
-          startedAt: Date.now(),
-        };
+        // Update local storage for "Ongoing Meetings" list
+        setTimeout(() => {
+            try {
+                const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+                let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+                if (!Array.isArray(startedMeetings)) startedMeetings = [];
+                
+                const newMeeting = {
+                id: meetingDetails.id,
+                title: trimmedMeetingTitle,
+                startedAt: Date.now(),
+                };
 
-        startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
-        startedMeetings.unshift(newMeeting); 
-        
-        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
-        
-        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
-      } catch (error) {
-        console.error("Failed to update local meeting records:", error);
-      }
-    }, 100);
+                startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
+                startedMeetings.unshift(newMeeting); 
+                
+                localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
+                
+                window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+            } catch (error) {
+                console.error("Failed to update local meeting records:", error);
+            }
+        }, 100);
+
+    } catch (error) {
+        console.error("Error creating meeting document:", error);
+        toast({
+            variant: "destructive",
+            title: "Failed to Start",
+            description: "Could not create the meeting room. Please check your Firestore rules and internet connection.",
+            duration: 7000,
+        });
+        setIsJoining(false);
+    }
   };
 
   return (
