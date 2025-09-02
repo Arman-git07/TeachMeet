@@ -41,8 +41,10 @@ const generateMeetingDetails = () => {
     
     let newMeetingLink = '';
     if (typeof window !== "undefined") {
+      // Construct the full URL for sharing, pointing to the waiting room.
       newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
     } else {
+      // Fallback for SSR (less likely to be used here but good practice)
       newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
     }
 
@@ -111,7 +113,7 @@ export function StartMeetingDialogContent() {
         // FIRST, create the meeting document in Firestore. This is the critical step.
         const meetingDocRef = doc(db, "meetings", meetingDetails.id);
         await setDoc(meetingDocRef, {
-            hostId: user.uid,
+            hostId: user.uid, // Set the host ID correctly
             topic: trimmedMeetingTitle,
             createdAt: serverTimestamp(),
         });
@@ -128,9 +130,9 @@ export function StartMeetingDialogContent() {
                 if (!Array.isArray(startedMeetings)) startedMeetings = [];
                 
                 const newMeeting = {
-                id: meetingDetails.id,
-                title: trimmedMeetingTitle,
-                startedAt: Date.now(),
+                    id: meetingDetails.id,
+                    title: trimmedMeetingTitle,
+                    startedAt: Date.now(),
                 };
 
                 startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);

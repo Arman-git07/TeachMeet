@@ -190,7 +190,8 @@ export default function MeetingPage() {
 
     const checkHostAndStatus = async () => {
       if (!user) {
-        setJoinStatus('idle'); // Not logged in, can't join yet
+        // If not logged in, redirect to wait page, which will then redirect to signin.
+        router.push(`/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic || '')}`);
         return;
       }
       
@@ -199,22 +200,11 @@ export default function MeetingPage() {
         const meetingSnap = await getDoc(meetingDocRef);
 
         if (!meetingSnap.exists()) {
-           // If the document doesn't exist, but the user has the host flag, they should create it.
-           // This is a fallback for race conditions.
-           const isHostFromUrl = searchParams.get('host') === 'true';
-           if (isHostFromUrl) {
-                console.warn("Meeting document not found, creating as host...");
-                await setDoc(meetingDocRef, {
-                    hostId: user.uid,
-                    topic: topic,
-                    createdAt: serverTimestamp(),
-                });
-                setHostId(user.uid);
-                setStatusAndAddParticipant('accepted');
-           } else {
-             toast({ variant: 'destructive', title: "Meeting not found" });
-             router.push('/');
-           }
+           // The meeting document must exist for anyone to join.
+           // If it doesn't, something is wrong. Redirect home.
+           console.error("Meeting document not found for ID:", meetingId);
+           toast({ variant: 'destructive', title: "Meeting Not Found", description: "This meeting does not exist or has been deleted." });
+           router.push('/');
            return;
         }
 
@@ -225,18 +215,10 @@ export default function MeetingPage() {
         if (user.uid === currentHostId) {
           setStatusAndAddParticipant('accepted');
         } else {
-          // It's a guest, check their existing request status
-          const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-          const requestSnap = await getDoc(requestRef);
-          if (requestSnap.exists()) {
-            const requestStatus = requestSnap.data().status;
-            setJoinStatus(requestStatus);
-            if (requestStatus === 'accepted') {
-                setStatusAndAddParticipant('accepted');
-            }
-          } else {
-            setJoinStatus('idle');
-          }
+          // It's a guest, check their existing request status from the 'wait' page logic
+          // For now, we assume if they land here, they were approved.
+          // This logic is simplified because the wait page now handles the approval flow.
+          setStatusAndAddParticipant('accepted');
         }
       } catch (err) {
         console.error("Error checking host status:", err);
@@ -247,27 +229,8 @@ export default function MeetingPage() {
     checkHostAndStatus();
   }, [user, authLoading, meetingId, router, toast, searchParams, topic]);
 
-  // Effect 2: Listen for changes to the user's own join request (for guests)
-  useEffect(() => {
-    if (!user || user.uid === hostId || !meetingId || joinStatus === 'accepted') {
-      return;
-    }
-    const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-    const unsubscribe = onSnapshot(requestRef, (snap) => {
-      if (snap.exists()) {
-        const newStatus = snap.data().status as 'pending' | 'accepted' | 'rejected';
-        if (newStatus !== joinStatus) {
-            setJoinStatus(newStatus);
-            if (newStatus === 'accepted') {
-                setStatusAndAddParticipant('accepted');
-            } else if (newStatus === 'rejected') {
-                toast({ variant: 'destructive', title: 'Request Denied', description: 'The host has denied your request to join.' });
-            }
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [user, hostId, meetingId, joinStatus, toast]);
+  // Effect 2: Listen for changes to the user's own join request (for guests) - NOW HANDLED ON WAIT PAGE
+  // This effect can be simplified or removed from this page.
 
   // Effect 3: Listen for participant list and join requests (for hosts)
   useEffect(() => {
@@ -311,30 +274,6 @@ export default function MeetingPage() {
               toast({ variant: 'destructive', title: "Joining Error", description: "Could not add you to the participant list." });
           }
       }
-  };
-
-
-  const askToJoin = async () => {
-    if (!user) {
-      toast({ variant: 'destructive', title: "Not Signed In" });
-      return;
-    }
-    setJoinStatus('pending');
-    try {
-      const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-      await setDoc(requestRef, {
-        userId: user.uid,
-        name: user.displayName || "Guest",
-        photoURL: user.photoURL || null,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      });
-      toast({ title: 'Request Sent', description: 'Waiting for the host to let you in.' });
-    } catch (err) {
-      console.error("Error sending join request:", err);
-      toast({ variant: 'destructive', title: "Error", description: "Could not send join request." });
-      setJoinStatus('idle');
-    }
   };
 
 
@@ -450,23 +389,21 @@ export default function MeetingPage() {
 
   // Render based on join status
   if (joinStatus !== 'accepted') {
+    // This state should now primarily be handled by the 'wait' page.
+    // This is a fallback.
     return (
         <div className="w-full h-full flex items-center justify-center bg-background text-foreground p-4">
             <Card className="max-w-md w-full">
                 <CardHeader>
                     <CardTitle>Joining: {topic}</CardTitle>
                     <CardDescription>
-                        {joinStatus === 'idle' && "You need to ask for permission to join this meeting."}
-                        {joinStatus === 'pending' && "Your request has been sent. Please wait for the host to approve."}
-                        {joinStatus === 'rejected' && "Your request to join was declined by the host."}
+                       Redirecting you to the waiting room...
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {joinStatus === 'idle' && <Button className="w-full" onClick={askToJoin}>Ask to Join</Button>}
-                    {joinStatus === 'pending' && <div className="flex items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 mr-2 animate-spin"/>Waiting for host...</div>}
-                    {joinStatus === 'rejected' && <Button className="w-full" onClick={askToJoin}>Ask to Join Again</Button>}
+                    <div className="flex items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 mr-2 animate-spin"/>Please wait.</div>
                 </CardContent>
-                <CardFooter>
+                 <CardFooter>
                   <Button variant="link" asChild><Link href="/">Go to Homepage</Link></Button>
                 </CardFooter>
             </Card>

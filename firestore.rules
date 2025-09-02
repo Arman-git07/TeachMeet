@@ -1,70 +1,75 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is signed in
+    // Helper function to check for authentication
     function signedIn() {
       return request.auth != null;
     }
 
     // Meetings Collection
     match /meetings/{meetingId} {
-      // Anyone signed in can create a new meeting document
+      // Any authenticated user can create a meeting document.
       allow create: if signedIn();
       
-      // Anyone signed in can read meeting details (e.g., to find the host)
+      // Any authenticated user can read meeting details (e.g., to find the hostId).
       allow read: if signedIn();
       
-      // Only the host can update or delete their own meeting
+      // Only the host can update or delete the meeting document.
       allow update, delete: if signedIn() && request.auth.uid == resource.data.hostId;
-
+      
       // Participants subcollection
       match /participants/{participantId} {
-        // Any signed-in user can add themselves as a participant
-        // The host can add/remove others (handled by secure cloud functions in a real app)
-        allow read, write, delete: if signedIn();
+        // Any signed-in user can add themselves. The host can remove others.
+        allow read, write: if signedIn();
       }
       
       // Join Requests subcollection
       match /joinRequests/{userId} {
-         // A user can create a request for themselves
+        // A user can create their own join request.
         allow create: if signedIn() && request.auth.uid == userId;
-        // The user who made the request can read/delete it
-        // The host can read/update/delete any request
-        allow read, update, delete: if signedIn();
+        
+        // The user who made the request can read/delete it (cancel).
+        // The host can read/update/delete requests (accept/deny).
+        allow read, update, delete: if signedIn(); 
       }
     }
 
-    // Users Collection (for profile info, etc.)
-    match /users/{userId}/{document=**} {
-      allow read, write: if signedIn() && request.auth.uid == userId;
+    // Users Collection (for user profiles, etc.)
+    match /users/{userId} {
+      allow read;
+      allow write: if signedIn() && request.auth.uid == userId;
+      
+      // Subcollections for user-specific data
+      match /{subcollection}/{docId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
     }
     
     // Classrooms Collection
-    match /classrooms/{classroomId}/{document=**} {
-       // Allow read for signed-in users, write only for authenticated users (specific logic in app)
-      allow read: if signedIn();
-      allow write: if signedIn();
+    match /classrooms/{classroomId} {
+        allow read: if true; // Public classrooms can be read by anyone
+        allow create: if signedIn();
+        allow update: if signedIn(); // More specific rules needed here in a real app
+
+        match /{subcollection}/{docId} {
+            allow read, write: if signedIn();
+        }
     }
-    
-    // Documents and Recordings (public are readable, private only by uploader)
-    match /documents/{documentId} {
-      allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
-      allow create: if signedIn();
-      allow update, delete: if request.auth.uid == resource.data.uploaderId;
+
+    // Documents and Recordings (public/private files)
+    match /documents/{docId} {
+        allow read: if resource.data.isPrivate == false || (signedIn() && request.auth.uid == resource.data.uploaderId);
+        allow create: if signedIn();
+        allow delete: if signedIn() && request.auth.uid == resource.data.uploaderId;
     }
-    
-    match /recordings/{recordingId} {
-       allow read: if resource.data.isPrivate == false || request.auth.uid == resource.data.uploaderId;
-       allow create: if signedIn();
-       allow update, delete: if request.auth.uid == resource.data.uploaderId;
+     match /recordings/{docId} {
+        allow read: if resource.data.isPrivate == false || (signedIn() && request.auth.uid == resource.data.uploaderId);
+        allow create: if signedIn();
+        allow delete: if signedIn() && request.auth.uid == resource.data.uploaderId;
     }
-    
-    // FCM tokens for notifications
-    match /fcmTokens/{userId} {
-      allow write: if signedIn() && request.auth.uid == userId;
+     match /fcmTokens/{userId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
     }
   }
 }
