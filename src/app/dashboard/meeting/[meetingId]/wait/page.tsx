@@ -60,45 +60,40 @@ export default function WaitingAreaPage() {
     setIsHost(isHostFromUrl);
     setIsLoadingMeetingData(false);
 
-    const checkPermissions = async () => {
-        try {
-            await navigator.mediaDevices.getUserMedia({ video: true });
-            setHasCameraPermission(true);
-        } catch (e) {
-            setHasCameraPermission(false);
-        }
-        try {
-            await navigator.mediaDevices.getUserMedia({ audio: true });
-            setHasMicPermission(true);
-        } catch (e) {
-            setHasMicPermission(false);
-        }
-    };
-    checkPermissions();
+    // Set default camera/mic state from localStorage
+    const cameraDefaultOn = localStorage.getItem('teachmeet-camera-default') !== 'off';
+    const micDefaultOn = localStorage.getItem('teachmeet-mic-default') === 'on';
 
+    if (cameraDefaultOn) handleToggleCamera();
+    if (micDefaultOn) handleToggleMic();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId, user, authLoading, isHostFromUrl, router, searchParams]);
 
   // Effect 2: Guest listener for join request status
   useEffect(() => {
-    if (!user || isHost || !meetingId) return;
+    if (!user || isHost || !meetingId || joinStatus !== 'pending') return;
 
     const requestRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
     const unsubscribe = onSnapshot(requestRef, (snap) => {
-        if (snap.exists()) {
+        if (!snap.exists()) {
+            // Document was deleted, implying denial
+            if (joinStatus === 'pending') {
+                toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
+                setJoinStatus('denied');
+            }
+        } else {
             const status = snap.data().status as JoinRequestStatus;
             if (status === 'approved') {
                 toast({ title: "Request Approved!", description: "You are now joining the meeting." });
                 const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
                 router.push(joinNowLinkPath);
-            } else if (status === 'denied') {
-                toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
-                setJoinStatus('denied');
-            } else {
-                 setJoinStatus(status);
             }
-        } else if (joinStatus === 'pending') {
+        }
+    }, (error) => {
+        console.error("Error listening for join request status:", error);
+        // If we can't listen, it's safer to assume denial or issue
+        if (joinStatus === 'pending') {
             setJoinStatus('denied');
-            toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
         }
     });
 
@@ -129,21 +124,13 @@ export default function WaitingAreaPage() {
       }
       setIsCameraActive(false);
     } else {
-      if (hasCameraPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Camera Access Denied",
-          description: "Please enable camera permissions in your browser settings to use this feature.",
-        });
-        return;
-      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setHasCameraPermission(true);
         currentVideoStreamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-        setHasCameraPermission(true);
         setIsCameraActive(true);
       } catch (error) {
         console.error('Error accessing camera:', error);
@@ -151,8 +138,8 @@ export default function WaitingAreaPage() {
         setIsCameraActive(false);
         toast({
           variant: 'destructive',
-          title: 'Camera Access Failed',
-          description: 'Could not access the camera. Please ensure it is not in use by another application and that permissions are allowed.',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this feature.',
         });
       }
     }
@@ -166,18 +153,10 @@ export default function WaitingAreaPage() {
       }
       setIsMicActive(false);
     } else {
-      if (hasMicPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Microphone Access Denied",
-          description: "Please enable microphone permissions in your browser settings.",
-        });
-        return;
-      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        currentMicStreamRef.current = stream;
         setHasMicPermission(true);
+        currentMicStreamRef.current = stream;
         setIsMicActive(true);
         toast({
           title: "Microphone On",
@@ -190,7 +169,7 @@ export default function WaitingAreaPage() {
         toast({
           variant: 'destructive',
           title: 'Microphone Access Failed',
-          description: 'Could not access the microphone. Please ensure it is not in use and permissions are allowed.',
+          description: 'Could not access the microphone.',
         });
       }
     }
@@ -225,6 +204,7 @@ export default function WaitingAreaPage() {
             photoURL: user.photoURL,
             status: 'pending',
             createdAt: serverTimestamp(),
+            userId: user.uid,
         });
         toast({ title: 'Request Sent', description: 'Waiting for the host to let you in.' });
     } catch (err) {
