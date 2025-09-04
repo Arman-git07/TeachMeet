@@ -90,7 +90,7 @@ export default function WaitingAreaPage() {
                 toast({ title: "Request Approved!", description: "You are now joining the meeting." });
                 const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
                 router.push(joinNowLinkPath);
-            } else if (status === 'rejected') {
+            } else if (status === 'denied') {
                 toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
                 setJoinStatus('denied');
             } else {

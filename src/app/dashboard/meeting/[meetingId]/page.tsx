@@ -24,7 +24,7 @@ import {
   Bell,
   LogIn,
 } from 'lucide-react';
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import MeetingClient from './MeetingClient';
@@ -183,6 +183,9 @@ export default function MeetingPage() {
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
+  
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPosition, setDragPosition] = useState({ x: 20, y: 20 });
   
   // Effect 1: Determine user's role (host or guest) and initial status
   useEffect(() => {
@@ -369,6 +372,15 @@ export default function MeetingPage() {
     }, 2000); // Animation duration
   }, []);
   
+  const handleDrag = (e: React.MouseEvent) => {
+    if (isDragging) {
+      setDragPosition({
+        x: dragPosition.x + e.movementX,
+        y: dragPosition.y + e.movementY,
+      });
+    }
+  };
+  
   const backToHomepage = () => {
     try {
       const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
@@ -416,25 +428,66 @@ export default function MeetingPage() {
                 </CardContent>
                  <CardFooter>
                   <Button variant="link" asChild><Link href="/">Go to Homepage</Link></Button>
-                </CardFooter>
+                 </CardFooter>
             </Card>
         </div>
     )
   }
 
-  // --- Render the main meeting UI only if accepted ---
+  const localParticipantView = user ? (
+    <MeetingClient 
+      ref={meetingClientRef}
+      meetingId={meetingId} 
+      userId={user.uid}
+      onMicToggle={handleMicToggle} 
+      onCamToggle={handleCamToggle}
+      onUserJoined={handleUserJoined}
+    />
+  ) : null;
+  
+  const remoteParticipants = participants.filter(p => p.id !== user?.uid);
+  const totalParticipants = remoteParticipants.length + (user ? 1 : 0);
+  
+  const gridCols = useMemo(() => {
+    const remoteCount = remoteParticipants.length;
+    if (remoteCount <= 1) return 'grid-cols-1';
+    if (remoteCount <= 2) return 'grid-cols-2';
+    if (remoteCount <= 4) return 'grid-cols-2';
+    if (remoteCount <= 6) return 'grid-cols-3';
+    return 'grid-cols-4';
+  }, [remoteParticipants.length]);
+  
   return (
-    <div className="w-full h-full flex flex-col bg-[#1e2a38] text-white overflow-hidden">
-      <div className="flex-grow relative">
-        {user && (
-          <MeetingClient 
-              ref={meetingClientRef}
-              meetingId={meetingId} 
-              userId={user.uid}
-              onMicToggle={handleMicToggle} 
-              onCamToggle={handleCamToggle}
-              onUserJoined={handleUserJoined}
-          />
+    <div className="w-full h-full flex flex-col bg-black text-white overflow-hidden">
+      {/* Video area */}
+       <div className="flex-1 relative flex items-center justify-center p-2 overflow-hidden" onMouseMove={handleDrag} onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
+        {totalParticipants <= 1 && user ? (
+          // Single participant (self) full screen
+          <div className="w-full h-full rounded-lg overflow-hidden">
+            {localParticipantView}
+          </div>
+        ) : (
+          <>
+            {/* Grid for remote participants */}
+            <div
+              className={`grid gap-2 w-full h-full ${gridCols}`}
+            >
+              {remoteParticipants.map((p, i) => (
+                  <div key={p.id} id={`remote-container-${p.id}`} className="w-full h-full rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center">
+                    <p className="text-muted-foreground">Waiting for video...</p>
+                  </div>
+              ))}
+            </div>
+
+            {/* Floating self-view */}
+            <div
+              className="absolute w-40 h-28 cursor-move rounded-lg overflow-hidden shadow-lg border border-gray-700 bg-black"
+              style={{ left: dragPosition.x, top: dragPosition.y, transition: isDragging ? 'none' : 'left 0.2s, top 0.2s' }}
+              onMouseDown={(e) => { e.preventDefault(); setIsDragging(true); }}
+            >
+              {localParticipantView}
+            </div>
+          </>
         )}
       </div>
 
