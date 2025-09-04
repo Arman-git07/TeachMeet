@@ -2,9 +2,9 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, ShieldAlert, Loader2 } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings2, User as UserIcon, AlertTriangle, ShieldAlert, Loader2, Link as LinkIcon, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -21,11 +21,11 @@ import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'fir
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
 
-export default function WaitingAreaPage({ params }: { params: { meetingId: string } }) {
-  const { meetingId } = params;
+export default function WaitingAreaPage() {
+  const { meetingId } = useParams() as { meetingId: string };
   const searchParams = useSearchParams();
-  const topic = searchParams.get("topic");
-  const isExplicitHost = searchParams.get("host") === "true";
+  const topic = searchParams.get("topic") || "TeachMeet Meeting";
+  const isHostFromUrl = searchParams.get("host") === "true";
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
@@ -35,9 +35,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   
-  const [appliedFilter, setAppliedFilter] = useState<string>("none");
-  const [isFilterToggleOn, setIsFilterToggleOn] = useState<boolean>(false);
-  const [mirrorVideo, setMirrorVideo] = useState<boolean>(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
@@ -50,83 +47,61 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
   
   const [isHost, setIsHost] = useState(false);
 
+  // Effect 1: Determine Host Status & Initial Setup
   useEffect(() => {
-    // Determine host status. Prioritize the explicit URL flag.
-    if (isExplicitHost && user) {
-      setIsHost(true);
-      setIsLoadingMeetingData(false);
-    } else if (user && !authLoading) {
-      // If not explicitly a host, check the database for existing meeting.
-      const meetingDocRef = doc(db, 'meetings', meetingId);
-      getDoc(meetingDocRef).then(docSnap => {
-        if (docSnap.exists()) {
-          setIsHost(docSnap.data().creatorId === user.uid);
-        } else {
-          // If doc doesn't exist and they don't have the flag, they are a guest.
-          setIsHost(false);
-        }
-      }).catch(err => {
-        console.error("Error checking host status:", err);
-        setIsHost(false);
-      }).finally(() => {
-        setIsLoadingMeetingData(false);
-      });
-    }
-    // If not logged in, they cannot be the host.
-    if (!user && !authLoading) {
-      setIsHost(false);
-      setIsLoadingMeetingData(false);
-    }
-  }, [meetingId, user, authLoading, isExplicitHost]);
-
-  // Listener for guests awaiting approval.
-  useEffect(() => {
-    if (!user || !meetingId || isHost || joinStatus !== 'pending') return;
+    if (authLoading) return;
     
-    const participantDocRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+    if (!user) {
+        const intendedUrl = `/dashboard/meeting/${meetingId}/wait?${searchParams.toString()}`;
+        router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
+        return;
+    }
 
-    const unsubscribe = onSnapshot(participantDocRef, (participantSnap) => {
-        if (participantSnap.exists()) {
-            setJoinStatus('approved');
-            toast({ title: "Request Approved!", description: "You are now joining the meeting." });
-            const joinNowLinkPath = topic
-                ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
-                : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
+    setIsHost(isHostFromUrl);
+    setIsLoadingMeetingData(false);
+
+    // Set default camera/mic state from localStorage
+    const cameraDefaultOn = localStorage.getItem('teachmeet-camera-default') !== 'off';
+    const micDefaultOn = localStorage.getItem('teachmeet-mic-default') === 'on';
+
+    if (cameraDefaultOn) handleToggleCamera();
+    if (micDefaultOn) handleToggleMic();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetingId, user, authLoading, isHostFromUrl, router, searchParams]);
+
+  // Effect 2: Guest listener for join request status
+  useEffect(() => {
+    if (!user || isHost || !meetingId || joinStatus !== 'pending') return;
+
+    const requestRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+    const unsubscribe = onSnapshot(requestRef, (snap) => {
+        if (!snap.exists()) {
+            // Document was deleted, implying denial
+            if (joinStatus === 'pending') {
+                toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join." });
+                setJoinStatus('denied');
+            }
+        } else {
+            const status = snap.data().status as JoinRequestStatus;
+            if (status === 'approved') {
+                toast({ title: "Request Approved!", description: "You are now joining the meeting." });
+                const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+                router.push(joinNowLinkPath);
+            }
         }
     }, (error) => {
-        console.error("Error listening to participant document:", error);
-    });
-    
-    const requestDocRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-    const unsubscribeDenial = onSnapshot(requestDocRef, (requestSnap) => {
-        if (!requestSnap.exists() && joinStatus === 'pending') {
-            setTimeout(() => {
-                if (joinStatus === 'pending') {
-                    setJoinStatus('denied');
-                }
-            }, 1500);
+        console.error("Error listening for join request status:", error);
+        // If we can't listen, it's safer to assume denial or issue
+        if (joinStatus === 'pending') {
+            setJoinStatus('denied');
         }
     });
 
-    return () => {
-        unsubscribe();
-        unsubscribeDenial();
-    };
-  }, [user, meetingId, isHost, joinStatus, router, topic, toast]);
+    return () => unsubscribe();
+  }, [user, meetingId, isHost, router, topic, toast, joinStatus]);
 
 
-  useEffect(() => {
-    const storedFilter = localStorage.getItem("teachmeet-camera-filter");
-    if (storedFilter) {
-      setAppliedFilter(storedFilter);
-      if (storedFilter !== "none") {
-        setIsFilterToggleOn(true); 
-      }
-    }
-    setMirrorVideo(localStorage.getItem('teachmeet-camera-mirror') === 'true');
-  }, []);
-
+  // Effect 3: Gracefully stop media tracks on component unmount
   useEffect(() => {
     return () => {
       if (currentVideoStreamRef.current) {
@@ -149,21 +124,13 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       }
       setIsCameraActive(false);
     } else {
-      if (hasCameraPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Camera Access Denied",
-          description: "Please enable camera permissions in your browser settings to use this feature.",
-        });
-        return;
-      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setHasCameraPermission(true);
         currentVideoStreamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-        setHasCameraPermission(true);
         setIsCameraActive(true);
       } catch (error) {
         console.error('Error accessing camera:', error);
@@ -171,8 +138,8 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         setIsCameraActive(false);
         toast({
           variant: 'destructive',
-          title: 'Camera Access Failed',
-          description: 'Could not access the camera. Please ensure it is not in use by another application and that permissions are allowed.',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this feature.',
         });
       }
     }
@@ -186,18 +153,10 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       }
       setIsMicActive(false);
     } else {
-      if (hasMicPermission === false) { 
-        toast({
-          variant: "destructive",
-          title: "Microphone Access Denied",
-          description: "Please enable microphone permissions in your browser settings.",
-        });
-        return;
-      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        currentMicStreamRef.current = stream;
         setHasMicPermission(true);
+        currentMicStreamRef.current = stream;
         setIsMicActive(true);
         toast({
           title: "Microphone On",
@@ -210,7 +169,7 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
         toast({
           variant: 'destructive',
           title: 'Microphone Access Failed',
-          description: 'Could not access the microphone. Please ensure it is not in use and permissions are allowed.',
+          description: 'Could not access the microphone.',
         });
       }
     }
@@ -232,49 +191,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
     }
 
     if (isHost) {
-        const meetingDocRef = doc(db, "meetings", meetingId);
-        const participantDocRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        try {
-            await setDoc(meetingDocRef, {
-                creatorId: user.uid,
-                topic: topic || "Untitled Meeting",
-                createdAt: serverTimestamp(),
-            });
-
-            // Host also adds themselves as a participant immediately
-            await setDoc(participantDocRef, {
-                name: user.displayName || userName,
-                photoURL: user.photoURL,
-                isMicMuted: !isMicActive,
-                isCameraOff: !isCameraActive,
-                isHandRaised: false,
-                isScreenSharing: false,
-                joinedAt: serverTimestamp(),
-            });
-
-            const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
-            router.push(joinNowLinkPath);
-        } catch (error) {
-            console.error("Host failed to create/update meeting document:", error);
-            toast({ variant: 'destructive', title: 'Failed to Start', description: 'Could not create the meeting room. Check Firestore rules.'});
-        }
+        const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
+        router.push(joinNowLinkPath);
         return;
     }
-
-    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
-    const requestData = {
-        name: user.displayName || userName,
-        photoURL: user.photoURL,
-        requestedAt: serverTimestamp(),
-    };
-
+    
+    setJoinStatus('pending');
     try {
-      await setDoc(requestRef, requestData);
-      setJoinStatus('pending');
-      toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host. Please wait for approval.'});
-    } catch (error: any) {
-        console.error("Join request failed:", error.code, error.message);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send your join request. The meeting may not exist or there may be a permissions issue.'});
+        const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+        await setDoc(requestRef, {
+            name: user.displayName || userName,
+            photoURL: user.photoURL,
+            status: 'pending',
+            createdAt: serverTimestamp(),
+            userId: user.uid,
+        });
+        toast({ title: 'Request Sent', description: 'Waiting for the host to let you in.' });
+    } catch (err) {
+        console.error("Join request failed:", err);
+        toast({ variant: 'destructive', title: "Request Failed", description: "Could not send join request. The meeting may not exist or there may be a permissions issue."});
         setJoinStatus('idle');
     }
   };
@@ -289,46 +224,25 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
       return { text: "Join Now as Host", disabled, showSpinner: false, onClick: handleJoinAction };
     }
 
-    let text = "Ask to Join";
-    let disabled = !agreedToTerms || joinStatus === 'pending' || joinStatus === 'approved';
-
-    if (joinStatus === 'pending') text = "Waiting for Host...";
-    if (joinStatus === 'approved') text = "Joining...";
-    if (joinStatus === 'denied') {
-      text = "Request Denied. Ask again?";
-      disabled = !agreedToTerms;
-      return { 
-        text, 
-        disabled, 
-        showSpinner: false, 
-        onClick: () => { setJoinStatus('idle'); handleJoinAction(); }
-      };
+    if (joinStatus === 'pending') {
+        return { text: "Waiting for Host...", disabled: true, showSpinner: true, onClick: () => {} };
     }
     
-    return { text, disabled, showSpinner: joinStatus === 'pending' || joinStatus === 'approved', onClick: handleJoinAction };
+    if (joinStatus === 'denied') {
+        return { 
+            text: "Request Denied. Ask again?", 
+            disabled: !agreedToTerms, 
+            showSpinner: false, 
+            onClick: handleJoinAction
+        };
+    }
+    
+    return { text: "Ask to Join", disabled: !agreedToTerms, showSpinner: false, onClick: handleJoinAction };
   };
 
   const { text: buttonText, disabled: buttonDisabled, showSpinner, onClick: buttonOnClick } = getButtonState();
 
-  const videoClassNames = cn(
-    "w-full h-full object-cover",
-    {
-      "video-mirror": mirrorVideo,
-      "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale" && isCameraActive,
-      "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia" && isCameraActive,
-      "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage" && isCameraActive,
-      "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous" && isCameraActive,
-      "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic" && isCameraActive,
-      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour" && isCameraActive,
-      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus" && isCameraActive,
-      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear" && isCameraActive,
-      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow" && isCameraActive,
-      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin" && isCameraActive,
-      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright" && isCameraActive,
-    }
-  );
-
-  const filterDisplayName = appliedFilter === "none" ? "No filter" : appliedFilter.charAt(0).toUpperCase() + appliedFilter.slice(1).replace(/([A-Z])/g, ' $1');;
+  const videoClassNames = cn("w-full h-full object-cover", { "video-mirror": true });
 
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
@@ -384,51 +298,6 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
             </div>
           </div>
 
-          {hasCameraPermission === false && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Camera Permission Required</AlertTitle>
-              <AlertDescription>
-                TeachMeet needs access to your camera to share your video.
-                Please enable camera permissions in your browser settings and refresh the page or try toggling the camera again.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {hasMicPermission === false && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Microphone Permission Required</AlertTitle>
-              <AlertDescription>
-                TeachMeet needs access to your microphone to share your audio.
-                Please enable microphone permissions in your browser settings and try toggling the microphone again.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-              <Label htmlFor="filter-toggle" className="text-sm text-muted-foreground">
-                Apply Filter: <span className="font-medium text-foreground">{filterDisplayName}</span>
-                {appliedFilter !== "none" && <span className="text-xs"> (from settings)</span>}
-              </Label>
-              <Switch
-                id="filter-toggle"
-                checked={isFilterToggleOn}
-                onCheckedChange={setIsFilterToggleOn}
-                disabled={appliedFilter === "none"}
-                aria-label="Toggle camera filter"
-              />
-            </div>
-          </div>
-
-          <Button asChild variant="outline" className="w-full flex items-center justify-center gap-2 rounded-lg">
-              <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}`}>
-                <Settings2 className="h-5 w-5" />
-                Advanced Settings
-              </Link>
-            </Button>
-          
           <div className="flex items-center space-x-2 p-3 border rounded-lg shadow-sm">
             <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
             <Label htmlFor="terms" className="text-xs text-muted-foreground">
@@ -453,13 +322,12 @@ export default function WaitingAreaPage({ params }: { params: { meetingId: strin
               You must agree to the terms and guidelines to join the meeting.
             </p>
           )}
-          <p className="text-xs text-muted-foreground text-center">
-            By joining, you acknowledge our{' '}
-             <Link href="/privacy-policy" target="_blank" className="text-accent hover:underline">
-                Privacy Policy
-              </Link>.
-          </p>
         </CardContent>
+         <CardFooter>
+            <Button variant="link" asChild className="text-muted-foreground">
+                <Link href="/"><LinkIcon className="mr-2 h-4 w-4"/> Go to Homepage</Link>
+            </Button>
+        </CardFooter>
       </Card>
     </div>
   );
