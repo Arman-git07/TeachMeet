@@ -212,7 +212,6 @@ export default function WaitingAreaPage() {
     }
 
     if (isHost) {
-        // The host already created the doc in the dialog, now they just navigate.
         const joinNowLinkPath = topic ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}` : `/dashboard/meeting/${meetingId}`;
         router.push(joinNowLinkPath);
         return;
