@@ -22,7 +22,7 @@ const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 export default function PrejoinPage() {
   const searchParams = useSearchParams();
-  const topic = searchParams.get("topic") || "TeachMeet Meeting";
+  const topic = searchParams.get("topic") || "My TeachMeet Meeting";
   const meetingId = searchParams.get("meetingId");
   const router = useRouter();
 
@@ -190,7 +190,7 @@ export default function PrejoinPage() {
                 {!camOn && (
                    <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                       <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
-                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user"/>
+                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
                         <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
                       </Avatar>
                   </div>
