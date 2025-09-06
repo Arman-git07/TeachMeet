@@ -15,6 +15,7 @@ import { db, auth } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
@@ -22,14 +23,15 @@ const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 export default function PrejoinPage() {
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic") || "TeachMeet Meeting";
-  const meetingId = searchParams.get("meetingId"); // Get meetingId from URL
+  const meetingId = searchParams.get("meetingId");
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
 
   const [camOn, setCamOn] = useState(true);
-  const [micOn, setMicOn] = useState(false); // Default mic to off
+  const [micOn, setMicOn] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentStreamRef = useRef<MediaStream | null>(null);
@@ -43,12 +45,8 @@ export default function PrejoinPage() {
 
   const getDevices = useCallback(async () => {
     try {
-      // First, get permissions
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      // Stop tracks immediately after getting permissions
       stream.getTracks().forEach(track => track.stop());
-
-      // Now, enumerate devices
       const devices = await navigator.mediaDevices.enumerateDevices();
       setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
       setAudioInDevices(devices.filter(d => d.kind === 'audioinput'));
@@ -63,24 +61,20 @@ export default function PrejoinPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    
-    // Load saved device preferences
     setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
     setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
-    
     getDevices();
   }, [user, authLoading, getDevices]);
   
    useEffect(() => {
     const setupStream = async () => {
-        // Stop any existing stream
         if (currentStreamRef.current) {
             currentStreamRef.current.getTracks().forEach(track => track.stop());
         }
 
-        if (camOn || micOn) {
+        if (hasPermissions && (camOn || micOn)) {
             try {
-                const constraints = {
+                const constraints: MediaStreamConstraints = {
                     video: camOn ? (selectedVideoDevice === 'default' ? true : { deviceId: { exact: selectedVideoDevice } }) : false,
                     audio: micOn ? (selectedAudioInDevice === 'default' ? true : { deviceId: { exact: selectedAudioInDevice } }) : false,
                 };
@@ -94,18 +88,14 @@ export default function PrejoinPage() {
                 toast({ variant: 'destructive', title: "Device Error", description: "Could not use the selected camera or microphone." });
             }
         } else {
-            // If both are off, ensure the video element is cleared
             if (videoRef.current) {
                 videoRef.current.srcObject = null;
             }
         }
     };
     
-    if(hasPermissions) {
-      setupStream();
-    }
+    setupStream();
     
-    // Cleanup function to stop tracks when component unmounts or dependencies change
     return () => {
       if (currentStreamRef.current) {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
@@ -133,14 +123,11 @@ export default function PrejoinPage() {
         localStorage.setItem('teachmeet-video-device', selectedVideoDevice);
         localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
         
-        // Update local storage for "Ongoing Meetings" list
         try {
             const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
             let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
             if (!Array.isArray(startedMeetings)) startedMeetings = [];
-            
             startedMeetings.unshift({ id: meetingId, title: topic, startedAt: Date.now() });
-            
             localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
             window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
         } catch (error) {
@@ -250,8 +237,21 @@ export default function PrejoinPage() {
                 </Button>
               </div>
           </div>
-
-          <Button onClick={handleJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isJoining || hasPermissions === false}>
+          <div className="flex items-center space-x-2 p-3 border rounded-lg shadow-sm">
+            <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
+            <Label htmlFor="terms" className="text-xs text-muted-foreground">
+              I agree to the{' '}
+              <Link href="/terms-of-service" target="_blank" className="text-accent hover:underline">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/community-guidelines" target="_blank" className="text-accent hover:underline">
+                Community Guidelines
+              </Link>
+              .
+            </Label>
+          </div>
+          <Button onClick={handleJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isJoining || hasPermissions === false || !agreedToTerms}>
             {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
             {isJoining ? "Joining..." : "Join Now"}
           </Button>
@@ -265,4 +265,3 @@ export default function PrejoinPage() {
     </div>
   );
 }
-
