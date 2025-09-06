@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon, Settings } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon, Settings, ImageIcon } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
@@ -23,11 +24,12 @@ const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 export default function PrejoinPage() {
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic") || "My TeachMeet Meeting";
-  const meetingId = searchParams.get("meetingId");
+  const meetingIdParam = searchParams.get("meetingId");
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
 
+  const [meetingId, setMeetingId] = useState('');
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -42,12 +44,27 @@ export default function PrejoinPage() {
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>('default');
   const [selectedAudioInDevice, setSelectedAudioInDevice] = useState<string>('default');
   const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
+  
+  const [appliedFilter, setAppliedFilter] = useState<string>('none');
+  const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
+
+  const generateRandomId = (length: number) => {
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return `${result.slice(0,3)}-${result.slice(3,6)}-${result.slice(6,9)}`;
+  };
+  
+  useEffect(() => {
+    setMeetingId(meetingIdParam || generateRandomId(9));
+  }, [meetingIdParam]);
 
   const getDevices = useCallback(async () => {
     try {
-      // We must get the stream first to request permissions before enumerating devices
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      stream.getTracks().forEach(track => track.stop()); // Stop this temporary stream
+      stream.getTracks().forEach(track => track.stop()); 
       const devices = await navigator.mediaDevices.enumerateDevices();
       setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
       setAudioInDevices(devices.filter(d => d.kind === 'audioinput'));
@@ -62,18 +79,20 @@ export default function PrejoinPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    // Load saved device preferences
     setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
     setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
-    // Set initial camera/mic state based on saved preferences
     setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
+    
+    const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
+    setAppliedFilter(filter);
+    setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
+
     getDevices();
   }, [user, authLoading, getDevices]);
   
    useEffect(() => {
     const setupStream = async () => {
-        // Stop any existing stream before creating a new one
         if (currentStreamRef.current) {
             currentStreamRef.current.getTracks().forEach(track => track.stop());
         }
@@ -102,7 +121,6 @@ export default function PrejoinPage() {
     
     setupStream();
     
-    // Cleanup function to stop tracks when component unmounts or dependencies change
     return () => {
       if (currentStreamRef.current) {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
@@ -118,7 +136,6 @@ export default function PrejoinPage() {
     setIsJoining(true);
     
     try {
-        // Create the meeting document in Firestore
         const meetingDocRef = doc(db, "meetings", meetingId);
         await setDoc(meetingDocRef, {
             hostId: user.uid,
@@ -126,13 +143,13 @@ export default function PrejoinPage() {
             createdAt: serverTimestamp(),
         });
         
-        // Save device states for in-meeting experience
         localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-video-device', selectedVideoDevice);
         localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
+        localStorage.setItem('teachmeet-camera-filter', appliedFilter);
+        localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
         
-        // Add to local list of ongoing meetings for quick rejoin
         try {
             const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
             let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
@@ -162,7 +179,22 @@ export default function PrejoinPage() {
   const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
   const userFallback = userName.charAt(0).toUpperCase();
 
-  const videoClassNames = cn("w-full h-full object-cover", { "video-mirror": true });
+  const videoClassNames = cn(
+    "w-full h-full object-cover video-mirror",
+    {
+      "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale",
+      "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia",
+      "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage",
+      "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous",
+      "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic",
+      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour",
+      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus",
+      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear",
+      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow",
+      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin",
+      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright",
+    }
+  );
 
   if(authLoading) {
     return (
@@ -239,6 +271,25 @@ export default function PrejoinPage() {
                           {audioInDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}
                       </SelectContent>
                   </Select>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="video-filter">Video Filter</Label>
+                    <Select value={appliedFilter} onValueChange={setAppliedFilter}>
+                        <SelectTrigger id="video-filter" className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger>
+                        <SelectContent className="rounded-lg">
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="grayscale">Grayscale</SelectItem>
+                            <SelectItem value="sepia">Sepia</SelectItem>
+                            <SelectItem value="vintage">Vintage</SelectItem>
+                            <SelectItem value="luminous">Luminous</SelectItem>
+                            <SelectItem value="dramatic">Dramatic</SelectItem>
+                            <SelectItem value="goldenhour">Golden Hour</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="flex items-center justify-between p-2 border rounded-lg">
+                    <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Apply Filter</Label>
+                    <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
                 </div>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
                   <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
