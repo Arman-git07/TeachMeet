@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Video, Loader2, Clipboard, Share2, Check, Link as LinkIcon } from "lucide-react";
+import { Video, Loader2, Clipboard, Share2, Check, Link as LinkIcon, Hash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect, useCallback } from "react";
 import { 
@@ -39,7 +39,6 @@ export function StartMeetingDialogContent() {
   const { user } = useAuth();
   
   useEffect(() => {
-    // Generate a new ID whenever the dialog is opened (assuming it's remounted)
     setMeetingId(generateRandomId(9));
   }, []);
 
@@ -66,7 +65,6 @@ export function StartMeetingDialogContent() {
     }
 
     setIsRedirecting(true);
-    // Pass both the generated meeting ID and the topic to the prejoin page
     const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(meetingTitle.trim())}`;
     router.push(prejoinPath);
   };
@@ -114,9 +112,18 @@ export function StartMeetingDialogContent() {
                 {copied === 'link' ? <Check className="h-4 w-4 text-primary" /> : <Clipboard className="h-4 w-4" />}
               </Button>
             </div>
-             <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-grow">
+                <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={meetingId} readOnly className="pl-9 rounded-lg text-sm bg-muted/50" />
+              </div>
+              <Button variant="outline" size="icon" className="rounded-lg flex-shrink-0" onClick={() => handleCopyToClipboard(meetingId, 'code')}>
+                {copied === 'code' ? <Check className="h-4 w-4 text-primary" /> : <Clipboard className="h-4 w-4" />}
+              </Button>
+            </div>
+             <div className="flex items-center gap-2 pt-2">
                 <Button variant="outline" className="w-full rounded-lg" onClick={() => setIsSharePanelOpen(true)}>
-                    <Share2 className="mr-2 h-4 w-4"/> Share Invite
+                    <Share2 className="mr-2 h-4 w-4"/> Share Full Invite
                 </Button>
             </div>
           </div>
