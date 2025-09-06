@@ -45,8 +45,9 @@ export default function PrejoinPage() {
 
   const getDevices = useCallback(async () => {
     try {
+      // We must get the stream first to request permissions before enumerating devices
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => track.stop()); // Stop this temporary stream
       const devices = await navigator.mediaDevices.enumerateDevices();
       setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
       setAudioInDevices(devices.filter(d => d.kind === 'audioinput'));
@@ -61,13 +62,18 @@ export default function PrejoinPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
+    // Load saved device preferences
     setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
     setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
+    // Set initial camera/mic state based on saved preferences
+    setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
+    setMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
     getDevices();
   }, [user, authLoading, getDevices]);
   
    useEffect(() => {
     const setupStream = async () => {
+        // Stop any existing stream before creating a new one
         if (currentStreamRef.current) {
             currentStreamRef.current.getTracks().forEach(track => track.stop());
         }
@@ -96,6 +102,7 @@ export default function PrejoinPage() {
     
     setupStream();
     
+    // Cleanup function to stop tracks when component unmounts or dependencies change
     return () => {
       if (currentStreamRef.current) {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
@@ -111,6 +118,7 @@ export default function PrejoinPage() {
     setIsJoining(true);
     
     try {
+        // Create the meeting document in Firestore
         const meetingDocRef = doc(db, "meetings", meetingId);
         await setDoc(meetingDocRef, {
             hostId: user.uid,
@@ -118,11 +126,13 @@ export default function PrejoinPage() {
             createdAt: serverTimestamp(),
         });
         
+        // Save device states for in-meeting experience
         localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-video-device', selectedVideoDevice);
         localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
         
+        // Add to local list of ongoing meetings for quick rejoin
         try {
             const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
             let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
