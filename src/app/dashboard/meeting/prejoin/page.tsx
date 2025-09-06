@@ -39,13 +39,11 @@ export default function PrejoinPage() {
   const currentStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
-  const [audioInDevices, setAudioInDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>('default');
-  const [selectedAudioInDevice, setSelectedAudioInDevice] = useState<string>('default');
   const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
   
   const [mirrorCamera, setMirrorCamera] = useState(false);
+  const [appliedFilter, setAppliedFilter] = useState<string>('none');
+  const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
 
   const generateRandomId = (length: number) => {
     const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -60,13 +58,10 @@ export default function PrejoinPage() {
     setMeetingId(meetingIdParam || generateRandomId(9));
   }, [meetingIdParam]);
 
-  const getDevices = useCallback(async () => {
+  const getDevicesAndPermissions = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       stream.getTracks().forEach(track => track.stop()); 
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
-      setAudioInDevices(devices.filter(d => d.kind === 'audioinput'));
       setHasPermissions(true);
     } catch (err) {
       console.error("Error getting A/V devices:", err);
@@ -78,14 +73,15 @@ export default function PrejoinPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
-    setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
     setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
     setMirrorCamera(localStorage.getItem('teachmeet-camera-mirror') === 'true');
+    const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
+    setAppliedFilter(filter);
+    setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
     
-    getDevices();
-  }, [user, authLoading, getDevices]);
+    getDevicesAndPermissions();
+  }, [user, authLoading, getDevicesAndPermissions]);
   
    useEffect(() => {
     const setupStream = async () => {
@@ -95,18 +91,15 @@ export default function PrejoinPage() {
 
         if (hasPermissions && (camOn || micOn)) {
             try {
-                const constraints: MediaStreamConstraints = {
-                    video: camOn ? (selectedVideoDevice === 'default' ? true : { deviceId: { exact: selectedVideoDevice } }) : false,
-                    audio: micOn ? (selectedAudioInDevice === 'default' ? true : { deviceId: { exact: selectedAudioInDevice } }) : false,
-                };
+                const constraints: MediaStreamConstraints = { video: camOn, audio: micOn };
                 const newStream = await navigator.mediaDevices.getUserMedia(constraints);
                 currentStreamRef.current = newStream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = newStream;
                 }
             } catch (err) {
-                console.error("Failed to get media with selected devices:", err);
-                toast({ variant: 'destructive', title: "Device Error", description: "Could not use the selected camera or microphone." });
+                console.error("Failed to get media:", err);
+                toast({ variant: 'destructive', title: "Device Error", description: "Could not use the camera or microphone." });
             }
         } else {
             if (videoRef.current) {
@@ -122,7 +115,7 @@ export default function PrejoinPage() {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [camOn, micOn, selectedVideoDevice, selectedAudioInDevice, hasPermissions, toast]);
+  }, [camOn, micOn, hasPermissions, toast]);
 
   const handleJoin = async () => {
     if (!user || !meetingId) {
@@ -141,9 +134,9 @@ export default function PrejoinPage() {
         
         localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
-        localStorage.setItem('teachmeet-video-device', selectedVideoDevice);
-        localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
         localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
+        localStorage.setItem('teachmeet-camera-filter', appliedFilter);
+        localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
         
         try {
             const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
@@ -178,6 +171,17 @@ export default function PrejoinPage() {
     "w-full h-full object-cover",
     {
       "video-mirror": mirrorCamera,
+      "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale",
+      "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia",
+      "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage",
+      "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous",
+      "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic",
+      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour",
+      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus",
+      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear",
+      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow",
+      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin",
+      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright",
     }
   );
 
@@ -237,29 +241,33 @@ export default function PrejoinPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="video-device-select">Camera</Label>
-                   <Select value={selectedVideoDevice} onValueChange={setSelectedVideoDevice} disabled={!hasPermissions}>
-                      <SelectTrigger id="video-device-select" className="rounded-lg"><SelectValue placeholder="Select a camera..." /></SelectTrigger>
-                      <SelectContent className="rounded-lg">
-                          <SelectItem value="default">Default</SelectItem>
-                          {videoDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}
-                      </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="audio-in-device-select">Microphone</Label>
-                   <Select value={selectedAudioInDevice} onValueChange={setSelectedAudioInDevice} disabled={!hasPermissions}>
-                      <SelectTrigger id="audio-in-device-select" className="rounded-lg"><SelectValue placeholder="Select a microphone..." /></SelectTrigger>
-                      <SelectContent className="rounded-lg">
-                          <SelectItem value="default">Default</SelectItem>
-                          {audioInDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}
-                      </SelectContent>
-                  </Select>
-                </div>
                 <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
                     <Label htmlFor="mirror-camera" className="flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
                     <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera}/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="video-filter">Video Filter</Label>
+                    <Select value={appliedFilter} onValueChange={setAppliedFilter}>
+                        <SelectTrigger id="video-filter" className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger>
+                        <SelectContent className="rounded-lg">
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="grayscale">Grayscale</SelectItem>
+                            <SelectItem value="sepia">Sepia</SelectItem>
+                            <SelectItem value="vintage">Vintage</SelectItem>
+                            <SelectItem value="luminous">Luminous</SelectItem>
+                            <SelectItem value="dramatic">Dramatic</SelectItem>
+                            <SelectItem value="goldenhour">Golden Hour</SelectItem>
+                            <SelectItem value="softfocus">Soft Focus</SelectItem>
+                             <SelectItem value="brightclear">Bright & Clear</SelectItem>
+                            <SelectItem value="naturalglow">Natural Glow</SelectItem>
+                            <SelectItem value="radiantskin">Radiant Skin</SelectItem>
+                            <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+                    <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Enable video filter</Label>
+                    <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
                 </div>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
                   <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
