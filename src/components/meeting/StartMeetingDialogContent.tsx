@@ -4,11 +4,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Hash, Link as LinkIcon, Share2, Video, Loader2, RefreshCw } from "lucide-react";
+import { Video, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState } from "react";
 import { 
   DialogDescription, 
   DialogFooter, 
@@ -17,88 +16,18 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-
-
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
-
-const generateRandomId = (length: number) => {
-    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-}
-
-const generateMeetingDetails = () => {
-    const newMeetingId = generateRandomId(9);
-    const codePart1 = newMeetingId.substring(0, 3);
-    const codePart2 = newMeetingId.substring(3, 6);
-    const codePart3 = newMeetingId.substring(6, 9);
-    const newMeetingCode = `${codePart1}-${codePart2}-${codePart3}`;
-    
-    let newMeetingLink = '';
-    if (typeof window !== "undefined") {
-      // Construct the full URL for sharing, pointing to the waiting room.
-      newMeetingLink = `${window.location.origin}/dashboard/meeting/${newMeetingId}/wait`;
-    } else {
-      // Fallback for SSR (less likely to be used here but good practice)
-      newMeetingLink = `/dashboard/meeting/${newMeetingId}/wait`;
-    }
-
-    return {
-      id: newMeetingId,
-      link: newMeetingLink,
-      code: newMeetingCode,
-    };
-};
-
 
 export function StartMeetingDialogContent() {
   const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
-  const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
-
-  const [meetingDetails, setMeetingDetails] = useState(generateMeetingDetails);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
-  
-  const regenerateMeetingDetails = useCallback(() => {
-    setMeetingDetails(generateMeetingDetails());
-    toast({ title: "New Link Generated", description: "A new meeting link and code have been created." });
-  }, [toast]);
 
-
-  const copyToClipboard = (textToCopy: string, type: "Link" | "Code") => {
-    if (!textToCopy) {
-        toast({ variant: "destructive", title: "Nothing to Copy", description: `${type} has not been generated yet.` });
-        return;
-    }
-    navigator.clipboard.writeText(textToCopy)
-      .then(() => {
-        toast({ title: `${type} Copied!`, description: `Meeting ${type.toLowerCase()} copied to clipboard.` });
-      })
-      .catch(err => {
-        console.error(`Failed to copy ${type.toLowerCase()}: `, err);
-        toast({ variant: "destructive", title: "Copy Failed", description: `Could not copy the meeting ${type.toLowerCase()}.` });
-      });
-  };
-
-  const handleShareInvite = () => {
-    if (!meetingDetails.link || !meetingDetails.code) {
-      toast({ variant: "destructive", title: "Cannot Share", description: "Meeting details are not yet generated." });
-      return;
-    }
-    setIsSharePanelOpen(true);
-  };
-  
-  const handleStartAndJoinMeeting = async () => {
-    if (!meetingDetails.id || !meetingTitle.trim()) {
-      toast({ variant: "destructive", title: "Missing Details", description: "Please ensure a meeting topic is set." });
+  const handleGoToPrejoin = () => {
+    if (!meetingTitle.trim()) {
+      toast({ variant: "destructive", title: "Topic Required", description: "Please enter a topic for the meeting." });
       return;
     }
     if (!user) {
@@ -106,56 +35,9 @@ export function StartMeetingDialogContent() {
       return;
     }
 
-    setIsJoining(true);
-    const trimmedMeetingTitle = meetingTitle.trim();
-    
-    try {
-        // FIRST, create the meeting document in Firestore. This is the critical step.
-        const meetingDocRef = doc(db, "meetings", meetingDetails.id);
-        await setDoc(meetingDocRef, {
-            hostId: user.uid, // Set the host ID correctly
-            topic: trimmedMeetingTitle,
-            createdAt: serverTimestamp(),
-        });
-        
-        // THEN, proceed with local state and redirection.
-        const waitRoomPath = `/dashboard/meeting/${meetingDetails.id}/wait?topic=${encodeURIComponent(trimmedMeetingTitle)}&host=true`;
-        router.push(waitRoomPath);
-
-        // Update local storage for "Ongoing Meetings" list
-        setTimeout(() => {
-            try {
-                const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-                let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
-                if (!Array.isArray(startedMeetings)) startedMeetings = [];
-                
-                const newMeeting = {
-                    id: meetingDetails.id,
-                    title: trimmedMeetingTitle,
-                    startedAt: Date.now(),
-                };
-
-                startedMeetings = startedMeetings.filter((m: any) => m.id !== meetingDetails.id);
-                startedMeetings.unshift(newMeeting); 
-                
-                localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
-                
-                window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
-            } catch (error) {
-                console.error("Failed to update local meeting records:", error);
-            }
-        }, 100);
-
-    } catch (error) {
-        console.error("Error creating meeting document:", error);
-        toast({
-            variant: "destructive",
-            title: "Failed to Start",
-            description: "Could not create the meeting room. Please check your Firestore rules and internet connection.",
-            duration: 7000,
-        });
-        setIsJoining(false);
-    }
+    setIsRedirecting(true);
+    const prejoinPath = `/dashboard/meeting/prejoin?topic=${encodeURIComponent(meetingTitle.trim())}`;
+    router.push(prejoinPath);
   };
 
   return (
@@ -166,7 +48,7 @@ export function StartMeetingDialogContent() {
             Start a New Meeting
           </DialogTitle>
           <DialogDescription>
-            Set a topic and share the invite to begin.
+            Set a topic for your meeting. You'll configure your camera and mic on the next screen.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-4">
@@ -180,85 +62,32 @@ export function StartMeetingDialogContent() {
               value={meetingTitle}
               onChange={(e) => setMeetingTitle(e.target.value)}
               className="rounded-lg text-base"
-              disabled={isJoining}
+              disabled={isRedirecting}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleGoToPrejoin();
+                }
+              }}
             />
-          </div>
-
-          <div>
-            <Label htmlFor="meetingLinkDialog" className="block text-sm font-medium text-muted-foreground mb-1">
-              Meeting Link
-            </Label>
-            <div className="flex items-center space-x-2">
-              <div className="relative flex-grow">
-                  <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                  id="meetingLinkDialog"
-                  type="text"
-                  readOnly
-                  value={meetingDetails.link || "Generating..."}
-                  className="pl-10 rounded-lg"
-                  />
-              </div>
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingDetails.link, "Link")} aria-label="Copy link" disabled={!meetingDetails.link || isJoining} className="rounded-lg">
-                <Copy className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="meetingCodeDialog" className="block text-sm font-medium text-muted-foreground mb-1">
-              Meeting Code
-            </Label>
-            <div className="flex items-center space-x-2">
-              <div className="relative flex-grow">
-                <Hash className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="meetingCodeDialog"
-                  type="text"
-                  readOnly
-                  value={meetingDetails.code || "Generating..."}
-                  className="pl-10 rounded-lg"
-                />
-              </div>
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(meetingDetails.code, "Code")} aria-label="Copy code" disabled={!meetingDetails.code || isJoining} className="rounded-lg">
-                <Copy className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="flex-grow rounded-lg py-3 text-base" onClick={handleShareInvite} disabled={!meetingDetails.link || !meetingDetails.code || isJoining}>
-              <Share2 className="mr-2 h-5 w-5" />
-              Share Invite
-            </Button>
-            <Button variant="ghost" size="icon" onClick={regenerateMeetingDetails} aria-label="Generate new link and code" disabled={isJoining} className="rounded-lg text-muted-foreground">
-              <RefreshCw className="h-5 w-5"/>
-            </Button>
           </div>
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <DialogClose asChild>
-            <Button type="button" variant="outline" className="rounded-lg" disabled={isJoining}>
+            <Button type="button" variant="outline" className="rounded-lg" disabled={isRedirecting}>
               Cancel
             </Button>
           </DialogClose>
           <Button 
             type="button" 
-            onClick={handleStartAndJoinMeeting} 
+            onClick={handleGoToPrejoin} 
             className="btn-gel rounded-lg" 
-            disabled={!meetingDetails.id || !meetingTitle.trim() || isJoining || !user}
+            disabled={!meetingTitle.trim() || isRedirecting || !user}
           >
-            {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isJoining ? "Redirecting..." : "Start and Join Meeting"}
+            {isRedirecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+            {isRedirecting ? "Proceeding..." : "Continue"}
           </Button>
         </DialogFooter>
-        <ShareOptionsPanel
-          isOpen={isSharePanelOpen}
-          onClose={() => setIsSharePanelOpen(false)}
-          meetingLink={meetingDetails.link}
-          meetingCode={meetingDetails.code}
-          meetingTitle={meetingTitle.trim()} 
-        />
     </>
   );
 }
