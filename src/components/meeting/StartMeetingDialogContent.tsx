@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Video, Loader2 } from "lucide-react";
+import { Video, Loader2, Clipboard, Share2, Check, Link as LinkIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { 
   DialogDescription, 
   DialogFooter, 
@@ -16,14 +16,44 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
+import { ShareOptionsPanel } from "../common/ShareOptionsPanel";
+
+const generateRandomId = (length: number) => {
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return `${result.slice(0,3)}-${result.slice(3,6)}-${result.slice(6,9)}`;
+};
 
 export function StartMeetingDialogContent() {
   const [meetingTitle, setMeetingTitle] = useState("My TeachMeet Meeting");
+  const [meetingId, setMeetingId] = useState('');
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [copied, setCopied] = useState<'link' | 'code' | null>(null);
 
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useAuth();
+  
+  useEffect(() => {
+    // Generate a new ID whenever the dialog is opened (assuming it's remounted)
+    setMeetingId(generateRandomId(9));
+  }, []);
+
+  const handleCopyToClipboard = useCallback((text: string, type: 'link' | 'code') => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(type);
+      toast({ title: `Meeting ${type} copied!` });
+      setTimeout(() => setCopied(null), 2000);
+    });
+  }, [toast]);
+  
+  const meetingLink = typeof window !== 'undefined' 
+    ? `${window.location.origin}/dashboard/join-meeting?code=${meetingId}` 
+    : '';
 
   const handleGoToPrejoin = () => {
     if (!meetingTitle.trim()) {
@@ -36,7 +66,8 @@ export function StartMeetingDialogContent() {
     }
 
     setIsRedirecting(true);
-    const prejoinPath = `/dashboard/meeting/prejoin?topic=${encodeURIComponent(meetingTitle.trim())}`;
+    // Pass both the generated meeting ID and the topic to the prejoin page
+    const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(meetingTitle.trim())}`;
     router.push(prejoinPath);
   };
 
@@ -48,7 +79,7 @@ export function StartMeetingDialogContent() {
             Start a New Meeting
           </DialogTitle>
           <DialogDescription>
-            Set a topic for your meeting. You'll configure your camera and mic on the next screen.
+            Use the details below to invite others, then proceed to the pre-join screen to set up your devices.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-4">
@@ -71,6 +102,24 @@ export function StartMeetingDialogContent() {
               }}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-muted-foreground">Invite Details</Label>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-grow">
+                <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={meetingLink} readOnly className="pl-9 rounded-lg text-sm bg-muted/50" />
+              </div>
+              <Button variant="outline" size="icon" className="rounded-lg flex-shrink-0" onClick={() => handleCopyToClipboard(meetingLink, 'link')}>
+                {copied === 'link' ? <Check className="h-4 w-4 text-primary" /> : <Clipboard className="h-4 w-4" />}
+              </Button>
+            </div>
+             <div className="flex items-center gap-2">
+                <Button variant="outline" className="w-full rounded-lg" onClick={() => setIsSharePanelOpen(true)}>
+                    <Share2 className="mr-2 h-4 w-4"/> Share Invite
+                </Button>
+            </div>
+          </div>
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <DialogClose asChild>
@@ -85,9 +134,16 @@ export function StartMeetingDialogContent() {
             disabled={!meetingTitle.trim() || isRedirecting || !user}
           >
             {isRedirecting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isRedirecting ? "Proceeding..." : "Continue"}
+            {isRedirecting ? "Proceeding..." : "Start and Join Meeting"}
           </Button>
         </DialogFooter>
+         <ShareOptionsPanel
+            isOpen={isSharePanelOpen}
+            onClose={() => setIsSharePanelOpen(false)}
+            meetingLink={meetingLink}
+            meetingCode={meetingId}
+            meetingTitle={meetingTitle}
+        />
     </>
   );
 }

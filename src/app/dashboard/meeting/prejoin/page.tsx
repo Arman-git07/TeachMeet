@@ -15,20 +15,12 @@ import { db, auth } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 
-const generateRandomId = (length: number) => {
-    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-};
-
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 export default function PrejoinPage() {
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic") || "TeachMeet Meeting";
+  const meetingId = searchParams.get("meetingId"); // Get meetingId from URL
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
@@ -47,6 +39,15 @@ export default function PrejoinPage() {
     if (!user) {
         const intendedUrl = `/dashboard/meeting/prejoin?${searchParams.toString()}`;
         router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
+        return;
+    }
+     if (!meetingId) {
+        toast({
+            variant: "destructive",
+            title: "Missing Meeting ID",
+            description: "Could not start the meeting because the ID is missing. Please try again.",
+        });
+        router.push('/');
         return;
     }
 
@@ -68,7 +69,7 @@ export default function PrejoinPage() {
         stream?.getTracks().forEach(track => track.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, router, searchParams]);
+  }, [user, authLoading, router, searchParams, meetingId]);
 
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -86,13 +87,11 @@ export default function PrejoinPage() {
 
 
   const handleJoin = async () => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Not authenticated' });
+    if (!user || !meetingId) {
+      toast({ variant: 'destructive', title: 'Not authenticated or Missing ID' });
       return;
     }
     setIsJoining(true);
-
-    const meetingId = generateRandomId(9);
     
     try {
         const meetingDocRef = doc(db, "meetings", meetingId);
@@ -119,7 +118,7 @@ export default function PrejoinPage() {
             console.error("Failed to update local meeting records:", error);
         }
 
-        router.push(`/dashboard/meeting/${meetingId}`);
+        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
 
     } catch (err) {
         console.error("Error creating meeting document:", err);
