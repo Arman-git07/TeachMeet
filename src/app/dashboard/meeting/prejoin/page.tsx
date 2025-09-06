@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon, Settings, ImageIcon } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon, Settings, ImageIcon, FlipHorizontal } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -45,8 +45,7 @@ export default function PrejoinPage() {
   const [selectedAudioInDevice, setSelectedAudioInDevice] = useState<string>('default');
   const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
   
-  const [appliedFilter, setAppliedFilter] = useState<string>('none');
-  const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
+  const [mirrorCamera, setMirrorCamera] = useState(false);
 
   const generateRandomId = (length: number) => {
     const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -83,11 +82,8 @@ export default function PrejoinPage() {
     setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
     setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
+    setMirrorCamera(localStorage.getItem('teachmeet-camera-mirror') === 'true');
     
-    const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
-    setAppliedFilter(filter);
-    setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
-
     getDevices();
   }, [user, authLoading, getDevices]);
   
@@ -147,8 +143,7 @@ export default function PrejoinPage() {
         localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-video-device', selectedVideoDevice);
         localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
-        localStorage.setItem('teachmeet-camera-filter', appliedFilter);
-        localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
+        localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
         
         try {
             const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
@@ -180,19 +175,9 @@ export default function PrejoinPage() {
   const userFallback = userName.charAt(0).toUpperCase();
 
   const videoClassNames = cn(
-    "w-full h-full object-cover video-mirror",
+    "w-full h-full object-cover",
     {
-      "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale",
-      "video-filter-sepia": isFilterToggleOn && appliedFilter === "sepia",
-      "video-filter-vintage": isFilterToggleOn && appliedFilter === "vintage",
-      "video-filter-luminous": isFilterToggleOn && appliedFilter === "luminous",
-      "video-filter-dramatic": isFilterToggleOn && appliedFilter === "dramatic",
-      "video-filter-goldenhour": isFilterToggleOn && appliedFilter === "goldenhour",
-      "video-filter-softfocus": isFilterToggleOn && appliedFilter === "softfocus",
-      "video-filter-brightclear": isFilterToggleOn && appliedFilter === "brightclear",
-      "video-filter-naturalglow": isFilterToggleOn && appliedFilter === "naturalglow",
-      "video-filter-radiantskin": isFilterToggleOn && appliedFilter === "radiantskin",
-      "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright",
+      "video-mirror": mirrorCamera,
     }
   );
 
@@ -272,24 +257,9 @@ export default function PrejoinPage() {
                       </SelectContent>
                   </Select>
                 </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="video-filter">Video Filter</Label>
-                    <Select value={appliedFilter} onValueChange={setAppliedFilter}>
-                        <SelectTrigger id="video-filter" className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger>
-                        <SelectContent className="rounded-lg">
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="grayscale">Grayscale</SelectItem>
-                            <SelectItem value="sepia">Sepia</SelectItem>
-                            <SelectItem value="vintage">Vintage</SelectItem>
-                            <SelectItem value="luminous">Luminous</SelectItem>
-                            <SelectItem value="dramatic">Dramatic</SelectItem>
-                            <SelectItem value="goldenhour">Golden Hour</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Apply Filter</Label>
-                    <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
+                <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+                    <Label htmlFor="mirror-camera" className="flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
+                    <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera}/>
                 </div>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
                   <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
