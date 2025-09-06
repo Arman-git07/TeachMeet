@@ -3,9 +3,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon, Settings } from "lucide-react";
 import Link from "next/link";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth'; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
@@ -13,6 +13,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { db, auth } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
@@ -27,64 +29,89 @@ export default function PrejoinPage() {
 
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(false); // Default mic to off
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [hasPermissions, setHasPermissions] = useState<boolean|null>(null);
   const [isJoining, setIsJoining] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const currentStreamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-        const intendedUrl = `/dashboard/meeting/prejoin?${searchParams.toString()}`;
-        router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
-        return;
-    }
-     if (!meetingId) {
-        toast({
-            variant: "destructive",
-            title: "Missing Meeting ID",
-            description: "Could not start the meeting because the ID is missing. Please try again.",
-        });
-        router.push('/');
-        return;
-    }
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioInDevices, setAudioInDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>('default');
+  const [selectedAudioInDevice, setSelectedAudioInDevice] = useState<string>('default');
+  const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
 
-    const getMedia = async () => {
-        try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            setStream(mediaStream);
-            setHasPermissions(true);
-        } catch (err) {
-            console.error("Error accessing media devices:", err);
-            setHasPermissions(false);
-            setCamOn(false);
-            setMicOn(false);
+  const getDevices = useCallback(async () => {
+    try {
+      // First, get permissions
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // Stop tracks immediately after getting permissions
+      stream.getTracks().forEach(track => track.stop());
+
+      // Now, enumerate devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
+      setAudioInDevices(devices.filter(d => d.kind === 'audioinput'));
+      setHasPermissions(true);
+    } catch (err) {
+      console.error("Error getting A/V devices:", err);
+      setHasPermissions(false);
+      setCamOn(false);
+      setMicOn(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    
+    // Load saved device preferences
+    setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
+    setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
+    
+    getDevices();
+  }, [user, authLoading, getDevices]);
+  
+   useEffect(() => {
+    const setupStream = async () => {
+        // Stop any existing stream
+        if (currentStreamRef.current) {
+            currentStreamRef.current.getTracks().forEach(track => track.stop());
+        }
+
+        if (camOn || micOn) {
+            try {
+                const constraints = {
+                    video: camOn ? (selectedVideoDevice === 'default' ? true : { deviceId: { exact: selectedVideoDevice } }) : false,
+                    audio: micOn ? (selectedAudioInDevice === 'default' ? true : { deviceId: { exact: selectedAudioInDevice } }) : false,
+                };
+                const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStreamRef.current = newStream;
+                if (videoRef.current) {
+                    videoRef.current.srcObject = newStream;
+                }
+            } catch (err) {
+                console.error("Failed to get media with selected devices:", err);
+                toast({ variant: 'destructive', title: "Device Error", description: "Could not use the selected camera or microphone." });
+            }
+        } else {
+            // If both are off, ensure the video element is cleared
+            if (videoRef.current) {
+                videoRef.current.srcObject = null;
+            }
         }
     };
-    getMedia();
-
-    return () => {
-        stream?.getTracks().forEach(track => track.stop());
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, router, searchParams, meetingId]);
-
-  useEffect(() => {
-    if (videoRef.current && stream) {
-        videoRef.current.srcObject = stream;
+    
+    if(hasPermissions) {
+      setupStream();
     }
-  }, [stream]);
-  
-  useEffect(() => {
-      stream?.getAudioTracks().forEach(track => track.enabled = micOn);
-  }, [stream, micOn]);
-  
-  useEffect(() => {
-      stream?.getVideoTracks().forEach(track => track.enabled = camOn);
-  }, [stream, camOn]);
-
+    
+    // Cleanup function to stop tracks when component unmounts or dependencies change
+    return () => {
+      if (currentStreamRef.current) {
+        currentStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [camOn, micOn, selectedVideoDevice, selectedAudioInDevice, hasPermissions, toast]);
 
   const handleJoin = async () => {
     if (!user || !meetingId) {
@@ -103,6 +130,8 @@ export default function PrejoinPage() {
         
         localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+        localStorage.setItem('teachmeet-video-device', selectedVideoDevice);
+        localStorage.setItem('teachmeet-audioin-device', selectedAudioInDevice);
         
         // Update local storage for "Ongoing Meetings" list
         try {
@@ -138,6 +167,15 @@ export default function PrejoinPage() {
 
   const videoClassNames = cn("w-full h-full object-cover", { "video-mirror": true });
 
+  if(authLoading) {
+    return (
+        <div className="w-full h-full flex items-center justify-center bg-background text-foreground">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p className="ml-4 text-lg">Loading...</p>
+        </div>
+    );
+  }
+
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
       <Card className="w-full max-w-2xl shadow-xl rounded-xl border-border/50">
@@ -149,45 +187,68 @@ export default function PrejoinPage() {
           <CardDescription>Check your camera and mic before joining.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="aspect-[9/16] md:aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-            <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
-            {(!camOn || hasPermissions === false) && (
-               <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                 {authLoading ? (
-                      <p>Loading user info...</p>
-                    ) : (
-                      <Avatar className="w-28 h-28 md:w-36 md:h-36 mb-4 border-4 border-background shadow-lg">
+          <div className="grid md:grid-cols-2 gap-4 items-start">
+              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
+                <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
+                {!camOn && (
+                   <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                      <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
                         <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user"/>
-                        <AvatarFallback className="text-5xl md:text-6xl">{userFallback}</AvatarFallback>
+                        <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
                       </Avatar>
-                    )}
-                {hasPermissions === false && (
-                    <p className="font-semibold mt-2 text-destructive">Camera/Mic permission denied</p>
+                  </div>
                 )}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-3 z-10">
+                  <Button
+                    variant={micOn ? "default" : "destructive"}
+                    size="icon"
+                    className="rounded-full shadow-md"
+                    onClick={() => setMicOn(!micOn)}
+                    aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
+                    disabled={hasPermissions === false}
+                  >
+                    {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                  </Button>
+                  <Button
+                    variant={camOn ? "default" : "destructive"}
+                    size="icon"
+                    className="rounded-full shadow-md"
+                    onClick={() => setCamOn(!camOn)}
+                    aria-label={camOn ? "Turn camera off" : "Turn camera on"}
+                    disabled={hasPermissions === false}
+                  >
+                    {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                  </Button>
+                </div>
               </div>
-            )}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-3 z-30">
-              <Button
-                variant={micOn ? "default" : "destructive"}
-                size="icon"
-                className="rounded-full shadow-md"
-                onClick={() => setMicOn(!micOn)}
-                aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
-                disabled={hasPermissions === false}
-              >
-                {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-              </Button>
-              <Button
-                variant={camOn ? "default" : "destructive"}
-                size="icon"
-                className="rounded-full shadow-md"
-                onClick={() => setCamOn(!camOn)}
-                aria-label={camOn ? "Turn camera off" : "Turn camera on"}
-                disabled={hasPermissions === false}
-              >
-                {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-              </Button>
-            </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="video-device-select">Camera</Label>
+                   <Select value={selectedVideoDevice} onValueChange={setSelectedVideoDevice} disabled={!hasPermissions}>
+                      <SelectTrigger id="video-device-select" className="rounded-lg"><SelectValue placeholder="Select a camera..." /></SelectTrigger>
+                      <SelectContent className="rounded-lg">
+                          <SelectItem value="default">Default</SelectItem>
+                          {videoDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="audio-in-device-select">Microphone</Label>
+                   <Select value={selectedAudioInDevice} onValueChange={setSelectedAudioInDevice} disabled={!hasPermissions}>
+                      <SelectTrigger id="audio-in-device-select" className="rounded-lg"><SelectValue placeholder="Select a microphone..." /></SelectTrigger>
+                      <SelectContent className="rounded-lg">
+                          <SelectItem value="default">Default</SelectItem>
+                          {audioInDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+                </div>
+                <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
+                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
+                    <Settings className="h-4 w-4 mr-2"/> Advanced Settings
+                  </Link>
+                </Button>
+              </div>
           </div>
 
           <Button onClick={handleJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isJoining || hasPermissions === false}>
@@ -204,3 +265,4 @@ export default function PrejoinPage() {
     </div>
   );
 }
+
