@@ -124,9 +124,12 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const handleJoin = async () => {
-    if (!user || !meetingId) {
-      toast({ variant: 'destructive', title: 'Not authenticated or Missing ID' });
+  const handleJoin = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isJoining || !user || !meetingId) {
+      if(!user) toast({ variant: 'destructive', title: 'Not authenticated or Missing ID' });
       return;
     }
     setIsJoining(true);
@@ -299,7 +302,7 @@ export default function PrejoinPage() {
               .
             </Label>
           </div>
-          <Button onClick={handleJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isJoining || hasPermissions === false || !agreedToTerms}>
+          <Button type="button" onClick={handleJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isJoining || hasPermissions === false || !agreedToTerms}>
             {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
             {isJoining ? "Joining..." : "Join Now as Host"}
           </Button>
