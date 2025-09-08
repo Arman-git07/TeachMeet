@@ -32,7 +32,7 @@ export default function PrejoinPage() {
   const [meetingId, setMeetingId] = useState('');
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -124,15 +124,12 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const handleJoin = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (isJoining || !user || !meetingId) {
+  const handleJoinNow = async () => {
+    if (joining || !user || !meetingId) {
       if(!user) toast({ variant: 'destructive', title: 'Not authenticated or Missing ID' });
       return;
     }
-    setIsJoining(true);
+    setJoining(true);
     
     try {
         const meetingDocRef = doc(db, "meetings", meetingId);
@@ -171,7 +168,8 @@ export default function PrejoinPage() {
             description: "Could not create the meeting room. Please check your Firestore rules and internet connection.",
             duration: 7000,
         });
-        setIsJoining(false);
+    } finally {
+        setJoining(false);
     }
   };
 
@@ -302,10 +300,24 @@ export default function PrejoinPage() {
               .
             </Label>
           </div>
-          <Button type="button" onClick={handleJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isJoining || hasPermissions === false || !agreedToTerms}>
-            {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isJoining ? "Joining..." : "Join Now as Host"}
-          </Button>
+          
+          <button
+            id="join-now-host"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleJoinNow();
+            }}
+            disabled={joining || !agreedToTerms || hasPermissions === false}
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg py-3 transition disabled:opacity-50 disabled:cursor-not-allowed text-lg h-auto flex items-center justify-center btn-gel"
+          >
+            {joining ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Starting...
+              </>
+            ) : "Join Now as Host"}
+          </button>
         </CardContent>
          <CardFooter>
             <Button variant="link" asChild className="text-muted-foreground">
@@ -316,3 +328,5 @@ export default function PrejoinPage() {
     </div>
   );
 }
+
+    
