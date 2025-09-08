@@ -60,7 +60,9 @@ export default function PrejoinPage() {
 
   const getDevicesAndPermissions = useCallback(async () => {
     try {
+      // Request both to ensure permissions are granted upfront
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // Stop the tracks immediately, we'll request them again based on toggles
       stream.getTracks().forEach(track => track.stop()); 
       setHasPermissions(true);
     } catch (err) {
@@ -71,6 +73,7 @@ export default function PrejoinPage() {
     }
   }, []);
 
+  // Load settings from localStorage and get permissions
   useEffect(() => {
     if (authLoading || !user) return;
     setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
@@ -83,8 +86,10 @@ export default function PrejoinPage() {
     getDevicesAndPermissions();
   }, [user, authLoading, getDevicesAndPermissions]);
   
+   // Effect to manage the media stream based on camOn/micOn state
    useEffect(() => {
     const setupStream = async () => {
+        // Stop any existing stream tracks
         if (currentStreamRef.current) {
             currentStreamRef.current.getTracks().forEach(track => track.stop());
         }
@@ -102,6 +107,7 @@ export default function PrejoinPage() {
                 toast({ variant: 'destructive', title: "Device Error", description: "Could not use the camera or microphone." });
             }
         } else {
+            // Ensure video element is cleared if no stream
             if (videoRef.current) {
                 videoRef.current.srcObject = null;
             }
@@ -110,6 +116,7 @@ export default function PrejoinPage() {
     
     setupStream();
     
+    // Cleanup function to stop tracks when component unmounts or dependencies change
     return () => {
       if (currentStreamRef.current) {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
@@ -132,12 +139,14 @@ export default function PrejoinPage() {
             createdAt: serverTimestamp(),
         });
         
+        // Save preferences for next time
         localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
         localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
         localStorage.setItem('teachmeet-camera-filter', appliedFilter);
         localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
         
+        // Add to recent meetings list for homepage
         try {
             const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
             let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
