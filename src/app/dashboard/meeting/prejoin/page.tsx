@@ -292,7 +292,7 @@ export default function PrejoinPage() {
           </div>
           <Button onClick={handleJoin} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isJoining || hasPermissions === false || !agreedToTerms}>
             {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isJoining ? "Joining..." : "Join Now"}
+            {isJoining ? "Joining..." : "Join Now as Host"}
           </Button>
         </CardContent>
          <CardFooter>
