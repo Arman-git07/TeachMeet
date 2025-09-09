@@ -310,7 +310,7 @@ export default function PrejoinPage() {
               handleJoinNow();
             }}
             disabled={joining || !agreedToTerms || hasPermissions === false}
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg py-3 transition disabled:opacity-50 disabled:cursor-not-allowed text-lg h-auto flex items-center justify-center btn-gel"
+            className="w-full btn-gel text-lg py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             {joining ? (
               <>
@@ -328,5 +328,3 @@ export default function PrejoinPage() {
     </div>
   );
 }
-
-    
