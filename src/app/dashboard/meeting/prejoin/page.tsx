@@ -15,6 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 export default function PrejoinPage() {
   const searchParams = useSearchParams();
@@ -112,7 +116,7 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const onJoin = () => {
+  const onJoin = async () => {
     if (!agreedToTerms || joining) return;
     if (!user || !meetingId) {
       toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or Meeting ID is missing.' });
@@ -121,14 +125,46 @@ export default function PrejoinPage() {
 
     setJoining(true);
     
-    // Save preferences for next time
+    // Save device preferences for next time
     localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
     localStorage.setItem('teachmeet-camera-filter', appliedFilter);
     localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
+    
+    try {
+        // Create the meeting document in Firestore now
+        const meetingRef = doc(db, "meetings", meetingId);
+        await setDoc(meetingRef, {
+            hostId: user.uid,
+            topic: topic.trim(),
+            createdAt: serverTimestamp(),
+        });
 
-    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+        // Add to local activity list
+        const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+        let meetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+        if (!Array.isArray(meetings)) meetings = [];
+
+        meetings.unshift({
+            id: meetingId,
+            title: topic.trim(),
+            startedAt: Date.now(),
+        });
+        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5)));
+        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+
+        // Redirect to the main meeting page
+        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+    } catch (error) {
+        console.error("Failed to create meeting:", error);
+        toast({
+            variant: "destructive",
+            title: "Failed to Start Meeting",
+            description: "Could not create the meeting document. Please check your Firestore rules and internet connection.",
+        });
+        setJoining(false);
+    }
   };
 
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
