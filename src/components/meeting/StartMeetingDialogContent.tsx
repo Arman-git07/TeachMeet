@@ -144,7 +144,7 @@ export function StartMeetingDialogContent() {
             disabled={!meetingTitle.trim() || isCreating || !user}
           >
             {isCreating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isCreating ? "Proceeding..." : "Setup Devices & Join"}
+            {isCreating ? "Proceeding..." : "Start Meeting"}
           </Button>
         </DialogFooter>
          <ShareOptionsPanel
