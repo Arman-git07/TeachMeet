@@ -124,9 +124,8 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const handleJoinNow = async () => {
+  const onJoinAsHost = async () => {
     if (!agreedToTerms || joining) return;
-    
     if (!user || !meetingId) {
       toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or Meeting ID is missing.' });
       return;
@@ -140,7 +139,7 @@ export default function PrejoinPage() {
             hostId: user.uid,
             topic: topic,
             createdAt: serverTimestamp(),
-        });
+        }, { merge: true });
         
         // Save preferences for next time
         localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
@@ -161,7 +160,7 @@ export default function PrejoinPage() {
             console.error("Failed to update local meeting records:", error);
         }
 
-        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&host=true`);
 
     } catch (err) {
         console.error("Error creating meeting document:", err);
@@ -307,20 +306,19 @@ export default function PrejoinPage() {
           <button
             id="join-now-host"
             type="button"
-            onClick={handleJoinNow}
+            onClick={onJoinAsHost}
             disabled={!agreedToTerms || joining}
             className={cn(
-              "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white",
-              (!agreedToTerms || joining || hasPermissions === false)
+              "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white flex items-center justify-center",
+              (!agreedToTerms || joining)
                 ? "bg-primary/50 cursor-not-allowed"
                 : "btn-gel"
             )}
           >
-            <span className="flex items-center justify-center">
-              {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              {joining ? "Starting..." : "Join Now as Host"}
-            </span>
+            {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+            {joining ? "Starting..." : "Join Now as Host"}
           </button>
+
         </CardContent>
          <CardFooter>
             <Button variant="link" asChild className="text-muted-foreground">
