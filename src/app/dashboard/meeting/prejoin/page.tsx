@@ -308,7 +308,7 @@ export default function PrejoinPage() {
             id="join-now-host"
             type="button"
             onClick={handleJoinNow}
-            disabled={!agreedToTerms || joining || hasPermissions === false}
+            disabled={!agreedToTerms || joining}
             className={cn(
               "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white",
               (!agreedToTerms || joining || hasPermissions === false)
@@ -316,11 +316,10 @@ export default function PrejoinPage() {
                 : "btn-gel"
             )}
           >
-            {joining ? (
-              <span className="flex items-center justify-center">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Starting...
-              </span>
-            ) : "Join Now as Host"}
+            <span className="flex items-center justify-center">
+              {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+              {joining ? "Starting..." : "Join Now as Host"}
+            </span>
           </button>
         </CardContent>
          <CardFooter>
@@ -332,5 +331,3 @@ export default function PrejoinPage() {
     </div>
   );
 }
-
-    
