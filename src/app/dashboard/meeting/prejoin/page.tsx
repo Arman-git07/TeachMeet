@@ -309,13 +309,18 @@ export default function PrejoinPage() {
               e.stopPropagation();
               handleJoinNow();
             }}
-            disabled={joining || !agreedToTerms || hasPermissions === false}
-            className="w-full btn-gel text-lg py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            disabled={!agreedToTerms || joining || hasPermissions === false}
+            className={cn(
+              "w-full text-lg py-3 rounded-lg transition-all duration-200",
+              (!agreedToTerms || joining || hasPermissions === false)
+                ? "bg-muted text-muted-foreground cursor-not-allowed"
+                : "btn-gel"
+            )}
           >
             {joining ? (
-              <>
+              <span className="flex items-center justify-center">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Starting...
-              </>
+              </span>
             ) : "Join Now as Host"}
           </button>
         </CardContent>
