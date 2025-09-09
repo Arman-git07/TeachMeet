@@ -125,10 +125,13 @@ export default function PrejoinPage() {
   }, [camOn, micOn, hasPermissions, toast]);
 
   const handleJoinNow = async () => {
-    if (joining || !user || !meetingId) {
-      if(!user) toast({ variant: 'destructive', title: 'Not authenticated or Missing ID' });
+    if (!agreedToTerms || joining) return;
+    
+    if (!user || !meetingId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or Meeting ID is missing.' });
       return;
     }
+
     setJoining(true);
     
     try {
@@ -251,7 +254,7 @@ export default function PrejoinPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
+                 <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
                     <Label htmlFor="mirror-camera" className="flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
                     <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera}/>
                 </div>
@@ -304,16 +307,12 @@ export default function PrejoinPage() {
           <button
             id="join-now-host"
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleJoinNow();
-            }}
+            onClick={handleJoinNow}
             disabled={!agreedToTerms || joining || hasPermissions === false}
             className={cn(
-              "w-full text-lg py-3 rounded-lg transition-all duration-200",
+              "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white",
               (!agreedToTerms || joining || hasPermissions === false)
-                ? "bg-muted text-muted-foreground cursor-not-allowed"
+                ? "bg-primary/50 cursor-not-allowed"
                 : "btn-gel"
             )}
           >
@@ -333,3 +332,5 @@ export default function PrejoinPage() {
     </div>
   );
 }
+
+    
