@@ -17,6 +17,9 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { ShareOptionsPanel } from "../common/ShareOptionsPanel";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 
 const generateRandomId = (length: number) => {
     const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -54,7 +57,7 @@ export function StartMeetingDialogContent() {
     ? `${window.location.origin}/dashboard/join-meeting?meetingId=${meetingId}`
     : '';
 
-  const handleCreateAndGoToPrejoin = () => {
+  const handleCreateAndGoToPrejoin = async () => {
     if (!meetingTitle.trim()) {
       toast({ variant: "destructive", title: "Topic Required", description: "Please enter a topic for the meeting." });
       return;
@@ -65,11 +68,46 @@ export function StartMeetingDialogContent() {
     }
 
     setIsCreating(true);
-    // In a real app, you might create the meeting document in Firestore here.
-    // For now, we'll just navigate.
     
-    const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(meetingTitle.trim())}`;
-    router.push(prejoinPath);
+    try {
+      // 1. Create the meeting document in Firestore first.
+      const meetingRef = doc(db, "meetings", meetingId);
+      await setDoc(meetingRef, {
+        hostId: user.uid,
+        topic: meetingTitle.trim(),
+        createdAt: serverTimestamp(),
+      });
+
+      // 2. Add the meeting to localStorage to show in "Latest Activity"
+      const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+      const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+      let meetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
+      if (!Array.isArray(meetings)) meetings = [];
+
+      meetings.unshift({
+        id: meetingId,
+        title: meetingTitle.trim(),
+        startedAt: Date.now(),
+      });
+      // Keep only the last 5 started meetings to prevent localStorage bloat
+      localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5)));
+      // Dispatch a custom event so other components (like the homepage) can update in real-time
+      window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+
+
+      // 3. Proceed to the prejoin page.
+      const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(meetingTitle.trim())}`;
+      router.push(prejoinPath);
+
+    } catch (error) {
+      console.error("Failed to create meeting:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to Create Meeting",
+        description: "Could not create the meeting document. Please check your Firestore rules and internet connection.",
+      });
+      setIsCreating(false);
+    }
   };
 
   return (

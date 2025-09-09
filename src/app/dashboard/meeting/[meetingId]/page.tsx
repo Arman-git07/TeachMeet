@@ -193,6 +193,7 @@ export default function MeetingPage() {
 
     const checkHostAndStatus = async () => {
       if (!user) {
+        // Guest isn't logged in, redirect to wait page which handles sign-in redirect
         router.push(`/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic || '')}`);
         return;
       }
@@ -202,23 +203,8 @@ export default function MeetingPage() {
         const meetingSnap = await getDoc(meetingDocRef);
 
         if (!meetingSnap.exists()) {
-           // Host Fallback: If the user is the intended host and the doc doesn't exist, create it.
-           const isHostFromUrl = searchParams.get("host") === "true";
-           if (isHostFromUrl) {
-                console.log("Host arrived, but meeting doc not found. Creating it now.");
-                await setDoc(meetingDocRef, {
-                    hostId: user.uid,
-                    topic: topic,
-                    createdAt: serverTimestamp(),
-                });
-                setHostId(user.uid);
-                setStatusAndAddParticipant('accepted');
-           } else {
-              // Guest arrived to a non-existent meeting.
-              console.error("Meeting document not found for ID:", meetingId);
-              toast({ variant: 'destructive', title: "Meeting Not Found", description: "This meeting does not exist or has been deleted." });
-              router.push('/');
-           }
+           toast({ variant: 'destructive', title: "Meeting Not Found", description: "This meeting does not exist or has been deleted. It may not have been created properly." });
+           router.push('/');
            return;
         }
 
@@ -243,8 +229,6 @@ export default function MeetingPage() {
     checkHostAndStatus();
   }, [user, authLoading, meetingId, router, toast, searchParams, topic]);
 
-  // Effect 2: Guest listener for join request status - NOW HANDLED ON WAIT PAGE
-  // This effect can be simplified or removed from this page.
 
   // Effect 3: Listen for participant list and join requests (for hosts)
   useEffect(() => {
