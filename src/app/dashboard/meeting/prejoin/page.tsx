@@ -15,15 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 export default function PrejoinPage() {
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic") || "My TeachMeet Meeting";
-  const meetingId = searchParams.get("meetingId");
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
@@ -43,18 +42,9 @@ export default function PrejoinPage() {
   const [appliedFilter, setAppliedFilter] = useState<string>('none');
   const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
 
-  useEffect(() => {
-    if (!meetingId) {
-      toast({ variant: 'destructive', title: 'Missing Meeting ID', description: 'Cannot join without a meeting ID.' });
-      router.push('/');
-    }
-  }, [meetingId, router, toast]);
-
   const getDevicesAndPermissions = useCallback(async () => {
     try {
-      // Request both to ensure permissions are granted upfront
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      // Stop the tracks immediately, we'll request them again based on toggles
       stream.getTracks().forEach(track => track.stop()); 
       setHasPermissions(true);
     } catch (err) {
@@ -65,7 +55,6 @@ export default function PrejoinPage() {
     }
   }, []);
 
-  // Load settings from localStorage and get permissions
   useEffect(() => {
     if (authLoading || !user) return;
     setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
@@ -78,10 +67,8 @@ export default function PrejoinPage() {
     getDevicesAndPermissions();
   }, [user, authLoading, getDevicesAndPermissions]);
   
-   // Effect to manage the media stream based on camOn/micOn state
    useEffect(() => {
     const setupStream = async () => {
-        // Stop any existing stream tracks
         if (currentStreamRef.current) {
             currentStreamRef.current.getTracks().forEach(track => track.stop());
         }
@@ -99,7 +86,6 @@ export default function PrejoinPage() {
                 toast({ variant: 'destructive', title: "Device Error", description: "Could not use the camera or microphone." });
             }
         } else {
-            // Ensure video element is cleared if no stream
             if (videoRef.current) {
                 videoRef.current.srcObject = null;
             }
@@ -108,7 +94,6 @@ export default function PrejoinPage() {
     
     setupStream();
     
-    // Cleanup function to stop tracks when component unmounts or dependencies change
     return () => {
       if (currentStreamRef.current) {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
@@ -116,10 +101,10 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const onJoin = async () => {
+  const handleJoinMeeting = async () => {
     if (!agreedToTerms || joining) return;
-    if (!user || !meetingId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or Meeting ID is missing.' });
+    if (!user) {
+      toast({ variant: "destructive", title: "Authentication Error", description: "You must be signed in to start a meeting." });
       return;
     }
 
@@ -133,15 +118,15 @@ export default function PrejoinPage() {
     localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
     
     try {
-        // Create the meeting document in Firestore now
+        const meetingId = "meeting-" + crypto.randomUUID().slice(0, 11);
         const meetingRef = doc(db, "meetings", meetingId);
+
         await setDoc(meetingRef, {
             hostId: user.uid,
             topic: topic.trim(),
             createdAt: serverTimestamp(),
         });
 
-        // Add to local activity list
         const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
         let meetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
         if (!Array.isArray(meetings)) meetings = [];
@@ -154,14 +139,13 @@ export default function PrejoinPage() {
         localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5)));
         window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
 
-        // Redirect to the main meeting page
         router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
     } catch (error) {
-        console.error("Failed to create meeting:", error);
+        console.error("Error creating meeting:", error);
         toast({
             variant: "destructive",
             title: "Failed to Start Meeting",
-            description: "Could not create the meeting document. Please check your Firestore rules and internet connection.",
+            description: "Could not create the meeting. Please check your Firestore rules and internet connection.",
         });
         setJoining(false);
     }
@@ -274,7 +258,7 @@ export default function PrejoinPage() {
                     <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
                 </div>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
-                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
+                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&topic=${encodeURIComponent(topic)}`}>
                     <Settings className="h-4 w-4 mr-2"/> Advanced Settings
                   </Link>
                 </Button>
@@ -298,7 +282,7 @@ export default function PrejoinPage() {
           <button
             id="join-now-host"
             type="button"
-            onClick={onJoin}
+            onClick={handleJoinMeeting}
             disabled={!agreedToTerms || joining}
             className={cn(
               "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white flex items-center justify-center",
