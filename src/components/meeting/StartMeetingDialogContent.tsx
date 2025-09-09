@@ -17,8 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { ShareOptionsPanel } from "../common/ShareOptionsPanel";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 const generateRandomId = (length: number) => {
     const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -53,10 +51,10 @@ export function StartMeetingDialogContent() {
   }, [toast]);
   
   const meetingLink = typeof window !== 'undefined' 
-    ? `${window.location.origin}/dashboard/meeting/${meetingId}/wait`
+    ? `${window.location.origin}/dashboard/join-meeting?meetingId=${meetingId}`
     : '';
 
-  const handleCreateAndGoToPrejoin = async () => {
+  const handleCreateAndGoToPrejoin = () => {
     if (!meetingTitle.trim()) {
       toast({ variant: "destructive", title: "Topic Required", description: "Please enter a topic for the meeting." });
       return;
@@ -67,27 +65,11 @@ export function StartMeetingDialogContent() {
     }
 
     setIsCreating(true);
+    // In a real app, you might create the meeting document in Firestore here.
+    // For now, we'll just navigate.
     
-    try {
-      const meetingRef = doc(db, "meetings", meetingId);
-      await setDoc(meetingRef, {
-        hostId: user.uid,
-        topic: meetingTitle.trim(),
-        createdAt: serverTimestamp(),
-      });
-      
-      const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(meetingTitle.trim())}`;
-      router.push(prejoinPath);
-
-    } catch (error) {
-      console.error("Failed to create meeting:", error);
-      toast({
-        variant: "destructive",
-        title: "Could not create meeting",
-        description: "Please check your internet connection and Firestore rules, then try again."
-      });
-      setIsCreating(false);
-    }
+    const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(meetingTitle.trim())}`;
+    router.push(prejoinPath);
   };
 
   return (

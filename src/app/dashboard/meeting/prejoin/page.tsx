@@ -11,25 +11,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
 import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 
-
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
-
 export default function PrejoinPage() {
   const searchParams = useSearchParams();
   const topic = searchParams.get("topic") || "My TeachMeet Meeting";
-  const meetingIdParam = searchParams.get("meetingId");
+  const meetingId = searchParams.get("meetingId");
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
 
-  const [meetingId, setMeetingId] = useState('');
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -45,18 +39,12 @@ export default function PrejoinPage() {
   const [appliedFilter, setAppliedFilter] = useState<string>('none');
   const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
 
-  const generateRandomId = (length: number) => {
-    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return `${result.slice(0,3)}-${result.slice(3,6)}-${result.slice(6,9)}`;
-  };
-  
   useEffect(() => {
-    setMeetingId(meetingIdParam || generateRandomId(9));
-  }, [meetingIdParam]);
+    if (!meetingId) {
+      toast({ variant: 'destructive', title: 'Missing Meeting ID', description: 'Cannot join without a meeting ID.' });
+      router.push('/');
+    }
+  }, [meetingId, router, toast]);
 
   const getDevicesAndPermissions = useCallback(async () => {
     try {
@@ -124,7 +112,7 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const onJoinAsHost = async () => {
+  const onJoin = () => {
     if (!agreedToTerms || joining) return;
     if (!user || !meetingId) {
       toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or Meeting ID is missing.' });
@@ -133,46 +121,14 @@ export default function PrejoinPage() {
 
     setJoining(true);
     
-    try {
-        const meetingDocRef = doc(db, "meetings", meetingId);
-        await setDoc(meetingDocRef, {
-            hostId: user.uid,
-            topic: topic,
-            createdAt: serverTimestamp(),
-        }, { merge: true });
-        
-        // Save preferences for next time
-        localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
-        localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
-        localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
-        localStorage.setItem('teachmeet-camera-filter', appliedFilter);
-        localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
-        
-        // Add to recent meetings list for homepage
-        try {
-            const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-            let startedMeetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
-            if (!Array.isArray(startedMeetings)) startedMeetings = [];
-            startedMeetings.unshift({ id: meetingId, title: topic, startedAt: Date.now() });
-            localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(startedMeetings.slice(0, 10)));
-            window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
-        } catch (error) {
-            console.error("Failed to update local meeting records:", error);
-        }
+    // Save preferences for next time
+    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
+    localStorage.setItem('teachmeet-camera-filter', appliedFilter);
+    localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
 
-        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&host=true`);
-
-    } catch (err) {
-        console.error("Error creating meeting document:", err);
-        toast({
-            variant: "destructive",
-            title: "Failed to Start Meeting",
-            description: "Could not create the meeting room. Please check your Firestore rules and internet connection.",
-            duration: 7000,
-        });
-    } finally {
-        setJoining(false);
-    }
+    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
   };
 
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
@@ -306,7 +262,7 @@ export default function PrejoinPage() {
           <button
             id="join-now-host"
             type="button"
-            onClick={onJoinAsHost}
+            onClick={onJoin}
             disabled={!agreedToTerms || joining}
             className={cn(
               "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white flex items-center justify-center",
@@ -316,7 +272,7 @@ export default function PrejoinPage() {
             )}
           >
             {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {joining ? "Starting..." : "Join Now as Host"}
+            {joining ? "Joining..." : "Join Now"}
           </button>
 
         </CardContent>
