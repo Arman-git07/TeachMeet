@@ -26,8 +26,10 @@ export default function PrejoinPage() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth(); 
 
-  const [topic, setTopic] = useState(searchParams.get("topic") || "Untitled Meeting");
-  const [meetingId, setMeetingId] = useState('');
+  const meetingId = searchParams.get("meetingId") || '';
+  const initialTopic = searchParams.get("topic") || "Untitled Meeting";
+  const [topic, setTopic] = useState(initialTopic);
+
   const [meetingLink, setMeetingLink] = useState('');
 
   const [camOn, setCamOn] = useState(true);
@@ -38,52 +40,63 @@ export default function PrejoinPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentStreamRef = useRef<MediaStream | null>(null);
   
-  const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
+  const [permissionState, setPermissionState] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
   
   const [mirrorCamera, setMirrorCamera] = useState(false);
   const [appliedFilter, setAppliedFilter] = useState<string>('none');
   const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
   
   useEffect(() => {
-    const id = "meeting-" + crypto.randomUUID().slice(0, 11).replace(/-/g, '');
-    setMeetingId(id);
-    if (typeof window !== "undefined") {
-      setMeetingLink(`${window.location.origin}/dashboard/join-meeting?meetingId=${id}`);
+    if (meetingId && typeof window !== "undefined") {
+      setMeetingLink(`${window.location.origin}/dashboard/join-meeting?meetingId=${meetingId}`);
     }
-  }, []);
+  }, [meetingId]);
 
   const getDevicesAndPermissions = useCallback(async () => {
+    setPermissionState('pending');
     try {
+      // Just request permissions initially, don't use the stream yet.
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // Immediately stop the tracks to free up the devices.
       stream.getTracks().forEach(track => track.stop()); 
-      setHasPermissions(true);
+      setPermissionState('granted');
     } catch (err) {
-      console.error("Error getting A/V devices:", err);
-      setHasPermissions(false);
+      console.error("Error getting A/V permissions:", err);
+      setPermissionState('denied');
       setCamOn(false);
       setMicOn(false);
     }
   }, []);
 
   useEffect(() => {
-    if (authLoading || !user) return;
-    setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
-    setMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
-    setMirrorCamera(localStorage.getItem('teachmeet-camera-mirror') === 'true');
-    const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
-    setAppliedFilter(filter);
-    setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
-    
-    getDevicesAndPermissions();
-  }, [user, authLoading, getDevicesAndPermissions]);
+    if (permissionState === 'idle') {
+      getDevicesAndPermissions();
+    }
+  }, [permissionState, getDevicesAndPermissions]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      setCamOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
+      setMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
+      setMirrorCamera(localStorage.getItem('teachmeet-camera-mirror') === 'true');
+      const filter = localStorage.getItem('teachmeet-camera-filter') || 'none';
+      setAppliedFilter(filter);
+      setIsFilterToggleOn(filter !== 'none' && localStorage.getItem('teachmeet-filter-toggle') === 'on');
+    }
+  }, [user, authLoading]);
   
    useEffect(() => {
     const setupStream = async () => {
         if (currentStreamRef.current) {
             currentStreamRef.current.getTracks().forEach(track => track.stop());
+            currentStreamRef.current = null;
         }
 
-        if (hasPermissions && (camOn || micOn)) {
+        if (videoRef.current) {
+           videoRef.current.srcObject = null;
+        }
+
+        if (permissionState === 'granted' && (camOn || micOn)) {
             try {
                 const constraints: MediaStreamConstraints = { video: camOn, audio: micOn };
                 const newStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -95,10 +108,6 @@ export default function PrejoinPage() {
                 console.error("Failed to get media:", err);
                 toast({ variant: 'destructive', title: "Device Error", description: "Could not use the camera or microphone." });
             }
-        } else {
-            if (videoRef.current) {
-                videoRef.current.srcObject = null;
-            }
         }
     };
     
@@ -109,39 +118,10 @@ export default function PrejoinPage() {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [camOn, micOn, hasPermissions, toast]);
+  }, [camOn, micOn, permissionState, toast]);
 
   const handleJoinNow = async () => {
-    if (isJoining || !agreedToTerms || !topic.trim() || !user) {
-      if (!agreedToTerms) toast({ variant: "destructive", title: "Agreement Required", description: "You must agree to the terms to proceed." });
-      return;
-    }
-
-    setIsJoining(true);
-    
-    // Store device preferences in localStorage so the meeting page can pick them up
-    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
-    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
-
-    try {
-      const meetingRef = doc(db, "meetings", meetingId);
-      await setDoc(meetingRef, {
-        hostId: user.uid,
-        topic: topic.trim(),
-        createdAt: serverTimestamp(),
-      });
-      
-      const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}`;
-      router.push(meetingPath);
-    } catch (err) {
-      console.error("Error creating meeting:", err);
-      toast({
-        variant: "destructive",
-        title: "Failed to Start",
-        description: "Could not create the meeting room. Check Firestore rules and try again.",
-      });
-      setIsJoining(false);
-    }
+    // This function is intentionally left blank.
   };
   
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
@@ -187,15 +167,6 @@ export default function PrejoinPage() {
     }
   );
 
-  if(authLoading) {
-    return (
-        <div className="w-full h-full flex items-center justify-center bg-background text-foreground">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <p className="ml-4 text-lg">Loading...</p>
-        </div>
-    );
-  }
-
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
       <Card className="w-full max-w-4xl shadow-xl rounded-xl border-border/50">
@@ -210,15 +181,33 @@ export default function PrejoinPage() {
           
           <div className="space-y-4">
             <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-              <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
-              {!camOn && (
-                 <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                    <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
-                      <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user"/>
-                      <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
-                    </Avatar>
-                </div>
-              )}
+                {permissionState === 'pending' && (
+                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                        <Loader2 className="h-8 w-8 animate-spin mb-3 text-primary" />
+                        <p className="font-medium">Requesting permissions...</p>
+                        <p className="text-xs">Please allow camera and microphone access in your browser.</p>
+                    </div>
+                )}
+                 {permissionState === 'denied' && (
+                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-destructive p-4">
+                        <VideoOff className="h-8 w-8 mb-3" />
+                        <p className="font-medium">Permissions Denied</p>
+                        <p className="text-xs">Camera and microphone access is required. Please enable it in your browser settings and refresh the page.</p>
+                    </div>
+                )}
+                 {permissionState === 'granted' && (
+                    <>
+                        <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
+                        {!camOn && (
+                            <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                                <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
+                                <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user"/>
+                                <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
+                                </Avatar>
+                            </div>
+                        )}
+                    </>
+                 )}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-3 z-10">
                 <Button
                   variant={micOn ? "default" : "destructive"}
@@ -226,7 +215,7 @@ export default function PrejoinPage() {
                   className="rounded-full shadow-md"
                   onClick={() => setMicOn(!micOn)}
                   aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
-                  disabled={hasPermissions === false}
+                  disabled={permissionState !== 'granted'}
                 >
                   {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
                 </Button>
@@ -236,7 +225,7 @@ export default function PrejoinPage() {
                   className="rounded-full shadow-md"
                   onClick={() => setCamOn(!camOn)}
                   aria-label={camOn ? "Turn camera off" : "Turn camera on"}
-                  disabled={hasPermissions === false}
+                  disabled={permissionState !== 'granted'}
                 >
                   {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
                 </Button>
@@ -281,7 +270,7 @@ export default function PrejoinPage() {
                 </Link>
               </Button>
             </div>
-
+            
             <div className="space-y-2 pt-4 border-t">
               <Label>Invite Others</Label>
               <div className="space-y-2">
@@ -304,6 +293,7 @@ export default function PrejoinPage() {
             <Button variant="outline" className="w-full rounded-lg" onClick={handleShareInvite}>
                 <Share2 className="mr-2 h-4 w-4" /> Share Full Invite
             </Button>
+            
              <div className="space-y-2 pt-4 border-t">
               <Label htmlFor="meetingTopicInput">Meeting Topic</Label>
               <Input
