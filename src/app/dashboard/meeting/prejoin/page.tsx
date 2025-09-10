@@ -15,14 +15,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 
 export default function PrejoinPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const meetingId = searchParams.get("meetingId");
-  const topic = searchParams.get("topic") || "Untitled Meeting";
+  const [topic, setTopic] = useState(searchParams.get("topic") || "Untitled Meeting");
   
   const { user, loading: authLoading } = useAuth(); 
 
@@ -105,19 +106,29 @@ export default function PrejoinPage() {
       toast({ variant: 'destructive', title: "Not Authenticated", description: "You must be signed in to start a meeting." });
       return;
     }
-    if (!meetingId) {
-      toast({ variant: 'destructive', title: "Meeting ID Missing", description: "Cannot join without a valid meeting ID. Please start again." });
-      router.push('/dashboard');
-      return;
-    }
 
     setIsJoining(true);
     
-    // Save device preferences for next time
-    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
-    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+    const meetingId = "meeting-" + crypto.randomUUID().slice(0, 11).replace(/-/g, '');
+    const meetingRef = doc(db, "meetings", meetingId);
 
-    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+    try {
+        await setDoc(meetingRef, {
+            hostId: user.uid,
+            topic: topic || "Untitled Meeting",
+            createdAt: serverTimestamp(),
+        });
+
+        // Save device preferences for next time
+        localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
+        localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+
+        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+    } catch (error) {
+        console.error("Error creating meeting:", error);
+        toast({ variant: "destructive", title: "Failed to Start Meeting", description: "Could not create the meeting room. Check Firestore rules." });
+        setIsJoining(false);
+    }
   };
 
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
@@ -157,7 +168,7 @@ export default function PrejoinPage() {
         <CardHeader className="text-center">
           <UserIcon className="mx-auto h-12 w-12 text-primary mb-3" />
           <CardTitle className="text-2xl">
-            Joining: {topic}
+            Ready to Join?
           </CardTitle>
           <CardDescription>Check your camera and mic before joining.</CardDescription>
         </CardHeader>
@@ -168,7 +179,7 @@ export default function PrejoinPage() {
                 {!camOn && (
                    <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex flex-col items-center justify-center text-center text-muted-foreground p-4">
                       <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
-                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar"/>
+                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="avatar user"/>
                         <AvatarFallback className="text-4xl">{userFallback}</AvatarFallback>
                       </Avatar>
                   </div>
@@ -261,7 +272,7 @@ export default function PrejoinPage() {
             )}
           >
             {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isJoining ? "Joining..." : "Join Now as Host"}
+            {isJoining ? "Starting..." : "Join Now"}
           </button>
 
         </CardContent>

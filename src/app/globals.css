@@ -191,9 +191,6 @@ html, body, #__next {
 .video-filter-sepia {
   filter: sepia(100%);
 }
-.video-filter-invert { /* Kept for reference if user adds it back */
-  filter: invert(100%);
-}
 .video-filter-vintage {
   filter: sepia(70%) contrast(1.1) brightness(0.9) saturate(1.3) hue-rotate(-10deg);
 }
