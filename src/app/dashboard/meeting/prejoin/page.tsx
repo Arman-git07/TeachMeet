@@ -15,13 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+
 
 export default function PrejoinPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const meetingId = searchParams.get("meetingId");
   const topic = searchParams.get("topic") || "Untitled Meeting";
   
   const { user, loading: authLoading } = useAuth(); 
@@ -105,33 +105,19 @@ export default function PrejoinPage() {
       toast({ variant: 'destructive', title: "Not Authenticated", description: "You must be signed in to start a meeting." });
       return;
     }
-    setIsJoining(true);
-
-    try {
-        const meetingId = "meeting-" + crypto.randomUUID().slice(0,11);
-        const meetingRef = doc(db, "meetings", meetingId);
-
-        await setDoc(meetingRef, {
-            hostId: user.uid,
-            topic: topic,
-            createdAt: serverTimestamp(),
-        });
-        
-        // Save device preferences for next time
-        localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
-        localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
-
-        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
-
-    } catch (err) {
-        console.error("Failed to start meeting:", err);
-        toast({
-            variant: "destructive",
-            title: "Failed to Start Meeting",
-            description: "Could not verify meeting details. Please check Firestore rules and try again.",
-        });
-        setIsJoining(false);
+    if (!meetingId) {
+      toast({ variant: 'destructive', title: "Meeting ID Missing", description: "Cannot join without a valid meeting ID. Please start again." });
+      router.push('/dashboard');
+      return;
     }
+
+    setIsJoining(true);
+    
+    // Save device preferences for next time
+    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+
+    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
   };
 
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
@@ -237,7 +223,7 @@ export default function PrejoinPage() {
                     </Select>
                 </div>
                 <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                    <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Enable video filter</Label>
+                    <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Apply Filter: {appliedFilter}</Label>
                     <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
                 </div>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">

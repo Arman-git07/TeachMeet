@@ -72,7 +72,7 @@ export function StartMeetingDialogContent() {
         createdAt: serverTimestamp(),
       });
       
-      const prejoinPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic.trim())}&host=true`;
+      const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}`;
       router.push(prejoinPath);
 
     } catch (err) {
