@@ -3,9 +3,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,20 +18,11 @@ import { Loader2, Video } from "lucide-react";
 
 export function StartMeetingDialogContent() {
   const router = useRouter();
-  const { user } = useAuth(); // Use `user` from your auth hook
   const { toast } = useToast();
   const [topic, setTopic] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleStartMeeting = async () => {
-    if (!user) {
-      toast({
-        variant: "destructive",
-        title: "Not Authenticated",
-        description: "You must be signed in to start a meeting.",
-      });
-      return;
-    }
     if (!topic.trim()) {
       toast({
         variant: "destructive",
@@ -43,35 +31,12 @@ export function StartMeetingDialogContent() {
       });
       return;
     }
-    try {
-      setLoading(true);
-
-      // Generate a unique meeting ID
-      const meetingId = "meeting-" + crypto.randomUUID().slice(0,11);
-      const meetingRef = doc(db, "meetings", meetingId);
-
-      // Create the Firestore meeting document
-      await setDoc(meetingRef, {
-        hostId: user.uid,
-        topic: topic.trim() || "Untitled Meeting",
-        createdAt: serverTimestamp(),
-      });
-
-      // Redirect to the prejoin page, passing the new meetingId and topic
-      router.push(
-        `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(
-          topic.trim() || "Untitled Meeting"
-        )}`
-      );
-    } catch (err) {
-      console.error("Failed to create meeting:", err);
-      toast({
-        variant: "destructive",
-        title: "Failed to Create Meeting",
-        description: "Please check your Firestore rules and try again.",
-      });
-      setLoading(false);
-    }
+    setLoading(true);
+    // In a real app, you'd create a meeting on the backend and get an ID
+    // For this prototype, we'll simulate it and redirect to a pre-join page
+    // The pre-join page will handle the actual meeting "creation" for now
+    const prejoinPath = `/dashboard/meeting/prejoin?topic=${encodeURIComponent(topic.trim())}`;
+    router.push(prejoinPath);
   };
 
   return (

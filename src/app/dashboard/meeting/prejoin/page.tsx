@@ -15,12 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function PrejoinPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const meetingId = searchParams.get("meetingId");
   const topic = searchParams.get("topic") || "Untitled Meeting";
   
   const { user, loading: authLoading } = useAuth(); 
@@ -99,19 +100,38 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const handleJoinNow = () => {
-    if (!meetingId) {
-      toast({ variant: 'destructive', title: "Invalid Meeting", description: "The meeting ID is missing. Please start again." });
-      router.push("/dashboard/classrooms");
+  const handleJoinNow = async () => {
+    if (!user) {
+      toast({ variant: 'destructive', title: "Not Authenticated", description: "You must be signed in to start a meeting." });
       return;
     }
     setIsJoining(true);
 
-    // Save device preferences for next time
-    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
-    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+    try {
+        const meetingId = "meeting-" + crypto.randomUUID().slice(0,11);
+        const meetingRef = doc(db, "meetings", meetingId);
 
-    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+        await setDoc(meetingRef, {
+            hostId: user.uid,
+            topic: topic,
+            createdAt: serverTimestamp(),
+        });
+        
+        // Save device preferences for next time
+        localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
+        localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+
+        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+
+    } catch (err) {
+        console.error("Failed to start meeting:", err);
+        toast({
+            variant: "destructive",
+            title: "Failed to Start Meeting",
+            description: "Could not verify meeting details. Please check Firestore rules and try again.",
+        });
+        setIsJoining(false);
+    }
   };
 
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
@@ -136,7 +156,7 @@ export default function PrejoinPage() {
     }
   );
 
-  if(authLoading || !meetingId) {
+  if(authLoading) {
     return (
         <div className="w-full h-full flex items-center justify-center bg-background text-foreground">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -221,7 +241,7 @@ export default function PrejoinPage() {
                     <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
                 </div>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
-                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
+                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`}>
                     <Settings className="h-4 w-4 mr-2"/> Advanced Settings
                   </Link>
                 </Button>
