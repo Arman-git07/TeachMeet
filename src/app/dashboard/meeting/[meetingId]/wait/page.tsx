@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2, LogIn, XCircle } from "lucide-react";
+import { Loader2, Link as LinkIcon, LogIn, XCircle } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -36,106 +36,26 @@ export default function WaitingAreaPage() {
         return;
     }
     
-    if (isHost) {
-        // Hosts go directly to the meeting page to manage it
-        const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
-        router.replace(meetingPath);
-        return;
-    }
+    // Redirect all users (hosts and guests) to the main meeting page.
+    // The meeting page now contains all the logic for waiting rooms, join requests, etc.
+    const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
+    router.replace(meetingPath);
 
-    // --- Guest Logic ---
-    const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+  }, [meetingId, user, authLoading, isHost, router, searchParams, topic]);
 
-    // Create the join request
-    setDoc(requestRef, {
-        name: user.displayName || "Guest",
-        photoURL: user.photoURL || null,
-        status: 'pending',
-        requestedAt: serverTimestamp()
-    }).then(() => {
-        setJoinStatus('requesting');
-    }).catch(err => {
-        console.error("Failed to create join request:", err);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request.' });
-        router.push('/dashboard');
-    });
 
-    // Listen for changes to the join request
-    const unsubscribe = onSnapshot(requestRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.status === 'accepted') {
-                setJoinStatus('admitted');
-                unsubscribe();
-                deleteDoc(requestRef); // Clean up the request document
-                const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
-                router.replace(meetingPath);
-            } else if (data.status === 'rejected') {
-                setJoinStatus('denied');
-                unsubscribe();
-                // Optionally clean up the denied request after a delay
-                setTimeout(() => deleteDoc(requestRef), 5000);
-            }
-        } else {
-            // If the document is deleted, it's equivalent to being denied
-             if (joinStatus === 'requesting') {
-                setJoinStatus('denied');
-                unsubscribe();
-            }
-        }
-    });
-
-    return () => unsubscribe();
-  }, [meetingId, user, authLoading, isHost, router, searchParams, topic, toast, joinStatus]);
-
-  // UI for different states
-  const renderContent = () => {
-    switch (joinStatus) {
-      case 'loading':
-        return (
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
-            <p>Connecting...</p>
-          </div>
-        );
-      case 'requesting':
-        return (
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
-            <p>Waiting for the host to let you in...</p>
-          </div>
-        );
-      case 'denied':
-         return (
-          <div className="flex flex-col items-center gap-4 text-center">
-            <XCircle className="h-10 w-10 text-destructive"/>
-            <p className="font-semibold">Your request to join was denied.</p>
-            <p className="text-sm text-muted-foreground">You can close this window or return to the dashboard.</p>
-          </div>
-        );
-      case 'admitted':
-         return (
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
-            <p>You've been admitted! Redirecting...</p>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
+  // Fallback UI while redirecting
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            Waiting to Join
+            Redirecting to Meeting...
           </CardTitle>
           <CardDescription>{topic}</CardDescription>
         </CardHeader>
         <CardContent className="py-8 flex justify-center">
-          {renderContent()}
+            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
         </CardContent>
          <CardFooter className="flex justify-center">
             <Button variant="link" asChild className="text-muted-foreground">

@@ -123,10 +123,11 @@ export default function PrejoinPage() {
   const handleJoinNow = async () => {
     setIsJoining(true);
 
+    // Persist the desired state for the meeting page to pick up.
     localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
     
-    // Save device preferences for next time
+    // Also save these as the new defaults for next time.
     localStorage.setItem('teachmeet-camera-default', camOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-mic-default', micOn ? 'on' : 'off');
 
@@ -177,11 +178,11 @@ export default function PrejoinPage() {
     }
   );
   
-  if (authLoading) {
+  if (authLoading || !meetingId) {
       return (
           <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="mt-4 text-muted-foreground">Loading user information...</p>
+              <p className="mt-4 text-muted-foreground">Preparing meeting room...</p>
           </div>
       )
   }
@@ -254,37 +255,20 @@ export default function PrejoinPage() {
           </div>
           
           <div className="space-y-4">
-            <div className="space-y-4 pt-4 border-t lg:border-t-0 lg:pt-0">
-              <div className="flex items-center justify-between">
-                  <Label htmlFor="mirror-camera" className="flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
-                  <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera}/>
-              </div>
-              <div className="space-y-2">
-                  <Label htmlFor="video-filter">Video Filter</Label>
-                  <Select value={appliedFilter} onValueChange={setAppliedFilter}>
-                      <SelectTrigger id="video-filter" className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger>
-                      <SelectContent className="rounded-lg">
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="grayscale">Grayscale</SelectItem>
-                          <SelectItem value="sepia">Sepia</SelectItem>
-                          <SelectItem value="vintage">Vintage</SelectItem>
-                          <SelectItem value="luminous">Luminous</SelectItem>
-                          <SelectItem value="dramatic">Dramatic</SelectItem>
-                          <SelectItem value="goldenhour">Golden Hour</SelectItem>
-                          <SelectItem value="softfocus">Soft Focus</SelectItem>
-                          <SelectItem value="brightclear">Bright & Clear</SelectItem>
-                          <SelectItem value="naturalglow">Natural Glow</SelectItem>
-                          <SelectItem value="radiantskin">Radiant Skin</SelectItem>
-                          <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
-                      </SelectContent>
-                  </Select>
-              </div>
-              <div className="flex items-center justify-between">
-                  <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Apply Filter</Label>
-                  <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="meetingTopicInput">Meeting Topic</Label>
+              <Input
+                id="meetingTopicInput"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="rounded-lg text-lg"
+                placeholder="E.g., Weekly Team Sync"
+              />
+            </div>
+            
+            <div className="space-y-4 pt-4 border-t">
               <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
-                <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`}>
+                <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
                   <Settings className="h-4 w-4 mr-2"/> Advanced Settings
                 </Link>
               </Button>
@@ -308,20 +292,9 @@ export default function PrejoinPage() {
                       </Button>
                   </div>
               </div>
-            </div>
-            <Button variant="outline" className="w-full rounded-lg" onClick={handleShareInvite}>
+              <Button variant="outline" className="w-full rounded-lg" onClick={handleShareInvite}>
                 <Share2 className="mr-2 h-4 w-4" /> Share Full Invite
-            </Button>
-            
-             <div className="space-y-2 pt-4 border-t">
-              <Label htmlFor="meetingTopicInput">Meeting Topic</Label>
-              <Input
-                id="meetingTopicInput"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="rounded-lg text-lg"
-                placeholder="E.g., Weekly Team Sync"
-              />
+              </Button>
             </div>
           </div>
         </CardContent>
