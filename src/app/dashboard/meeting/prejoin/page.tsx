@@ -112,7 +112,36 @@ export default function PrejoinPage() {
   }, [camOn, micOn, hasPermissions, toast]);
 
   const handleJoinNow = async () => {
-    // This function is now empty.
+    if (isJoining || !agreedToTerms || !topic.trim() || !user) {
+      if (!agreedToTerms) toast({ variant: "destructive", title: "Agreement Required", description: "You must agree to the terms to proceed." });
+      return;
+    }
+
+    setIsJoining(true);
+    
+    // Store device preferences in localStorage so the meeting page can pick them up
+    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+
+    try {
+      const meetingRef = doc(db, "meetings", meetingId);
+      await setDoc(meetingRef, {
+        hostId: user.uid,
+        topic: topic.trim(),
+        createdAt: serverTimestamp(),
+      });
+      
+      const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}`;
+      router.push(meetingPath);
+    } catch (err) {
+      console.error("Error creating meeting:", err);
+      toast({
+        variant: "destructive",
+        title: "Failed to Start",
+        description: "Could not create the meeting room. Check Firestore rules and try again.",
+      });
+      setIsJoining(false);
+    }
   };
   
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
@@ -305,6 +334,8 @@ export default function PrejoinPage() {
             <button
                 id="join-now-host"
                 type="button"
+                onClick={handleJoinNow}
+                disabled={!agreedToTerms || isJoining || !topic.trim()}
                 className={cn(
                   "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white flex items-center justify-center",
                   (!agreedToTerms || isJoining || !topic.trim())
@@ -323,4 +354,3 @@ export default function PrejoinPage() {
     </div>
   );
 }
-
