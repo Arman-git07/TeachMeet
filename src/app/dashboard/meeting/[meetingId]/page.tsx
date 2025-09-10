@@ -352,6 +352,18 @@ export default function MeetingPage() {
   
   const isCurrentUserTheHost = user?.uid === hostId;
 
+  const remoteParticipants = participants.filter(p => p.id !== user?.uid);
+  const totalParticipants = remoteParticipants.length + (user ? 1 : 0);
+
+  const gridCols = useMemo(() => {
+    const remoteCount = remoteParticipants.length;
+    if (remoteCount <= 1) return 'grid-cols-1';
+    if (remoteCount <= 2) return 'grid-cols-2';
+    if (remoteCount <= 4) return 'grid-cols-2';
+    if (remoteCount <= 6) return 'grid-cols-3';
+    return 'grid-cols-4';
+  }, [remoteParticipants.length]);
+
   // Loading state
   if (isLoadingMeeting || authLoading) {
     return (
@@ -372,18 +384,6 @@ export default function MeetingPage() {
       onUserJoined={handleUserJoined}
     />
   ) : null;
-  
-  const remoteParticipants = participants.filter(p => p.id !== user?.uid);
-  const totalParticipants = remoteParticipants.length + (user ? 1 : 0);
-  
-  const gridCols = useMemo(() => {
-    const remoteCount = remoteParticipants.length;
-    if (remoteCount <= 1) return 'grid-cols-1';
-    if (remoteCount <= 2) return 'grid-cols-2';
-    if (remoteCount <= 4) return 'grid-cols-2';
-    if (remoteCount <= 6) return 'grid-cols-3';
-    return 'grid-cols-4';
-  }, [remoteParticipants.length]);
   
   return (
     <div className="w-full h-full flex flex-col bg-black text-white overflow-hidden">
