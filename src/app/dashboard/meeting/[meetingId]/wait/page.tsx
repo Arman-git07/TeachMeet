@@ -3,21 +3,18 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2, Link as LinkIcon } from "lucide-react";
+import { Loader2, LogIn, XCircle } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth'; 
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 
-type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
+type JoinRequestStatus = 'loading' | 'requesting' | 'denied' | 'admitted';
 
-// DEPRECATED: This page is no longer the primary entry point for hosts.
-// It remains as the waiting room for guests who join via a link.
-// The new /dashboard/meeting/prejoin page handles the host's setup flow.
 export default function WaitingAreaPage() {
   const { meetingId } = useParams() as { meetingId: string };
   const searchParams = useSearchParams();
@@ -25,13 +22,11 @@ export default function WaitingAreaPage() {
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
-  const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
+  const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('loading');
   const { toast } = useToast();
 
-  // This page is now only for guests. Hosts go to /prejoin.
   const isHost = searchParams.get("host") === "true";
   
-  // Effect 1: Redirect hosts and handle guests
   useEffect(() => {
     if (authLoading) return;
     
@@ -40,39 +35,111 @@ export default function WaitingAreaPage() {
         router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
         return;
     }
-
+    
     if (isHost) {
-        // Hosts should use the new pre-join flow. Redirect them there.
-        const prejoinPath = `/dashboard/meeting/prejoin?topic=${encodeURIComponent(topic)}`;
-        router.replace(prejoinPath);
+        // Hosts go directly to the meeting page to manage it
+        const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
+        router.replace(meetingPath);
         return;
     }
 
-    // If we are here, we are a guest. For simplicity, we'll now redirect guests to the meeting page directly
-    // and let the meeting page handle the join request logic. This simplifies the flow and removes
-    // the need for complex state management on this now-deprecated page.
-    const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
-    router.replace(meetingPath);
+    // --- Guest Logic ---
+    const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
-  }, [meetingId, user, authLoading, isHost, router, searchParams, topic]);
+    // Create the join request
+    setDoc(requestRef, {
+        name: user.displayName || "Guest",
+        photoURL: user.photoURL || null,
+        status: 'pending',
+        requestedAt: serverTimestamp()
+    }).then(() => {
+        setJoinStatus('requesting');
+    }).catch(err => {
+        console.error("Failed to create join request:", err);
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request.' });
+        router.push('/dashboard');
+    });
 
+    // Listen for changes to the join request
+    const unsubscribe = onSnapshot(requestRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.status === 'accepted') {
+                setJoinStatus('admitted');
+                unsubscribe();
+                deleteDoc(requestRef); // Clean up the request document
+                const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
+                router.replace(meetingPath);
+            } else if (data.status === 'rejected') {
+                setJoinStatus('denied');
+                unsubscribe();
+                // Optionally clean up the denied request after a delay
+                setTimeout(() => deleteDoc(requestRef), 5000);
+            }
+        } else {
+            // If the document is deleted, it's equivalent to being denied
+             if (joinStatus === 'requesting') {
+                setJoinStatus('denied');
+                unsubscribe();
+            }
+        }
+    });
 
-  // Fallback UI while redirecting
+    return () => unsubscribe();
+  }, [meetingId, user, authLoading, isHost, router, searchParams, topic, toast, joinStatus]);
+
+  // UI for different states
+  const renderContent = () => {
+    switch (joinStatus) {
+      case 'loading':
+        return (
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+            <p>Connecting...</p>
+          </div>
+        );
+      case 'requesting':
+        return (
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+            <p>Waiting for the host to let you in...</p>
+          </div>
+        );
+      case 'denied':
+         return (
+          <div className="flex flex-col items-center gap-4 text-center">
+            <XCircle className="h-10 w-10 text-destructive"/>
+            <p className="font-semibold">Your request to join was denied.</p>
+            <p className="text-sm text-muted-foreground">You can close this window or return to the dashboard.</p>
+          </div>
+        );
+      case 'admitted':
+         return (
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+            <p>You've been admitted! Redirecting...</p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-2xl shadow-xl rounded-xl border-border/50">
+      <Card className="w-full max-w-md shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            Redirecting to Meeting...
+            Waiting to Join
           </CardTitle>
-          <CardDescription>Please wait while we prepare the meeting room.</CardDescription>
+          <CardDescription>{topic}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+        <CardContent className="py-8 flex justify-center">
+          {renderContent()}
         </CardContent>
-         <CardFooter>
+         <CardFooter className="flex justify-center">
             <Button variant="link" asChild className="text-muted-foreground">
-                <Link href="/"><LinkIcon className="mr-2 h-4 w-4"/> Go to Homepage</Link>
+                <Link href="/dashboard">Go to Dashboard</Link>
             </Button>
         </CardFooter>
       </Card>

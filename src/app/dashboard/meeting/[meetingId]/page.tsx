@@ -23,6 +23,8 @@ import {
   Loader2,
   Bell,
   LogIn,
+  Check,
+  X,
 } from 'lucide-react';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -39,7 +41,6 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp, where } from 'firebase/firestore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 
 // --- Join Request Logic ---
@@ -64,8 +65,8 @@ const JoinRequestItem = React.memo(({ request, onAccept, onDeny }: { request: Jo
       </div>
     </div>
     <div className="flex items-center gap-2">
-      <Button size="sm" variant="destructive" onClick={() => onDeny(request)}>Deny</Button>
-      <Button size="sm" onClick={() => onAccept(request)}>Admit</Button>
+      <Button size="sm" variant="destructive" onClick={() => onDeny(request)}><X className="h-4 w-4 mr-1" />Deny</Button>
+      <Button size="sm" onClick={() => onAccept(request)}><Check className="h-4 w-4 mr-1"/>Admit</Button>
     </div>
   </div>
 ));
@@ -156,7 +157,6 @@ const ParticipantItem = React.memo(({
 ParticipantItem.displayName = 'ParticipantItem';
 // --- End of Participant List Logic ---
 
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 export default function MeetingPage() {
   const { meetingId } = useParams() as { meetingId: string };
@@ -177,6 +177,7 @@ export default function MeetingPage() {
   // States for join flow logic
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [hostId, setHostId] = useState<string | null>(null);
+  const [joinStatus, setJoinStatus] = useState<'loading' | 'requesting' | 'admitted' | 'denied' | 'idle'>('loading');
 
   // States for data
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -187,7 +188,7 @@ export default function MeetingPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState({ x: 20, y: 20 });
   
-  // Effect 1: Fetch meeting data once and set up participant listener
+  // Effect 1: Fetch meeting data and determine user status
   useEffect(() => {
     if (authLoading || !meetingId || !user) return;
 
@@ -203,16 +204,22 @@ export default function MeetingPage() {
                 return;
             }
             const meetingData = meetingSnap.data();
-            setHostId(meetingData.hostId);
+            const meetingHostId = meetingData.hostId;
+            setHostId(meetingHostId);
             setTopic(meetingData.topic || "TeachMeet Meeting");
 
-            // Add current user to participants list if not already there
-            const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-            await setDoc(participantRef, {
-                name: user.displayName || "Guest",
-                photoURL: user.photoURL || null,
-                joinedAt: serverTimestamp(),
-            }, { merge: true });
+            if (user.uid === meetingHostId) {
+                setJoinStatus('admitted');
+            } else {
+                // Check if user is already a participant
+                const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+                const participantSnap = await getDoc(participantRef);
+                if (participantSnap.exists()) {
+                    setJoinStatus('admitted');
+                } else {
+                    setJoinStatus('requesting');
+                }
+            }
 
         } catch (err) {
             console.error("Error setting up meeting:", err);
@@ -224,36 +231,92 @@ export default function MeetingPage() {
     };
     
     setupMeeting();
+  }, [user, authLoading, meetingId, router, toast]);
 
+  // Effect 2: If admitted, add to participants. If requesting, create join request.
+  useEffect(() => {
+    if (joinStatus !== 'admitted' && joinStatus !== 'requesting' || !user || !meetingId) return;
+
+    const performAction = async () => {
+      if (joinStatus === 'admitted') {
+        const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+        await setDoc(participantRef, {
+            name: user.displayName || "Guest",
+            photoURL: user.photoURL || null,
+            joinedAt: serverTimestamp(),
+        }, { merge: true });
+      } else if (joinStatus === 'requesting') {
+        const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+        await setDoc(requestRef, {
+          name: user.displayName || "Guest",
+          photoURL: user.photoURL || null,
+          status: 'pending',
+          requestedAt: serverTimestamp()
+        });
+      }
+    };
+
+    performAction();
+
+  }, [joinStatus, user, meetingId]);
+
+  // Effect 3: Listeners for participants and join requests
+  useEffect(() => {
+    if (!meetingId) return;
+    
     // Listener for all participants
     const participantsQuery = query(collection(db, "meetings", meetingId, "participants"));
     const unsubParticipants = onSnapshot(participantsQuery, (snapshot) => {
       setParticipants(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Participant)));
     });
 
+    // Listener for join requests (only if host)
+    let unsubRequests = () => {};
+    if (user?.uid === hostId) {
+        const requestsQuery = query(collection(db, "meetings", meetingId, "joinRequests"), where('status', '==', 'pending'));
+        unsubRequests = onSnapshot(requestsQuery, (snapshot) => {
+            const newRequests: JoinRequest[] = [];
+            snapshot.forEach(doc => {
+              newRequests.push({ id: doc.id, userId: doc.id, ...doc.data() } as JoinRequest);
+            });
+            if (newRequests.length > joinRequests.length && newRequests.length > 0) {
+                toast({ title: "New Join Request", description: `${newRequests[newRequests.length - 1].name} wants to join.` });
+            }
+            setJoinRequests(newRequests);
+        });
+    }
+
+    // Listener for the status of the current user's join request
+    let unsubOwnRequest = () => {};
+    if (user && user.uid !== hostId) {
+        const ownRequestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+        unsubOwnRequest = onSnapshot(ownRequestRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.status === 'accepted') {
+                    setJoinStatus('admitted');
+                    deleteDoc(ownRequestRef); // Clean up the request
+                } else if (data.status === 'rejected') {
+                    setJoinStatus('denied');
+                }
+            } else {
+                // If doc is deleted, it might mean admission was denied without an explicit status update
+                if(joinStatus === 'requesting') {
+                    // Check if now a participant
+                    getDoc(doc(db, "meetings", meetingId, "participants", user.uid)).then(pSnap => {
+                        if(!pSnap.exists()) setJoinStatus('denied');
+                    });
+                }
+            }
+        });
+    }
+
     return () => {
       unsubParticipants();
+      unsubRequests();
+      unsubOwnRequest();
     };
-  }, [user, authLoading, meetingId, router, toast]);
-
-  // Effect 2: Set up join request listener for hosts only
-  useEffect(() => {
-    if (!user || user.uid !== hostId || !meetingId) return;
-
-    const requestsQuery = query(collection(db, "meetings", meetingId, "joinRequests"), where('status', '==', 'pending'));
-    const unsubRequests = onSnapshot(requestsQuery, (snapshot) => {
-        const newRequests: JoinRequest[] = [];
-        snapshot.forEach(doc => {
-          newRequests.push({ id: doc.id, userId: doc.id, ...doc.data() } as JoinRequest);
-        });
-        if (newRequests.length > joinRequests.length && newRequests.length > 0) {
-            toast({ title: "New Join Request", description: `${newRequests[newRequests.length - 1].name} wants to join.` });
-        }
-        setJoinRequests(newRequests);
-    });
-
-    return () => unsubRequests();
-  }, [user, hostId, meetingId, toast, joinRequests.length]);
+  }, [user, hostId, meetingId, toast, joinRequests.length, joinStatus]);
 
 
   useEffect(() => {
@@ -305,6 +368,7 @@ export default function MeetingPage() {
   
   const handleDenyRequest = async (request: JoinRequest) => {
     try {
+        // Just deleting is simpler than setting a 'rejected' status that needs cleanup.
         await deleteDoc(doc(db, "meetings", meetingId, "joinRequests", request.userId));
         toast({ title: "Request Denied" });
     } catch (err) {
@@ -352,18 +416,6 @@ export default function MeetingPage() {
   
   const isCurrentUserTheHost = user?.uid === hostId;
 
-  const remoteParticipants = participants.filter(p => p.id !== user?.uid);
-  const totalParticipants = remoteParticipants.length + (user ? 1 : 0);
-
-  const gridCols = useMemo(() => {
-    const remoteCount = remoteParticipants.length;
-    if (remoteCount <= 1) return 'grid-cols-1';
-    if (remoteCount <= 2) return 'grid-cols-2';
-    if (remoteCount <= 4) return 'grid-cols-2';
-    if (remoteCount <= 6) return 'grid-cols-3';
-    return 'grid-cols-4';
-  }, [remoteParticipants.length]);
-
   // Loading state
   if (isLoadingMeeting || authLoading) {
     return (
@@ -374,48 +426,69 @@ export default function MeetingPage() {
     );
   }
 
-  const localParticipantView = user ? (
-    <MeetingClient 
-      ref={meetingClientRef}
-      meetingId={meetingId} 
-      userId={user.uid}
-      onMicToggle={handleMicToggle} 
-      onCamToggle={handleCamToggle}
-      onUserJoined={handleUserJoined}
-    />
-  ) : null;
+  // Waiting Room UI for guests
+  if (joinStatus === 'requesting') {
+    return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-background text-foreground text-center p-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+            <h1 className="text-2xl font-bold">Asking to join...</h1>
+            <p className="text-muted-foreground mt-2">You'll be let in once the host accepts your request.</p>
+        </div>
+    );
+  }
   
+  // Denied Access UI for guests
+  if (joinStatus === 'denied') {
+    return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-background text-foreground text-center p-4">
+            <XCircle className="h-12 w-12 text-destructive mb-4" />
+            <h1 className="text-2xl font-bold">Access Denied</h1>
+            <p className="text-muted-foreground mt-2">Your request to join this meeting was denied by the host.</p>
+             <Button onClick={() => router.push('/dashboard')} className="mt-6">Back to Dashboard</Button>
+        </div>
+    );
+  }
+
+  // Meeting UI for admitted users
   return (
     <div className="w-full h-full flex flex-col bg-black text-white overflow-hidden">
-      {/* Video area */}
        <div className="flex-1 relative flex items-center justify-center p-2 overflow-hidden" onMouseMove={handleDrag} onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
-        {totalParticipants <= 1 && user ? (
+        {participants.length <= 1 && user ? (
           // Single participant (self) full screen
           <div className="w-full h-full rounded-lg overflow-hidden">
-            {localParticipantView}
+            <MeetingClient 
+              ref={meetingClientRef}
+              meetingId={meetingId} 
+              userId={user.uid}
+              onMicToggle={handleMicToggle} 
+              onCamToggle={handleCamToggle}
+              onUserJoined={handleUserJoined}
+            />
           </div>
         ) : (
-          <>
-            {/* Grid for remote participants */}
-            <div
-              className={`grid gap-2 w-full h-full ${gridCols}`}
-            >
-              {remoteParticipants.map((p, i) => (
-                  <div key={p.id} id={`remote-container-${p.id}`} className="w-full h-full rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center">
-                    <p className="text-muted-foreground">Waiting for video...</p>
-                  </div>
-              ))}
+          <div className="w-full h-full relative">
+            <div className="absolute inset-0 bg-muted/20 flex items-center justify-center rounded-lg">
+              <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
+                <AvatarFallback className="text-6xl">{participants.length > 0 ? participants[0].name.charAt(0).toUpperCase() : '?'}</AvatarFallback>
+              </Avatar>
             </div>
-
+            
             {/* Floating self-view */}
             <div
               className="absolute w-40 h-28 cursor-move rounded-lg overflow-hidden shadow-lg border border-gray-700 bg-black"
               style={{ left: dragPosition.x, top: dragPosition.y, transition: isDragging ? 'none' : 'left 0.2s, top 0.2s' }}
               onMouseDown={(e) => { e.preventDefault(); setIsDragging(true); }}
             >
-              {localParticipantView}
+              <MeetingClient 
+                ref={meetingClientRef}
+                meetingId={meetingId} 
+                userId={user.uid}
+                onMicToggle={handleMicToggle} 
+                onCamToggle={handleCamToggle}
+                onUserJoined={handleUserJoined}
+              />
             </div>
-          </>
+          </div>
         )}
       </div>
 
