@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,71 +14,142 @@ import {
   DialogFooter,
   DialogClose
 } from "@/components/ui/dialog";
-import { Loader2, Video } from "lucide-react";
+import { Loader2, Video, Link as LinkIcon, Hash, Copy, Share2 } from "lucide-react";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
+import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 
 export function StartMeetingDialogContent() {
   const router = useRouter();
   const { toast } = useToast();
-  const [topic, setTopic] = useState("");
+  const { user } = useAuth();
+  
+  const [topic, setTopic] = useState("My TeachMeet Meeting");
   const [loading, setLoading] = useState(false);
+  const [meetingId, setMeetingId] = useState("");
+  const [meetingCode, setMeetingCode] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
-  const handleStartMeeting = async () => {
-    if (!topic.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Topic Required",
-        description: "Please enter a topic for the meeting.",
-      });
+  useEffect(() => {
+    // Generate meeting details once when the component mounts
+    const id = "meeting-" + crypto.randomUUID().slice(0, 11);
+    const code = crypto.randomUUID().slice(0, 10).replace(/-/g, '');
+    setMeetingId(id);
+    setMeetingCode(code);
+    if (typeof window !== "undefined") {
+      setMeetingLink(`${window.location.origin}/dashboard/meeting/${id}/wait`);
+    }
+  }, []);
+
+  const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      toast({ title: `${type} Copied!`, description: `${type} has been copied to your clipboard.`});
+    }).catch(err => {
+      toast({ variant: 'destructive', title: 'Copy Failed', description: `Could not copy the ${type}.`});
+    });
+  };
+
+  const handleSetupAndJoin = async () => {
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be signed in to start a meeting.' });
       return;
     }
+    if (!topic.trim()) {
+      toast({ variant: "destructive", title: "Topic Required", description: "Please enter a topic for the meeting." });
+      return;
+    }
+
     setLoading(true);
-    // In a real app, you'd create a meeting on the backend and get an ID
-    // For this prototype, we'll simulate it and redirect to a pre-join page
-    // The pre-join page will handle the actual meeting "creation" for now
-    const prejoinPath = `/dashboard/meeting/prejoin?topic=${encodeURIComponent(topic.trim())}`;
-    router.push(prejoinPath);
+
+    try {
+      const meetingRef = doc(db, "meetings", meetingId);
+      await setDoc(meetingRef, {
+        hostId: user.uid,
+        topic: topic.trim(),
+        code: meetingCode,
+        createdAt: serverTimestamp(),
+      });
+      
+      const prejoinPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic.trim())}&host=true`;
+      router.push(prejoinPath);
+
+    } catch (err) {
+      console.error("Error creating meeting:", err);
+      toast({
+        variant: "destructive",
+        title: "Could not create meeting",
+        description: "Please check your internet connection and Firestore rules, then try again.",
+      });
+      setLoading(false);
+    }
   };
 
   return (
-     <>
-        <DialogHeader>
-          <DialogTitle>
-            <Video className="mr-2 h-6 w-6 text-primary inline-block" />
-            Start a New Meeting
-          </DialogTitle>
-          <DialogDescription>
-            Enter a topic for your meeting, then proceed to set up your devices before joining.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-            <Label htmlFor="meetingTopicDialog" className="sr-only">
-              Meeting Topic
-            </Label>
-            <Input
-                id="meetingTopicDialog"
-                placeholder="Enter meeting topic"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="w-full rounded-md border p-2"
-                disabled={loading}
-                 onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleStartMeeting();
-                    }
-                }}
-            />
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center">
+          <Video className="mr-2 h-6 w-6 text-primary" />
+          Start a New Meeting
+        </DialogTitle>
+        <DialogDescription>
+          Use the details below to invite others, then proceed to the pre-join screen to set up your devices.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div>
+          <Label htmlFor="meetingTopicDialog">Meeting Topic / Purpose</Label>
+          <Input
+            id="meetingTopicDialog"
+            placeholder="Enter meeting topic"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            className="w-full rounded-md border p-2 mt-1"
+            disabled={loading}
+          />
         </div>
-        <DialogFooter>
-             <DialogClose asChild>
-                <Button type="button" variant="outline" className="rounded-lg" disabled={loading}>
-                Cancel
-                </Button>
-            </DialogClose>
-            <Button onClick={handleStartMeeting} disabled={loading || !topic.trim()} className="btn-gel rounded-lg">
-                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting...</> : "Start Meeting"}
-            </Button>
-        </DialogFooter>
+        <div>
+            <Label>Invite Details</Label>
+            <div className="space-y-2 mt-1">
+                <div className="relative">
+                    <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input readOnly value={meetingLink} className="pl-9 pr-10 rounded-lg text-xs" />
+                    <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingLink, 'Link')}>
+                        <Copy className="h-4 w-4" />
+                    </Button>
+                </div>
+                 <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input readOnly value={meetingCode} className="pl-9 pr-10 rounded-lg text-sm font-mono" />
+                     <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingCode, 'Code')}>
+                        <Copy className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+        </div>
+        <Button variant="outline" className="w-full rounded-lg" onClick={() => setIsSharePanelOpen(true)}>
+            <Share2 className="mr-2 h-4 w-4" /> Share Full Invite
+        </Button>
+      </div>
+      <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between sm:space-x-2">
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" className="w-full sm:w-auto rounded-lg" disabled={loading}>
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button onClick={handleSetupAndJoin} disabled={loading || !topic.trim()} className="w-full sm:w-auto btn-gel rounded-lg">
+          {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting...</> : "Setup Devices & Join"}
+        </Button>
+      </DialogFooter>
+
+      <ShareOptionsPanel
+        isOpen={isSharePanelOpen}
+        onClose={() => setIsSharePanelOpen(false)}
+        meetingLink={meetingLink}
+        meetingCode={meetingCode}
+        meetingTitle={topic}
+      />
     </>
   );
 }
