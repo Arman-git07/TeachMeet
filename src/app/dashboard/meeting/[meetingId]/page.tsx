@@ -41,7 +41,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { db, auth } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 
 
 // --- Join Request Logic ---
@@ -239,22 +239,24 @@ export default function MeetingPage() {
     if (joinStatus !== 'admitted' && joinStatus !== 'requesting' || !user || !meetingId) return;
 
     const performAction = async () => {
+      const batch = writeBatch(db);
       if (joinStatus === 'admitted') {
         const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        await setDoc(participantRef, {
+        batch.set(participantRef, {
             name: user.displayName || "Guest",
             photoURL: user.photoURL || null,
             joinedAt: serverTimestamp(),
         }, { merge: true });
       } else if (joinStatus === 'requesting') {
         const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-        await setDoc(requestRef, {
+        batch.set(requestRef, {
           name: user.displayName || "Guest",
           photoURL: user.photoURL || null,
           status: 'pending',
           requestedAt: serverTimestamp()
         });
       }
+      await batch.commit();
     };
 
     performAction();
@@ -411,8 +413,12 @@ export default function MeetingPage() {
     }
   };
   
-  const backToHomepage = () => {
-    router.push('/');
+  const handleEndCall = () => {
+    if(user?.uid === hostId) {
+        // Here you would add logic to end the meeting for everyone
+        console.log("Host is ending the meeting for all.")
+    }
+    router.push('/dashboard');
   };
   
   const isCurrentUserTheHost = user?.uid === hostId;
@@ -584,7 +590,7 @@ export default function MeetingPage() {
             variant="destructive"
             size="icon"
             className="rounded-full w-12 h-12 md:w-14 md:h-14"
-            onClick={backToHomepage}
+            onClick={handleEndCall}
             aria-label="Leave meeting"
           >
             <Phone className="h-6 w-6" />

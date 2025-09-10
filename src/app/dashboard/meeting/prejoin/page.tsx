@@ -119,6 +119,10 @@ export default function PrejoinPage() {
   }, [camOn, permissionState, toast]);
 
   const handleJoinNow = async () => {
+    if (!meetingId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Meeting ID is missing. Cannot join.' });
+      return;
+    }
     setIsJoining(true);
 
     // Persist the desired state for the meeting page to pick up.
@@ -176,7 +180,7 @@ export default function PrejoinPage() {
     }
   );
   
-  if (authLoading || !meetingId) {
+  if (authLoading) {
       return (
           <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -315,10 +319,10 @@ export default function PrejoinPage() {
                 id="join-now-host"
                 type="button"
                 onClick={handleJoinNow}
-                disabled={!agreedToTerms || isJoining || !topic.trim()}
+                disabled={!agreedToTerms || isJoining || !topic.trim() || !meetingId}
                 className={cn(
                   "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white flex items-center justify-center",
-                  (!agreedToTerms || isJoining || !topic.trim())
+                  (!agreedToTerms || isJoining || !topic.trim() || !meetingId)
                     ? "bg-primary/50 cursor-not-allowed"
                     : "btn-gel"
                 )}
