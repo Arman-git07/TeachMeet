@@ -112,32 +112,7 @@ export default function PrejoinPage() {
   }, [camOn, micOn, hasPermissions, toast]);
 
   const handleJoinNow = async () => {
-    if (!user) {
-      toast({ variant: 'destructive', title: "Not Authenticated", description: "You must be signed in to start a meeting." });
-      return;
-    }
-
-    setIsJoining(true);
-    
-    const meetingRef = doc(db, "meetings", meetingId);
-
-    try {
-        await setDoc(meetingRef, {
-            hostId: user.uid,
-            topic: topic || "Untitled Meeting",
-            createdAt: serverTimestamp(),
-        });
-
-        // Save device preferences for next time
-        localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
-        localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
-
-        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
-    } catch (error) {
-        console.error("Error creating meeting:", error);
-        toast({ variant: "destructive", title: "Failed to Start Meeting", description: "Could not create the meeting room. Check Firestore rules." });
-        setIsJoining(false);
-    }
+    // This function is now empty.
   };
   
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
@@ -278,18 +253,7 @@ export default function PrejoinPage() {
               </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="meetingTopicInput">Meeting Topic</Label>
-              <Input
-                id="meetingTopicInput"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="rounded-lg text-lg"
-                placeholder="E.g., Weekly Team Sync"
-              />
-            </div>
-
-             <div className="space-y-2 pt-4 border-t">
+            <div className="space-y-2 pt-4 border-t">
               <Label>Invite Others</Label>
               <div className="space-y-2">
                   <div className="relative">
@@ -311,6 +275,16 @@ export default function PrejoinPage() {
             <Button variant="outline" className="w-full rounded-lg" onClick={handleShareInvite}>
                 <Share2 className="mr-2 h-4 w-4" /> Share Full Invite
             </Button>
+             <div className="space-y-2 pt-4 border-t">
+              <Label htmlFor="meetingTopicInput">Meeting Topic</Label>
+              <Input
+                id="meetingTopicInput"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="rounded-lg text-lg"
+                placeholder="E.g., Weekly Team Sync"
+              />
+            </div>
           </div>
         </CardContent>
          <CardFooter className="flex-col gap-4 border-t pt-4">
@@ -331,8 +305,6 @@ export default function PrejoinPage() {
             <button
                 id="join-now-host"
                 type="button"
-                onClick={handleJoinNow}
-                disabled={!agreedToTerms || isJoining || !topic.trim()}
                 className={cn(
                   "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white flex items-center justify-center",
                   (!agreedToTerms || isJoining || !topic.trim())
