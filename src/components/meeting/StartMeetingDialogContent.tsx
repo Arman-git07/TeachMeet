@@ -34,7 +34,7 @@ export function StartMeetingDialogContent() {
 
   useEffect(() => {
     // Generate meeting details once when the component mounts
-    const id = "meeting-" + crypto.randomUUID().slice(0, 11);
+    const id = "meeting-" + crypto.randomUUID().slice(0, 11).replace(/-/g, '');
     const code = crypto.randomUUID().slice(0, 10).replace(/-/g, '');
     setMeetingId(id);
     setMeetingCode(code);
@@ -72,7 +72,7 @@ export function StartMeetingDialogContent() {
         createdAt: serverTimestamp(),
       });
       
-      const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}`;
+      const prejoinPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic.trim())}&host=true`;
       router.push(prejoinPath);
 
     } catch (err) {
