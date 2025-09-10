@@ -239,16 +239,6 @@ export default function PrejoinPage() {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="meetingTopicInput">Meeting Topic</Label>
-              <Input
-                id="meetingTopicInput"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="rounded-lg text-lg"
-                placeholder="E.g., Weekly Team Sync"
-              />
-            </div>
           </div>
           
           <div className="space-y-4">
@@ -286,6 +276,17 @@ export default function PrejoinPage() {
                   <Settings className="h-4 w-4 mr-2"/> Advanced Settings
                 </Link>
               </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="meetingTopicInput">Meeting Topic</Label>
+              <Input
+                id="meetingTopicInput"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="rounded-lg text-lg"
+                placeholder="E.g., Weekly Team Sync"
+              />
             </div>
 
              <div className="space-y-2 pt-4 border-t">
