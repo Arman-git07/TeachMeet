@@ -121,7 +121,17 @@ export default function PrejoinPage() {
   }, [camOn, micOn, permissionState, toast]);
 
   const handleJoinNow = async () => {
-    // This function is intentionally left blank.
+    setIsJoining(true);
+
+    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
+    
+    // Save device preferences for next time
+    localStorage.setItem('teachmeet-camera-default', camOn ? 'on' : 'off');
+    localStorage.setItem('teachmeet-mic-default', micOn ? 'on' : 'off');
+
+    const navigationPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
+    router.push(navigationPath);
   };
   
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
@@ -334,7 +344,7 @@ export default function PrejoinPage() {
                 )}
               >
                 {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                {isJoining ? "Starting..." : "Join Now"}
+                {isJoining ? "Joining..." : "Join Now"}
             </button>
             <Button variant="link" asChild className="text-muted-foreground text-sm">
                 <Link href="/"><LinkIcon className="mr-2 h-4 w-4"/> Cancel and go to Homepage</Link>
@@ -344,3 +354,5 @@ export default function PrejoinPage() {
     </div>
   );
 }
+
+    
