@@ -161,7 +161,7 @@ const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 export default function MeetingPage() {
   const { meetingId } = useParams() as { meetingId: string };
   const searchParams = useSearchParams();
-  const topic = searchParams.get('topic') || "TeachMeet Meeting";
+  const [topic, setTopic] = useState(searchParams.get('topic') || "TeachMeet Meeting");
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -175,7 +175,7 @@ export default function MeetingPage() {
   const [isParticipantJoining, setIsParticipantJoining] = useState(false);
   
   // States for join flow logic
-  const [joinStatus, setJoinStatus] = useState<'idle' | 'pending' | 'accepted' | 'rejected' | 'loading'>('loading');
+  const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [hostId, setHostId] = useState<string | null>(null);
 
   // States for data
@@ -187,57 +187,58 @@ export default function MeetingPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState({ x: 20, y: 20 });
   
-  // Effect 1: Determine user's role (host or guest) and initial status
+  // Effect 1: Fetch meeting data once and set up participant listener
   useEffect(() => {
-    if (authLoading || !meetingId) return;
+    if (authLoading || !meetingId || !user) return;
 
-    const checkHostAndStatus = async () => {
-      if (!user) {
-        // Guest isn't logged in, redirect to wait page which handles sign-in redirect
-        router.push(`/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic || '')}`);
-        return;
-      }
-      
-      try {
-        const meetingDocRef = doc(db, "meetings", meetingId);
-        const meetingSnap = await getDoc(meetingDocRef);
+    const setupMeeting = async () => {
+        setIsLoadingMeeting(true);
+        try {
+            const meetingDocRef = doc(db, "meetings", meetingId);
+            const meetingSnap = await getDoc(meetingDocRef);
 
-        if (!meetingSnap.exists()) {
-           toast({ variant: 'destructive', title: "Meeting Not Found", description: "This meeting does not exist or has been deleted. It may not have been created properly." });
-           router.push('/');
-           return;
+            if (!meetingSnap.exists()) {
+                toast({ variant: 'destructive', title: "Meeting Not Found", description: "This meeting does not exist or has been deleted." });
+                router.push('/dashboard/classrooms');
+                return;
+            }
+            const meetingData = meetingSnap.data();
+            setHostId(meetingData.hostId);
+            setTopic(meetingData.topic || "TeachMeet Meeting");
+
+            // Add current user to participants list if not already there
+            const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+            await setDoc(participantRef, {
+                name: user.displayName || "Guest",
+                photoURL: user.photoURL || null,
+                joinedAt: serverTimestamp(),
+            }, { merge: true });
+
+        } catch (err) {
+            console.error("Error setting up meeting:", err);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load meeting details.' });
+            router.push('/dashboard/classrooms');
+        } finally {
+            setIsLoadingMeeting(false);
         }
-
-        const meetingData = meetingSnap.data();
-        const currentHostId = meetingData.hostId;
-        setHostId(currentHostId);
-
-        if (user.uid === currentHostId) {
-          setStatusAndAddParticipant('accepted');
-        } else {
-          // It's a guest, check their existing request status from the 'wait' page logic
-          // For now, we assume if they land here, they were approved.
-          // This logic is simplified because the wait page now handles the approval flow.
-          setStatusAndAddParticipant('accepted');
-        }
-      } catch (err) {
-        console.error("Error checking host status:", err);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not verify meeting details.' });
-        router.push('/');
-      }
     };
-    checkHostAndStatus();
-  }, [user, authLoading, meetingId, router, toast, searchParams, topic]);
+    
+    setupMeeting();
 
-
-  // Effect 3: Listen for participant list and join requests (for hosts)
-  useEffect(() => {
-    if (!user || user.uid !== hostId) return;
-
+    // Listener for all participants
     const participantsQuery = query(collection(db, "meetings", meetingId, "participants"));
     const unsubParticipants = onSnapshot(participantsQuery, (snapshot) => {
       setParticipants(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Participant)));
     });
+
+    return () => {
+      unsubParticipants();
+    };
+  }, [user, authLoading, meetingId, router, toast]);
+
+  // Effect 2: Set up join request listener for hosts only
+  useEffect(() => {
+    if (!user || user.uid !== hostId || !meetingId) return;
 
     const requestsQuery = query(collection(db, "meetings", meetingId, "joinRequests"), where('status', '==', 'pending'));
     const unsubRequests = onSnapshot(requestsQuery, (snapshot) => {
@@ -245,34 +246,14 @@ export default function MeetingPage() {
         snapshot.forEach(doc => {
           newRequests.push({ id: doc.id, userId: doc.id, ...doc.data() } as JoinRequest);
         });
-        if (newRequests.length > joinRequests.length) {
-            toast({ title: "New Join Request", description: "Someone wants to join the meeting." });
+        if (newRequests.length > joinRequests.length && newRequests.length > 0) {
+            toast({ title: "New Join Request", description: `${newRequests[newRequests.length - 1].name} wants to join.` });
         }
         setJoinRequests(newRequests);
     });
 
-    return () => {
-      unsubParticipants();
-      unsubRequests();
-    };
+    return () => unsubRequests();
   }, [user, hostId, meetingId, toast, joinRequests.length]);
-
-  const setStatusAndAddParticipant = async (status: 'accepted') => {
-      setJoinStatus(status);
-      if (status === 'accepted' && user) {
-          const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-          try {
-              await setDoc(participantRef, {
-                name: user.displayName || "Guest",
-                photoURL: user.photoURL || null,
-                joinedAt: serverTimestamp(),
-              }, { merge: true });
-          } catch(err) {
-              console.error("Failed to add self to participants list:", err);
-              toast({ variant: 'destructive', title: "Joining Error", description: "Could not add you to the participant list." });
-          }
-      }
-  };
 
 
   useEffect(() => {
@@ -366,56 +347,19 @@ export default function MeetingPage() {
   };
   
   const backToHomepage = () => {
-    try {
-      const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-      if (startedMeetingsRaw) {
-        let startedMeetings = JSON.parse(startedMeetingsRaw);
-        if (Array.isArray(startedMeetings)) {
-          const updatedMeetings = startedMeetings.filter(m => m.id !== meetingId);
-          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
-          window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
-        }
-      }
-    } catch (error) {
-      console.error("Failed to update ongoing meetings in localStorage:", error);
-    }
     router.push('/');
   };
   
   const isCurrentUserTheHost = user?.uid === hostId;
 
   // Loading state
-  if (joinStatus === 'loading' || authLoading) {
+  if (isLoadingMeeting || authLoading) {
     return (
         <div className="w-full h-full flex items-center justify-center bg-background text-foreground">
             <Loader2 className="h-8 w-8 animate-spin" />
             <p className="ml-4 text-lg">Loading Meeting...</p>
         </div>
     );
-  }
-
-  // Render based on join status
-  if (joinStatus !== 'accepted') {
-    // This state should now primarily be handled by the 'wait' page.
-    // This is a fallback.
-    return (
-        <div className="w-full h-full flex items-center justify-center bg-background text-foreground p-4">
-            <Card className="max-w-md w-full">
-                <CardHeader>
-                    <CardTitle>Joining: {topic}</CardTitle>
-                    <CardDescription>
-                       Redirecting you to the waiting room...
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 mr-2 animate-spin"/>Please wait.</div>
-                </CardContent>
-                 <CardFooter>
-                  <Button variant="link" asChild><Link href="/">Go to Homepage</Link></Button>
-                 </CardFooter>
-            </Card>
-        </div>
-    )
   }
 
   const localParticipantView = user ? (

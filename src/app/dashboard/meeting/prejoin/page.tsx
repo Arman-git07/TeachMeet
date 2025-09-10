@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -15,22 +15,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 export default function PrejoinPage() {
-  const searchParams = useSearchParams();
-  const topic = searchParams.get("topic") || "My TeachMeet Meeting";
   const router = useRouter();
+  const searchParams = useSearchParams();
 
+  const meetingId = searchParams.get("meetingId");
+  const topic = searchParams.get("topic") || "Untitled Meeting";
+  
   const { user, loading: authLoading } = useAuth(); 
 
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(false);
-  const [joining, setJoining] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentStreamRef = useRef<MediaStream | null>(null);
@@ -101,54 +99,19 @@ export default function PrejoinPage() {
     };
   }, [camOn, micOn, hasPermissions, toast]);
 
-  const handleJoinMeeting = async () => {
-    if (!agreedToTerms || joining) return;
-    if (!user) {
-      toast({ variant: "destructive", title: "Authentication Error", description: "You must be signed in to start a meeting." });
+  const handleJoinNow = () => {
+    if (!meetingId) {
+      toast({ variant: 'destructive', title: "Invalid Meeting", description: "The meeting ID is missing. Please start again." });
+      router.push("/dashboard/classrooms");
       return;
     }
+    setIsJoining(true);
 
-    setJoining(true);
-    
     // Save device preferences for next time
     localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
-    localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
-    localStorage.setItem('teachmeet-camera-filter', appliedFilter);
-    localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
-    
-    try {
-        const meetingId = "meeting-" + crypto.randomUUID().slice(0, 11);
-        const meetingRef = doc(db, "meetings", meetingId);
 
-        await setDoc(meetingRef, {
-            hostId: user.uid,
-            topic: topic.trim(),
-            createdAt: serverTimestamp(),
-        });
-
-        const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-        let meetings = startedMeetingsRaw ? JSON.parse(startedMeetingsRaw) : [];
-        if (!Array.isArray(meetings)) meetings = [];
-
-        meetings.unshift({
-            id: meetingId,
-            title: topic.trim(),
-            startedAt: Date.now(),
-        });
-        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5)));
-        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
-
-        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
-    } catch (error) {
-        console.error("Error creating meeting:", error);
-        toast({
-            variant: "destructive",
-            title: "Failed to Start Meeting",
-            description: "Could not create the meeting. Please check your Firestore rules and internet connection.",
-        });
-        setJoining(false);
-    }
+    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
   };
 
   const userName = user?.displayName || user?.email?.split('@')[0] || "User";
@@ -173,7 +136,7 @@ export default function PrejoinPage() {
     }
   );
 
-  if(authLoading) {
+  if(authLoading || !meetingId) {
     return (
         <div className="w-full h-full flex items-center justify-center bg-background text-foreground">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -258,7 +221,7 @@ export default function PrejoinPage() {
                     <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
                 </div>
                 <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
-                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&topic=${encodeURIComponent(topic)}`}>
+                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
                     <Settings className="h-4 w-4 mr-2"/> Advanced Settings
                   </Link>
                 </Button>
@@ -282,17 +245,17 @@ export default function PrejoinPage() {
           <button
             id="join-now-host"
             type="button"
-            onClick={handleJoinMeeting}
-            disabled={!agreedToTerms || joining}
+            onClick={handleJoinNow}
+            disabled={!agreedToTerms || isJoining}
             className={cn(
               "w-full text-lg py-3 rounded-lg transition-all duration-200 font-semibold text-white flex items-center justify-center",
-              (!agreedToTerms || joining)
+              (!agreedToTerms || isJoining)
                 ? "bg-primary/50 cursor-not-allowed"
                 : "btn-gel"
             )}
           >
-            {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {joining ? "Starting..." : "Join Now as Host"}
+            {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+            {isJoining ? "Joining..." : "Join Now as Host"}
           </button>
 
         </CardContent>
