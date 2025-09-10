@@ -55,9 +55,7 @@ export default function PrejoinPage() {
   const getDevicesAndPermissions = useCallback(async () => {
     setPermissionState('pending');
     try {
-      // Just request permissions initially, don't use the stream yet.
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      // Immediately stop the tracks to free up the devices.
       stream.getTracks().forEach(track => track.stop()); 
       setPermissionState('granted');
     } catch (err) {
