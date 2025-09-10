@@ -15,9 +15,10 @@ import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
 
 type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
 
-// DEPRECATED: This page is no longer the primary entry point for hosts.
-// It remains as the waiting room for guests who join via a link.
+// DEPRECATED: This page is no longer the primary entry point for hosts or guests.
+// It remains as a simple redirector to the main meeting page to handle old links.
 // The new /dashboard/meeting/prejoin page handles the host's setup flow.
+// The /dashboard/meeting/[meetingId] page handles guest join requests and waiting rooms.
 export default function WaitingAreaPage() {
   const { meetingId } = useParams() as { meetingId: string };
   const searchParams = useSearchParams();
@@ -25,54 +26,41 @@ export default function WaitingAreaPage() {
   const router = useRouter();
 
   const { user, loading: authLoading } = useAuth(); 
-  const [joinStatus, setJoinStatus] = useState<JoinRequestStatus>('idle');
   const { toast } = useToast();
-
-  // This page is now only for guests. Hosts go to /prejoin.
-  const isHost = searchParams.get("host") === "true";
   
-  // Effect 1: Redirect hosts and handle guests
   useEffect(() => {
     if (authLoading) return;
     
     if (!user) {
-        const intendedUrl = `/dashboard/meeting/${meetingId}/wait?${searchParams.toString()}`;
+        const intendedUrl = `/dashboard/meeting/${meetingId}?${searchParams.toString()}`;
         router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
         return;
     }
-
-    if (isHost) {
-        // Hosts should use the new pre-join flow. Redirect them there.
-        const prejoinPath = `/dashboard/meeting/prejoin?topic=${encodeURIComponent(topic)}`;
-        router.replace(prejoinPath);
-        return;
-    }
-
-    // If we are here, we are a guest. For simplicity, we'll now redirect guests to the meeting page directly
-    // and let the meeting page handle the join request logic. This simplifies the flow and removes
-    // the need for complex state management on this now-deprecated page.
+    
+    // Redirect all users (hosts and guests) to the main meeting page.
+    // The meeting page now contains all the logic for waiting rooms, join requests, etc.
     const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
     router.replace(meetingPath);
 
-  }, [meetingId, user, authLoading, isHost, router, searchParams, topic]);
+  }, [meetingId, user, authLoading, router, searchParams, topic]);
 
 
   // Fallback UI while redirecting
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-2xl shadow-xl rounded-xl border-border/50">
+      <Card className="w-full max-w-md shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
             Redirecting to Meeting...
           </CardTitle>
-          <CardDescription>Please wait while we prepare the meeting room.</CardDescription>
+          <CardDescription>{topic}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 flex justify-center">
+        <CardContent className="py-8 flex justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary"/>
         </CardContent>
-         <CardFooter>
+         <CardFooter className="flex justify-center">
             <Button variant="link" asChild className="text-muted-foreground">
-                <Link href="/"><LinkIcon className="mr-2 h-4 w-4"/> Go to Homepage</Link>
+                <Link href="/dashboard">Go to Dashboard</Link>
             </Button>
         </CardFooter>
       </Card>
