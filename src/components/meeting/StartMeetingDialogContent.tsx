@@ -39,7 +39,7 @@ export function StartMeetingDialogContent() {
     setMeetingId(id);
     setMeetingCode(code);
     if (typeof window !== "undefined") {
-      setMeetingLink(`${window.location.origin}/dashboard/meeting/${id}/wait`);
+      setMeetingLink(`${window.location.origin}/dashboard/join-meeting?code=${id}`);
     }
   }, []);
 
@@ -72,7 +72,7 @@ export function StartMeetingDialogContent() {
         createdAt: serverTimestamp(),
       });
       
-      const prejoinPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic.trim())}&host=true`;
+      const prejoinPath = `/dashboard/meeting/prejoin?topic=${encodeURIComponent(topic.trim())}`;
       router.push(prejoinPath);
 
     } catch (err) {
