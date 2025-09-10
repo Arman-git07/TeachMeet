@@ -96,9 +96,9 @@ export default function PrejoinPage() {
            videoRef.current.srcObject = null;
         }
 
-        if (permissionState === 'granted' && (camOn || micOn)) {
+        if (permissionState === 'granted' && camOn) {
             try {
-                const constraints: MediaStreamConstraints = { video: camOn, audio: micOn };
+                const constraints: MediaStreamConstraints = { video: true, audio: false };
                 const newStream = await navigator.mediaDevices.getUserMedia(constraints);
                 currentStreamRef.current = newStream;
                 if (videoRef.current) {
@@ -118,7 +118,7 @@ export default function PrejoinPage() {
         currentStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [camOn, micOn, permissionState, toast]);
+  }, [camOn, permissionState, toast]);
 
   const handleJoinNow = async () => {
     setIsJoining(true);
@@ -176,6 +176,15 @@ export default function PrejoinPage() {
       "video-filter-smoothbright": isFilterToggleOn && appliedFilter === "smoothbright",
     }
   );
+  
+  if (authLoading) {
+      return (
+          <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="mt-4 text-muted-foreground">Loading user information...</p>
+          </div>
+      )
+  }
 
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
@@ -354,5 +363,3 @@ export default function PrejoinPage() {
     </div>
   );
 }
-
-    

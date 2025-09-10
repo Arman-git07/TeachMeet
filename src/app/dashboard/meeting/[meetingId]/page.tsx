@@ -25,6 +25,7 @@ import {
   LogIn,
   Check,
   X,
+  XCircle,
 } from 'lucide-react';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -449,12 +450,20 @@ export default function MeetingPage() {
     );
   }
 
+  if(joinStatus !== 'admitted') {
+     return (
+        <div className="w-full h-full flex items-center justify-center bg-background text-foreground">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p className="ml-4 text-lg">Joining...</p>
+        </div>
+    );
+  }
+
   // Meeting UI for admitted users
   return (
     <div className="w-full h-full flex flex-col bg-black text-white overflow-hidden">
        <div className="flex-1 relative flex items-center justify-center p-2 overflow-hidden" onMouseMove={handleDrag} onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
-        {participants.length <= 1 && user ? (
-          // Single participant (self) full screen
+        {user ? (
           <div className="w-full h-full rounded-lg overflow-hidden">
             <MeetingClient 
               ref={meetingClientRef}
@@ -466,28 +475,9 @@ export default function MeetingPage() {
             />
           </div>
         ) : (
-          <div className="w-full h-full relative">
-            <div className="absolute inset-0 bg-muted/20 flex items-center justify-center rounded-lg">
-              <Avatar className="w-48 h-48 border-4 border-background shadow-lg">
-                <AvatarFallback className="text-6xl">{participants.length > 0 ? participants[0].name.charAt(0).toUpperCase() : '?'}</AvatarFallback>
-              </Avatar>
-            </div>
-            
-            {/* Floating self-view */}
-            <div
-              className="absolute w-40 h-28 cursor-move rounded-lg overflow-hidden shadow-lg border border-gray-700 bg-black"
-              style={{ left: dragPosition.x, top: dragPosition.y, transition: isDragging ? 'none' : 'left 0.2s, top 0.2s' }}
-              onMouseDown={(e) => { e.preventDefault(); setIsDragging(true); }}
-            >
-              <MeetingClient 
-                ref={meetingClientRef}
-                meetingId={meetingId} 
-                userId={user.uid}
-                onMicToggle={handleMicToggle} 
-                onCamToggle={handleCamToggle}
-                onUserJoined={handleUserJoined}
-              />
-            </div>
+          <div className="text-center text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin"/>
+            <p>Initializing...</p>
           </div>
         )}
       </div>
@@ -520,7 +510,7 @@ export default function MeetingPage() {
           <Sheet open={isParticipantsPanelOpen} onOpenChange={setIsParticipantsPanelOpen}>
             <SheetTrigger asChild>
                <Button
-                variant={'destructive'}
+                variant={'default'}
                 size="icon"
                 className={cn(
                   "rounded-full w-12 h-12 md:w-14 md:h-14 relative",
@@ -579,7 +569,7 @@ export default function MeetingPage() {
           </Sheet>
 
           <Button 
-            variant={isHandRaised ? 'default' : 'destructive'}
+            variant={isHandRaised ? 'primary' : 'default'}
             size="icon" 
             className="rounded-full w-12 h-12 md:w-14 md:h-14" 
             aria-label="Raise hand"
