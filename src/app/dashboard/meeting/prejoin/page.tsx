@@ -252,30 +252,7 @@ export default function PrejoinPage() {
           </div>
           
           <div className="space-y-4">
-             <div className="space-y-2">
-              <Label>Invite Others</Label>
-              <div className="space-y-2">
-                  <div className="relative">
-                      <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input readOnly value={meetingLink} className="pl-9 pr-10 rounded-lg text-xs" />
-                      <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingLink, 'Link')}>
-                          <Copy className="h-4 w-4" />
-                      </Button>
-                  </div>
-                   <div className="relative">
-                      <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input readOnly value={meetingId} className="pl-9 pr-10 rounded-lg text-sm font-mono" />
-                       <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingId, 'Code')}>
-                          <Copy className="h-4 w-4" />
-                      </Button>
-                  </div>
-              </div>
-            </div>
-            <Button variant="outline" className="w-full rounded-lg" onClick={handleShareInvite}>
-                <Share2 className="mr-2 h-4 w-4" /> Share Full Invite
-            </Button>
-             
-            <div className="space-y-4 pt-4 border-t">
+            <div className="space-y-4 pt-4 border-t lg:border-t-0 lg:pt-0">
               <div className="flex items-center justify-between">
                   <Label htmlFor="mirror-camera" className="flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
                   <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera}/>
@@ -310,6 +287,29 @@ export default function PrejoinPage() {
                 </Link>
               </Button>
             </div>
+
+             <div className="space-y-2 pt-4 border-t">
+              <Label>Invite Others</Label>
+              <div className="space-y-2">
+                  <div className="relative">
+                      <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input readOnly value={meetingLink} className="pl-9 pr-10 rounded-lg text-xs" />
+                      <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingLink, 'Link')}>
+                          <Copy className="h-4 w-4" />
+                      </Button>
+                  </div>
+                   <div className="relative">
+                      <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input readOnly value={meetingId} className="pl-9 pr-10 rounded-lg text-sm font-mono" />
+                       <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingId, 'Code')}>
+                          <Copy className="h-4 w-4" />
+                      </Button>
+                  </div>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full rounded-lg" onClick={handleShareInvite}>
+                <Share2 className="mr-2 h-4 w-4" /> Share Full Invite
+            </Button>
           </div>
         </CardContent>
          <CardFooter className="flex-col gap-4 border-t pt-4">
