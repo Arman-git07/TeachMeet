@@ -242,7 +242,7 @@ export default function MeetingPage() {
 
         {/* Participants Sheet */}
         <Sheet open={isParticipantsOpen} onOpenChange={setIsParticipantsOpen}>
-          <SheetContent className="bg-[#101726] text-white border-l border-[#1f2a40]">
+          <SheetContent side="bottom" className="h-1/2 bg-[#101726] text-white border-t border-[#1f2a40] rounded-t-2xl">
             <SheetHeader>
               <SheetTitle>Participants</SheetTitle>
               <SheetDescription className="text-gray-400">
