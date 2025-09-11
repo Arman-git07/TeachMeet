@@ -379,9 +379,12 @@ export default function PreJoinPage() {
               }
             }}
             disabled={!agreed}
-            className={`w-full py-3 text-lg font-semibold rounded-xl transition-colors ${
-              agreed ? "bg-primary text-primary-foreground hover:bg-primary/90 btn-gel" : "bg-muted text-muted-foreground cursor-not-allowed"
-            }`}
+            className={cn(
+              "w-full py-3 text-lg font-semibold rounded-xl transition-colors",
+              agreed
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 btn-gel"
+                : "bg-primary/30 text-primary-foreground/50 cursor-not-allowed"
+            )}
           >
             Join Now as Host
           </Button>
