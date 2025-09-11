@@ -5,7 +5,7 @@ import React, { useImperativeHandle, forwardRef, useMemo } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import { MicOff, VideoOff } from "lucide-react";
+import { Mic, MicOff, VideoOff } from "lucide-react";
 
 type Props = { 
   meetingId: string; 
