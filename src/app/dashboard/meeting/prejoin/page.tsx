@@ -317,9 +317,8 @@ export default function PrejoinPage() {
                   .
                 </Label>
             </div>
-            <button
+            <Button
                 id="join-now-host"
-                type="button"
                 onClick={handleJoinNow}
                 disabled={!agreedToTerms || isJoining || !topic.trim() || !meetingId}
                 className={cn(
@@ -331,7 +330,7 @@ export default function PrejoinPage() {
               >
                 {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                 Join Now as Host
-            </button>
+            </Button>
             <Button variant="link" asChild className="text-muted-foreground text-sm">
                 <Link href="/"><LinkIcon className="mr-2 h-4 w-4"/> Cancel and go to Homepage</Link>
             </Button>
