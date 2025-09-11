@@ -1,15 +1,15 @@
 
 "use client";
-
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button"; // shadcn/ui Button
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon, Settings, ImageIcon, FlipHorizontal, Copy, Share2, Hash } from "lucide-react";
 import Link from "next/link";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth'; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
-import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -305,7 +305,7 @@ export default function PrejoinPage() {
          <CardFooter className="flex-col gap-4 border-t pt-4">
             <div className="flex items-center space-x-2">
                 <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
-                <Label htmlFor="terms" className="text-xs text-muted-foreground">
+                <Label htmlFor="terms" className="text-sm text-muted-foreground">
                   I agree to the{' '}
                   <Link href="/terms-of-service" target="_blank" className="text-accent hover:underline">
                     Terms of Service
@@ -339,3 +339,5 @@ export default function PrejoinPage() {
     </div>
   );
 }
+
+    
