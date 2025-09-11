@@ -102,9 +102,9 @@ export default function MeetingPage() {
     router.push("/");
   };
   
-  const handleUserJoined = (socketId: string) => {
+  const handleUserJoined = useCallback((socketId: string) => {
     toast({ title: 'Participant Joined', description: `A new user has joined the meeting.` });
-  };
+  }, [toast]);
   
   if (authLoading) {
     return <div className="h-screen w-screen flex items-center justify-center bg-[#222E46]">Loading...</div>;
