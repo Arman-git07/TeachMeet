@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Video, PlusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDial
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
   const { isAuthenticated, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     const timer = setTimeout(() => setShowPanel(true), 300);
@@ -37,6 +39,7 @@ export function SlideUpPanel() {
               size="lg"
               className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
               aria-label="Start New Meeting"
+              onClick={() => router.push("/dashboard/meeting/prejoin")}
               disabled={authLoading}
             >
               <PlusCircle className="mr-2 h-6 w-6" />
