@@ -35,10 +35,18 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Logo } from "@/components/common/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
+
 
 type ControlButtonProps = {
   label: string;
@@ -80,10 +88,56 @@ export default function MeetingPage() {
   const { toast } = useToast();
   
   const rtcRef = useRef<MeetingClientRef>(null);
+  const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
+
+  useEffect(() => {
+    setHeaderContent(
+      <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
+        {topic}
+      </h1>
+    );
+    setHeaderAction(
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <MoreVertical className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56 rounded-xl">
+          <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/whiteboard?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+            <Brush className="mr-2 h-4 w-4" />
+            <span>Whiteboard</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => toast({ title: 'Screen Share is under development.' })} className="cursor-pointer">
+            <MonitorUp className="mr-2 h-4 w-4" />
+            <span>Screen Share</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+            <Users className="mr-2 h-4 w-4" />
+            <span>Participants</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+            <MessageSquare className="mr-2 h-4 w-4" />
+            <span>Chat</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings`)} className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Settings</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+
+    return () => {
+      setHeaderContent(null);
+      setHeaderAction(null);
+    };
+  }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast]);
+  
 
   // Store desired state in localStorage to persist across reloads
   useEffect(() => {
