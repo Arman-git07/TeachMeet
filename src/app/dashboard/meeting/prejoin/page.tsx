@@ -1,7 +1,6 @@
+"use client";
 
-'use client';
-
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,13 +12,11 @@ import {
   Mic,
   AlertTriangle,
   Link as LinkIcon,
-  ChevronDown,
   Settings,
   FlipHorizontal,
   Sparkles,
   User,
   Hash,
-  X,
 } from 'lucide-react';
 import {
   Card,
@@ -31,7 +28,6 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -47,8 +43,7 @@ import {
 } from '@/components/ui/select';
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function PreJoinPage() {
   const searchParams = useSearchParams();
@@ -83,7 +78,7 @@ export default function PreJoinPage() {
       setMeetingLink(
         `${window.location.origin}/dashboard/join-meeting?meetingId=${meetingId}`
       );
-      setMeetingCode(meetingId.replace('meeting-', ''));
+      setMeetingCode(meetingId);
     }
   }, [meetingId]);
 
@@ -98,9 +93,7 @@ export default function PreJoinPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      // Initially, keep mic track enabled but mute it visually
       stream.getAudioTracks().forEach((track) => (track.enabled = true));
-      // By default camera is on
       stream.getVideoTracks().forEach((track) => (track.enabled = true));
 
       setIsMicOn(true);
@@ -116,7 +109,6 @@ export default function PreJoinPage() {
   useEffect(() => {
     getCameraPermission();
     return () => {
-      // Clean up stream when component unmounts
       if (videoRef.current && videoRef.current.srcObject) {
         (videoRef.current.srcObject as MediaStream)
           .getTracks()
@@ -138,34 +130,6 @@ export default function PreJoinPage() {
     if (stream) {
       stream.getAudioTracks().forEach((track) => (track.enabled = !isMicOn));
       setIsMicOn(!isMicOn);
-    }
-  };
-
-  const handleJoinNow = async () => {
-    if (!meetingId || !user) {
-      setStartError(
-        'Meeting ID or User information is missing. Cannot start meeting.'
-      );
-      return;
-    }
-    setStartError(null);
-    try {
-      // Create the meeting document in Firestore
-      const meetingRef = doc(db, 'meetings', meetingId);
-      await setDoc(meetingRef, {
-        creatorId: user.uid,
-        hostId: user.uid, // for compatibility
-        topic: topic,
-        createdAt: serverTimestamp(),
-      });
-      router.push(
-        `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
-      );
-    } catch (error) {
-      console.error('Failed to create meeting:', error);
-      setStartError(
-        'Could not create the meeting room. Check Firestore rules and try again.'
-      );
     }
   };
 
@@ -405,10 +369,18 @@ export default function PreJoinPage() {
           </div>
         </CardContent>
         <CardFooter className="flex-col gap-4 border-t pt-4">
-          <Button
-            onClick={handleJoinNow}
+           <Button
+            onClick={() => {
+              if (meetingId) {
+                router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+              } else {
+                toast({ variant: 'destructive', title: "Error", description: "Meeting ID is missing."});
+              }
+            }}
             disabled={!agreed}
-            className="w-full btn-gel text-lg py-3"
+            className={`w-full py-3 text-lg font-semibold rounded-xl transition-colors ${
+              agreed ? "bg-primary text-primary-foreground hover:bg-primary/90 btn-gel" : "bg-muted text-muted-foreground cursor-not-allowed"
+            }`}
           >
             Join Now as Host
           </Button>
