@@ -5,13 +5,8 @@ import { Video, PlusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
-import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
+import { v4 as uuidv4 } from 'uuid';
 
 
 export function SlideUpPanel() {
@@ -25,6 +20,16 @@ export function SlideUpPanel() {
   }, []);
   
   const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
+
+  const handleStartMeeting = () => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/auth/signin?action=start');
+      return;
+    }
+    const meetingId = `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
+    router.push(`/dashboard/meeting/prejoin?meetingId=${meetingId}`);
+  };
   
   return (
     <div
@@ -39,7 +44,7 @@ export function SlideUpPanel() {
               size="lg"
               className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
               aria-label="Start New Meeting"
-              onClick={() => router.push("/dashboard/meeting/prejoin")}
+              onClick={handleStartMeeting}
               disabled={authLoading}
             >
               <PlusCircle className="mr-2 h-6 w-6" />
