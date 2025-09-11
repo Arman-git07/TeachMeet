@@ -5,6 +5,7 @@ import React, { useImperativeHandle, forwardRef, useMemo } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { MicOff, VideoOff } from "lucide-react";
 
 type Props = { 
   meetingId: string; 
@@ -21,55 +22,42 @@ export interface MeetingClientRef {
 
 const MeetingClient = forwardRef<MeetingClientRef, Props>(
   ({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined }, ref) => {
-  const localRef = React.useRef<HTMLVideoElement>(null);
+  
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = React.useState<string[]>([]);
 
   const [micOn, setMicOn] = React.useState(true);
   const [camOn, setCamOn] = React.useState(true);
+  const [remoteStreams, setRemoteStreams] = React.useState<Map<string, MediaStream>>(new Map());
 
-  const [rtc] = React.useState(() => new MeshRTC({
+  const rtc = useMemo(() => new MeshRTC({
     roomId: meetingId,
     userId,
     onRemoteStream: (socketId, stream) => {
-      // create/attach a remote video tile
-      let el = document.getElementById(`remote-${socketId}`) as HTMLVideoElement | null;
-      if (!el) {
-        const container = document.getElementById(`remote-container-${socketId}`);
-        if (!container) return;
-
-        el = document.createElement("video");
-        el.id = `remote-${socketId}`;
-        el.autoplay = true;
-        el.playsInline = true;
-        el.controls = false;
-        el.muted = false; // Remote streams should not be muted
-        el.style.width = "100%";
-        el.style.height = "100%";
-        el.style.objectFit = "cover";
-        
-        container.appendChild(el);
-      }
-      el.srcObject = stream;
+      setRemoteStreams(prev => new Map(prev).set(socketId, stream));
     },
     onRemoteLeft: (socketId) => {
       setRemoteSocketIds(prev => prev.filter(id => id !== socketId));
+      setRemoteStreams(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(socketId);
+        return newMap;
+      });
     },
     onUserJoined: (socketId: string) => {
       setRemoteSocketIds(prev => [...prev, socketId]);
       onUserJoined(socketId);
     },
-  }));
+  }), [meetingId, userId, onUserJoined]);
 
 
   // Init once
   React.useEffect(() => {
     let mounted = true;
     (async () => {
-      // Load initial state from localStorage
-      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') === 'on';
-      const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') === 'on';
-
+      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
+      const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
+      
       setCamOn(desiredCamState);
       onCamToggle(desiredCamState);
       setMicOn(desiredMicState);
@@ -77,14 +65,24 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
       await rtc.init(desiredMicState, desiredCamState);
       if (!mounted) return;
-      if (localRef.current) rtc.attachLocal(localRef.current);
+      
+      const localVideoContainer = document.getElementById('local-video-container');
+      if (localVideoContainer) {
+        const videoEl = document.createElement('video');
+        videoEl.id = 'local-video-element';
+        videoEl.autoplay = true;
+        videoEl.playsInline = true;
+        videoEl.muted = true;
+        videoEl.className = 'w-full h-full object-cover';
+        localVideoContainer.appendChild(videoEl);
+        rtc.attachLocal(videoEl);
+      }
     })();
     return () => {
       mounted = false;
       rtc.leave();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [rtc, onCamToggle, onMicToggle]);
   
   useImperativeHandle(ref, () => ({
     toggleMic: async () => {
@@ -98,76 +96,75 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       setCamOn(next);
       onCamToggle(next);
       await rtc.toggleCam(next);
-      if (next && localRef.current) {
-          // If turning camera on, re-attach the stream
-          rtc.attachLocal(localRef.current);
-      }
     },
   }));
 
-  const userName = user?.displayName || user?.email?.split('@')[0] || "User";
-  const userAvatarSrc = user?.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
-  const userFallback = userName.charAt(0).toUpperCase();
+  const RemoteVideo = ({ stream }: { stream: MediaStream }) => {
+    const videoRef = React.useRef<HTMLVideoElement>(null);
+    React.useEffect(() => {
+      if (videoRef.current && stream) {
+        videoRef.current.srcObject = stream;
+      }
+    }, [stream]);
+    return <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />;
+  };
+  
+  // Dummy data for example layout
+  const allParticipants = [
+    { id: 'local', name: user?.displayName || "User", avatar: user?.photoURL, isCamOff: !camOn, isMicOff: !micOn },
+    ...remoteSocketIds.map(id => ({ id, name: `User ${id.slice(0,4)}`, avatar: `https://placehold.co/128x128.png?text=${id.charAt(0)}`, isCamOff: false, isMicOff: true })) // Simulating states
+  ];
 
-  const totalParticipants = remoteSocketIds.length + 1;
 
-  const VideoTile = ({ isLocal = false, socketId }: { isLocal?: boolean; socketId?: string }) => (
-    <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative">
-      <video
-        ref={isLocal ? localRef : null}
-        id={isLocal ? "local" : `remote-${socketId}`}
-        className="w-full h-full object-cover"
-        muted={isLocal}
-        playsInline
-        autoPlay
-        style={{ display: isLocal ? (camOn ? 'block' : 'none') : 'block' }}
-      />
-      {isLocal && !camOn && (
-        <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-          <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
-            <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" />
-            <AvatarFallback className="text-4xl md:text-6xl">{userFallback}</AvatarFallback>
-          </Avatar>
+  const ParticipantTile = ({ p }: { p: typeof allParticipants[0] }) => {
+    const stream = p.id === 'local' ? rtc.getLocalStream() : remoteStreams.get(p.id);
+
+    return (
+      <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative flex items-center justify-center">
+        {p.isCamOff || !stream ? (
+           <div className="flex flex-col items-center text-muted-foreground">
+             <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
+                <AvatarImage src={p.avatar} alt={p.name} data-ai-hint="user avatar" />
+                <AvatarFallback className="text-4xl md:text-6xl">{p.name.charAt(0).toUpperCase()}</AvatarFallback>
+             </Avatar>
+           </div>
+        ) : (
+          p.id === 'local' ? (
+            // This is just a placeholder, the actual local video is in the floating pip
+            <div className="flex flex-col items-center text-muted-foreground">
+                <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
+                    <AvatarImage src={p.avatar} alt={p.name} data-ai-hint="user avatar" />
+                    <AvatarFallback className="text-4xl md:text-6xl">{p.name.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+            </div>
+          ) : (
+            <RemoteVideo stream={stream} />
+          )
+        )}
+        <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
+           {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
+           <span className="text-sm">{p.name}</span>
         </div>
-      )}
-       {!isLocal && (
-        <div id={`remote-container-${socketId}`} className="w-full h-full" />
-      )}
-    </div>
-  );
-
-  const gridCols = useMemo(() => {
-    return Math.ceil(Math.sqrt(totalParticipants));
-  }, [totalParticipants]);
-
-  if (totalParticipants === 1) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-black">
-        <VideoTile isLocal />
+        {!p.isCamOff && p.isCamOff && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
       </div>
     );
+  };
+  
+  if (allParticipants.length === 1) {
+    return (
+       <div className="w-full h-full flex items-center justify-center p-4">
+          <ParticipantTile p={allParticipants[0]} />
+      </div>
+    )
   }
 
-  if (totalParticipants === 2) {
-    return (
-      <div className="grid grid-cols-2 w-full h-full bg-black">
-        <VideoTile isLocal />
-        {remoteSocketIds.map((socketId) => (
-          <VideoTile key={socketId} socketId={socketId} />
-        ))}
-      </div>
-    );
-  }
+  // A more dynamic grid for > 1 participants could be implemented here.
+  // For now, let's just show the first remote participant for simplicity.
+  const remoteParticipant = allParticipants.find(p => p.id !== 'local');
 
   return (
-    <div
-      className="grid w-full h-full bg-black"
-      style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}
-    >
-      <VideoTile isLocal />
-      {remoteSocketIds.map((socketId) => (
-        <VideoTile key={socketId} socketId={socketId} />
-      ))}
+    <div className="w-full h-full flex items-center justify-center p-4">
+        {remoteParticipant ? <ParticipantTile p={remoteParticipant} /> :  <ParticipantTile p={allParticipants[0]} />}
     </div>
   );
 });
