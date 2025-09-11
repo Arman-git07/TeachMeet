@@ -328,7 +328,7 @@ export default function PrejoinPage() {
                 )}
               >
                 {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                {isJoining ? "Joining..." : "Join Now"}
+                {isJoining ? "Joining..." : "Join Now as Host"}
             </button>
             <Button variant="link" asChild className="text-muted-foreground text-sm">
                 <Link href="/"><LinkIcon className="mr-2 h-4 w-4"/> Cancel and go to Homepage</Link>
@@ -338,3 +338,5 @@ export default function PrejoinPage() {
     </div>
   );
 }
+
+    
