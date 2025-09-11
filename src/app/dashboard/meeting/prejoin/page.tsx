@@ -119,6 +119,7 @@ export default function PrejoinPage() {
   }, [camOn, permissionState, toast]);
 
   const handleJoinNow = async () => {
+    if (!agreedToTerms) return;
     if (!meetingId) {
       toast({ variant: 'destructive', title: 'Error', description: 'Meeting ID is missing. Cannot join.' });
       return;
@@ -328,7 +329,7 @@ export default function PrejoinPage() {
                 )}
               >
                 {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                {isJoining ? "Joining..." : "Join Now as Host"}
+                Join Now as Host
             </button>
             <Button variant="link" asChild className="text-muted-foreground text-sm">
                 <Link href="/"><LinkIcon className="mr-2 h-4 w-4"/> Cancel and go to Homepage</Link>
