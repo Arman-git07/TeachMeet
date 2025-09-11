@@ -119,18 +119,19 @@ export default function PrejoinPage() {
   }, [camOn, permissionState, toast]);
 
   const handleJoinNow = async () => {
-    if (!agreedToTerms) return;
+    if (!agreedToTerms) {
+        toast({ variant: 'destructive', title: 'Agreement Required', description: 'You must agree to the terms to continue.' });
+        return;
+    }
     if (!meetingId) {
       toast({ variant: 'destructive', title: 'Error', description: 'Meeting ID is missing. Cannot join.' });
       return;
     }
     setIsJoining(true);
 
-    // Persist the desired state for the meeting page to pick up.
     localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
     
-    // Also save these as the new defaults for next time.
     localStorage.setItem('teachmeet-camera-default', camOn ? 'on' : 'off');
     localStorage.setItem('teachmeet-mic-default', micOn ? 'on' : 'off');
 
