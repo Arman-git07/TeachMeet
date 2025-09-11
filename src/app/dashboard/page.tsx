@@ -2,36 +2,30 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Clock } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
 
-   return (
-     <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0f1c] text-white px-4">
-       <h1 className="text-4xl font-bold text-green-400 mb-10">TeachMeet</h1>
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
+      <h1 className="text-4xl font-bold mb-6">TeachMeet</h1>
 
-       <Card className="w-full max-w-md bg-[#101726] border border-[#1f2a40] shadow-lg">
-         <CardContent className="p-6 text-center">
-           <div className="flex flex-col items-center gap-3">
-             <Clock className="text-green-400 w-10 h-10" />
-             <h2 className="text-xl font-semibold text-green-400">Latest Activity</h2>
-             <p className="text-gray-400 text-sm">
-               No recent activity. Start a new meeting to get started!
-             </p>
-           </div>
-         </CardContent>
-       </Card>
+      {/* Latest Activity Card */}
+      <div className="bg-gray-800 p-6 rounded-2xl shadow-lg w-full max-w-md mb-6 text-center">
+        <h2 className="text-green-400 text-lg font-semibold mb-2">
+          Latest Activity
+        </h2>
+        <p className="text-gray-400">No recent activity.</p>
+        <p className="text-gray-400">Start a new meeting to get started!</p>
+      </div>
 
-       <div className="fixed bottom-6 w-full max-w-md px-4">
-         <Button
-           onClick={() => router.push("/dashboard/meeting/prejoin")}
-           className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-6 rounded-xl shadow-lg"
-         >
-           + Start New Meeting
-         </Button>
-       </div>
-     </div>
-   );
+      {/* Start New Meeting Button */}
+      <Button
+        onClick={() => router.push("/dashboard/meeting/prejoin")}
+        className="w-full max-w-md bg-green-500 hover:bg-green-600 text-white font-semibold py-6 rounded-xl shadow-lg transition duration-200"
+      >
+        + Start New Meeting
+      </Button>
+    </div>
+  );
 }
