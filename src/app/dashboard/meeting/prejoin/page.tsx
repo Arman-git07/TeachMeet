@@ -1,12 +1,12 @@
 
 "use client";
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button"; // shadcn/ui Button
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Mic, MicOff, Video, VideoOff, Loader2, Link as LinkIcon, User as UserIcon, Settings, ImageIcon, FlipHorizontal, Copy, Share2, Hash } from "lucide-react";
 import Link from "next/link";
-import React, { useRef, useCallback } from "react";
+import React from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth'; 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"; 
@@ -339,5 +339,7 @@ export default function PrejoinPage() {
     </div>
   );
 }
+
+    
 
     
