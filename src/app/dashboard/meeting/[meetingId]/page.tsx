@@ -17,10 +17,10 @@ import {
   Users,
   MessageSquare,
   MoreVertical,
-  XCircle,
   Settings,
   Brush,
   PhoneOff,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Tooltip,
@@ -55,6 +55,15 @@ type ControlButtonProps = {
   isDestructive?: boolean;
   children: React.ReactNode;
 };
+
+type Participant = {
+  id: string;
+  name: string;
+  avatar?: string;
+  isCamOff: boolean;
+  isMicOff: boolean;
+};
+
 
 const ControlButton = ({ label, onClick, isActive, isDestructive, children }: ControlButtonProps) => (
   <Tooltip>
@@ -93,6 +102,8 @@ export default function MeetingPage() {
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+
 
   useEffect(() => {
     setHeaderContent(
@@ -116,7 +127,7 @@ export default function MeetingPage() {
             <MonitorUp className="mr-2 h-4 w-4" />
             <span>Screen Share</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+          <DropdownMenuItem onSelect={() => setIsParticipantsOpen(true)} className="cursor-pointer">
             <Users className="mr-2 h-4 w-4" />
             <span>Participants</span>
           </DropdownMenuItem>
@@ -185,6 +196,7 @@ export default function MeetingPage() {
             onMicToggle={setMicOn}
             onCamToggle={setCamOn}
             onUserJoined={handleUserJoined}
+            onParticipantsChange={setParticipants}
           />
         </main>
 
@@ -244,14 +256,45 @@ export default function MeetingPage() {
         <Sheet open={isParticipantsOpen} onOpenChange={setIsParticipantsOpen}>
           <SheetContent side="bottom" className="h-1/2 bg-[#101726] text-white border-t border-[#1f2a40] rounded-t-2xl">
             <SheetHeader>
-              <SheetTitle>Participants</SheetTitle>
+              <SheetTitle>Participants ({participants.length})</SheetTitle>
               <SheetDescription className="text-gray-400">
                 List of everyone currently in the meeting.
               </SheetDescription>
             </SheetHeader>
-            <div className="py-4">
-              {/* Participants list will go here */}
-              <p className="text-gray-400">Participants list is under development.</p>
+            <div className="py-4 space-y-2">
+              {participants.map((p) => (
+                <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/10">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                       <AvatarImage src={p.avatar} alt={p.name} data-ai-hint="avatar user" />
+                      <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span>{p.name} {p.id === 'local' && '(You)'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {p.isMicOff ? (
+                      <MicOff className="h-5 w-5 text-red-400" />
+                    ) : (
+                      <Mic className="h-5 w-5 text-green-400" />
+                    )}
+                    {p.isCamOff ? (
+                      <VideoOff className="h-5 w-5 text-red-400" />
+                    ) : (
+                      <Video className="h-5 w-5 text-green-400" />
+                    )}
+                    {p.id === 'local' && ( // Assuming host is the local user for now
+                      <Tooltip>
+                        <TooltipTrigger>
+                           <ShieldCheck className="h-5 w-5 text-blue-400" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="rounded-lg bg-card text-card-foreground">
+                            <p>Host</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </SheetContent>
         </Sheet>

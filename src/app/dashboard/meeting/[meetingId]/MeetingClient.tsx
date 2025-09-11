@@ -1,11 +1,19 @@
 
 "use client";
 
-import React, { useImperativeHandle, forwardRef, useMemo } from "react";
+import React, { useImperativeHandle, forwardRef, useMemo, useState, useEffect } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, VideoOff } from "lucide-react";
+
+type Participant = {
+  id: string;
+  name: string;
+  avatar?: string;
+  isCamOff: boolean;
+  isMicOff: boolean;
+};
 
 type Props = { 
   meetingId: string; 
@@ -13,6 +21,7 @@ type Props = {
   onMicToggle: (isOn: boolean) => void;
   onCamToggle: (isOn: boolean) => void;
   onUserJoined: (socketId: string) => void;
+  onParticipantsChange: (participants: Participant[]) => void; // New prop
 };
 
 export interface MeetingClientRef {
@@ -21,14 +30,14 @@ export interface MeetingClientRef {
 }
 
 const MeetingClient = forwardRef<MeetingClientRef, Props>(
-  ({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined }, ref) => {
+  ({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined, onParticipantsChange }, ref) => {
   
   const { user } = useAuth();
-  const [remoteSocketIds, setRemoteSocketIds] = React.useState<string[]>([]);
+  const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
 
-  const [micOn, setMicOn] = React.useState(true);
-  const [camOn, setCamOn] = React.useState(true);
-  const [remoteStreams, setRemoteStreams] = React.useState<Map<string, MediaStream>>(new Map());
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
   const rtc = useMemo(() => new MeshRTC({
     roomId: meetingId,
@@ -109,14 +118,18 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     return <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />;
   };
   
-  // Dummy data for example layout
-  const allParticipants = [
-    { id: 'local', name: user?.displayName || "User", avatar: user?.photoURL, isCamOff: !camOn, isMicOff: !micOn },
-    ...remoteSocketIds.map(id => ({ id, name: `User ${id.slice(0,4)}`, avatar: `https://placehold.co/128x128.png?text=${id.charAt(0)}`, isCamOff: false, isMicOff: true })) // Simulating states
-  ];
+  // Real participants list
+  const allParticipants: Participant[] = useMemo(() => [
+    { id: 'local', name: user?.displayName || "User", avatar: user?.photoURL || undefined, isCamOff: !camOn, isMicOff: !micOn },
+    ...remoteSocketIds.map(id => ({ id, name: `User ${id.slice(0,4)}`, avatar: `https://placehold.co/128x128.png?text=${id.charAt(0)}`, isCamOff: false, isMicOff: true })) // Simulating remote states for now
+  ], [user, camOn, micOn, remoteSocketIds]);
 
+  // Notify parent component of participant changes
+  useEffect(() => {
+    onParticipantsChange(allParticipants);
+  }, [allParticipants, onParticipantsChange]);
 
-  const ParticipantTile = ({ p }: { p: typeof allParticipants[0] }) => {
+  const ParticipantTile = ({ p }: { p: Participant }) => {
     const stream = p.id === 'local' ? rtc.getLocalStream() : remoteStreams.get(p.id);
 
     return (
@@ -145,7 +158,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
            {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
            <span className="text-sm">{p.name}</span>
         </div>
-        {!p.isCamOff && p.isCamOff && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
+        {p.isCamOff && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
       </div>
     );
   };
