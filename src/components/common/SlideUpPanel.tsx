@@ -23,6 +23,7 @@ export function SlideUpPanel() {
   }, []);
   
   const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
+  const startMeetingHref = isAuthenticated ? "/dashboard/classrooms" : "/auth/signin?action=start";
 
   return (
     <div
@@ -33,22 +34,18 @@ export function SlideUpPanel() {
       <div className="container mx-auto max-w-3xl flex flex-col sm:flex-row items-center sm:items-start justify-center gap-x-6 gap-y-4">
         {/* Start New Meeting Section */}
         <div className="w-full sm:flex-1 flex justify-center">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                size="lg"
-                className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
-                aria-label="Start New Meeting"
-                disabled={authLoading}
-              >
+            <Button
+              asChild
+              size="lg"
+              className="w-full max-w-xs btn-gel text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-primary/50"
+              aria-label="Start New Meeting"
+              disabled={authLoading}
+            >
+              <Link href={startMeetingHref}>
                 <PlusCircle className="mr-2 h-6 w-6" />
                 Start New Meeting
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg rounded-xl">
-              <StartMeetingDialogContent />
-            </DialogContent>
-          </Dialog>
+              </Link>
+            </Button>
         </div>
 
         {/* Separator */}
