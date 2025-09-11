@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/common/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
+import Link from 'next/link';
 
 
 type ControlButtonProps = {
@@ -71,15 +72,17 @@ const ControlButton = ({ label, onClick, isActive, isDestructive, children, asCh
       )}
       asChild={asChild}
     >
-      {children}
-      <span className="sr-only">{label}</span>
+      <div>
+        {children}
+        <span className="sr-only">{label}</span>
+      </div>
     </Button>
   );
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        {asChild ? <a href={href}>{content}</a> : content}
+        {asChild && href ? <Link href={href}>{content}</Link> : content}
       </TooltipTrigger>
       <TooltipContent side="top" className="rounded-lg bg-card text-card-foreground">
         <p>{label}</p>
