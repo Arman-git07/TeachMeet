@@ -48,6 +48,7 @@ type ControlButtonProps = {
   children: React.ReactNode;
   asChild?: boolean;
   href?: string;
+  className?: string; // Allow className to be passed
 };
 
 type Participant = {
@@ -59,7 +60,7 @@ type Participant = {
 };
 
 
-const ControlButton = ({ label, onClick, isActive, isDestructive, children, asChild, href }: ControlButtonProps) => {
+const ControlButton = ({ label, onClick, isActive, isDestructive, children, asChild, href, className }: ControlButtonProps) => {
   const content = (
     <Button
       variant="ghost"
@@ -68,7 +69,8 @@ const ControlButton = ({ label, onClick, isActive, isDestructive, children, asCh
       className={cn(
         "h-14 w-14 rounded-full flex flex-col items-center justify-center gap-1 text-xs text-white",
         isActive ? "bg-primary/80" : "bg-white/10 hover:bg-white/20",
-        isDestructive && "bg-destructive/90 hover:bg-destructive"
+        isDestructive && "bg-destructive/90 hover:bg-destructive",
+        className // Apply additional classNames
       )}
       asChild={asChild}
     >
@@ -106,6 +108,7 @@ export default function MeetingPage() {
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isParticipantJoining, setIsParticipantJoining] = useState(false);
 
 
   useEffect(() => {
@@ -172,6 +175,8 @@ export default function MeetingPage() {
   
   const handleUserJoined = useCallback((socketId: string) => {
     toast({ title: 'Participant Joined', description: `A new user has joined the meeting.` });
+    setIsParticipantJoining(true);
+    setTimeout(() => setIsParticipantJoining(false), 2000); // Animation is 1s, runs twice
   }, [toast]);
   
   if (authLoading) {
@@ -242,8 +247,10 @@ export default function MeetingPage() {
 
             <div className="h-8 w-px bg-white/20 mx-2" />
             
-            <ControlButton label="Participants" asChild href={participantsLink}>
-                <Users className="h-6 w-6" />
+            <ControlButton label="Participants" asChild href={participantsLink} className={cn(isParticipantJoining && "animate-blink-success")}>
+                <div>
+                  <Users className="h-6 w-6" />
+                </div>
             </ControlButton>
              <ControlButton label="Raise Hand">
               <Hand className="h-6 w-6" />
