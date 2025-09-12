@@ -215,7 +215,7 @@ export default function PreJoinPage() {
             )}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
               <Button
-                variant={isMicOn ? 'secondary' : 'destructive'}
+                variant={isMicOn ? 'default' : 'destructive'}
                 size="icon"
                 className="rounded-full h-12 w-12"
                 onClick={toggleMic}
@@ -223,7 +223,7 @@ export default function PreJoinPage() {
                 {isMicOn ? <Mic /> : <MicOff />}
               </Button>
               <Button
-                variant={isCameraOn ? 'secondary' : 'destructive'}
+                variant={isCameraOn ? 'default' : 'destructive'}
                 size="icon"
                 className="rounded-full h-12 w-12"
                 onClick={toggleCamera}
@@ -383,7 +383,7 @@ export default function PreJoinPage() {
               "w-full py-3 text-lg font-semibold rounded-xl transition-colors",
               agreed
                 ? "bg-primary text-primary-foreground hover:bg-primary/90 btn-gel"
-                : "bg-primary/30 text-primary-foreground/50 cursor-not-allowed"
+                : "bg-green-900 opacity-50 cursor-not-allowed"
             )}
           >
             Join Now as Host
@@ -403,3 +403,5 @@ export default function PreJoinPage() {
     </div>
   );
 }
+
+    
