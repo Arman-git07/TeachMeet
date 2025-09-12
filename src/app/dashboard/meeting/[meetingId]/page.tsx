@@ -188,6 +188,8 @@ export default function MeetingPage() {
 
   const participantsLink = `/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`;
 
+  const showPip = participants.length > 1;
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen w-screen bg-[#222E46] text-white overflow-hidden">
@@ -206,25 +208,27 @@ export default function MeetingPage() {
         </main>
 
         {/* Self-view / local video preview */}
-        <div className="absolute bottom-28 right-4 z-20 w-48 h-32">
-             <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative">
-                <div id="local-video-container" className="w-full h-full">
-                  {/* MeetingClient will attach video here */}
-                </div>
-                 {!camOn && (
-                    <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
-                    <Avatar className="w-16 h-16 border-2 border-background shadow-lg">
-                        <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" />
-                        <AvatarFallback className="text-2xl">{userName.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    </div>
-                )}
-                <div className="absolute bottom-1 right-1 flex items-center gap-1.5 bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm">
-                    {micOn ? <Mic className="h-3 w-3 text-green-400" /> : <MicOff className="h-3 w-3 text-red-400" />}
-                    <span className="text-xs">{userName} (You)</span>
-                </div>
-            </div>
-        </div>
+        {showPip && (
+          <div className="absolute bottom-28 right-4 z-20 w-48 h-32">
+               <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative">
+                  <div id="local-video-container" className="w-full h-full">
+                    {/* MeetingClient will attach video here */}
+                  </div>
+                   {!camOn && (
+                      <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
+                      <Avatar className="w-16 h-16 border-2 border-background shadow-lg">
+                          <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" />
+                          <AvatarFallback className="text-2xl">{userName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      </div>
+                  )}
+                  <div className="absolute bottom-1 right-1 flex items-center gap-1.5 bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                      {micOn ? <Mic className="h-3 w-3 text-green-400" /> : <MicOff className="h-3 w-3 text-red-400" />}
+                      <span className="text-xs">{userName} (You)</span>
+                  </div>
+              </div>
+          </div>
+        )}
 
         {/* Controls */}
         <footer className="absolute bottom-0 left-0 right-0 z-20 flex justify-center p-4">

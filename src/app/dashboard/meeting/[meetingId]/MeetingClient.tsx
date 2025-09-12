@@ -129,6 +129,16 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     onParticipantsChange(allParticipants);
   }, [allParticipants, onParticipantsChange]);
 
+  const LocalVideo = ({ stream }: { stream: MediaStream }) => {
+    const videoRef = React.useRef<HTMLVideoElement>(null);
+    React.useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [stream]);
+    return <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />;
+  };
+
   const ParticipantTile = ({ p }: { p: Participant }) => {
     const stream = p.id === 'local' ? rtc.getLocalStream() : remoteStreams.get(p.id);
 
@@ -142,17 +152,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
              </Avatar>
            </div>
         ) : (
-          p.id === 'local' ? (
-            // This is just a placeholder, the actual local video is in the floating pip
-            <div className="flex flex-col items-center text-muted-foreground">
-                <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
-                    <AvatarImage src={p.avatar} alt={p.name} data-ai-hint="user avatar" />
-                    <AvatarFallback className="text-4xl md:text-6xl">{p.name.charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-            </div>
-          ) : (
-            <RemoteVideo stream={stream} />
-          )
+          p.id === 'local' ? <LocalVideo stream={stream} /> : <RemoteVideo stream={stream} />
         )}
         <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
            {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
