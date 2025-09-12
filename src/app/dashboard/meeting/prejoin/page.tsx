@@ -18,6 +18,7 @@ import {
   Sparkles,
   User,
   Hash,
+  PanelLeftOpen,
 } from 'lucide-react';
 import {
   Card,
@@ -45,6 +46,7 @@ import {
 import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function PreJoinPage() {
   const searchParams = useSearchParams();
@@ -157,7 +159,12 @@ export default function PreJoinPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <Card className="w-full max-w-xl shadow-2xl rounded-2xl border-border/50">
-        <CardHeader className="text-center">
+        <CardHeader className="relative text-center">
+            <div className="absolute top-4 right-4">
+                <SidebarTrigger className="md:hidden">
+                    <PanelLeftOpen className="h-6 w-6" />
+                </SidebarTrigger>
+            </div>
           {startError && (
             <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
@@ -394,3 +401,5 @@ export default function PreJoinPage() {
     </div>
   );
 }
+
+    
