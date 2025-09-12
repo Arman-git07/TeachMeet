@@ -20,6 +20,11 @@ import {
   Settings,
   Brush,
   PhoneOff,
+  ShieldCheck,
+  Pin,
+  UserX,
+  AlertCircle,
+  Maximize,
 } from "lucide-react";
 import {
   Tooltip,
@@ -31,13 +36,23 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/common/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
 import Link from 'next/link';
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 type ControlButtonProps = {
@@ -58,6 +73,76 @@ type Participant = {
   isCamOff: boolean;
   isMicOff: boolean;
 };
+
+const ParticipantItem = React.memo(({
+  participant
+}: { 
+  participant: Participant, 
+}) => {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const isMe = user?.uid === participant.id || participant.id === 'local';
+
+  const handleActionClick = (action: string, participantName: string) => {
+    toast({
+      title: `${action} ${participantName}`,
+      description: `The "${action.toLowerCase()}" feature is under development.`,
+      duration: 3000,
+    });
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
+      <div className="flex items-center gap-3">
+        <Avatar className="h-10 w-10">
+          <AvatarImage src={participant.avatar} alt={participant.name} data-ai-hint="avatar user"/>
+          <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            {participant.name} {isMe && "(You)"}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
+          {participant.isMicOff ? <MicOff className="h-4 w-4 text-muted-foreground" /> : <Mic className="h-4 w-4 text-foreground" />}
+        </Button>
+        <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
+          {participant.isCamOff ? <VideoOff className="h-4 w-4 text-muted-foreground" /> : <Video className="h-4 w-4 text-foreground" />}
+        </Button>
+        {!isMe && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg">
+              <DropdownMenuItem onSelect={() => handleActionClick('Chat Privately with', participant.name)} className="cursor-pointer">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                <span>Chat Privately</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleActionClick('Pin', participant.name)} className="cursor-pointer">
+                <Pin className="mr-2 h-4 w-4" />
+                <span>Pin User</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onSelect={() => handleActionClick('Remove', participant.name)} 
+                className="text-destructive focus:text-destructive cursor-pointer"
+              >
+                <UserX className="mr-2 h-4 w-4" />
+                <span>Remove Participant</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
+  );
+});
+ParticipantItem.displayName = 'ParticipantItem';
 
 
 const ControlButton = ({ label, onClick, isActive, isDestructive, children, asChild, href, className }: ControlButtonProps) => {
@@ -109,6 +194,7 @@ export default function MeetingPage() {
   const [camOn, setCamOn] = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isParticipantJoining, setIsParticipantJoining] = useState(false);
+  const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
 
 
   useEffect(() => {
@@ -133,7 +219,7 @@ export default function MeetingPage() {
             <MonitorUp className="mr-2 h-4 w-4" />
             <span>Screen Share</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+          <DropdownMenuItem onSelect={() => setIsParticipantsPanelOpen(true)} className="cursor-pointer">
             <Users className="mr-2 h-4 w-4" />
             <span>Participants</span>
           </DropdownMenuItem>
@@ -191,8 +277,6 @@ export default function MeetingPage() {
   const userName = user.displayName || "User";
   const userAvatarSrc = user.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
 
-  const participantsLink = `/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`;
-
   const showPip = participants.length > 1;
 
   return (
@@ -247,11 +331,31 @@ export default function MeetingPage() {
 
             <div className="h-8 w-px bg-white/20 mx-2" />
             
-            <ControlButton label="Participants" asChild href={participantsLink} className={cn(isParticipantJoining && "animate-blink-success")}>
-                <div>
-                  <Users className="h-6 w-6" />
-                </div>
-            </ControlButton>
+            <Sheet open={isParticipantsPanelOpen} onOpenChange={setIsParticipantsPanelOpen}>
+              <SheetTrigger asChild>
+                <ControlButton label="Participants" className={cn(isParticipantJoining && "animate-blink-success")}>
+                    <div>
+                      <Users className="h-6 w-6" />
+                    </div>
+                </ControlButton>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-3/4 rounded-t-2xl bg-background text-foreground">
+                <SheetHeader>
+                  <SheetTitle>Participants ({participants.length})</SheetTitle>
+                  <SheetDescription>
+                    Manage who is in the meeting.
+                  </SheetDescription>
+                </SheetHeader>
+                <ScrollArea className="h-[calc(100%-80px)] mt-4">
+                  <div className="space-y-1 p-4">
+                    {participants.map((p) => (
+                      <ParticipantItem key={p.id} participant={p} />
+                    ))}
+                  </div>
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
+
              <ControlButton label="Raise Hand">
               <Hand className="h-6 w-6" />
             </ControlButton>
