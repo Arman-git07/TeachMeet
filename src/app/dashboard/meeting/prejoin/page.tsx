@@ -80,7 +80,7 @@ export default function PreJoinPage() {
       setMeetingLink(
         `${window.location.origin}/dashboard/join-meeting?meetingId=${meetingId}`
       );
-      setMeetingCode(meetingId);
+      setMeetingCode(meetingId.replace('meeting-', ''));
     }
   }, [meetingId]);
 
@@ -378,7 +378,7 @@ export default function PreJoinPage() {
             }}
             disabled={!agreed}
             className={cn(
-              "w-full py-3 text-lg font-semibold rounded-xl transition-colors",
+              "w-full py-3 text-lg font-semibold rounded-xl",
               agreed
                 ? "btn-gel"
                 : "bg-green-900/50 text-green-100/70 cursor-not-allowed"
