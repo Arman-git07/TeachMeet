@@ -173,7 +173,7 @@ export default function PreJoinPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="relative w-full h-64 max-h-[50vh] bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+          <div className="relative w-full max-h-[50vh] bg-muted rounded-lg flex items-center justify-center overflow-hidden aspect-video">
             {hasCameraPermission && isCameraOn ? (
               <video
                 ref={videoRef}
@@ -215,7 +215,7 @@ export default function PreJoinPage() {
             )}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
               <Button
-                variant={isMicOn ? 'default' : 'destructive'}
+                variant={isMicOn ? "default" : 'destructive'}
                 size="icon"
                 className="rounded-full h-12 w-12"
                 onClick={toggleMic}
@@ -223,7 +223,7 @@ export default function PreJoinPage() {
                 {isMicOn ? <Mic /> : <MicOff />}
               </Button>
               <Button
-                variant={isCameraOn ? 'default' : 'destructive'}
+                variant={isCameraOn ? "default" : 'destructive'}
                 size="icon"
                 className="rounded-full h-12 w-12"
                 onClick={toggleCamera}
@@ -382,8 +382,8 @@ export default function PreJoinPage() {
             className={cn(
               "w-full py-3 text-lg font-semibold rounded-xl transition-colors",
               agreed
-                ? "bg-green-500 hover:bg-green-600"
-                : "bg-green-900 opacity-50 cursor-not-allowed"
+                ? "btn-gel"
+                : "bg-primary/50 text-primary-foreground cursor-not-allowed"
             )}
           >
             Join Now as Host
@@ -403,5 +403,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    
