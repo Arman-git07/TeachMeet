@@ -173,7 +173,7 @@ export default function PreJoinPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="relative aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+          <div className="relative w-full h-64 max-h-[50vh] bg-muted rounded-lg flex items-center justify-center overflow-hidden">
             {hasCameraPermission && isCameraOn ? (
               <video
                 ref={videoRef}
@@ -382,7 +382,7 @@ export default function PreJoinPage() {
             className={cn(
               "w-full py-3 text-lg font-semibold rounded-xl transition-colors",
               agreed
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 btn-gel"
+                ? "bg-green-500 hover:bg-green-600"
                 : "bg-green-900 opacity-50 cursor-not-allowed"
             )}
           >
