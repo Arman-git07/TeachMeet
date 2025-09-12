@@ -59,7 +59,6 @@ export default function PreJoinPage() {
 
   // UI State
   const [agreed, setAgreed] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [mirrorVideo, setMirrorVideo] = useState(true);
   const [applyFilter, setApplyFilter] = useState(true);
   const [videoFilter, setVideoFilter] = useState('bright-clear');
@@ -275,19 +274,11 @@ export default function PreJoinPage() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="advanced-settings"
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Settings className="h-4 w-4" /> Advanced Settings
-              </Label>
-              <Switch
-                id="advanced-settings"
-                checked={showAdvanced}
-                onCheckedChange={setShowAdvanced}
-              />
-            </div>
+            <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg">
+                <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}`}>
+                    <Settings className="mr-2 h-4 w-4" /> Advanced A/V Settings
+                </Link>
+            </Button>
           </div>
           <div className="space-y-2">
             <Label>Invite Others</Label>

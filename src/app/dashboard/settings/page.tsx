@@ -355,7 +355,7 @@ export default function SettingsPage() {
         headerAction={
             meetingId && (
               <Button asChild variant="outline" size="sm" className="rounded-lg">
-                <Link href={`/dashboard/meeting/${meetingId}/wait`}>
+                <Link href={`/dashboard/meeting/prejoin?meetingId=${meetingId}`}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Join Room
                 </Link>
