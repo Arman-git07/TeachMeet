@@ -6,6 +6,8 @@ import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, VideoOff } from "lucide-react";
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 type Participant = {
   id: string;
@@ -21,7 +23,7 @@ type Props = {
   onMicToggle: (isOn: boolean) => void;
   onCamToggle: (isOn: boolean) => void;
   onUserJoined: (socketId: string) => void;
-  onParticipantsChange: (participants: Participant[]) => void; // New prop
+  onParticipantsChange: (participants: Participant[]) => void;
 };
 
 export interface MeetingClientRef {
@@ -38,6 +40,22 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+  
+  const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string}>>(new Map());
+
+  // Firestore listener for participants
+  useEffect(() => {
+    if (!meetingId) return;
+    const participantsCol = collection(db, "meetings", meetingId, "participants");
+    const unsubscribe = onSnapshot(participantsCol, (snapshot) => {
+      const newParticipants = new Map<string, {name: string, photoURL?: string}>();
+      snapshot.forEach(doc => {
+        newParticipants.set(doc.id, doc.data() as {name: string, photoURL?: string});
+      });
+      setLiveParticipants(newParticipants);
+    });
+    return () => unsubscribe();
+  }, [meetingId]);
 
   const rtc = useMemo(() => new MeshRTC({
     roomId: meetingId,
@@ -118,13 +136,31 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     return <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />;
   };
   
-  // Real participants list
-  const allParticipants: Participant[] = useMemo(() => [
-    { id: 'local', name: user?.displayName || "User", avatar: user?.photoURL || undefined, isCamOff: !camOn, isMicOff: !micOn },
-    ...remoteSocketIds.map(id => ({ id, name: `User ${id.slice(0,4)}`, avatar: `https://placehold.co/128x128.png?text=${id.charAt(0)}`, isCamOff: false, isMicOff: true })) // Simulating remote states for now
-  ], [user, camOn, micOn, remoteSocketIds]);
+  const allParticipants: Participant[] = useMemo(() => {
+    const localUser = liveParticipants.get(userId);
+    const self = { 
+      id: userId, 
+      name: localUser?.name || user?.displayName || "You", 
+      avatar: localUser?.photoURL || user?.photoURL || undefined, 
+      isCamOff: !camOn, 
+      isMicOff: !micOn 
+    };
 
-  // Notify parent component of participant changes
+    const remotes = Array.from(liveParticipants.entries())
+      .filter(([id]) => id !== userId)
+      .map(([id, data]) => ({
+        id,
+        name: data.name || `User ${id.substring(0, 4)}`,
+        avatar: data.photoURL,
+        // TODO: get real mic/cam state from liveParticipants data
+        isCamOff: false, 
+        isMicOff: true
+      }));
+
+    return [self, ...remotes];
+  }, [user, camOn, micOn, liveParticipants, userId]);
+
+
   useEffect(() => {
     onParticipantsChange(allParticipants);
   }, [allParticipants, onParticipantsChange]);
@@ -140,7 +176,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   };
 
   const ParticipantTile = ({ p }: { p: Participant }) => {
-    const stream = p.id === 'local' ? rtc.getLocalStream() : remoteStreams.get(p.id);
+    const stream = p.id === userId ? rtc.getLocalStream() : remoteStreams.get(p.id);
 
     return (
       <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative flex items-center justify-center">
@@ -152,7 +188,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
              </Avatar>
            </div>
         ) : (
-          p.id === 'local' ? <LocalVideo stream={stream} /> : <RemoteVideo stream={stream} />
+          p.id === userId ? <LocalVideo stream={stream} /> : <RemoteVideo stream={stream} />
         )}
         <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
            {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
@@ -172,12 +208,11 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   }
 
   // A more dynamic grid for > 1 participants could be implemented here.
-  // For now, let's just show the first remote participant for simplicity.
-  const remoteParticipant = allParticipants.find(p => p.id !== 'local');
+  const mainParticipant = allParticipants.find(p => p.id !== userId) || allParticipants[0];
 
   return (
     <div className="w-full h-full flex items-center justify-center p-4">
-        {remoteParticipant ? <ParticipantTile p={remoteParticipant} /> :  <ParticipantTile p={allParticipants[0]} />}
+        {mainParticipant ? <ParticipantTile p={mainParticipant} /> :  <div className="text-muted-foreground">Waiting for participants...</div>}
     </div>
   );
 });
