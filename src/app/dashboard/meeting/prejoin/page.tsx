@@ -157,7 +157,7 @@ export default function PreJoinPage() {
   const userAvatar = user?.photoURL;
 
   return (
-    <div className="container mx-auto max-w-xl py-8">
+    <div className="container mx-auto max-w-xl">
       <Card className="w-full shadow-2xl rounded-2xl border-border/50">
         <CardHeader className="relative text-center">
             <div className="absolute top-4 left-4">
@@ -381,7 +381,7 @@ export default function PreJoinPage() {
               "w-full py-3 text-lg font-semibold rounded-xl transition-colors",
               agreed
                 ? "btn-gel"
-                : "bg-primary/50 text-primary-foreground/70 cursor-not-allowed"
+                : "bg-green-900/50 text-green-100/70 cursor-not-allowed"
             )}
           >
             Join Now as Host
@@ -401,3 +401,5 @@ export default function PreJoinPage() {
     </div>
   );
 }
+
+    
