@@ -157,8 +157,8 @@ export default function PreJoinPage() {
   const userAvatar = user?.photoURL;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
-      <Card className="w-full max-w-xl shadow-2xl rounded-2xl border-border/50">
+    <div className="container mx-auto max-w-xl py-8">
+      <Card className="w-full shadow-2xl rounded-2xl border-border/50">
         <CardHeader className="relative text-center">
             <div className="absolute top-4 left-4">
                 <SidebarTrigger>
