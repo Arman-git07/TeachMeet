@@ -197,6 +197,7 @@ export default function MeetingPage() {
   const [isParticipantJoining, setIsParticipantJoining] = useState(false);
   const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [isHandRaised, setIsHandRaised] = useState(false);
 
 
   useEffect(() => {
@@ -278,6 +279,17 @@ export default function MeetingPage() {
   const handleToggleMic = () => rtcRef.current?.toggleMic();
   const handleToggleCam = () => rtcRef.current?.toggleCam();
   
+  const handleToggleHandRaise = () => {
+    const newHandRaiseState = !isHandRaised;
+    setIsHandRaised(newHandRaiseState);
+    if (newHandRaiseState) {
+        toast({
+            title: "Hand Raised",
+            description: "Your hand is now raised. Other participants can see this.",
+        });
+    }
+  };
+
   const handleLeave = () => {
     toast({ title: "You left the meeting." });
     router.push("/");
@@ -346,10 +358,10 @@ export default function MeetingPage() {
         {/* Controls */}
         <footer className="absolute bottom-0 left-0 right-0 z-20 flex justify-center p-4">
           <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
-            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(micOn ? "bg-primary/80" : "bg-destructive/90 hover:bg-destructive")}>
+            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(!micOn ? "bg-destructive/90 hover:bg-destructive" : "bg-primary/80")}>
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
-            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(camOn ? "bg-primary/80" : "bg-destructive/90 hover:bg-destructive")}>
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn ? "bg-destructive/90 hover:bg-destructive" : "bg-primary/80")}>
               {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </ControlButton>
 
@@ -380,7 +392,7 @@ export default function MeetingPage() {
               </SheetContent>
             </Sheet>
 
-             <ControlButton label="Raise Hand">
+             <ControlButton label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={handleToggleHandRaise} className={cn(isHandRaised && "bg-primary/80")}>
               <Hand className="h-6 w-6" />
             </ControlButton>
 
