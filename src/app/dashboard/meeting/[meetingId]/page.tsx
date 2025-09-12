@@ -60,7 +60,6 @@ import { doc, getDoc } from "firebase/firestore";
 type ControlButtonProps = {
   label: string;
   onClick?: () => void;
-  isActive?: boolean;
   isDestructive?: boolean;
   children: React.ReactNode;
   asChild?: boolean;
@@ -147,7 +146,7 @@ const ParticipantItem = React.memo(({
 ParticipantItem.displayName = 'ParticipantItem';
 
 
-const ControlButton = ({ label, onClick, isActive, isDestructive, children, asChild, href, className }: ControlButtonProps) => {
+const ControlButton = ({ label, onClick, isDestructive, children, asChild, href, className }: ControlButtonProps) => {
   const content = (
     <Button
       variant="ghost"
@@ -155,7 +154,7 @@ const ControlButton = ({ label, onClick, isActive, isDestructive, children, asCh
       onClick={onClick}
       className={cn(
         "h-14 w-14 rounded-full flex flex-col items-center justify-center gap-1 text-xs text-white",
-        isActive ? "bg-primary/80" : "bg-white/10 hover:bg-white/20",
+        "bg-white/10 hover:bg-white/20",
         isDestructive && "bg-destructive/90 hover:bg-destructive",
         className // Apply additional classNames
       )}
@@ -347,10 +346,10 @@ export default function MeetingPage() {
         {/* Controls */}
         <footer className="absolute bottom-0 left-0 right-0 z-20 flex justify-center p-4">
           <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
-            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} isActive={micOn}>
+            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(micOn ? "bg-primary/80" : "bg-destructive/90 hover:bg-destructive")}>
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
-            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} isActive={camOn}>
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(camOn ? "bg-primary/80" : "bg-destructive/90 hover:bg-destructive")}>
               {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </ControlButton>
 
@@ -400,5 +399,3 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
-
-    
