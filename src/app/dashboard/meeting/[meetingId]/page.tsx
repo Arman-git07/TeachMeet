@@ -53,6 +53,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
 import Link from 'next/link';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 
 type ControlButtonProps = {
@@ -195,6 +197,27 @@ export default function MeetingPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isParticipantJoining, setIsParticipantJoining] = useState(false);
   const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
+  const [isHost, setIsHost] = useState(false);
+
+
+  useEffect(() => {
+    async function checkHostStatus() {
+        if (!user || !meetingId) return;
+        try {
+            const meetingDocRef = doc(db, 'meetings', meetingId);
+            const meetingSnap = await getDoc(meetingDocRef);
+            if (meetingSnap.exists() && meetingSnap.data().hostId === user.uid) {
+                setIsHost(true);
+            } else {
+                setIsHost(false);
+            }
+        } catch (error) {
+            console.error("Failed to check host status:", error);
+            setIsHost(false);
+        }
+    }
+    checkHostStatus();
+  }, [user, meetingId]);
 
 
   useEffect(() => {
@@ -219,10 +242,12 @@ export default function MeetingPage() {
             <MonitorUp className="mr-2 h-4 w-4" />
             <span>Screen Share</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setIsParticipantsPanelOpen(true)} className="cursor-pointer">
-            <Users className="mr-2 h-4 w-4" />
-            <span>Participants</span>
-          </DropdownMenuItem>
+          {isHost && (
+            <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
+              <Users className="mr-2 h-4 w-4" />
+              <span>Manage Participants</span>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onSelect={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)} className="cursor-pointer">
             <MessageSquare className="mr-2 h-4 w-4" />
             <span>Chat</span>
@@ -239,7 +264,7 @@ export default function MeetingPage() {
       setHeaderContent(null);
       setHeaderAction(null);
     };
-  }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast]);
+  }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost]);
   
 
   // Store desired state in localStorage to persist across reloads
@@ -343,7 +368,7 @@ export default function MeetingPage() {
                 <SheetHeader>
                   <SheetTitle>Participants ({participants.length})</SheetTitle>
                   <SheetDescription>
-                    Manage who is in the meeting.
+                    List of everyone in the meeting.
                   </SheetDescription>
                 </SheetHeader>
                 <ScrollArea className="h-[calc(100%-80px)] mt-4">
