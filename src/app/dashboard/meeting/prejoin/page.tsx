@@ -160,8 +160,8 @@ export default function PreJoinPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <Card className="w-full max-w-xl shadow-2xl rounded-2xl border-border/50">
         <CardHeader className="relative text-center">
-            <div className="absolute top-4 right-4">
-                <SidebarTrigger className="md:hidden">
+            <div className="absolute top-4 left-4">
+                <SidebarTrigger>
                     <PanelLeftOpen className="h-6 w-6" />
                 </SidebarTrigger>
             </div>
@@ -401,5 +401,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    

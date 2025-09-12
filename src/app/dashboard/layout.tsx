@@ -26,6 +26,7 @@ export default function DashboardLayout({
   }, [isAuthenticated, loading, router]);
 
   const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
+  const isPrejoinPage = pathname === '/dashboard/meeting/prejoin';
 
   if (loading) {
     return (
@@ -53,10 +54,10 @@ export default function DashboardLayout({
   return (
     <DynamicHeaderProvider>
       <div className="flex flex-col flex-1">
-        <DashboardHeader />
+        {!isPrejoinPage && <DashboardHeader />}
         <main className={cn(
           "flex flex-col flex-1 bg-background",
-          !isMeetingPage && "p-4 md:p-8"
+          !isMeetingPage && !isPrejoinPage && "p-4 md:p-8"
         )}>
           {children}
         </main>
