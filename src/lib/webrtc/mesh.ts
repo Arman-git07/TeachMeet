@@ -6,7 +6,6 @@ import { io, Socket } from "socket.io-client";
 type Remote = {
   pc: RTCPeerConnection;
   stream: MediaStream;
-  videoEl?: HTMLVideoElement | null;
   negotiating: boolean; // Add this flag
 };
 
@@ -174,12 +173,6 @@ export class MeshRTC {
       video: wantCam ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
     };
 
-    if (wantMic === false && wantCam === false) {
-      this.locals.stream?.getTracks().forEach(track => track.stop());
-      this.locals.stream = new MediaStream(); // Keep an empty stream object
-      return this.locals.stream;
-    }
-
     try {
         this.locals.stream = await navigator.mediaDevices.getUserMedia(constraints);
         this.locals.mic = wantMic;
@@ -203,61 +196,21 @@ export class MeshRTC {
 
   async toggleMic(on: boolean) {
     this.locals.mic = on;
-    await this.updateStream();
+    if (this.locals.stream) {
+      this.locals.stream.getAudioTracks().forEach(track => {
+        track.enabled = on;
+      });
+    }
   }
 
   async toggleCam(on: boolean) {
     this.locals.cam = on;
-    await this.updateStream();
-  }
-  
-  private async updateStream() {
     if (this.locals.stream) {
-        this.locals.stream.getTracks().forEach(track => track.stop());
-    }
-
-    await this.ensureLocalStream(this.locals.mic, this.locals.cam);
-
-    for (const remote of this.remotes.values()) {
-        const senders = remote.pc.getSenders();
-        const newTracks = this.locals.stream?.getTracks() || [];
-        
-        // Handle video track replacement
-        const videoSender = senders.find(s => s.track?.kind === 'video');
-        const newVideoTrack = newTracks.find(t => t.kind === 'video');
-        if (videoSender) {
-            if (newVideoTrack) {
-                videoSender.replaceTrack(newVideoTrack);
-            } else {
-                try {
-                    remote.pc.removeTrack(videoSender);
-                } catch(e) { console.error("Error removing video track", e); }
-            }
-        } else if (newVideoTrack) {
-             try {
-                remote.pc.addTrack(newVideoTrack, this.locals.stream!);
-            } catch(e) { console.error("Error adding video track", e); }
-        }
-
-        // Handle audio track replacement
-        const audioSender = senders.find(s => s.track?.kind === 'audio');
-        const newAudioTrack = newTracks.find(t => t.kind === 'audio');
-        if (audioSender) {
-            if (newAudioTrack) {
-                audioSender.replaceTrack(newAudioTrack);
-            } else {
-                 try {
-                    remote.pc.removeTrack(audioSender);
-                } catch(e) { console.error("Error removing audio track", e); }
-            }
-        } else if (newAudioTrack) {
-             try {
-                remote.pc.addTrack(newAudioTrack, this.locals.stream!);
-            } catch(e) { console.error("Error adding audio track", e); }
-        }
+      this.locals.stream.getVideoTracks().forEach(track => {
+        track.enabled = on;
+      });
     }
   }
-
 
   leave() {
     try {
