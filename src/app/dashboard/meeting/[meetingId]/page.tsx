@@ -267,14 +267,12 @@ export default function MeetingPage() {
   }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost]);
   
 
-  // Store desired state in localStorage to persist across reloads
   useEffect(() => {
-    localStorage.setItem('teachmeet-desired-camera-state', camOn ? 'on' : 'off');
-  }, [camOn]);
-
-  useEffect(() => {
-    localStorage.setItem('teachmeet-desired-mic-state', micOn ? 'on' : 'off');
-  }, [micOn]);
+    const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
+    const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
+    setCamOn(desiredCamState);
+    setMicOn(desiredMicState);
+  }, []);
 
   const handleToggleMic = () => rtcRef.current?.toggleMic();
   const handleToggleCam = () => rtcRef.current?.toggleCam();
@@ -411,3 +409,5 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
+
+    

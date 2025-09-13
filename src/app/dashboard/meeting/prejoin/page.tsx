@@ -119,6 +119,16 @@ export default function PreJoinPage() {
     };
   }, [getCameraPermission]);
 
+  // Persist camera state to localStorage
+  useEffect(() => {
+    localStorage.setItem('teachmeet-desired-camera-state', isCameraOn ? 'on' : 'off');
+  }, [isCameraOn]);
+
+  // Persist mic state to localStorage
+  useEffect(() => {
+    localStorage.setItem('teachmeet-desired-mic-state', isMicOn ? 'on' : 'off');
+  }, [isMicOn]);
+
   const toggleCamera = () => {
     const stream = videoRef.current?.srcObject as MediaStream;
     if (stream) {
@@ -402,4 +412,5 @@ export default function PreJoinPage() {
   );
 }
 
+    
     
