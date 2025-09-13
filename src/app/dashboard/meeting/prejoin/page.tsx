@@ -47,6 +47,7 @@ import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function PreJoinPage() {
   const searchParams = useSearchParams();
@@ -54,8 +55,8 @@ export default function PreJoinPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
-  const meetingId = searchParams.get('meetingId');
   const [topic, setTopic] = useState('Untitled Meeting');
+  const [meetingId, setMeetingId] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
 
@@ -77,33 +78,46 @@ export default function PreJoinPage() {
   const [isMicOn, setIsMicOn] = useState(true);
 
   useEffect(() => {
-    if (meetingId && typeof window !== 'undefined') {
+    // This logic now runs when the component mounts, ensuring a stable ID is set.
+    const existingMeetingId = searchParams.get('meetingId');
+    const id = existingMeetingId || `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
+    const code = id.replace('meeting-','');
+    
+    setMeetingId(id);
+    setMeetingCode(code);
+    
+    if (typeof window !== 'undefined') {
       setMeetingLink(
-        `${window.location.origin}/dashboard/join-meeting?meetingId=${meetingId}`
+        `${window.location.origin}/dashboard/join-meeting?meetingId=${id}`
       );
-      setMeetingCode(meetingId);
     }
-  }, [meetingId]);
+  }, [searchParams]);
 
   const getCameraPermission = useCallback(async () => {
+    // Only ask for permissions if we haven't already
+    if (hasCameraPermission !== null) return;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
       });
-      streamRef.current = stream; // Store stream in ref
+      streamRef.current = stream;
       setHasCameraPermission(true);
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
       
+      // Get desired states from localStorage or default
       const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
       const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
-
+      
+      // Apply initial states
       stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
       stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
-
+      
+      // Set react state to match
       setIsMicOn(desiredMicState);
       setIsCameraOn(desiredCamState);
 
@@ -113,10 +127,11 @@ export default function PreJoinPage() {
       setIsCameraOn(false);
       setIsMicOn(false);
     }
-  }, []);
+  }, [hasCameraPermission]);
 
   useEffect(() => {
     getCameraPermission();
+    // Cleanup function: stop all tracks when the component unmounts
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -124,30 +139,28 @@ export default function PreJoinPage() {
     };
   }, [getCameraPermission]);
 
-  // Persist camera state to localStorage
-  useEffect(() => {
-    localStorage.setItem('teachmeet-desired-camera-state', isCameraOn ? 'on' : 'off');
-  }, [isCameraOn]);
-
-  // Persist mic state to localStorage
-  useEffect(() => {
-    localStorage.setItem('teachmeet-desired-mic-state', isMicOn ? 'on' : 'off');
-  }, [isMicOn]);
-
   const toggleCamera = () => {
+    const nextState = !isCameraOn;
+    setIsCameraOn(nextState);
     if (streamRef.current) {
-      const nextState = !isCameraOn;
-      streamRef.current.getVideoTracks().forEach((track) => (track.enabled = nextState));
-      setIsCameraOn(nextState);
+      streamRef.current.getVideoTracks().forEach((track) => {
+        track.enabled = nextState;
+      });
     }
+    // Persist choice
+    localStorage.setItem('teachmeet-desired-camera-state', nextState ? 'on' : 'off');
   };
-
+  
   const toggleMic = () => {
+    const nextState = !isMicOn;
+    setIsMicOn(nextState);
     if (streamRef.current) {
-      const nextState = !isMicOn;
-      streamRef.current.getAudioTracks().forEach((track) => (track.enabled = nextState));
-      setIsMicOn(nextState);
+      streamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = nextState;
+      });
     }
+     // Persist choice
+    localStorage.setItem('teachmeet-desired-mic-state', nextState ? 'on' : 'off');
   };
 
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
@@ -172,7 +185,7 @@ export default function PreJoinPage() {
   const userAvatar = user?.photoURL;
 
   return (
-    <div className="container mx-auto max-w-xl">
+    <div className="container mx-auto max-w-xl py-4 sm:py-8">
       <Card className="w-full shadow-2xl rounded-2xl border-border/50">
         <CardHeader className="relative text-center">
             <div className="absolute top-4 left-4">
@@ -416,3 +429,5 @@ export default function PreJoinPage() {
     </div>
   );
 }
+
+    
