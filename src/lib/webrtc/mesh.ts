@@ -41,7 +41,6 @@ export class MeshRTC {
     this.locals.cam = initialCamOn;
 
     // IMPORTANT: create socket once
-    await fetch("/api/socket"); // boot API route
     this.socket = io({ path: "/api/socketio" });
 
     this.roomId = this.opts.roomId;
