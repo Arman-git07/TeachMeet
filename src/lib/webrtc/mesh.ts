@@ -52,6 +52,8 @@ export class MeshRTC {
 
     this.registerSocketEvents();
     this.socket.emit("join-room", { roomId: this.roomId, userId: this.userId });
+    
+    return this.locals.stream;
   }
 
   private registerSocketEvents() {
@@ -197,7 +199,7 @@ export class MeshRTC {
   }
 
   getLocalStream() {
-    return this.locals.stream!;
+    return this.locals.stream;
   }
 
   async toggleMic(on: boolean) {

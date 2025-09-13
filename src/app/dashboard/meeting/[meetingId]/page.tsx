@@ -189,6 +189,7 @@ export default function MeetingPage() {
   const { toast } = useToast();
   
   const rtcRef = useRef<MeetingClientRef>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
   const [micOn, setMicOn] = useState(true);
@@ -313,6 +314,12 @@ export default function MeetingPage() {
 
   const showPip = participants.length > 1;
 
+  const onLocalStream = (stream: MediaStream) => {
+    if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen w-screen bg-[#222E46] text-white overflow-hidden">
@@ -327,6 +334,7 @@ export default function MeetingPage() {
             onCamToggle={setCamOn}
             onUserJoined={handleUserJoined}
             onParticipantsChange={setParticipants}
+            onLocalStream={onLocalStream}
           />
         </main>
 
@@ -334,9 +342,7 @@ export default function MeetingPage() {
         {showPip && (
           <div className="absolute bottom-28 right-4 z-20 w-48 h-32">
                <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative">
-                  <div id="local-video-container" className="w-full h-full">
-                    {/* MeetingClient will attach video here */}
-                  </div>
+                  <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                    {!camOn && (
                       <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
                       <Avatar className="w-16 h-16 border-2 border-background shadow-lg">
@@ -356,10 +362,10 @@ export default function MeetingPage() {
         {/* Controls */}
         <footer className="absolute bottom-0 left-0 right-0 z-20 flex justify-center p-4">
           <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
-            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(!micOn ? "bg-destructive/90 hover:bg-destructive" : "bg-primary/80")}>
+            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(!micOn ? "bg-destructive hover:bg-destructive/90" : "bg-primary/80")}>
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
-            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn ? "bg-destructive/90 hover:bg-destructive" : "bg-primary/80")}>
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn ? "bg-destructive hover:bg-destructive/90" : "bg-primary/80")}>
               {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </ControlButton>
 
@@ -409,5 +415,3 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
-
-    

@@ -24,6 +24,7 @@ type Props = {
   onCamToggle: (isOn: boolean) => void;
   onUserJoined: (socketId: string) => void;
   onParticipantsChange: (participants: Participant[]) => void;
+  onLocalStream: (stream: MediaStream) => void;
 };
 
 export interface MeetingClientRef {
@@ -32,7 +33,7 @@ export interface MeetingClientRef {
 }
 
 const MeetingClient = forwardRef<MeetingClientRef, Props>(
-  ({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined, onParticipantsChange }, ref) => {
+  ({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined, onParticipantsChange, onLocalStream }, ref) => {
   
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
@@ -90,26 +91,18 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       setMicOn(desiredMicState);
       onMicToggle(desiredMicState);
 
-      await rtc.init(desiredMicState, desiredCamState);
+      const localStream = await rtc.init(desiredMicState, desiredCamState);
       if (!mounted) return;
       
-      const localVideoContainer = document.getElementById('local-video-container');
-      if (localVideoContainer) {
-        const videoEl = document.createElement('video');
-        videoEl.id = 'local-video-element';
-        videoEl.autoplay = true;
-        videoEl.playsInline = true;
-        videoEl.muted = true;
-        videoEl.className = 'w-full h-full object-cover';
-        localVideoContainer.appendChild(videoEl);
-        rtc.attachLocal(videoEl);
+      if(localStream) {
+        onLocalStream(localStream);
       }
     })();
     return () => {
       mounted = false;
       rtc.leave();
     };
-  }, [rtc, onCamToggle, onMicToggle]);
+  }, [rtc, onCamToggle, onMicToggle, onLocalStream]);
   
   useImperativeHandle(ref, () => ({
     toggleMic: async () => {
@@ -165,7 +158,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     onParticipantsChange(allParticipants);
   }, [allParticipants, onParticipantsChange]);
 
-  const LocalVideo = ({ stream }: { stream: MediaStream }) => {
+  const LocalVideo = ({ stream }: { stream: MediaStream | undefined }) => {
     const videoRef = React.useRef<HTMLVideoElement>(null);
     React.useEffect(() => {
         if (videoRef.current && stream) {
