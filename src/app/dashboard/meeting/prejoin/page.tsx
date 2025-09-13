@@ -93,51 +93,51 @@ export default function PreJoinPage() {
     }
   }, [searchParams]);
 
-  const getCameraPermission = useCallback(async () => {
-    // Only ask for permissions if we haven't already
-    if (hasCameraPermission !== null) return;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-      streamRef.current = stream;
-      setHasCameraPermission(true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      
-      // Get desired states from localStorage or default
-      const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
-      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
-      
-      // Apply initial states
-      stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
-      stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
-      
-      // Set react state to match
-      setIsMicOn(desiredMicState);
-      setIsCameraOn(desiredCamState);
-
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      setHasCameraPermission(false);
-      setIsCameraOn(false);
-      setIsMicOn(false);
-    }
-  }, [hasCameraPermission]);
-
   useEffect(() => {
+    const getCameraPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        streamRef.current = stream;
+        setHasCameraPermission(true);
+  
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        
+        const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
+        const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
+        
+        stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
+        stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
+        
+        setIsMicOn(desiredMicState);
+        setIsCameraOn(desiredCamState);
+  
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        setIsCameraOn(false);
+        setIsMicOn(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this app.',
+        });
+      }
+    };
+  
     getCameraPermission();
+
     // Cleanup function: stop all tracks when the component unmounts
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [getCameraPermission]);
+  }, [toast]);
 
   const toggleCamera = () => {
     const nextState = !isCameraOn;
@@ -147,7 +147,6 @@ export default function PreJoinPage() {
         track.enabled = nextState;
       });
     }
-    // Persist choice
     localStorage.setItem('teachmeet-desired-camera-state', nextState ? 'on' : 'off');
   };
   
@@ -159,7 +158,6 @@ export default function PreJoinPage() {
         track.enabled = nextState;
       });
     }
-     // Persist choice
     localStorage.setItem('teachmeet-desired-mic-state', nextState ? 'on' : 'off');
   };
 
