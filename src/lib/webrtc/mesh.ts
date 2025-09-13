@@ -223,28 +223,38 @@ export class MeshRTC {
         const senders = remote.pc.getSenders();
         const newTracks = this.locals.stream?.getTracks() || [];
         
-        // Replace tracks for existing senders
-        for (const sender of senders) {
-            const newTrack = newTracks.find(t => t.kind === sender.track?.kind);
-            if (newTrack) {
-                if(sender.track?.id !== newTrack.id) {
-                    await sender.replaceTrack(newTrack);
-                }
-            } else if (sender.track) {
-                // If there's no new track of this kind, remove the track
-                 try {
-                    remote.pc.removeTrack(sender);
-                } catch(e) { console.error("Error removing track", e); }
-            }
-        }
-        
-        // Add new tracks for new kinds
-        for (const track of newTracks) {
-            if (!senders.some(s => s.track && s.track.kind === track.kind)) {
+        // Handle video track replacement
+        const videoSender = senders.find(s => s.track?.kind === 'video');
+        const newVideoTrack = newTracks.find(t => t.kind === 'video');
+        if (videoSender) {
+            if (newVideoTrack) {
+                videoSender.replaceTrack(newVideoTrack);
+            } else {
                 try {
-                    remote.pc.addTrack(track, this.locals.stream!);
-                } catch(e) { console.error("Error adding track", e); }
+                    remote.pc.removeTrack(videoSender);
+                } catch(e) { console.error("Error removing video track", e); }
             }
+        } else if (newVideoTrack) {
+             try {
+                remote.pc.addTrack(newVideoTrack, this.locals.stream!);
+            } catch(e) { console.error("Error adding video track", e); }
+        }
+
+        // Handle audio track replacement
+        const audioSender = senders.find(s => s.track?.kind === 'audio');
+        const newAudioTrack = newTracks.find(t => t.kind === 'audio');
+        if (audioSender) {
+            if (newAudioTrack) {
+                audioSender.replaceTrack(newAudioTrack);
+            } else {
+                 try {
+                    remote.pc.removeTrack(audioSender);
+                } catch(e) { console.error("Error removing audio track", e); }
+            }
+        } else if (newAudioTrack) {
+             try {
+                remote.pc.addTrack(newAudioTrack, this.locals.stream!);
+            } catch(e) { console.error("Error adding audio track", e); }
         }
     }
   }
