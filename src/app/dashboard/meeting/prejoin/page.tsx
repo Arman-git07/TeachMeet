@@ -69,6 +69,7 @@ export default function PreJoinPage() {
 
   // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(
     null
   );
@@ -80,7 +81,7 @@ export default function PreJoinPage() {
       setMeetingLink(
         `${window.location.origin}/dashboard/join-meeting?meetingId=${meetingId}`
       );
-      setMeetingCode(meetingId.replace('meeting-', ''));
+      setMeetingCode(meetingId);
     }
   }, [meetingId]);
 
@@ -90,16 +91,22 @@ export default function PreJoinPage() {
         video: true,
         audio: true,
       });
+      streamRef.current = stream; // Store stream in ref
       setHasCameraPermission(true);
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      stream.getAudioTracks().forEach((track) => (track.enabled = true));
-      stream.getVideoTracks().forEach((track) => (track.enabled = true));
+      
+      const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
+      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
 
-      setIsMicOn(true);
-      setIsCameraOn(true);
+      stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
+      stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
+
+      setIsMicOn(desiredMicState);
+      setIsCameraOn(desiredCamState);
+
     } catch (error) {
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
@@ -111,10 +118,8 @@ export default function PreJoinPage() {
   useEffect(() => {
     getCameraPermission();
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream)
-          .getTracks()
-          .forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, [getCameraPermission]);
@@ -130,18 +135,18 @@ export default function PreJoinPage() {
   }, [isMicOn]);
 
   const toggleCamera = () => {
-    const stream = videoRef.current?.srcObject as MediaStream;
-    if (stream) {
-      stream.getVideoTracks().forEach((track) => (track.enabled = !isCameraOn));
-      setIsCameraOn(!isCameraOn);
+    if (streamRef.current) {
+      const nextState = !isCameraOn;
+      streamRef.current.getVideoTracks().forEach((track) => (track.enabled = nextState));
+      setIsCameraOn(nextState);
     }
   };
 
   const toggleMic = () => {
-    const stream = videoRef.current?.srcObject as MediaStream;
-    if (stream) {
-      stream.getAudioTracks().forEach((track) => (track.enabled = !isMicOn));
-      setIsMicOn(!isMicOn);
+    if (streamRef.current) {
+      const nextState = !isMicOn;
+      streamRef.current.getAudioTracks().forEach((track) => (track.enabled = nextState));
+      setIsMicOn(nextState);
     }
   };
 
@@ -411,6 +416,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    
-    
