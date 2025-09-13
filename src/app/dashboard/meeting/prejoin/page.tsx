@@ -64,7 +64,7 @@ export default function PreJoinPage() {
   const [agreed, setAgreed] = useState(false);
   const [mirrorVideo, setMirrorVideo] = useState(true);
   const [applyFilter, setApplyFilter] = useState(true);
-  const [videoFilter, setVideoFilter] = useState('bright-clear');
+  const [videoFilter, setVideoFilter] = useState('brightclear');
   const [startError, setStartError] = useState<string | null>(null);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
@@ -177,6 +177,26 @@ export default function PreJoinPage() {
 
   const userName = user?.displayName || 'User';
   const userAvatar = user?.photoURL;
+  
+  const videoClassNames = cn(
+    'h-full w-full object-cover transition-opacity duration-300',
+    mirrorVideo && 'transform -scale-x-100',
+    (hasCameraPermission && isCameraOn) ? 'opacity-100' : 'opacity-0',
+    {
+      'video-filter-grayscale': applyFilter && videoFilter === 'grayscale',
+      'video-filter-sepia': applyFilter && videoFilter === 'sepia',
+      'video-filter-vintage': applyFilter && videoFilter === 'vintage',
+      'video-filter-luminous': applyFilter && videoFilter === 'luminous',
+      'video-filter-dramatic': applyFilter && videoFilter === 'dramatic',
+      'video-filter-goldenhour': applyFilter && videoFilter === 'goldenhour',
+      'video-filter-softfocus': applyFilter && videoFilter === 'softfocus',
+      'video-filter-brightclear': applyFilter && videoFilter === 'brightclear',
+      'video-filter-naturalglow': applyFilter && videoFilter === 'naturalglow',
+      'video-filter-radiantskin': applyFilter && videoFilter === 'radiantskin',
+      'video-filter-smoothbright': applyFilter && videoFilter === 'smoothbright',
+    }
+  );
+
 
   return (
     <div className="container mx-auto max-w-xl py-4 sm:py-8">
@@ -204,11 +224,7 @@ export default function PreJoinPage() {
           <div className="relative w-full bg-muted rounded-lg flex items-center justify-center overflow-hidden aspect-[9/16] sm:aspect-video">
             <video
                 ref={videoRef}
-                className={cn(
-                  'h-full w-full object-cover transition-opacity duration-300',
-                  mirrorVideo && 'transform -scale-x-100',
-                  (hasCameraPermission && isCameraOn) ? 'opacity-100' : 'opacity-0'
-                )}
+                className={videoClassNames}
                 autoPlay
                 muted
                 playsInline
@@ -298,9 +314,17 @@ export default function PreJoinPage() {
                 <SelectValue placeholder="Select a filter..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="bright-clear">Bright & Clear</SelectItem>
+                <SelectItem value="brightclear">Bright & Clear</SelectItem>
                 <SelectItem value="vintage">Vintage</SelectItem>
                 <SelectItem value="grayscale">Grayscale</SelectItem>
+                <SelectItem value="sepia">Sepia</SelectItem>
+                <SelectItem value="luminous">Luminous</SelectItem>
+                <SelectItem value="dramatic">Dramatic</SelectItem>
+                <SelectItem value="goldenhour">Golden Hour</SelectItem>
+                <SelectItem value="softfocus">Soft Focus</SelectItem>
+                <SelectItem value="naturalglow">Natural Glow</SelectItem>
+                <SelectItem value="radiantskin">Radiant Skin</SelectItem>
+                <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
               </SelectContent>
             </Select>
 

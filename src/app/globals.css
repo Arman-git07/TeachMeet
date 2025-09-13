@@ -185,39 +185,18 @@ html, body, #__next {
 }
 
 /* Basic CSS Filters for video placeholder */
-.video-filter-grayscale {
-  filter: grayscale(100%);
-}
-.video-filter-sepia {
-  filter: sepia(100%);
-}
-.video-filter-vintage {
-  filter: sepia(70%) contrast(1.1) brightness(0.9) saturate(1.3) hue-rotate(-10deg);
-}
-.video-filter-luminous {
-  filter: brightness(1.2) saturate(0.8);
-}
-.video-filter-dramatic {
-  filter: contrast(1.4) saturate(0.7);
-}
-.video-filter-goldenhour {
-  filter: sepia(30%) saturate(1.3) hue-rotate(-15deg) brightness(1.05);
-}
-.video-filter-softfocus {
-  filter: blur(0.5px) brightness(1.05) contrast(1.05);
-}
-.video-filter-brightclear {
-  filter: brightness(1.1) saturate(1.1);
-}
-.video-filter-naturalglow {
-  filter: brightness(1.05) saturate(1.1) contrast(1.05);
-}
-.video-filter-radiantskin {
-  filter: brightness(1.1) saturate(1.15) contrast(1.1);
-}
-.video-filter-smoothbright {
-  filter: brightness(1.12) contrast(1.08) saturate(1.05);
-}
+.video-filter-grayscale { filter: grayscale(100%); }
+.video-filter-sepia { filter: sepia(100%); }
+.video-filter-vintage { filter: sepia(70%) contrast(1.1) brightness(0.9) saturate(1.3) hue-rotate(-10deg); }
+.video-filter-luminous { filter: brightness(1.2) saturate(0.8); }
+.video-filter-dramatic { filter: contrast(1.4) saturate(0.7); }
+.video-filter-goldenhour { filter: sepia(30%) saturate(1.3) hue-rotate(-15deg) brightness(1.05); }
+.video-filter-softfocus { filter: blur(0.5px) brightness(1.05) contrast(1.05); }
+.video-filter-brightclear { filter: brightness(1.1) saturate(1.1); }
+.video-filter-naturalglow { filter: brightness(1.05) saturate(1.1) contrast(1.05); }
+.video-filter-radiantskin { filter: brightness(1.1) saturate(1.15) contrast(1.1); }
+.video-filter-smoothbright { filter: brightness(1.12) contrast(1.08) saturate(1.05); }
+
 
 /* Logo character animation */
 .logo-animate-chars .logo-animated-span {
@@ -290,3 +269,5 @@ html, body, #__next {
   from { transform: translateX(-5px) scale(0.5); opacity: 0; }
   to { transform: translateX(0) scale(1); opacity: 1; }
 }
+
+    
