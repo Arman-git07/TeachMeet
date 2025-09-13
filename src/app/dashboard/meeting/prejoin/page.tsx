@@ -96,13 +96,10 @@ export default function PreJoinPage() {
   useEffect(() => {
     const getCameraPermission = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-        streamRef.current = stream;
+        const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
         setHasCameraPermission(true);
-  
+        streamRef.current = stream;
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -110,12 +107,11 @@ export default function PreJoinPage() {
         const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
         const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
         
-        stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
-        stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
-        
         setIsMicOn(desiredMicState);
         setIsCameraOn(desiredCamState);
-  
+
+        stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
+        stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
       } catch (error) {
         console.error('Error accessing camera:', error);
         setHasCameraPermission(false);
@@ -128,7 +124,7 @@ export default function PreJoinPage() {
         });
       }
     };
-  
+
     getCameraPermission();
 
     // Cleanup function: stop all tracks when the component unmounts
@@ -206,19 +202,19 @@ export default function PreJoinPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="relative w-full bg-muted rounded-lg flex items-center justify-center overflow-hidden aspect-[9/16] sm:aspect-video">
-            {hasCameraPermission && isCameraOn ? (
-              <video
+            <video
                 ref={videoRef}
                 className={cn(
-                  'h-full w-full object-cover',
-                  mirrorVideo && 'transform -scale-x-100'
+                  'h-full w-full object-cover transition-opacity duration-300',
+                  mirrorVideo && 'transform -scale-x-100',
+                  (hasCameraPermission && isCameraOn) ? 'opacity-100' : 'opacity-0'
                 )}
                 autoPlay
                 muted
                 playsInline
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center text-muted-foreground">
+            />
+            {(!isCameraOn || hasCameraPermission === false) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground">
                 <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">
                   {userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar"/>}
                   <AvatarFallback className="text-4xl">
@@ -259,6 +255,7 @@ export default function PreJoinPage() {
                 size="icon"
                 className={cn("rounded-full h-12 w-12", isCameraOn && "bg-primary hover:bg-primary/90")}
                 onClick={toggleCamera}
+                disabled={hasCameraPermission === false}
               >
                 {isCameraOn ? <Video /> : <VideoOff />}
               </Button>
