@@ -144,6 +144,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
+  const [showMeetingId, setShowMeetingId] = useState(false);
   const currentUserId = auth.currentUser?.uid;
 
   useEffect(() => {
@@ -156,7 +157,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
         try {
             const docSnap = await getDoc(meetingDocRef);
             if (docSnap.exists()) {
-                const creator = docSnap.data().creatorId;
+                const creator = docSnap.data().hostId;
                 setMeetingCreatorId(creator);
             } else {
                 toast({ variant: "destructive", title: "Meeting Not Found", description: "Could not load meeting details." });
@@ -213,10 +214,14 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <UsersIcon className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground truncate" title={displayTopic}>
-              {displayTopic}
-            </h1>
-            <span className="text-sm text-muted-foreground"> (Meeting ID: {meetingId})</span>
+             <div className="cursor-pointer" onClick={() => setShowMeetingId(prev => !prev)}>
+                <h1 className="text-xl font-semibold text-foreground truncate" title={displayTopic}>
+                    {showMeetingId ? meetingId : displayTopic}
+                </h1>
+                <p className="text-xs text-muted-foreground">
+                    {showMeetingId ? 'Click to show topic' : 'Click to show Meeting ID'}
+                </p>
+             </div>
           </div>
           <Button asChild variant="outline" className="rounded-lg">
             <Link href={backToMeetingLink}>

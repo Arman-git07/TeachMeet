@@ -33,6 +33,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const [inputValue, setInputValue] = useState("");
   const [activeTab, setActiveTab] = useState<string>("public");
   const [privateChatTarget, setPrivateChatTarget] = useState<{id: string, name: string} | null>(null);
+  const [showMeetingId, setShowMeetingId] = useState(false);
 
   // Use a ref for the scroll viewport's inner content div
   const scrollContentRef = useRef<HTMLDivElement>(null);
@@ -91,11 +92,13 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-7 w-7 text-primary" />
-            <div>
+            <div className="cursor-pointer" onClick={() => setShowMeetingId(prev => !prev)}>
               <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-                {privateChatTarget ? `Chat with ${privateChatTarget.name}` : topic}
+                {showMeetingId ? meetingId : (privateChatTarget ? `Chat with ${privateChatTarget.name}` : topic)}
               </h1>
-              <p className="text-xs text-muted-foreground">Meeting ID: {meetingId}</p>
+              <p className="text-xs text-muted-foreground">
+                 {showMeetingId ? 'Click to show topic' : 'Click to show Meeting ID'}
+              </p>
             </div>
           </div>
           <Button asChild variant="outline" className="rounded-lg">
