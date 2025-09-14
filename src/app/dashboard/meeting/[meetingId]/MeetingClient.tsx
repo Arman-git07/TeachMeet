@@ -83,7 +83,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
+      const desiredCamState = false; // Always start with camera off
       const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
       
       setCamOn(desiredCamState);
@@ -112,10 +112,8 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       onMicToggle(nextState);
     },
     toggleCam: () => {
-      const nextState = !camOn;
-      rtc.toggleCam(nextState);
-      setCamOn(nextState);
-      onCamToggle(nextState);
+      // Camera toggle functionality is removed from the UI, but the method remains for potential future use.
+      // This function is no longer called from the main meeting page.
     },
   }));
 
