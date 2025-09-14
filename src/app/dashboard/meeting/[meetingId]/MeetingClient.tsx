@@ -39,7 +39,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
 
   const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const [camOn, setCamOn] = useState(false); // Default to off
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   
   const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string}>>(new Map());
@@ -83,8 +83,8 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const desiredCamState = false; // Always start with camera off
       const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
+      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') === 'on'; // Check if explicitly 'on'
       
       setCamOn(desiredCamState);
       onCamToggle(desiredCamState);
@@ -112,8 +112,10 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       onMicToggle(nextState);
     },
     toggleCam: () => {
-      // Camera toggle functionality is removed from the UI, but the method remains for potential future use.
-      // This function is no longer called from the main meeting page.
+      const nextState = !camOn;
+      rtc.toggleCam(nextState);
+      setCamOn(nextState);
+      onCamToggle(nextState);
     },
   }));
 
@@ -144,7 +146,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
         name: data.name || `User ${id.substring(0, 4)}`,
         avatar: data.photoURL,
         // TODO: get real mic/cam state from liveParticipants data
-        isCamOff: false, 
+        isCamOff: true, 
         isMicOff: true
       }));
 
