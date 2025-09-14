@@ -80,7 +80,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
 
   // Init once
-  React.useEffect(() => {
+  useEffect(() => {
     let mounted = true;
     (async () => {
       const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
@@ -105,17 +105,17 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   }, [rtc, onCamToggle, onMicToggle, onLocalStream]);
   
   useImperativeHandle(ref, () => ({
-    toggleMic: async () => {
-      const next = !micOn;
-      setMicOn(next);
-      onMicToggle(next);
-      await rtc.toggleMic(next);
+    toggleMic: () => {
+      const nextState = !micOn;
+      rtc.toggleMic(nextState);
+      setMicOn(nextState);
+      onMicToggle(nextState);
     },
-    toggleCam: async () => {
-      const next = !camOn;
-      setCamOn(next);
-      onCamToggle(next);
-      await rtc.toggleCam(next);
+    toggleCam: () => {
+      const nextState = !camOn;
+      rtc.toggleCam(nextState);
+      setCamOn(nextState);
+      onCamToggle(nextState);
     },
   }));
 
