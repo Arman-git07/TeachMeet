@@ -193,7 +193,7 @@ export default function MeetingPage() {
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
   const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const [camOn, setCamOn] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isParticipantJoining, setIsParticipantJoining] = useState(false);
   const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
@@ -270,10 +270,13 @@ export default function MeetingPage() {
 
   useEffect(() => {
     const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
+    const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
     setMicOn(desiredMicState);
+    setCamOn(desiredCamState);
   }, []);
 
   const handleToggleMic = () => rtcRef.current?.toggleMic();
+  const handleToggleCam = () => rtcRef.current?.toggleCam();
   
   const handleToggleHandRaise = () => {
     const newHandRaiseState = !isHandRaised;
@@ -361,6 +364,10 @@ export default function MeetingPage() {
           <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
             <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(!micOn && "bg-destructive hover:bg-destructive/90")}>
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+            </ControlButton>
+
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn && "bg-destructive hover:bg-destructive/90")}>
+              {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </ControlButton>
 
             <div className="h-8 w-px bg-white/20 mx-2" />
