@@ -267,8 +267,13 @@ export default function MeetingPage() {
     };
   }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost]);
   
-  const handleToggleMic = () => rtcRef.current?.toggleMic();
-  const handleToggleCam = () => rtcRef.current?.toggleCam();
+  const handleToggleMic = () => {
+    rtcRef.current?.toggleMic();
+  };
+  
+  const handleToggleCam = () => {
+    rtcRef.current?.toggleCam();
+  };
   
   const handleToggleHandRaise = () => {
     const newHandRaiseState = !isHandRaised;
