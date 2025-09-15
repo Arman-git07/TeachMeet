@@ -77,6 +77,7 @@ export class MeshRTC {
         } else {
            console.log("Ignoring offer as impolite peer", this.socket.id, "vs", from);
            // Allow our own offer to proceed
+           return;
         }
       }
 
@@ -174,6 +175,9 @@ export class MeshRTC {
     };
 
     try {
+        if (this.locals.stream) {
+            this.locals.stream.getTracks().forEach(track => track.stop());
+        }
         this.locals.stream = await navigator.mediaDevices.getUserMedia(constraints);
         this.locals.stream.getAudioTracks().forEach(track => track.enabled = wantMic);
         this.locals.stream.getVideoTracks().forEach(track => track.enabled = wantCam);
@@ -195,21 +199,28 @@ export class MeshRTC {
   getLocalStream() {
     return this.locals.stream;
   }
+  
+  isMicOn() {
+    return this.locals.mic;
+  }
+  isCamOn() {
+    return this.locals.cam;
+  }
 
-  async toggleMic(on: boolean) {
-    this.locals.mic = on;
+  toggleMic() {
+    this.locals.mic = !this.locals.mic;
     if (this.locals.stream) {
       this.locals.stream.getAudioTracks().forEach(track => {
-        track.enabled = on;
+        track.enabled = this.locals.mic;
       });
     }
   }
 
-  async toggleCam(on: boolean) {
-    this.locals.cam = on;
+  toggleCam() {
+    this.locals.cam = !this.locals.cam;
     if (this.locals.stream) {
       this.locals.stream.getVideoTracks().forEach(track => {
-        track.enabled = on;
+        track.enabled = this.locals.cam;
       });
     }
   }
