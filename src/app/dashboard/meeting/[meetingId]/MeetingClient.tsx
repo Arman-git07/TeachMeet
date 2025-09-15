@@ -109,14 +109,10 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   
   useImperativeHandle(ref, () => ({
     toggleMic: () => {
-      const newState = rtc.toggleMic();
-      setMicOn(newState);
-      onMicToggle(newState);
+      // Functionality removed
     },
     toggleCam: () => {
-      const newState = rtc.toggleCam();
-      setCamOn(newState);
-      onCamToggle(newState);
+      // Functionality removed
     },
   }));
 
@@ -213,3 +209,5 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
 MeetingClient.displayName = 'MeetingClient';
 export default MeetingClient;
+
+    
