@@ -83,16 +83,19 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
-      const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') === 'on'; // Check if explicitly 'on'
+      const desiredMicState = localStorage.getItem('teachmeet-mic-default') === 'on';
+      const desiredCamState = localStorage.getItem('teachmeet-camera-default') !== 'off';
       
       const localStream = await rtc.init(desiredMicState, desiredCamState);
       if (!mounted) return;
       
-      setCamOn(rtc.isCamOn());
-      onCamToggle(rtc.isCamOn());
-      setMicOn(rtc.isMicOn());
-      onMicToggle(rtc.isMicOn());
+      const actualCamOn = rtc.isCamOn();
+      const actualMicOn = rtc.isMicOn();
+
+      setCamOn(actualCamOn);
+      onCamToggle(actualCamOn);
+      setMicOn(actualMicOn);
+      onMicToggle(actualMicOn);
       
       if(localStream) {
         onLocalStream(localStream);
@@ -106,14 +109,12 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   
   useImperativeHandle(ref, () => ({
     toggleMic: () => {
-      rtc.toggleMic();
-      const newState = rtc.isMicOn();
+      const newState = rtc.toggleMic();
       setMicOn(newState);
       onMicToggle(newState);
     },
     toggleCam: () => {
-      rtc.toggleCam();
-      const newState = rtc.isCamOn();
+      const newState = rtc.toggleCam();
       setCamOn(newState);
       onCamToggle(newState);
     },

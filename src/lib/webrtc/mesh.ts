@@ -208,21 +208,21 @@ export class MeshRTC {
   }
 
   toggleMic() {
-    this.locals.mic = !this.locals.mic;
-    if (this.locals.stream) {
-      this.locals.stream.getAudioTracks().forEach(track => {
-        track.enabled = this.locals.mic;
-      });
-    }
+    const nextState = !this.locals.mic;
+    this.locals.mic = nextState;
+    this.locals.stream?.getAudioTracks().forEach((track) => {
+      track.enabled = nextState;
+    });
+    return nextState;
   }
 
   toggleCam() {
-    this.locals.cam = !this.locals.cam;
-    if (this.locals.stream) {
-      this.locals.stream.getVideoTracks().forEach(track => {
-        track.enabled = this.locals.cam;
-      });
-    }
+    const nextState = !this.locals.cam;
+    this.locals.cam = nextState;
+    this.locals.stream?.getVideoTracks().forEach((track) => {
+      track.enabled = nextState;
+    });
+    return nextState;
   }
 
   leave() {
