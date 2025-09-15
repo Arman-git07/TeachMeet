@@ -208,11 +208,21 @@ export class MeshRTC {
   }
 
   toggleMic() {
-    // Functionality removed
+    if (!this.locals.stream) return;
+    const nextState = !this.locals.mic;
+    this.locals.stream.getAudioTracks().forEach(track => {
+        track.enabled = nextState;
+    });
+    this.locals.mic = nextState;
   }
 
   toggleCam() {
-    // Functionality removed
+    if (!this.locals.stream) return;
+    const nextState = !this.locals.cam;
+    this.locals.stream.getVideoTracks().forEach(track => {
+        track.enabled = nextState;
+    });
+    this.locals.cam = nextState;
   }
 
   leave() {
@@ -238,5 +248,3 @@ export class MeshRTC {
     }
   }
 }
-
-    
