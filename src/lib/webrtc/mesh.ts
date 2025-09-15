@@ -175,6 +175,8 @@ export class MeshRTC {
 
     try {
         this.locals.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        this.locals.stream.getAudioTracks().forEach(track => track.enabled = wantMic);
+        this.locals.stream.getVideoTracks().forEach(track => track.enabled = wantCam);
         this.locals.mic = wantMic;
         this.locals.cam = wantCam;
     } catch (e) {
