@@ -193,7 +193,9 @@ export default function MeetingPage() {
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
   const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(false);
+  const [camOn, setCamOn] = useState(true);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isParticipantJoining, setIsParticipantJoining] = useState(false);
   const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
@@ -268,11 +270,21 @@ export default function MeetingPage() {
   }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost]);
   
   const handleToggleMic = () => {
-    // Functionality removed
+    if (!localStream) return;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setMicOn(audioTrack.enabled);
+    }
   };
   
   const handleToggleCam = () => {
-    // Functionality removed
+    if (!localStream) return;
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setCamOn(videoTrack.enabled);
+    }
   };
   
   const handleToggleHandRaise = () => {
@@ -312,6 +324,7 @@ export default function MeetingPage() {
   const showPip = participants.length > 1;
 
   const onLocalStream = (stream: MediaStream) => {
+    setLocalStream(stream);
     if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
     }
@@ -327,8 +340,6 @@ export default function MeetingPage() {
             ref={rtcRef}
             meetingId={meetingId}
             userId={user.uid}
-            onMicToggle={setMicOn}
-            onCamToggle={setCamOn}
             onUserJoined={handleUserJoined}
             onParticipantsChange={setParticipants}
             onLocalStream={onLocalStream}
@@ -359,11 +370,11 @@ export default function MeetingPage() {
         {/* Controls */}
         <footer className="absolute bottom-0 left-0 right-0 z-20 flex justify-center p-4">
           <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
-            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic}>
+            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(!micOn && "bg-destructive hover:bg-destructive/90")}>
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
 
-            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam}>
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn && "bg-destructive hover:bg-destructive/90")}>
               {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </ControlButton>
 
@@ -413,7 +424,3 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
-
-    
-
-    

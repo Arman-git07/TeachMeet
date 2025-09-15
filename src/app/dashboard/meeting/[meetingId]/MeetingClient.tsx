@@ -20,26 +20,23 @@ type Participant = {
 type Props = { 
   meetingId: string; 
   userId: string;
-  onMicToggle: (isOn: boolean) => void;
-  onCamToggle: (isOn: boolean) => void;
   onUserJoined: (socketId: string) => void;
   onParticipantsChange: (participants: Participant[]) => void;
   onLocalStream: (stream: MediaStream) => void;
 };
 
 export interface MeetingClientRef {
-  toggleMic: () => void;
-  toggleCam: () => void;
+  // Exposing methods from ref is no longer needed as parent controls tracks
 }
 
 const MeetingClient = forwardRef<MeetingClientRef, Props>(
-  ({ meetingId, userId, onMicToggle, onCamToggle, onUserJoined, onParticipantsChange, onLocalStream }, ref) => {
+  ({ meetingId, userId, onUserJoined, onParticipantsChange, onLocalStream }, ref) => {
   
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
 
   const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(false); // Default to off
+  const [camOn, setCamOn] = useState(true);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   
   const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string}>>(new Map());
@@ -93,9 +90,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       const actualMicOn = rtc.isMicOn();
 
       setCamOn(actualCamOn);
-      onCamToggle(actualCamOn);
       setMicOn(actualMicOn);
-      onMicToggle(actualMicOn);
       
       if(localStream) {
         onLocalStream(localStream);
@@ -105,15 +100,10 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
       mounted = false;
       rtc.leave();
     };
-  }, [rtc, onCamToggle, onMicToggle, onLocalStream]);
+  }, [rtc, onLocalStream]);
   
   useImperativeHandle(ref, () => ({
-    toggleMic: () => {
-      // Functionality removed
-    },
-    toggleCam: () => {
-      // Functionality removed
-    },
+    // No methods need to be exposed now
   }));
 
   const RemoteVideo = ({ stream }: { stream: MediaStream }) => {
@@ -209,5 +199,3 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
 MeetingClient.displayName = 'MeetingClient';
 export default MeetingClient;
-
-    
