@@ -268,11 +268,11 @@ export default function MeetingPage() {
   }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost]);
   
   const handleToggleMic = () => {
-    rtcRef.current?.toggleMic();
+    // Functionality removed
   };
   
   const handleToggleCam = () => {
-    rtcRef.current?.toggleCam();
+    // Functionality removed
   };
   
   const handleToggleHandRaise = () => {
@@ -413,3 +413,5 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
+
+    
