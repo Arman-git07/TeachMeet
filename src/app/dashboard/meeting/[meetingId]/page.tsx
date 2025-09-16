@@ -398,11 +398,11 @@ export default function MeetingPage() {
         {/* Controls */}
         <footer className="absolute bottom-0 left-0 right-0 z-20 flex justify-center p-4">
           <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
-            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(micOn ? "bg-green-600 hover:bg-green-700" : "bg-destructive hover:bg-destructive/90")}>
+            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")}>
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
 
-            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(camOn ? "bg-green-600 hover:bg-green-700" : "bg-destructive hover:bg-destructive/90")}>
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")}>
               {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </ControlButton>
 
