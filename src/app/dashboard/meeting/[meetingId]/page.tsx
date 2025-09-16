@@ -230,7 +230,7 @@ export default function MeetingPage() {
         });
         setLocalStream(stream);
 
-        const initialMic = localStorage.getItem('teachmeet-mic-default') === 'on';
+        const initialMic = localStorage.getItem('teachmeet-mic-default') !== 'off';
         const initialCam = localStorage.getItem('teachmeet-camera-default') !== 'off';
 
         stream.getAudioTracks().forEach(track => track.enabled = initialMic);
@@ -353,15 +353,19 @@ export default function MeetingPage() {
         
         {/* Main Content (Video Tiles) */}
         <main className="flex-1 relative flex items-center justify-center">
-           <MeetingClient
-            meetingId={meetingId}
-            userId={user.uid}
-            onUserJoined={handleUserJoined}
-            onParticipantsChange={setParticipants}
-            localStream={localStream}
-            micOn={micOn}
-            camOn={camOn}
-          />
+           {localStream ? (
+              <MeetingClient
+                meetingId={meetingId}
+                userId={user.uid}
+                onUserJoined={handleUserJoined}
+                onParticipantsChange={setParticipants}
+                localStream={localStream}
+                micOn={micOn}
+                camOn={camOn}
+              />
+            ) : (
+              <div className="text-muted-foreground">Initializing camera...</div>
+            )}
         </main>
 
         {/* Controls */}
