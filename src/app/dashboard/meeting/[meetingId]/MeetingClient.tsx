@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,14 +24,14 @@ type Props = {
   meetingId: string; 
   userId: string;
   onUserJoined: (socketId: string) => void;
-  onParticipantsChange: (participants: any[]) => void; // Using any to avoid type clash on simplified participant
+  onParticipantsChange: (participants: any[]) => void;
   localStream: MediaStream | null;
   micOn: boolean;
   camOn: boolean;
 };
 
 const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
-  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   useEffect(() => {
     if (videoRef.current && user.stream) {
@@ -138,7 +138,6 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
         id,
         name: data.name || `User ${id.substring(0, 4)}`,
         avatar: data.photoURL,
-        // TODO: get real mic/cam state from liveParticipants data
         isCamOff: remoteStreams.get(id)?.getVideoTracks().every(t => !t.enabled) ?? true, 
         isMicOff: remoteStreams.get(id)?.getAudioTracks().every(t => !t.enabled) ?? true,
         stream: remoteStreams.get(id) || null
@@ -160,7 +159,6 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
     }
     
     if (count === 1) {
-      // Only you in meeting → full screen
       return (
         <div className="w-full h-full flex items-center justify-center p-4">
           <VideoTile user={allParticipants[0]} full />
@@ -169,7 +167,6 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
     }
   
     if (count === 2) {
-      // 2 users → remote full, local bottom-right
       const remote = allParticipants.find((u) => !u.isLocal);
       const local = allParticipants.find((u) => u.isLocal);
       return (
@@ -185,7 +182,6 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
     }
 
     if (count === 3) {
-      // 3 users -> 2 big tiles, 1 small
        const remotes = allParticipants.filter((u) => !u.isLocal);
        const local = allParticipants.find((u) => u.isLocal);
        return (
@@ -206,7 +202,6 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
     }
   
     if (count === 4) {
-      // 4 users → grid 2x2
       return (
         <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2 p-2">
           {allParticipants.map((u) => (
@@ -216,7 +211,6 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       );
     }
   
-    // 5 or more → dynamic grid
     const cols = Math.ceil(Math.sqrt(count));
     const rows = Math.ceil(count / cols);
     return (

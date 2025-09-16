@@ -341,7 +341,7 @@ export default function MeetingPage() {
     setTimeout(() => setIsParticipantJoining(false), 2000); // Animation is 1s, runs twice
   }, [toast]);
   
-  if (authLoading || !localStream) {
+  if (authLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-[#222E46] text-white">
         <Loader2 className="h-8 w-8 animate-spin mr-3"/>
@@ -372,7 +372,10 @@ export default function MeetingPage() {
                 camOn={camOn}
               />
             ) : (
-              <div className="text-muted-foreground">Initializing camera...</div>
+               <div className="flex flex-col items-center justify-center text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
+                Initializing Camera...
+              </div>
             )}
         </main>
 
