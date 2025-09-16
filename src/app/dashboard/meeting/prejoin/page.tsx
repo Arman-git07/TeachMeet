@@ -104,8 +104,8 @@ export default function PreJoinPage() {
           videoRef.current.srcObject = stream;
         }
         
-        const desiredMicState = localStorage.getItem('teachmeet-desired-mic-state') !== 'off';
-        const desiredCamState = localStorage.getItem('teachmeet-desired-camera-state') !== 'off';
+        const desiredMicState = localStorage.getItem('teachmeet-mic-default') !== 'off';
+        const desiredCamState = localStorage.getItem('teachmeet-camera-default') !== 'off';
         
         setIsMicOn(desiredMicState);
         setIsCameraOn(desiredCamState);
@@ -143,7 +143,7 @@ export default function PreJoinPage() {
         track.enabled = nextState;
       });
     }
-    localStorage.setItem('teachmeet-desired-camera-state', nextState ? 'on' : 'off');
+    localStorage.setItem('teachmeet-camera-default', nextState ? 'on' : 'off');
   };
   
   const toggleMic = () => {
@@ -154,7 +154,7 @@ export default function PreJoinPage() {
         track.enabled = nextState;
       });
     }
-    localStorage.setItem('teachmeet-desired-mic-state', nextState ? 'on' : 'off');
+    localStorage.setItem('teachmeet-mic-default', nextState ? 'on' : 'off');
   };
 
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
@@ -448,5 +448,7 @@ export default function PreJoinPage() {
     </div>
   );
 }
+
+    
 
     
