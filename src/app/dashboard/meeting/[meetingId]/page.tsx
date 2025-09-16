@@ -210,7 +210,7 @@ export default function MeetingPage() {
         try {
             const meetingDocRef = doc(db, 'meetings', meetingId);
             const meetingSnap = await getDoc(meetingDocRef);
-            if (meetingSnap.exists() && meetingSnap.data().hostId === user.uid) {
+            if (meetingSnap.exists() && meetingSnap.data().creatorId === user.uid) {
                 setIsHost(true);
             } else {
                 setIsHost(false);
@@ -460,3 +460,4 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
+

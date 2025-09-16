@@ -66,7 +66,7 @@ export function StartMeetingDialogContent() {
     try {
       const meetingRef = doc(db, "meetings", meetingId);
       await setDoc(meetingRef, {
-        hostId: user.uid,
+        creatorId: user.uid,
         topic: topic.trim(),
         code: meetingCode,
         createdAt: serverTimestamp(),
