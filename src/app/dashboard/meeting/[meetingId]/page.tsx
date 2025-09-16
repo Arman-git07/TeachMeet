@@ -55,7 +55,7 @@ import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
 import Link from 'next/link';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 
 
 type ControlButtonProps = {
@@ -74,6 +74,7 @@ type Participant = {
   avatar?: string;
   isCamOff: boolean;
   isMicOff: boolean;
+  isHandRaised?: boolean;
 };
 
 const ParticipantItem = React.memo(({
@@ -101,8 +102,9 @@ const ParticipantItem = React.memo(({
           <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
         </Avatar>
         <div>
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-sm font-medium text-foreground flex items-center gap-2">
             {participant.name} {isMe && "(You)"}
+            {participant.isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
           </p>
         </div>
       </div>
@@ -223,9 +225,10 @@ export default function MeetingPage() {
 
   // Correctly initialize media stream once
   useEffect(() => {
+    let stream: MediaStream;
     const initMedia = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
@@ -252,6 +255,19 @@ export default function MeetingPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Subscribe to own participant state for hand-raise status
+  useEffect(() => {
+    if (!user || !meetingId) return;
+    const participantRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+    const unsubscribe = onSnapshot(participantRef, (doc) => {
+        if (doc.exists()) {
+            setIsHandRaised(!!doc.data().isHandRaised);
+        }
+    });
+    return () => unsubscribe();
+  }, [user, meetingId]);
+
 
   useEffect(() => {
     setHeaderContent(
@@ -319,14 +335,22 @@ export default function MeetingPage() {
     localStorage.setItem('teachmeet-camera-default', nextState ? 'on' : 'off');
   };
   
-  const handleToggleHandRaise = () => {
+  const handleToggleHandRaise = async () => {
+    if (!user) return;
     const newHandRaiseState = !isHandRaised;
-    setIsHandRaised(newHandRaiseState);
-    if (newHandRaiseState) {
-        toast({
-            title: "Hand Raised",
-            description: "Your hand is now raised. Other participants can see this.",
-        });
+    const participantRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+    try {
+        await updateDoc(participantRef, { isHandRaised: newHandRaiseState });
+        // The local state `isHandRaised` is now managed by the onSnapshot listener.
+        if (newHandRaiseState) {
+            toast({
+                title: "Hand Raised",
+                description: "Your hand is now raised. Other participants can see this.",
+            });
+        }
+    } catch (error) {
+        console.error("Failed to update hand-raise status:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Could not update your hand-raise status." });
     }
   };
 
@@ -436,5 +460,3 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
-
-    

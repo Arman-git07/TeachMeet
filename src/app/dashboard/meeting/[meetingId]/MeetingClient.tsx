@@ -5,7 +5,7 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import { Mic, MicOff, VideoOff } from "lucide-react";
+import { Mic, MicOff, VideoOff, Hand } from "lucide-react";
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ type Participant = {
   avatar?: string;
   isCamOff: boolean;
   isMicOff: boolean;
+  isHandRaised?: boolean;
   isLocal?: boolean;
   stream: MediaStream | null;
 };
@@ -65,6 +66,7 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
            <span className="text-sm">{user.name}{user.isLocal ? " (You)" : ""}</span>
         </div>
         {user.isCamOff && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
+        {user.isHandRaised && <Hand className="h-5 w-5 absolute top-2 left-2 text-yellow-400 bg-black/50 p-1 rounded-full" />}
     </div>
   );
 }
@@ -73,16 +75,16 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
-  const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string}>>(new Map());
+  const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean}>>(new Map());
 
   // Firestore listener for participants
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
     const unsubscribe = onSnapshot(participantsCol, (snapshot) => {
-      const newParticipants = new Map<string, {name: string, photoURL?: string}>();
+      const newParticipants = new Map<string, {name: string, photoURL?: string, isHandRaised?: boolean}>();
       snapshot.forEach(doc => {
-        newParticipants.set(doc.id, doc.data() as {name: string, photoURL?: string});
+        newParticipants.set(doc.id, doc.data() as {name: string, photoURL?: string, isHandRaised?: boolean});
       });
       setLiveParticipants(newParticipants);
     });
@@ -128,6 +130,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       avatar: localUserDetails?.photoURL || user?.photoURL || undefined, 
       isCamOff: !camOn, 
       isMicOff: !micOn,
+      isHandRaised: localUserDetails?.isHandRaised,
       isLocal: true,
       stream: localStream
     };
@@ -138,6 +141,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
         id,
         name: data.name || `User ${id.substring(0, 4)}`,
         avatar: data.photoURL,
+        isHandRaised: data.isHandRaised,
         isCamOff: remoteStreams.get(id)?.getVideoTracks().every(t => !t.enabled) ?? true, 
         isMicOff: remoteStreams.get(id)?.getAudioTracks().every(t => !t.enabled) ?? true,
         stream: remoteStreams.get(id) || null
