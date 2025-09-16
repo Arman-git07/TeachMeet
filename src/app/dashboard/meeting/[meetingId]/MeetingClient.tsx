@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, VideoOff } from "lucide-react";
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { cn } from "@/lib/utils";
 
 type Participant = {
   id: string;
