@@ -417,7 +417,7 @@ export default function MeetingPage() {
               </SheetContent>
             </Sheet>
 
-             <ControlButton label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={handleToggleHandRaise} className={cn(isHandRaised && "bg-primary/80")}>
+             <ControlButton label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={handleToggleHandRaise} className={cn(isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")}>
               <Hand className="h-6 w-6" />
             </ControlButton>
 
