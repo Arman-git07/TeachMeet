@@ -24,7 +24,7 @@ const ICE: RTCIceServer[] = [
 
 export class MeshRTC {
   private socket!: Socket;
-  private locals: { mic: boolean; cam: boolean; stream?: MediaStream } = { mic: true, cam: true };
+  private localStream?: MediaStream;
   private remotes = new Map<string, Remote>();
   private roomId!: string;
   private userId!: string;
@@ -32,12 +32,11 @@ export class MeshRTC {
 
   constructor(private opts: MeshOptions) {}
 
-  async init(initialMicOn: boolean, initialCamOn: boolean) {
+  async init(stream: MediaStream) {
     if (this.initialized) return;
     this.initialized = true;
 
-    this.locals.mic = initialMicOn;
-    this.locals.cam = initialCamOn;
+    this.localStream = stream;
 
     // IMPORTANT: create socket once
     this.socket = io({ path: "/api/socketio" });
@@ -45,13 +44,10 @@ export class MeshRTC {
     this.roomId = this.opts.roomId;
     this.userId = this.opts.userId;
 
-    // Prepare local media before joining (permissions)
-    await this.ensureLocalStream(this.locals.mic, this.locals.cam);
-
     this.registerSocketEvents();
     this.socket.emit("join-room", { roomId: this.roomId, userId: this.userId });
     
-    return this.locals.stream;
+    return this.localStream;
   }
 
   private registerSocketEvents() {
@@ -118,7 +114,7 @@ export class MeshRTC {
     this.remotes.set(remoteSocketId, remote);
 
     // Forward local tracks to this peer
-    this.locals.stream?.getTracks().forEach((t) => pc.addTrack(t, this.locals.stream!));
+    this.localStream?.getTracks().forEach((t) => pc.addTrack(t, this.localStream!));
 
     // Receive tracks
     pc.ontrack = (e) => {
@@ -168,83 +164,15 @@ export class MeshRTC {
     }
   }
 
-  private async ensureLocalStream(wantMic: boolean, wantCam: boolean) {
-    const constraints: MediaStreamConstraints = {
-      audio: wantMic,
-      video: wantCam ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
-    };
-
-    try {
-        if (this.locals.stream) {
-            this.locals.stream.getTracks().forEach(track => track.stop());
-        }
-        this.locals.stream = await navigator.mediaDevices.getUserMedia(constraints);
-        this.locals.stream.getAudioTracks().forEach(track => track.enabled = wantMic);
-        this.locals.stream.getVideoTracks().forEach(track => track.enabled = wantCam);
-        this.locals.mic = wantMic;
-        this.locals.cam = wantCam;
-    } catch (e) {
-        console.error("Could not get user media", e);
-        // If we fail, create an empty stream to avoid errors down the line
-        if (!this.locals.stream) {
-            this.locals.stream = new MediaStream();
-        }
-        this.locals.mic = false;
-        this.locals.cam = false;
-    }
-    
-    return this.locals.stream;
-  }
-
-  getLocalStream() {
-    return this.locals.stream;
-  }
-  
-  isMicOn() {
-    return this.locals.mic;
-  }
-  isCamOn() {
-    return this.locals.cam;
-  }
-
-  toggleMic() {
-    if (!this.locals.stream) return;
-    const nextState = !this.locals.mic;
-    this.locals.stream.getAudioTracks().forEach(track => {
-        track.enabled = nextState;
-    });
-    this.locals.mic = nextState;
-  }
-
-  toggleCam() {
-    if (!this.locals.stream) return;
-    const nextState = !this.locals.cam;
-    this.locals.stream.getVideoTracks().forEach(track => {
-        track.enabled = nextState;
-    });
-    this.locals.cam = nextState;
-  }
-
   leave() {
     try {
       this.socket?.emit("leave-room", { roomId: this.roomId, userId: this.userId });
     } catch {}
     this.remotes.forEach(({ pc }) => pc.close());
     this.remotes.clear();
-    this.locals.stream?.getTracks().forEach((t) => t.stop());
-    this.locals.stream = undefined;
+    this.localStream?.getTracks().forEach((t) => t.stop());
+    this.localStream = undefined;
     this.initialized = false;
     this.socket?.disconnect();
-  }
-
-  // Attach convenience
-  attachLocal(video: HTMLVideoElement) {
-    const s = this.getLocalStream();
-    if (video && s) {
-      video.srcObject = s;
-      video.muted = true; // self-view muted to avoid echo
-      video.playsInline = true;
-      video.autoplay = true;
-    }
   }
 }

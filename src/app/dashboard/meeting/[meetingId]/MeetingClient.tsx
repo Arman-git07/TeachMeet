@@ -22,7 +22,9 @@ type Props = {
   userId: string;
   onUserJoined: (socketId: string) => void;
   onParticipantsChange: (participants: Participant[]) => void;
-  onLocalStream: (stream: MediaStream) => void;
+  localStream: MediaStream | null;
+  micOn: boolean;
+  camOn: boolean;
 };
 
 export interface MeetingClientRef {
@@ -30,15 +32,11 @@ export interface MeetingClientRef {
 }
 
 const MeetingClient = forwardRef<MeetingClientRef, Props>(
-  ({ meetingId, userId, onUserJoined, onParticipantsChange, onLocalStream }, ref) => {
+  ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn }, ref) => {
   
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
-
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
-  
   const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string}>>(new Map());
 
   // Firestore listener for participants
@@ -78,29 +76,13 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
   // Init once
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const desiredMicState = localStorage.getItem('teachmeet-mic-default') === 'on';
-      const desiredCamState = localStorage.getItem('teachmeet-camera-default') !== 'off';
-      
-      const localStream = await rtc.init(desiredMicState, desiredCamState);
-      if (!mounted) return;
-      
-      const actualCamOn = rtc.isCamOn();
-      const actualMicOn = rtc.isMicOn();
-
-      setCamOn(actualCamOn);
-      setMicOn(actualMicOn);
-      
-      if(localStream) {
-        onLocalStream(localStream);
-      }
-    })();
+    if (localStream) {
+      rtc.init(localStream);
+    }
     return () => {
-      mounted = false;
       rtc.leave();
     };
-  }, [rtc, onLocalStream]);
+  }, [rtc, localStream]);
   
   useImperativeHandle(ref, () => ({
     // No methods need to be exposed now
@@ -145,18 +127,8 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     onParticipantsChange(allParticipants);
   }, [allParticipants, onParticipantsChange]);
 
-  const LocalVideo = ({ stream }: { stream: MediaStream | undefined }) => {
-    const videoRef = React.useRef<HTMLVideoElement>(null);
-    React.useEffect(() => {
-        if (videoRef.current && stream) {
-            videoRef.current.srcObject = stream;
-        }
-    }, [stream]);
-    return <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />;
-  };
-
   const ParticipantTile = ({ p }: { p: Participant }) => {
-    const stream = p.id === userId ? rtc.getLocalStream() : remoteStreams.get(p.id);
+    const stream = p.id === userId ? localStream : remoteStreams.get(p.id);
 
     return (
       <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative flex items-center justify-center">
@@ -168,7 +140,7 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
              </Avatar>
            </div>
         ) : (
-          p.id === userId ? <LocalVideo stream={stream} /> : <RemoteVideo stream={stream} />
+          p.id !== userId ? <RemoteVideo stream={stream} /> : null
         )}
         <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
            {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
@@ -180,11 +152,9 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
   };
   
   if (allParticipants.length === 1) {
-    return (
-       <div className="w-full h-full flex items-center justify-center p-4">
-          <ParticipantTile p={allParticipants[0]} />
-      </div>
-    )
+    // When only self is in the meeting, don't render a tile here.
+    // The local preview is handled by the parent page.
+    return <div className="text-muted-foreground text-center pt-20">Waiting for others to join...</div>;
   }
 
   // A more dynamic grid for > 1 participants could be implemented here.

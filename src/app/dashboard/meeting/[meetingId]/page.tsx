@@ -188,7 +188,6 @@ export default function MeetingPage() {
   const router = useRouter();
   const { toast } = useToast();
   
-  const rtcRef = useRef<MeetingClientRef>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   
@@ -222,6 +221,41 @@ export default function MeetingPage() {
     checkHostStatus();
   }, [user, meetingId]);
 
+  // Correctly initialize media stream once
+  useEffect(() => {
+    const initMedia = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        setLocalStream(stream);
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+
+        const initialMic = localStorage.getItem('teachmeet-mic-default') === 'on';
+        const initialCam = localStorage.getItem('teachmeet-camera-default') !== 'off';
+
+        stream.getAudioTracks().forEach(track => track.enabled = initialMic);
+        stream.getVideoTracks().forEach(track => track.enabled = initialCam);
+        setMicOn(initialMic);
+        setCamOn(initialCam);
+        
+      } catch (err) {
+        console.error("Error accessing media devices:", err);
+        toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.'});
+      }
+    };
+
+    initMedia();
+    
+    return () => {
+        localStream?.getTracks().forEach(track => track.stop());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setHeaderContent(
@@ -321,14 +355,7 @@ export default function MeetingPage() {
   const userName = user.displayName || "User";
   const userAvatarSrc = user.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
 
-  const showPip = participants.length > 1;
-
-  const onLocalStream = (stream: MediaStream) => {
-    setLocalStream(stream);
-    if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-    }
-  };
+  const showPip = participants.length > 0; // Show if anyone else is there
 
   return (
     <TooltipProvider>
@@ -337,12 +364,13 @@ export default function MeetingPage() {
         {/* Main Content (Video Tiles) */}
         <main className="flex-1 relative">
            <MeetingClient
-            ref={rtcRef}
             meetingId={meetingId}
             userId={user.uid}
             onUserJoined={handleUserJoined}
             onParticipantsChange={setParticipants}
-            onLocalStream={onLocalStream}
+            localStream={localStream}
+            micOn={micOn}
+            camOn={camOn}
           />
         </main>
 
