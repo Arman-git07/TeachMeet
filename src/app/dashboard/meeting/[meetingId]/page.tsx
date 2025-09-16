@@ -231,6 +231,7 @@ export default function MeetingPage() {
         });
         setLocalStream(stream);
 
+        // This stream is now passed to MeetingClient, but we also use it here for the local preview
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
@@ -355,14 +356,15 @@ export default function MeetingPage() {
   const userName = user.displayName || "User";
   const userAvatarSrc = user.photoURL || `https://placehold.co/128x128.png?text=${userName.charAt(0).toUpperCase()}`;
 
-  const showPip = participants.length > 0; // Show if anyone else is there
+  const showPip = participants.length > 1; // Show PiP only if there are 2 or more people total
 
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen w-screen bg-[#222E46] text-white overflow-hidden">
         
         {/* Main Content (Video Tiles) */}
-        <main className="flex-1 relative">
+        <main className="flex-1 relative flex items-center justify-center">
+          {/* Main remote video */}
            <MeetingClient
             meetingId={meetingId}
             userId={user.uid}
@@ -372,9 +374,30 @@ export default function MeetingPage() {
             micOn={micOn}
             camOn={camOn}
           />
+          {/* If you are alone, show your video in the main area */}
+          {!showPip && (
+              <div className="w-full h-full p-4 flex items-center justify-center">
+                  <div className="w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden shadow-lg relative flex items-center justify-center">
+                      <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                      {!camOn && (
+                          <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center text-muted-foreground">
+                          <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
+                              <AvatarImage src={userAvatarSrc} alt={userName} data-ai-hint="user avatar" />
+                              <AvatarFallback className="text-4xl md:text-6xl">{userName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <p className="mt-4 font-semibold">Camera is off</p>
+                          </div>
+                      )}
+                      <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
+                          {micOn ? <Mic className="h-4 w-4 text-green-400" /> : <MicOff className="h-4 w-4 text-red-400" />}
+                          <span className="text-sm">{userName} (You)</span>
+                      </div>
+                  </div>
+              </div>
+          )}
         </main>
 
-        {/* Self-view / local video preview */}
+        {/* Self-view / picture-in-picture */}
         {showPip && (
           <div className="absolute bottom-28 right-4 z-20 w-48 h-32">
                <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative">
@@ -452,3 +475,4 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
+

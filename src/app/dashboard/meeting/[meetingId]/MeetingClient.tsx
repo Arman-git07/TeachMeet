@@ -151,9 +151,9 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     );
   };
   
-  if (allParticipants.length === 1) {
-    // When only self is in the meeting, don't render a tile here.
-    // The local preview is handled by the parent page.
+  if (allParticipants.length <= 1) {
+    // When only self is in the meeting, don't render anything here.
+    // The parent `page.tsx` now handles the full-screen local preview.
     return <div className="text-muted-foreground text-center pt-20">Waiting for others to join...</div>;
   }
 
@@ -169,3 +169,4 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
 
 MeetingClient.displayName = 'MeetingClient';
 export default MeetingClient;
+
