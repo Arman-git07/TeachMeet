@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useImperativeHandle, forwardRef, useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,25 +15,60 @@ type Participant = {
   avatar?: string;
   isCamOff: boolean;
   isMicOff: boolean;
+  isLocal?: boolean;
+  stream: MediaStream | null;
 };
 
 type Props = { 
   meetingId: string; 
   userId: string;
   onUserJoined: (socketId: string) => void;
-  onParticipantsChange: (participants: Participant[]) => void;
+  onParticipantsChange: (participants: any[]) => void; // Using any to avoid type clash on simplified participant
   localStream: MediaStream | null;
   micOn: boolean;
   camOn: boolean;
 };
 
-export interface MeetingClientRef {
-  // Exposing methods from ref is no longer needed as parent controls tracks
+const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  
+  useEffect(() => {
+    if (videoRef.current && user.stream) {
+      videoRef.current.srcObject = user.stream;
+    }
+  }, [user.stream]);
+
+  return (
+    <div className={cn(
+        "bg-gray-800 flex items-center justify-center relative rounded-lg overflow-hidden",
+        full ? "w-full h-full" : "w-full h-full"
+    )}>
+        {user.stream && !user.isCamOff ? (
+            <video
+              autoPlay
+              playsInline
+              muted={user.isLocal}
+              ref={videoRef}
+              className="w-full h-full object-cover"
+            />
+        ) : (
+          <div className="flex flex-col items-center text-muted-foreground">
+             <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
+                <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="user avatar" />
+                <AvatarFallback className="text-4xl md:text-6xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+             </Avatar>
+           </div>
+        )}
+        <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
+           {user.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
+           <span className="text-sm">{user.name}{user.isLocal ? " (You)" : ""}</span>
+        </div>
+        {user.isCamOff && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
+    </div>
+  );
 }
 
-const MeetingClient = forwardRef<MeetingClientRef, Props>(
-  ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn }, ref) => {
-  
+const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn }: Props) => {
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
@@ -84,92 +119,121 @@ const MeetingClient = forwardRef<MeetingClientRef, Props>(
     };
   }, [rtc, localStream]);
   
-  useImperativeHandle(ref, () => ({
-    // No methods need to be exposed now
-  }));
-
-  const RemoteVideo = ({ stream }: { stream: MediaStream }) => {
-    const videoRef = React.useRef<HTMLVideoElement>(null);
-    React.useEffect(() => {
-      if (videoRef.current && stream) {
-        videoRef.current.srcObject = stream;
-      }
-    }, [stream]);
-    return <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />;
-  };
-  
   const allParticipants: Participant[] = useMemo(() => {
-    const localUser = liveParticipants.get(userId);
-    const self = { 
+    const localUserDetails = liveParticipants.get(userId);
+    const self: Participant = { 
       id: userId, 
-      name: localUser?.name || user?.displayName || "You", 
-      avatar: localUser?.photoURL || user?.photoURL || undefined, 
+      name: localUserDetails?.name || user?.displayName || "You", 
+      avatar: localUserDetails?.photoURL || user?.photoURL || undefined, 
       isCamOff: !camOn, 
-      isMicOff: !micOn 
+      isMicOff: !micOn,
+      isLocal: true,
+      stream: localStream
     };
 
-    const remotes = Array.from(liveParticipants.entries())
+    const remotes: Participant[] = Array.from(liveParticipants.entries())
       .filter(([id]) => id !== userId)
       .map(([id, data]) => ({
         id,
         name: data.name || `User ${id.substring(0, 4)}`,
         avatar: data.photoURL,
         // TODO: get real mic/cam state from liveParticipants data
-        isCamOff: true, 
-        isMicOff: true
+        isCamOff: remoteStreams.get(id)?.getVideoTracks().every(t => !t.enabled) ?? true, 
+        isMicOff: remoteStreams.get(id)?.getAudioTracks().every(t => !t.enabled) ?? true,
+        stream: remoteStreams.get(id) || null
       }));
 
     return [self, ...remotes];
-  }, [user, camOn, micOn, liveParticipants, userId]);
+  }, [user, camOn, micOn, liveParticipants, userId, localStream, remoteStreams]);
 
 
   useEffect(() => {
     onParticipantsChange(allParticipants);
   }, [allParticipants, onParticipantsChange]);
 
-  const ParticipantTile = ({ p }: { p: Participant }) => {
-    const stream = p.id === userId ? localStream : remoteStreams.get(p.id);
+  const renderLayout = () => {
+    const count = allParticipants.length;
 
-    return (
-      <div className="w-full h-full bg-black rounded-lg overflow-hidden shadow-lg relative flex items-center justify-center">
-        {p.isCamOff || !stream ? (
-           <div className="flex flex-col items-center text-muted-foreground">
-             <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
-                <AvatarImage src={p.avatar} alt={p.name} data-ai-hint="user avatar" />
-                <AvatarFallback className="text-4xl md:text-6xl">{p.name.charAt(0).toUpperCase()}</AvatarFallback>
-             </Avatar>
-           </div>
-        ) : (
-          p.id !== userId ? <RemoteVideo stream={stream} /> : null
-        )}
-        <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
-           {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
-           <span className="text-sm">{p.name}</span>
+    if (count === 0) {
+      return <div className="text-muted-foreground">Initializing...</div>;
+    }
+    
+    if (count === 1) {
+      // Only you in meeting → full screen
+      return (
+        <div className="w-full h-full flex items-center justify-center p-4">
+          <VideoTile user={allParticipants[0]} full />
         </div>
-        {p.isCamOff && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
+      );
+    }
+  
+    if (count === 2) {
+      // 2 users → remote full, local bottom-right
+      const remote = allParticipants.find((u) => !u.isLocal);
+      const local = allParticipants.find((u) => u.isLocal);
+      return (
+        <div className="w-full h-full relative p-4">
+          {remote && <VideoTile user={remote} full />}
+          {local && 
+            <div className="absolute bottom-6 right-6 w-48 h-32 z-20">
+              <VideoTile user={local} />
+            </div>
+          }
+        </div>
+      );
+    }
+
+    if (count === 3) {
+      // 3 users -> 2 big tiles, 1 small
+       const remotes = allParticipants.filter((u) => !u.isLocal);
+       const local = allParticipants.find((u) => u.isLocal);
+       return (
+        <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
+            <div className="flex-1">
+                {remotes[0] && <VideoTile user={remotes[0]} full/>}
+            </div>
+            <div className="flex-1 flex flex-col gap-2">
+                <div className="flex-1">
+                    {remotes[1] && <VideoTile user={remotes[1]} full/>}
+                </div>
+                <div className="flex-1">
+                    {local && <VideoTile user={local} full/>}
+                </div>
+            </div>
+        </div>
+      );
+    }
+  
+    if (count === 4) {
+      // 4 users → grid 2x2
+      return (
+        <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2 p-2">
+          {allParticipants.map((u) => (
+            <VideoTile key={u.id} user={u} />
+          ))}
+        </div>
+      );
+    }
+  
+    // 5 or more → dynamic grid
+    const cols = Math.ceil(Math.sqrt(count));
+    const rows = Math.ceil(count / cols);
+    return (
+      <div 
+        className="w-full h-full grid gap-2 p-2"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+        }}
+      >
+        {allParticipants.map((u) => (
+          <VideoTile key={u.id} user={u} />
+        ))}
       </div>
     );
   };
-  
-  if (allParticipants.length <= 1) {
-    // When only self is in the meeting, don't render anything here.
-    // The parent `page.tsx` now handles the full-screen local preview.
-    return <div className="text-muted-foreground text-center pt-20">Waiting for others to join...</div>;
-  }
 
-  // A more dynamic grid for > 1 participants could be implemented here.
-  const mainParticipant = allParticipants.find(p => p.id !== userId) || allParticipants[0];
+  return <div className="w-full h-full">{renderLayout()}</div>;
+};
 
-  return (
-    <div className="w-full h-full flex items-center justify-center p-4">
-        {mainParticipant ? <ParticipantTile p={mainParticipant} /> :  <div className="text-muted-foreground">Waiting for participants...</div>}
-    </div>
-  );
-});
-
-MeetingClient.displayName = 'MeetingClient';
 export default MeetingClient;
-
-
-
-    
