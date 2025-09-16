@@ -25,6 +25,7 @@ import {
   UserX,
   AlertCircle,
   Maximize,
+  Loader2,
 } from "lucide-react";
 import {
   Tooltip,
@@ -300,20 +301,22 @@ export default function MeetingPage() {
   
   const handleToggleMic = () => {
     if (!localStream) return;
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setMicOn(audioTrack.enabled);
-    }
+    const nextState = !micOn;
+    localStream.getAudioTracks().forEach((track) => {
+      track.enabled = nextState;
+    });
+    setMicOn(nextState);
+    localStorage.setItem('teachmeet-mic-default', nextState ? 'on' : 'off');
   };
   
   const handleToggleCam = () => {
     if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setCamOn(videoTrack.enabled);
-    }
+    const nextState = !camOn;
+    localStream.getVideoTracks().forEach((track) => {
+      track.enabled = nextState;
+    });
+    setCamOn(nextState);
+    localStorage.setItem('teachmeet-camera-default', nextState ? 'on' : 'off');
   };
   
   const handleToggleHandRaise = () => {
@@ -338,8 +341,13 @@ export default function MeetingPage() {
     setTimeout(() => setIsParticipantJoining(false), 2000); // Animation is 1s, runs twice
   }, [toast]);
   
-  if (authLoading) {
-    return <div className="h-screen w-screen flex items-center justify-center bg-[#222E46]">Loading...</div>;
+  if (authLoading || !localStream) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#222E46] text-white">
+        <Loader2 className="h-8 w-8 animate-spin mr-3"/>
+        Initializing...
+      </div>
+    );
   }
   
   if (!user) {
@@ -425,6 +433,5 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
-
 
     
