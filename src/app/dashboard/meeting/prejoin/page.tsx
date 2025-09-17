@@ -185,6 +185,7 @@ export default function PreJoinPage() {
 
   const handleCreateAndJoinMeeting = async () => {
     if (!user) {
+      console.error("No authenticated user found.");
       toast({ variant: 'destructive', title: 'Not Authenticated' });
       router.push(`/auth/signin?redirect=${window.location.pathname}${window.location.search}`);
       return;
@@ -209,9 +210,9 @@ export default function PreJoinPage() {
       
       // Navigate to the meeting page
       router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}`);
-    } catch (error) {
-      console.error("Failed to create meeting:", error);
-      setStartError("Could not create the meeting. Please check your internet connection and permissions, then try again.");
+    } catch (error: any) {
+      console.error("Failed to create meeting:", error.code, error.message);
+      setStartError(`Could not create the meeting. Please check the browser console for a specific error code (e.g., 'permission-denied').`);
       setIsCreatingMeeting(false);
     }
   };
@@ -485,5 +486,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    
