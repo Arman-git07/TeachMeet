@@ -201,7 +201,7 @@ export default function PreJoinPage() {
       // Create the meeting document in Firestore
       const meetingRef = doc(db, "meetings", meetingId);
       await setDoc(meetingRef, {
-        creatorId: user.uid,
+        creatorId: user.uid, // Correct field name for host
         topic: topic.trim(),
         code: meetingCode,
         createdAt: serverTimestamp(),
@@ -485,3 +485,5 @@ export default function PreJoinPage() {
     </div>
   );
 }
+
+    
