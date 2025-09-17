@@ -48,6 +48,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { v4 as uuidv4 } from 'uuid';
+import { db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+
 
 export default function PreJoinPage() {
   const searchParams = useSearchParams();
@@ -67,6 +70,7 @@ export default function PreJoinPage() {
   const [videoFilter, setVideoFilter] = useState('brightclear');
   const [startError, setStartError] = useState<string | null>(null);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
 
   // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -82,6 +86,9 @@ export default function PreJoinPage() {
     const existingMeetingId = searchParams.get('meetingId');
     const id = existingMeetingId || `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
     const code = id.replace('meeting-','');
+    const topicFromParams = searchParams.get('topic');
+
+    if(topicFromParams) setTopic(topicFromParams);
     
     setMeetingId(id);
     setMeetingCode(code);
@@ -174,6 +181,40 @@ export default function PreJoinPage() {
         });
       });
   };
+
+  const handleCreateAndJoinMeeting = async () => {
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Not Authenticated' });
+      router.push(`/auth/signin?redirect=${window.location.pathname}${window.location.search}`);
+      return;
+    }
+    if (!topic.trim()) {
+      toast({ variant: 'destructive', title: 'Topic is required' });
+      return;
+    }
+
+    setIsCreatingMeeting(true);
+    setStartError(null);
+
+    try {
+      // Create the meeting document in Firestore
+      const meetingRef = doc(db, "meetings", meetingId);
+      await setDoc(meetingRef, {
+        creatorId: user.uid,
+        topic: topic.trim(),
+        code: meetingCode,
+        createdAt: serverTimestamp(),
+      });
+      
+      // Navigate to the meeting page
+      router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}`);
+    } catch (error) {
+      console.error("Failed to create meeting:", error);
+      setStartError("Could not create the meeting. Please check your internet connection and permissions, then try again.");
+      setIsCreatingMeeting(false);
+    }
+  };
+
 
   const userName = user?.displayName || 'User';
   const userAvatar = user?.photoURL;
@@ -329,7 +370,7 @@ export default function PreJoinPage() {
             </Select>
 
             <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg">
-                <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}`}>
+                <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
                     <Settings className="mr-2 h-4 w-4" /> Advanced A/V Settings
                 </Link>
             </Button>
@@ -416,14 +457,8 @@ export default function PreJoinPage() {
         </CardContent>
         <CardFooter className="flex-col gap-4 border-t pt-4">
            <Button
-            onClick={() => {
-              if (meetingId) {
-                router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
-              } else {
-                toast({ variant: 'destructive', title: "Error", description: "Meeting ID is missing."});
-              }
-            }}
-            disabled={!agreed}
+            onClick={handleCreateAndJoinMeeting}
+            disabled={!agreed || isCreatingMeeting}
             className={cn(
               "w-full py-3 text-lg font-semibold rounded-xl",
               agreed
@@ -431,6 +466,7 @@ export default function PreJoinPage() {
                 : "bg-green-900/50 text-green-100/70 cursor-not-allowed"
             )}
           >
+            {isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
             Join Now as Host
           </Button>
           <Button asChild variant="link" className="text-muted-foreground">
@@ -448,7 +484,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    
-
-    

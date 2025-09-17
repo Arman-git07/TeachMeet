@@ -31,13 +31,12 @@ export default function WaitingAreaPage() {
     if (authLoading) return;
     
     if (!user) {
-        const intendedUrl = `/dashboard/meeting/${meetingId}/wait?${searchParams.toString()}`;
+        const intendedUrl = `/dashboard/meeting/${meetingId}?${searchParams.toString()}`;
         router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
         return;
     }
     
     // Redirect all users (hosts and guests) to the main meeting page.
-    // The meeting page now contains all the logic for waiting rooms, join requests, etc.
     const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
     router.replace(meetingPath);
 

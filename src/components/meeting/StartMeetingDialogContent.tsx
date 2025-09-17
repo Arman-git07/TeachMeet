@@ -19,6 +19,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
+import { v4 as uuidv4 } from 'uuid';
 
 export function StartMeetingDialogContent() {
   const router = useRouter();
@@ -27,21 +28,29 @@ export function StartMeetingDialogContent() {
   
   const [topic, setTopic] = useState("My TeachMeet Meeting");
   const [loading, setLoading] = useState(false);
-  const [meetingId, setMeetingId] = useState("");
-  const [meetingCode, setMeetingCode] = useState("");
-  const [meetingLink, setMeetingLink] = useState("");
+  
+  // These are now derived from a single stable meetingId
+  const [meetingId, setMeetingId] = useState('');
+  const [meetingCode, setMeetingCode] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
+  
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
   useEffect(() => {
-    // Generate meeting details once when the component mounts
-    const id = "meeting-" + crypto.randomUUID().slice(0, 11).replace(/-/g, '');
-    const code = crypto.randomUUID().slice(0, 10).replace(/-/g, '');
+    // Generate a stable ID once when the dialog mounts
+    const id = `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
+    const code = id.replace('meeting-','');
+    
     setMeetingId(id);
     setMeetingCode(code);
-    if (typeof window !== "undefined") {
-      setMeetingLink(`${window.location.origin}/dashboard/join-meeting?code=${id}`);
+    
+    if (typeof window !== 'undefined') {
+      setMeetingLink(
+        `${window.location.origin}/dashboard/join-meeting?meetingId=${id}`
+      );
     }
   }, []);
+
 
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => {
     navigator.clipboard.writeText(textToCopy).then(() => {
@@ -52,38 +61,10 @@ export function StartMeetingDialogContent() {
   };
 
   const handleSetupAndJoin = async () => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be signed in to start a meeting.' });
-      return;
-    }
-    if (!topic.trim()) {
-      toast({ variant: "destructive", title: "Topic Required", description: "Please enter a topic for the meeting." });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const meetingRef = doc(db, "meetings", meetingId);
-      await setDoc(meetingRef, {
-        creatorId: user.uid,
-        topic: topic.trim(),
-        code: meetingCode,
-        createdAt: serverTimestamp(),
-      });
-      
-      const prejoinPath = `/dashboard/meeting/${meetingId}/wait?topic=${encodeURIComponent(topic.trim())}&host=true`;
-      router.push(prejoinPath);
-
-    } catch (err) {
-      console.error("Error creating meeting:", err);
-      toast({
-        variant: "destructive",
-        title: "Could not create meeting",
-        description: "Please check your internet connection and Firestore rules, then try again.",
-      });
-      setLoading(false);
-    }
+    // This dialog now only redirects to the prejoin page.
+    // The prejoin page will handle creating the meeting document.
+    const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}`;
+    router.push(prejoinPath);
   };
 
   return (
