@@ -19,6 +19,7 @@ import {
   User,
   Hash,
   PanelLeftOpen,
+  Loader2,
 } from 'lucide-react';
 import {
   Card,
