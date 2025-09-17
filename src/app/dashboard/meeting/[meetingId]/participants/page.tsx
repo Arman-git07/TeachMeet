@@ -157,7 +157,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
         try {
             const docSnap = await getDoc(meetingDocRef);
             if (docSnap.exists()) {
-                const creator = docSnap.data().hostId;
+                const creator = docSnap.data().creatorId; // Correctly use creatorId
                 setMeetingCreatorId(creator);
             } else {
                 toast({ variant: "destructive", title: "Meeting Not Found", description: "Could not load meeting details." });
