@@ -55,7 +55,7 @@ import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
 import Link from 'next/link';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, updateDoc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 
 
 type ControlButtonProps = {
@@ -202,6 +202,7 @@ export default function MeetingPage() {
   const [isParticipantsPanelOpen, setIsParticipantsPanelOpen] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [isHandRaised, setIsHandRaised] = useState(false);
+  const [showMeetingId, setShowMeetingId] = useState(false);
 
 
   useEffect(() => {
@@ -226,54 +227,83 @@ export default function MeetingPage() {
   // Correctly initialize media stream once
   useEffect(() => {
     let stream: MediaStream;
+    let cancelled = false;
+
     const initMedia = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
-        setLocalStream(stream);
+        if (cancelled) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
 
         const initialMic = localStorage.getItem('teachmeet-mic-default') !== 'off';
         const initialCam = localStorage.getItem('teachmeet-camera-default') !== 'off';
 
         stream.getAudioTracks().forEach(track => track.enabled = initialMic);
         stream.getVideoTracks().forEach(track => track.enabled = initialCam);
-        setMicOn(initialMic);
-        setCamOn(initialCam);
+        
+        if (!cancelled) {
+          setLocalStream(stream);
+          setMicOn(initialMic);
+          setCamOn(initialCam);
+        }
         
       } catch (err) {
         console.error("Error accessing media devices:", err);
-        toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.'});
+        if (!cancelled) {
+          toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.'});
+        }
       }
     };
 
-    initMedia();
+    if (user) {
+        initMedia();
+    }
     
     return () => {
+        cancelled = true;
         localStream?.getTracks().forEach(track => track.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
 
   // Subscribe to own participant state for hand-raise status
   useEffect(() => {
     if (!user || !meetingId) return;
     const participantRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+    
+    // Set initial participant data
+    setDoc(participantRef, { 
+      name: user.displayName || `User ${user.uid.substring(0, 4)}`,
+      photoURL: user.photoURL,
+      isHandRaised: false, // Start with hand down
+      joinedAt: serverTimestamp()
+    }, { merge: true });
+
     const unsubscribe = onSnapshot(participantRef, (doc) => {
         if (doc.exists()) {
             setIsHandRaised(!!doc.data().isHandRaised);
         }
     });
+
     return () => unsubscribe();
   }, [user, meetingId]);
 
 
   useEffect(() => {
     setHeaderContent(
-      <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-        {topic}
-      </h1>
+      <div className="cursor-pointer" onClick={() => setShowMeetingId(prev => !prev)}>
+        <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
+          {showMeetingId ? meetingId : topic}
+        </h1>
+        <p className="text-xs text-muted-foreground">
+            {showMeetingId ? 'Click to show topic' : 'Click to show Meeting ID'}
+        </p>
+      </div>
     );
     setHeaderAction(
       <DropdownMenu>
@@ -313,7 +343,7 @@ export default function MeetingPage() {
       setHeaderContent(null);
       setHeaderAction(null);
     };
-  }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost]);
+  }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost, showMeetingId]);
   
   const handleToggleMic = () => {
     if (!localStream) return;
@@ -460,4 +490,3 @@ export default function MeetingPage() {
     </TooltipProvider>
   );
 }
-
