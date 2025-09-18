@@ -137,15 +137,20 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
 
     const remotes: Participant[] = Array.from(liveParticipants.entries())
       .filter(([id]) => id !== userId)
-      .map(([id, data]) => ({
-        id,
-        name: data.name || `User ${id.substring(0, 4)}`,
-        avatar: data.photoURL,
-        isHandRaised: data.isHandRaised,
-        isCamOff: remoteStreams.get(id)?.getVideoTracks().every(t => !t.enabled) ?? true, 
-        isMicOff: remoteStreams.get(id)?.getAudioTracks().every(t => !t.enabled) ?? true,
-        stream: remoteStreams.get(id) || null
-      }));
+      .map(([id, data]) => {
+        const remoteStream = remoteStreams.get(id);
+        const videoTracks = remoteStream?.getVideoTracks() || [];
+        const audioTracks = remoteStream?.getAudioTracks() || [];
+        return {
+          id,
+          name: data.name || `User ${id.substring(0, 4)}`,
+          avatar: data.photoURL,
+          isHandRaised: data.isHandRaised,
+          isCamOff: videoTracks.length === 0 || videoTracks.every(t => !t.enabled),
+          isMicOff: audioTracks.length === 0 || audioTracks.every(t => !t.enabled),
+          stream: remoteStream || null,
+        };
+      });
 
     return [self, ...remotes];
   }, [user, camOn, micOn, liveParticipants, userId, localStream, remoteStreams]);
