@@ -184,37 +184,20 @@ export default function PreJoinPage() {
   };
 
   const handleCreateAndJoinMeeting = async () => {
-    if (!user) {
-      console.error("No authenticated user found.");
-      toast({ variant: 'destructive', title: 'Not Authenticated' });
-      router.push(`/auth/signin?redirect=${window.location.pathname}${window.location.search}`);
-      return;
+    if (!agreed) {
+        toast({ variant: 'destructive', title: 'Agreement Required', description: 'You must agree to the terms to proceed.' });
+        return;
     }
     if (!topic.trim()) {
-      toast({ variant: 'destructive', title: 'Topic is required' });
-      return;
+        toast({ variant: 'destructive', title: 'Topic is required' });
+        return;
     }
 
     setIsCreatingMeeting(true);
-    setStartError(null);
-
-    try {
-      // Create the meeting document in Firestore
-      const meetingRef = doc(db, "meetings", meetingId);
-      await setDoc(meetingRef, {
-        creatorId: user.uid,
-        topic: topic.trim(),
-        code: meetingCode,
-        createdAt: serverTimestamp(),
-      });
-      
-      // Navigate to the meeting page
-      router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}`);
-    } catch (error: any) {
-      console.error("Failed to create meeting:", error.code, error.message);
-      setStartError(`Could not create the meeting. Please check the browser console for a specific error code (e.g., 'permission-denied').`);
-      setIsCreatingMeeting(false);
-    }
+    
+    // Simply redirect to the meeting page.
+    // The meeting page will handle its own logic for joining/waiting.
+    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}`);
   };
 
 
