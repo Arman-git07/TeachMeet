@@ -345,7 +345,7 @@ export default function MeetingPage() {
     };
   }, [meetingId, topic, router, setHeaderContent, setHeaderAction, toast, isHost, showMeetingId]);
   
-  const handleToggleMic = () => {
+  const handleToggleMic = useCallback(() => {
     if (!localStream) return;
     const nextState = !micOn;
     localStream.getAudioTracks().forEach((track) => {
@@ -353,9 +353,9 @@ export default function MeetingPage() {
     });
     setMicOn(nextState);
     localStorage.setItem('teachmeet-mic-default', nextState ? 'on' : 'off');
-  };
+  }, [localStream, micOn]);
   
-  const handleToggleCam = () => {
+  const handleToggleCam = useCallback(() => {
     if (!localStream) return;
     const nextState = !camOn;
     localStream.getVideoTracks().forEach((track) => {
@@ -363,7 +363,7 @@ export default function MeetingPage() {
     });
     setCamOn(nextState);
     localStorage.setItem('teachmeet-camera-default', nextState ? 'on' : 'off');
-  };
+  }, [localStream, camOn]);
   
   const handleToggleHandRaise = async () => {
     if (!user) return;
@@ -384,10 +384,10 @@ export default function MeetingPage() {
     }
   };
 
-  const handleLeave = () => {
+  const handleLeave = useCallback(() => {
     toast({ title: "You left the meeting." });
     router.push("/");
-  };
+  }, [router, toast]);
   
   const handleUserJoined = useCallback((socketId: string) => {
     toast({ title: 'Participant Joined', description: `A new user has joined the meeting.` });
@@ -436,11 +436,11 @@ export default function MeetingPage() {
         {/* Controls */}
         <footer className="absolute bottom-0 left-0 right-0 z-20 flex justify-center p-4">
           <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
-            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")}>
+            <ControlButton label={micOn ? "Mute" : "Unmute"} onClick={handleToggleMic} className={cn(!micOn && "bg-destructive hover:bg-destructive/90")}>
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
 
-            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")}>
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn && "bg-destructive hover:bg-destructive/90")}>
               {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </ControlButton>
 
@@ -471,7 +471,7 @@ export default function MeetingPage() {
               </SheetContent>
             </Sheet>
 
-             <ControlButton label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={handleToggleHandRaise} className={cn(isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")}>
+             <ControlButton label={isHandRaised ? "Lower Hand" : "Raise Hand"} onClick={handleToggleHandRaise} className={cn(isHandRaised && "bg-primary hover:bg-primary/90")}>
               <Hand className="h-6 w-6" />
             </ControlButton>
 
