@@ -363,7 +363,6 @@ export default function MeetingPage() {
       track.enabled = nextState;
     });
     setCamOn(nextState);
-    setLocalStream(localStream); // Trigger re-render
     localStorage.setItem('teachmeet-camera-default', nextState ? 'on' : 'off');
 }, [localStream, camOn]);
   
@@ -442,7 +441,10 @@ export default function MeetingPage() {
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
 
-            <CameraToggle localStream={localStream} setLocalStream={setLocalStream} />
+            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn && "bg-destructive hover:bg-destructive/90")}>
+                {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+            </ControlButton>
+
 
             <div className="h-8 w-px bg-white/20 mx-2" />
             
