@@ -150,9 +150,10 @@ const ParticipantItem = React.memo(({
 ParticipantItem.displayName = 'ParticipantItem';
 
 
-const ControlButton = ({ label, onClick, isDestructive, children, asChild, href, className }: ControlButtonProps) => {
+export const ControlButton = React.forwardRef<HTMLButtonElement, ControlButtonProps>(({ label, onClick, isDestructive, children, asChild, href, className }: ControlButtonProps, ref) => {
   const content = (
     <Button
+      ref={ref}
       variant="ghost"
       size="icon"
       onClick={onClick}
@@ -181,7 +182,8 @@ const ControlButton = ({ label, onClick, isDestructive, children, asChild, href,
       </TooltipContent>
     </Tooltip>
   );
-};
+});
+ControlButton.displayName = 'ControlButton';
 
 
 export default function MeetingPage() {
@@ -441,9 +443,7 @@ export default function MeetingPage() {
               {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
             </ControlButton>
 
-            <ControlButton label={camOn ? "Stop Camera" : "Start Camera"} onClick={handleToggleCam} className={cn(!camOn && "bg-destructive hover:bg-destructive/90")}>
-                {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
-            </ControlButton>
+            <CameraToggle isCameraOn={camOn} onToggle={handleToggleCam} />
 
 
             <div className="h-8 w-px bg-white/20 mx-2" />

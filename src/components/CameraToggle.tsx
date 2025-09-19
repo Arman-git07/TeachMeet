@@ -5,25 +5,28 @@ import React from "react";
 import { Video, VideoOff } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
+import { ControlButton } from "@/app/dashboard/meeting/[meetingId]/page";
 
 type CameraToggleProps = {
   isCameraOn: boolean;
   onToggle: () => void;
+  className?: string;
+  label?: string;
 };
 
-export default function CameraToggle({ isCameraOn, onToggle }: CameraToggleProps) {
+const CameraToggle = React.forwardRef<HTMLButtonElement, CameraToggleProps>(({ isCameraOn, onToggle, className, label }, ref) => {
   return (
-    <Button
-      variant={isCameraOn ? "default" : "destructive"}
-      size="icon"
-      className={cn(
-        "h-14 w-14 rounded-full flex flex-col items-center justify-center gap-1 text-xs text-white",
-        !isCameraOn && "bg-destructive hover:bg-destructive/90"
-      )}
-      onClick={onToggle}
-      aria-label={isCameraOn ? "Stop Camera" : "Start Camera"}
-    >
+    <ControlButton
+        label={isCameraOn ? "Stop Camera" : "Start Camera"}
+        onClick={onToggle}
+        className={cn(!isCameraOn && "bg-destructive hover:bg-destructive/90", className)}
+        ref={ref}
+      >
       {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
-    </Button>
+    </ControlButton>
   );
-}
+});
+
+CameraToggle.displayName = "CameraToggle";
+
+export default CameraToggle;
