@@ -124,11 +124,15 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
   
   const allParticipants: Participant[] = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
+    // Determine local camera status based on the stream itself
+    const localVideoTracks = localStream?.getVideoTracks() || [];
+    const isLocalCamActuallyOff = localVideoTracks.length === 0 || localVideoTracks.every(t => !t.enabled);
+    
     const self: Participant = { 
       id: userId, 
       name: localUserDetails?.name || user?.displayName || "You", 
       avatar: localUserDetails?.photoURL || user?.photoURL || undefined, 
-      isCamOff: !camOn, 
+      isCamOff: isLocalCamActuallyOff, 
       isMicOff: !micOn,
       isHandRaised: localUserDetails?.isHandRaised,
       isLocal: true,
@@ -153,7 +157,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       });
 
     return [self, ...remotes];
-  }, [user, camOn, micOn, liveParticipants, userId, localStream, remoteStreams]);
+  }, [user, micOn, liveParticipants, userId, localStream, remoteStreams]);
 
 
   useEffect(() => {
@@ -241,5 +245,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
 };
 
 export default MeetingClient;
+
+    
 
     
