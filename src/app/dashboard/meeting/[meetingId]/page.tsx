@@ -1,23 +1,27 @@
 
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Mic, MicOff, Video, VideoOff, Hand, Users, PhoneOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function MeetingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   const searchParams = useSearchParams();
+  const { toast } = useToast();
+  
   const initialCamState = searchParams.get('cam') === 'true';
   const initialMicState = searchParams.get('mic') === 'true';
 
   const [isCameraOn, setIsCameraOn] = useState(initialCamState);
   const [isMicOn, setIsMicOn] = useState(initialMicState);
   const [isHandRaised, setIsHandRaised] = useState(false);
-  const [loadingCamera, setLoadingCamera] = useState(true);
+  const [loadingMedia, setLoadingMedia] = useState(true);
 
   useEffect(() => {
     const setupMedia = async () => {
@@ -27,7 +31,6 @@ export default function MeetingPage() {
           audio: true,
         });
 
-        // Set initial track state based on URL params
         stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
         stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
 
@@ -38,8 +41,13 @@ export default function MeetingPage() {
         }
       } catch (err) {
         console.error("Error accessing media devices:", err);
+        toast({
+            variant: "destructive",
+            title: "Media Access Denied",
+            description: "Could not access your camera or microphone. Please check browser permissions."
+        });
       } finally {
-        setLoadingCamera(false);
+        setLoadingMedia(false);
       }
     };
 
@@ -50,51 +58,26 @@ export default function MeetingPage() {
         localStream.getTracks().forEach((track) => track.stop());
       }
     };
-     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleToggleCamera = async () => {
-    try {
-      if (isCameraOn) {
-        // TURN OFF CAMERA
-        if (localStream) {
-          localStream.getVideoTracks().forEach(track => track.stop());
-        }
-        setIsCameraOn(false);
-      } else {
-        // TURN ON CAMERA (fresh stream every time)
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        
-        // Add new video track to existing stream, and remove old one if it exists
-        if(localStream){
-            const oldVideoTrack = localStream.getVideoTracks()[0];
-            if(oldVideoTrack){
-                localStream.removeTrack(oldVideoTrack);
-            }
-            localStream.addTrack(stream.getVideoTracks()[0]);
-        }
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = localStream;
-          videoRef.current.play().catch(err => console.error("Autoplay failed:", err));
-        }
-         
-        setIsCameraOn(true);
-      }
-    } catch (error) {
-      console.error("Camera toggle failed:", error);
+  const handleToggleCamera = useCallback(() => {
+    if (!localStream) return;
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      setIsCameraOn(videoTrack.enabled);
     }
-  };
+  }, [localStream]);
 
-
-  const handleToggleMic = () => {
+  const handleToggleMic = useCallback(() => {
     if (!localStream) return;
     const audioTrack = localStream.getAudioTracks()[0];
     if (audioTrack) {
       audioTrack.enabled = !audioTrack.enabled;
       setIsMicOn(audioTrack.enabled);
     }
-  };
+  }, [localStream]);
 
   const handleToggleHandRaise = () => {
     setIsHandRaised((prev) => !prev);
@@ -111,8 +94,8 @@ export default function MeetingPage() {
     <div className="w-full h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
       {/* Video or Avatar */}
       <div className="flex-1 flex items-center justify-center w-full">
-        {loadingCamera ? (
-          <div className="text-lg text-gray-400">Initializing Camera...</div>
+        {loadingMedia ? (
+          <div className="text-lg text-gray-400">Initializing Media...</div>
         ) : isCameraOn ? (
           <video
             ref={videoRef}
@@ -133,9 +116,9 @@ export default function MeetingPage() {
         {/* Mic Button */}
         <Button
           onClick={handleToggleMic}
-          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
+          className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", 
             isMicOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
-          }`}
+          )}
           aria-label={isMicOn ? "Mute" : "Unmute"}
         >
           {isMicOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
@@ -144,9 +127,9 @@ export default function MeetingPage() {
         {/* Camera Button */}
         <Button
           onClick={handleToggleCamera}
-          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
+          className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
             isCameraOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
-          }`}
+          )}
           aria-label={isCameraOn ? "Stop Camera" : "Start Camera"}
         >
           {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
@@ -167,9 +150,9 @@ export default function MeetingPage() {
         {/* Hand Raise Button */}
         <Button
           onClick={handleToggleHandRaise}
-          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
+          className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
             isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
-          }`}
+          )}
           aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
         >
           <Hand className="h-6 w-6" />
