@@ -7,7 +7,7 @@ import { Mic, MicOff, Video, VideoOff, Hand, Users, MessageSquare, PhoneOff } fr
 export default function MeetingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [isCameraOn, setIsCameraOn] = useState(true); // start with camera ON
+  const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [loadingCamera, setLoadingCamera] = useState(true);
@@ -22,12 +22,9 @@ export default function MeetingPage() {
 
         setLocalStream(stream);
 
-        // attach stream immediately
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-
-        // default ON states
         setIsCameraOn(true);
         setIsMicOn(true);
       } catch (err) {
@@ -40,42 +37,51 @@ export default function MeetingPage() {
     setupMedia();
 
     return () => {
-      localStream?.getTracks().forEach((track) => track.stop());
+      if (localStream) {
+        localStream.getTracks().forEach((track) => track.stop());
+      }
     };
+     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // === Toggle Handlers ===
   const handleToggleCamera = async () => {
     if (!localStream) return;
 
-    const videoTrack = localStream.getVideoTracks()[0];
-
     if (isCameraOn) {
-      // === TURN OFF CAMERA ===
+      // Turn camera OFF
+      const videoTrack = localStream.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.stop(); // fully stop camera
+        videoTrack.stop();
         localStream.removeTrack(videoTrack);
       }
       setIsCameraOn(false);
     } else {
-      // === TURN ON CAMERA AGAIN ===
+      // Turn camera ON
       try {
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const newVideoTrack = newStream.getVideoTracks()[0];
-        if (newVideoTrack) {
-          localStream.addTrack(newVideoTrack);
+        const newVideoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newVideoTrack = newVideoStream.getVideoTracks()[0];
+        
+        // Find and remove any old video tracks before adding the new one
+        const oldVideoTracks = localStream.getVideoTracks();
+        oldVideoTracks.forEach(track => {
+            track.stop();
+            localStream.removeTrack(track);
+        });
 
-          // replace srcObject
-          if (videoRef.current) {
-            videoRef.current.srcObject = localStream;
-          }
-          setIsCameraOn(true);
+        localStream.addTrack(newVideoTrack);
+        
+        // Re-assign the srcObject to ensure the video element updates
+        if (videoRef.current) {
+          videoRef.current.srcObject = localStream;
         }
+
+        setIsCameraOn(true);
       } catch (err) {
         console.error("Error turning camera back on:", err);
       }
     }
   };
+
 
   const handleToggleMic = () => {
     if (!localStream) return;
