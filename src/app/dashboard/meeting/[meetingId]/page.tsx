@@ -45,12 +45,35 @@ export default function MeetingPage() {
   }, []);
 
   // === Toggle Handlers ===
-  const handleToggleCamera = () => {
+  const handleToggleCamera = async () => {
     if (!localStream) return;
+
     const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      setIsCameraOn(videoTrack.enabled);
+
+    if (isCameraOn) {
+      // === TURN OFF CAMERA ===
+      if (videoTrack) {
+        videoTrack.stop(); // fully stop camera
+        localStream.removeTrack(videoTrack);
+      }
+      setIsCameraOn(false);
+    } else {
+      // === TURN ON CAMERA AGAIN ===
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        if (newVideoTrack) {
+          localStream.addTrack(newVideoTrack);
+
+          // replace srcObject
+          if (videoRef.current) {
+            videoRef.current.srcObject = localStream;
+          }
+          setIsCameraOn(true);
+        }
+      } catch (err) {
+        console.error("Error turning camera back on:", err);
+      }
     }
   };
 
@@ -133,7 +156,7 @@ export default function MeetingPage() {
         <button
           onClick={handleToggleHandRaise}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
-            isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
+            isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-white/10 hover:bg-white/20"
           }`}
           aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
         >
