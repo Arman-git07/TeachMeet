@@ -195,9 +195,9 @@ export default function PreJoinPage() {
 
     setIsCreatingMeeting(true);
     
-    // Simply redirect to the meeting page.
-    // The meeting page will handle its own logic for joining/waiting.
-    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}`);
+    // Redirect to the meeting page with camera and mic status as query parameters.
+    const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+    router.push(meetingPath);
   };
 
 

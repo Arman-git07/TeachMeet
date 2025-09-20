@@ -2,13 +2,20 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Mic, MicOff, Video, VideoOff, Hand, Users, MessageSquare, PhoneOff } from "lucide-react";
 
 export default function MeetingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(true);
+  const searchParams = useSearchParams();
+
+  // Get initial state from URL or default to true
+  const initialCamState = searchParams.get('cam') === 'true';
+  const initialMicState = searchParams.get('mic') === 'true';
+
+  const [isCameraOn, setIsCameraOn] = useState(initialCamState);
+  const [isMicOn, setIsMicOn] = useState(initialMicState);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [loadingCamera, setLoadingCamera] = useState(true);
 
@@ -20,13 +27,15 @@ export default function MeetingPage() {
           audio: true,
         });
 
+        // Set initial track state based on URL params
+        stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
+        stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+
         setLocalStream(stream);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-        setIsCameraOn(true);
-        setIsMicOn(true);
       } catch (err) {
         console.error("Error accessing media devices:", err);
       } finally {
@@ -45,46 +54,26 @@ export default function MeetingPage() {
   }, []);
 
   const handleToggleCamera = async () => {
-    try {
-      if (isCameraOn) {
-        // TURN OFF CAMERA
-        if (localStream) {
-          localStream.getTracks().forEach(track => {
-            if (track.kind === 'video') {
-                track.stop();
-            }
-          });
-        }
-        // Don't set the stream to null, just update camera state
-        setIsCameraOn(false);
-      } else {
-        // TURN ON CAMERA (fresh stream every time)
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const newVideoTrack = stream.getVideoTracks()[0];
-        
-        if (localStream) {
-            // Remove old video track if it exists and is stopped
-            const oldVideoTracks = localStream.getVideoTracks();
-            oldVideoTracks.forEach(track => {
-                localStream.removeTrack(track);
-            });
-            // Add the new one
-            localStream.addTrack(newVideoTrack);
-        } else {
-            // This case is unlikely if mic is also on, but as a fallback
-            setLocalStream(stream);
-        }
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = localStream;
-        }
+    if (!localStream) return;
+
+    const videoTracks = localStream.getVideoTracks();
+    if (videoTracks.length > 0) {
+      // If a track exists, toggle it
+      const currentTrack = videoTracks[0];
+      currentTrack.enabled = !currentTrack.enabled;
+      setIsCameraOn(currentTrack.enabled);
+    } else {
+      // If no video track, get a new one
+      try {
+        const newVideo = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = newVideo.getVideoTracks()[0];
+        localStream.addTrack(newTrack);
         setIsCameraOn(true);
+      } catch (err) {
+        console.error("Error starting camera:", err);
       }
-    } catch (error) {
-      console.error("Camera toggle failed:", error);
     }
   };
-
 
   const handleToggleMic = () => {
     if (!localStream) return;
