@@ -51,6 +51,7 @@ export default function MeetingPage() {
       // Turn camera OFF
       if (videoTrack) {
         videoTrack.stop();
+        localStream.removeTrack(videoTrack);
       }
       setIsCameraOn(false);
     } else {
