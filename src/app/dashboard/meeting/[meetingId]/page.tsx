@@ -3,14 +3,14 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Mic, MicOff, Video, VideoOff, Hand, Users, MessageSquare, PhoneOff } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, Users, PhoneOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function MeetingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  
   const searchParams = useSearchParams();
-
-  // Get initial state from URL or default to true
   const initialCamState = searchParams.get('cam') === 'true';
   const initialMicState = searchParams.get('mic') === 'true';
 
@@ -54,26 +54,38 @@ export default function MeetingPage() {
   }, []);
 
   const handleToggleCamera = async () => {
-    if (!localStream) return;
-
-    const videoTracks = localStream.getVideoTracks();
-    if (videoTracks.length > 0) {
-      // If a track exists, toggle it
-      const currentTrack = videoTracks[0];
-      currentTrack.enabled = !currentTrack.enabled;
-      setIsCameraOn(currentTrack.enabled);
-    } else {
-      // If no video track, get a new one
-      try {
-        const newVideo = await navigator.mediaDevices.getUserMedia({ video: true });
-        const newTrack = newVideo.getVideoTracks()[0];
-        localStream.addTrack(newTrack);
+    try {
+      if (isCameraOn) {
+        // TURN OFF CAMERA
+        if (localStream) {
+          localStream.getVideoTracks().forEach(track => track.stop());
+        }
+        setIsCameraOn(false);
+      } else {
+        // TURN ON CAMERA (fresh stream every time)
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // Add new video track to existing stream, and remove old one if it exists
+        if(localStream){
+            const oldVideoTrack = localStream.getVideoTracks()[0];
+            if(oldVideoTrack){
+                localStream.removeTrack(oldVideoTrack);
+            }
+            localStream.addTrack(stream.getVideoTracks()[0]);
+        }
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = localStream;
+          videoRef.current.play().catch(err => console.error("Autoplay failed:", err));
+        }
+         
         setIsCameraOn(true);
-      } catch (err) {
-        console.error("Error starting camera:", err);
       }
+    } catch (error) {
+      console.error("Camera toggle failed:", error);
     }
   };
+
 
   const handleToggleMic = () => {
     if (!localStream) return;
@@ -119,7 +131,7 @@ export default function MeetingPage() {
       {/* Controls */}
       <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
         {/* Mic Button */}
-        <button
+        <Button
           onClick={handleToggleMic}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
             isMicOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
@@ -127,10 +139,10 @@ export default function MeetingPage() {
           aria-label={isMicOn ? "Mute" : "Unmute"}
         >
           {isMicOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
-        </button>
+        </Button>
 
         {/* Camera Button */}
-        <button
+        <Button
           onClick={handleToggleCamera}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
             isCameraOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
@@ -138,20 +150,22 @@ export default function MeetingPage() {
           aria-label={isCameraOn ? "Stop Camera" : "Start Camera"}
         >
           {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
-        </button>
+        </Button>
 
         <div className="h-8 w-px bg-white/20 mx-2" />
 
         {/* Participants Button */}
-        <button
-          className="h-14 w-14 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-14 w-14 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20"
           aria-label="Participants"
         >
           <Users className="h-6 w-6" />
-        </button>
+        </Button>
 
         {/* Hand Raise Button */}
-        <button
+        <Button
           onClick={handleToggleHandRaise}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
             isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
@@ -159,18 +173,18 @@ export default function MeetingPage() {
           aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
         >
           <Hand className="h-6 w-6" />
-        </button>
+        </Button>
         
         <div className="h-8 w-px bg-white/20 mx-2" />
 
         {/* Leave Meeting Button */}
-        <button
+        <Button
           onClick={handleLeave}
           className="h-14 w-14 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 transition-colors"
           aria-label="Leave Meeting"
         >
           <PhoneOff className="h-6 w-6" />
-        </button>
+        </Button>
       </div>
     </div>
   );
