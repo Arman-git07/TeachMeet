@@ -45,39 +45,43 @@ export default function MeetingPage() {
   }, []);
 
   const handleToggleCamera = async () => {
-    if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (isCameraOn) {
-      // Turn camera OFF
-      if (videoTrack) {
-        videoTrack.stop();
-        localStream.removeTrack(videoTrack);
-      }
-      setIsCameraOn(false);
-    } else {
-      // Turn camera ON
-      try {
-        const newVideoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const newVideoTrack = newVideoStream.getVideoTracks()[0];
+    try {
+      if (isCameraOn) {
+        // TURN OFF CAMERA
+        if (localStream) {
+          localStream.getTracks().forEach(track => {
+            if (track.kind === 'video') {
+                track.stop();
+            }
+          });
+        }
+        // Don't set the stream to null, just update camera state
+        setIsCameraOn(false);
+      } else {
+        // TURN ON CAMERA (fresh stream every time)
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newVideoTrack = stream.getVideoTracks()[0];
         
-        // Find and remove any old video tracks before adding the new one
-        const oldVideoTracks = localStream.getVideoTracks();
-        oldVideoTracks.forEach(track => {
-            track.stop();
-            localStream.removeTrack(track);
-        });
-
-        localStream.addTrack(newVideoTrack);
+        if (localStream) {
+            // Remove old video track if it exists and is stopped
+            const oldVideoTracks = localStream.getVideoTracks();
+            oldVideoTracks.forEach(track => {
+                localStream.removeTrack(track);
+            });
+            // Add the new one
+            localStream.addTrack(newVideoTrack);
+        } else {
+            // This case is unlikely if mic is also on, but as a fallback
+            setLocalStream(stream);
+        }
         
-        // Re-assign the srcObject to ensure the video element updates
         if (videoRef.current) {
           videoRef.current.srcObject = localStream;
         }
-
         setIsCameraOn(true);
-      } catch (err) {
-        console.error("Error turning camera back on:", err);
       }
+    } catch (error) {
+      console.error("Camera toggle failed:", error);
     }
   };
 
