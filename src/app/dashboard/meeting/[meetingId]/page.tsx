@@ -46,13 +46,11 @@ export default function MeetingPage() {
 
   const handleToggleCamera = async () => {
     if (!localStream) return;
-
+    const videoTrack = localStream.getVideoTracks()[0];
     if (isCameraOn) {
       // Turn camera OFF
-      const videoTrack = localStream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.stop();
-        localStream.removeTrack(videoTrack);
       }
       setIsCameraOn(false);
     } else {
@@ -162,7 +160,7 @@ export default function MeetingPage() {
         <button
           onClick={handleToggleHandRaise}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
-            isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-white/10 hover:bg-white/20"
+            isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
           }`}
           aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
         >
