@@ -101,7 +101,7 @@ export default function MeetingPage() {
         <button
           onClick={handleToggleMic}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
-            isMicOn ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+            isMicOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
           }`}
           aria-label={isMicOn ? "Mute" : "Unmute"}
         >
@@ -112,7 +112,7 @@ export default function MeetingPage() {
         <button
           onClick={handleToggleCamera}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
-            isCameraOn ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+            isCameraOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
           }`}
           aria-label={isCameraOn ? "Stop Camera" : "Start Camera"}
         >
@@ -133,7 +133,7 @@ export default function MeetingPage() {
         <button
           onClick={handleToggleHandRaise}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
-            isHandRaised ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+            isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
           }`}
           aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
         >
@@ -145,7 +145,7 @@ export default function MeetingPage() {
         {/* Leave Meeting Button */}
         <button
           onClick={handleLeave}
-          className="h-14 w-14 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors"
+          className="h-14 w-14 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 transition-colors"
           aria-label="Leave Meeting"
         >
           <PhoneOff className="h-6 w-6" />
