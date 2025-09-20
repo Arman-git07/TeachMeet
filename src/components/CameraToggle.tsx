@@ -3,7 +3,6 @@
 
 import React from "react";
 import { Video, VideoOff } from "lucide-react";
-import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { ControlButton } from "@/app/dashboard/meeting/[meetingId]/page";
 
@@ -11,10 +10,9 @@ type CameraToggleProps = {
   isCameraOn: boolean;
   onToggle: () => void;
   className?: string;
-  label?: string;
 };
 
-const CameraToggle = React.forwardRef<HTMLButtonElement, CameraToggleProps>(({ isCameraOn, onToggle, className, label }, ref) => {
+const CameraToggle = React.forwardRef<HTMLButtonElement, CameraToggleProps>(({ isCameraOn, onToggle, className }, ref) => {
   return (
     <ControlButton
         label={isCameraOn ? "Stop Camera" : "Start Camera"}
