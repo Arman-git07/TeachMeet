@@ -11,8 +11,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export default function MeetingPage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -25,68 +25,30 @@ export default function MeetingPage() {
   const [isMicOn, setIsMicOn] = useState(initialMicState);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(true);
-
-  const startCamera = async () => {
-    try {
-      setLoadingMedia(true);
-      // Always request a fresh stream when turning camera ON
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {}); // ensure playback
-      }
-
-      setIsCameraOn(true);
-    } catch (err) {
-      console.error("Error starting camera:", err);
-      toast({
-          variant: "destructive",
-          title: "Camera Error",
-          description: "Could not start camera. Please check browser permissions."
-      });
-      setIsCameraOn(false);
-    } finally {
-      setLoadingMedia(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setIsCameraOn(false);
-  };
-  
-  const handleToggleCamera = () => {
-    if (isCameraOn) {
-      stopCamera();
-    } else {
-      startCamera();
-    }
-  };
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
   useEffect(() => {
     async function setupMedia() {
       try {
         setLoadingMedia(true);
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: initialCamState,
-          audio: initialMicState,
+          video: true, // Always request video to get permission
+          audio: true, // Always request audio
         });
         streamRef.current = stream;
-
-        // Apply initial mic state
-        stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+        setHasCameraPermission(true);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+
+        // Apply initial states from URL params
+        stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
+        stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+
+        setIsCameraOn(initialCamState);
+        setIsMicOn(initialMicState);
+
       } catch (err) {
         console.error("Error accessing media devices:", err);
         toast({
@@ -96,6 +58,7 @@ export default function MeetingPage() {
         });
         setIsCameraOn(false);
         setIsMicOn(false);
+        setHasCameraPermission(false);
       } finally {
         setLoadingMedia(false);
       }
@@ -103,12 +66,23 @@ export default function MeetingPage() {
     setupMedia();
 
     return () => {
+      // Clean up stream on component unmount
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, [initialCamState, initialMicState, toast]);
 
+
+  const handleToggleCamera = useCallback(() => {
+    if (!streamRef.current || hasCameraPermission === false) return;
+    const videoTrack = streamRef.current.getVideoTracks()[0];
+    if (videoTrack) {
+        const nextState = !videoTrack.enabled;
+        videoTrack.enabled = nextState;
+        setIsCameraOn(nextState);
+    }
+  }, [hasCameraPermission]);
 
   const handleToggleMic = useCallback(() => {
     if (!streamRef.current) return;
@@ -140,21 +114,34 @@ export default function MeetingPage() {
       <div className="flex-1 flex items-center justify-center w-full">
         {loadingMedia ? (
           <div className="text-lg text-gray-400">Initializing Media...</div>
-        ) : isCameraOn ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
         ) : (
-            <Avatar className="w-32 h-32 border-4 border-background shadow-lg">
-                {userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar"/>}
-                <AvatarFallback className="text-6xl bg-gray-700 text-white">
-                {userName.charAt(0).toUpperCase()}
-                </AvatarFallback>
-            </Avatar>
+          <div className="w-full h-full relative flex items-center justify-center">
+            {/* Video element is always present but hidden if camera is off */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={cn("w-full h-full object-cover transition-opacity", isCameraOn ? "opacity-100" : "opacity-0")}
+            />
+            {/* Avatar is shown when camera is off */}
+            {(!isCameraOn || hasCameraPermission === false) && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground">
+                    <Avatar className="w-32 h-32 border-4 border-background shadow-lg">
+                        {userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar"/>}
+                        <AvatarFallback className="text-6xl bg-gray-700 text-white">
+                        {userName.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                    </Avatar>
+                     {hasCameraPermission === false && (
+                         <div className="mt-4">
+                            <p className="text-sm font-semibold text-destructive">Camera access denied</p>
+                            <p className="text-xs">Enable camera permissions in your browser.</p>
+                         </div>
+                     )}
+                 </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -178,6 +165,7 @@ export default function MeetingPage() {
             isCameraOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
           )}
           aria-label={isCameraOn ? "Stop Camera" : "Start Camera"}
+          disabled={hasCameraPermission === false}
         >
           {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
         </Button>
