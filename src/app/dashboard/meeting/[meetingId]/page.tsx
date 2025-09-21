@@ -66,11 +66,12 @@ export default function MeetingPage() {
   const [participants, setParticipants] = useState<any[]>([]);
   const [participantCount, setParticipantCount] = useState(0);
   const [blink, setBlink] = useState(false);
-  const selfParticipant = participants.find(p => p.id === user?.uid);
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
+
+  const selfParticipant = participants.find(p => p.id === user?.uid);
 
   useEffect(() => {
     async function setupMedia() {
@@ -130,8 +131,6 @@ export default function MeetingPage() {
   };
 
   const handleToggleCamera = useCallback(() => {
-    // Camera can only be toggled if not screen sharing.
-    // The actual track management is handled by handleScreenShare.
     if (isScreenSharing) {
         toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
         return;
@@ -146,7 +145,7 @@ export default function MeetingPage() {
   }, [isScreenSharing, isCameraOn, toast]);
 
   const handleToggleMic = useCallback(() => {
-    const stream = localStreamRef.current; // Mic is always from the user's primary device
+    const stream = isScreenSharing ? screenStreamRef.current : localStreamRef.current;
     if (!stream) return;
     const audioTrack = stream.getAudioTracks()[0];
     if (audioTrack) {
@@ -155,7 +154,7 @@ export default function MeetingPage() {
       setIsMicOn(nextState);
       updateMyStatus({ isMicOn: nextState });
     }
-  }, [isMicOn]);
+  }, [isMicOn, isScreenSharing]);
 
   const handleToggleHandRaise = () => {
     const nextState = !isHandRaised;
@@ -167,19 +166,17 @@ export default function MeetingPage() {
     setShowScreenShareConfirm(false);
     if (isScreenSharing) {
         // Stop sharing
-        localStreamRef.current?.getTracks().forEach(t => {
-            if (t.kind === 'video') t.enabled = isCameraOn;
-        });
-        
-        const videoTrack = localStreamRef.current?.getVideoTracks()[0];
-        if (videoTrack) {
-            setLocalStream(new MediaStream([videoTrack, ...localStreamRef.current!.getAudioTracks()]));
+        const cameraVideoTrack = localStreamRef.current?.getVideoTracks()[0];
+        if (cameraVideoTrack) {
+            cameraVideoTrack.enabled = isCameraOn; // Restore original camera state
+            const newStream = new MediaStream([cameraVideoTrack, ...localStreamRef.current!.getAudioTracks()]);
+            setLocalStream(newStream);
         }
 
         screenStreamRef.current?.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
         setIsScreenSharing(false);
-        updateMyStatus({ isScreenSharing: false });
+        await updateMyStatus({ isScreenSharing: false });
         return;
     }
 
@@ -201,7 +198,7 @@ export default function MeetingPage() {
         setLocalStream(newStream);
         screenStreamRef.current = screenStream;
         setIsScreenSharing(true);
-        updateMyStatus({ isScreenSharing: true });
+        await updateMyStatus({ isScreenSharing: true });
 
     } catch (err) {
         console.error("Screen share error:", err);

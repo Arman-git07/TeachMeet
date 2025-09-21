@@ -19,6 +19,7 @@ type Participant = {
   isHandRaised?: boolean;
   isLocal?: boolean;
   stream: MediaStream | null;
+  isScreenSharing?: boolean;
 };
 
 type Props = { 
@@ -75,16 +76,16 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
-  const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean}>>(new Map());
+  const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>>(new Map());
 
   // Firestore listener for participants
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
     const unsubscribe = onSnapshot(participantsCol, (snapshot) => {
-      const newParticipants = new Map<string, {name: string, photoURL?: string, isHandRaised?: boolean}>();
+      const newParticipants = new Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>();
       snapshot.forEach(doc => {
-        newParticipants.set(doc.id, doc.data() as {name: string, photoURL?: string, isHandRaised?: boolean});
+        newParticipants.set(doc.id, doc.data() as {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean});
       });
       setLiveParticipants(newParticipants);
     });
@@ -132,6 +133,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       isCamOff: !camOn, 
       isMicOff: !micOn,
       isHandRaised: localUserDetails?.isHandRaised,
+      isScreenSharing: localUserDetails?.isScreenSharing,
       isLocal: true,
       stream: localStream
     };
@@ -147,7 +149,8 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
           name: data.name || `User ${id.substring(0, 4)}`,
           avatar: data.photoURL,
           isHandRaised: data.isHandRaised,
-          isCamOff: videoTracks.length === 0 || videoTracks.every(t => !t.enabled),
+          isScreenSharing: data.isScreenSharing,
+          isCamOff: data.isScreenSharing ? false : (videoTracks.length === 0 || !videoTracks.some(t => t.enabled && !t.muted)),
           isMicOff: audioTracks.length === 0 || audioTracks.every(t => !t.enabled),
           stream: remoteStream || null,
         };
