@@ -296,51 +296,6 @@ export default function MeetingPage() {
                     </Button>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Sheet>
-                      <SheetTrigger asChild>
-                         <Button
-                            variant="ghost"
-                            className={cn(
-                              "h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/20 text-white relative",
-                              blink && 'animate-blink-success'
-                            )}
-                            aria-label="View Participants"
-                          >
-                            <Users className="h-6 w-6" />
-                             {participantCount > 0 && (
-                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">
-                                {participantCount}
-                              </span>
-                            )}
-                        </Button>
-                      </SheetTrigger>
-                       <SheetContent>
-                        <SheetHeader>
-                          <SheetTitle>Participants ({participants.length})</SheetTitle>
-                          <SheetDescription>List of participants currently in the meeting.</SheetDescription>
-                        </SheetHeader>
-                        <ScrollArea className="h-[calc(100%-80px)] mt-4">
-                          <div className="space-y-4 pr-4">
-                            {participants.map(p => (
-                               <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-                                  <Avatar>
-                                    <AvatarImage src={p.avatar} />
-                                    <AvatarFallback>{p.name?.charAt(0) || 'U'}</AvatarFallback>
-                                  </Avatar>
-                                  <div className="flex-grow">
-                                    <p className="text-sm font-medium">{p.name}{p.isLocal && " (You)"}</p>
-                                    {p.isHandRaised && <Hand className="h-4 w-4 text-yellow-400 inline-block ml-2" />}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    {p.isMicOff ? <MicOff className="h-4 w-4 text-destructive" /> : <Mic className="h-4 w-4 text-green-500"/>}
-                                    {p.isCamOff ? <VideoOff className="h-4 w-4 text-destructive" /> : <Video className="h-4 w-4 text-green-500"/>}
-                                  </div>
-                                </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </SheetContent>
-                    </Sheet>
                      <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
                        <AlertDialogTrigger asChild>
                            <Button
