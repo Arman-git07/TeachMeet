@@ -275,27 +275,6 @@ export default function MeetingPage() {
                       {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
                     </Button>
 
-                    <Button
-                      onClick={handleToggleHandRaise}
-                      className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-white/10 hover:bg-white/20 text-white"
-                      )}
-                      aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
-                    >
-                      <Hand className="h-6 w-6" />
-                    </Button>
-                    
-                    <div className="h-8 w-px bg-white/20 mx-2" />
-
-                    <Button
-                      onClick={handleLeave}
-                      className="h-14 w-14 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 transition-colors"
-                      aria-label="Leave Meeting"
-                    >
-                      <PhoneOff className="h-6 w-6" />
-                    </Button>
-                </div>
-                <div className="flex items-center gap-3">
                      <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
                        <AlertDialogTrigger asChild>
                            <Button
@@ -322,6 +301,29 @@ export default function MeetingPage() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
+
+                    <Button
+                      onClick={handleToggleHandRaise}
+                      className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
+                        isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-white/10 hover:bg-white/20 text-white"
+                      )}
+                      aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
+                    >
+                      <Hand className="h-6 w-6" />
+                    </Button>
+                    
+                    <div className="h-8 w-px bg-white/20 mx-2" />
+
+                    <Button
+                      onClick={handleLeave}
+                      className="h-14 w-14 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 transition-colors"
+                      aria-label="Leave Meeting"
+                    >
+                      <PhoneOff className="h-6 w-6" />
+                    </Button>
+                </div>
+                <div className="flex items-center gap-3">
+                     {/* Placeholder for right-aligned controls if needed */}
                 </div>
             </div>
         </div>
@@ -329,3 +331,5 @@ export default function MeetingPage() {
   );
 }
  
+
+    
