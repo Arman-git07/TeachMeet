@@ -10,31 +10,87 @@ import { cn } from "@/lib/utils";
 
 export default function MeetingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  
+  const streamRef = useRef<MediaStream | null>(null); // Use a ref to hold the stream
+
   const searchParams = useSearchParams();
   const { toast } = useToast();
   
-  const initialCamState = searchParams.get('cam') === 'true';
-  const initialMicState = searchParams.get('mic') === 'true';
+  // Get initial states from URL params, defaulting to true if not present
+  const initialCamState = searchParams.get('cam') !== 'false';
+  const initialMicState = searchParams.get('mic') !== 'false';
 
   const [isCameraOn, setIsCameraOn] = useState(initialCamState);
   const [isMicOn, setIsMicOn] = useState(initialMicState);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(true);
 
+  // Function to start the camera
+  const startCamera = useCallback(async () => {
+    // Avoid starting if already on
+    if (streamRef.current?.getVideoTracks().some(t => t.readyState === 'live')) {
+        return;
+    }
+    try {
+      setLoadingMedia(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      
+      // If there's an existing stream with audio, add the new video track
+      if (streamRef.current) {
+         stream.getVideoTracks().forEach(track => streamRef.current!.addTrack(track));
+      } else {
+         streamRef.current = stream;
+      }
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+        await videoRef.current.play().catch(() => {}); // ensure playback
+      }
+      setIsCameraOn(true);
+    } catch (err) {
+      console.error("Error starting camera:", err);
+      toast({
+          variant: "destructive",
+          title: "Camera Error",
+          description: "Could not start camera. Please check browser permissions."
+      });
+      setIsCameraOn(false); // Ensure state is correct on failure
+    } finally {
+      setLoadingMedia(false);
+    }
+  }, [toast]);
+
+  // Function to stop the camera
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getVideoTracks().forEach(track => {
+        track.stop();
+        streamRef.current!.removeTrack(track); // Also remove it
+      });
+    }
+    // Don't nullify the streamRef if audio is still running
+    if (streamRef.current?.getAudioTracks().length === 0) {
+        streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOn(false);
+  }, []);
+
+  // Initial media setup
   useEffect(() => {
-    const setupMedia = async () => {
+    async function setupMedia() {
       try {
+        setLoadingMedia(true);
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
+          video: initialCamState,
+          audio: initialMicState,
         });
+        streamRef.current = stream;
 
-        stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
+        // Apply initial mic state
         stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
-
-        setLocalStream(stream);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -42,50 +98,51 @@ export default function MeetingPage() {
       } catch (err) {
         console.error("Error accessing media devices:", err);
         toast({
-            variant: "destructive",
-            title: "Media Access Denied",
-            description: "Could not access your camera or microphone. Please check browser permissions."
+          variant: "destructive",
+          title: "Media Access Denied",
+          description: "Could not access camera or microphone. Please check browser permissions.",
         });
+        setIsCameraOn(false);
+        setIsMicOn(false);
       } finally {
         setLoadingMedia(false);
       }
-    };
-
+    }
     setupMedia();
 
+    // Cleanup on unmount
     return () => {
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialCamState, initialMicState, toast]);
 
-  const handleToggleCamera = useCallback(() => {
-    if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      setIsCameraOn(videoTrack.enabled);
+  const handleToggleCamera = () => {
+    if (isCameraOn) {
+      stopCamera();
+    } else {
+      startCamera();
     }
-  }, [localStream]);
+  };
 
   const handleToggleMic = useCallback(() => {
-    if (!localStream) return;
-    const audioTrack = localStream.getAudioTracks()[0];
+    if (!streamRef.current) return;
+    const audioTrack = streamRef.current.getAudioTracks()[0];
     if (audioTrack) {
       audioTrack.enabled = !audioTrack.enabled;
       setIsMicOn(audioTrack.enabled);
     }
-  }, [localStream]);
+  }, []);
 
   const handleToggleHandRaise = () => {
     setIsHandRaised((prev) => !prev);
   };
   
   const handleLeave = () => {
-    // In a real app, this would disconnect from the call and redirect.
-    console.log("Leaving meeting.");
+    if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+    }
     window.location.href = "/";
   };
 
@@ -172,3 +229,5 @@ export default function MeetingPage() {
     </div>
   );
 }
+
+    
