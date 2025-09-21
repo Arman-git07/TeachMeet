@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, MicOff, Video, VideoOff, Hand, Users, PhoneOff, ScreenShare, ScreenShareOff, MoreVertical, Brush, MessageSquare, PanelLeftOpen, Settings } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, Users, PhoneOff, ScreenShare, ScreenShareOff, MoreVertical, Brush, MessageSquare, PanelLeftOpen, Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,17 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 export default function MeetingPage() {
   const params = useSearchParams();
   const router = useRouter();
-  const { meetingId } = router.query || { meetingId: "" };
+  
+  // A simple way to get the meetingId from the URL since `useParams` can be tricky with client components
+  const [meetingId, setMeetingId] = useState('');
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pathParts = window.location.pathname.split('/');
+      const id = pathParts[pathParts.indexOf('meeting') + 1];
+      setMeetingId(id);
+    }
+  }, []);
+
   const topic = params.get('topic') || "TeachMeet Meeting";
   
   const { user } = useAuth();
@@ -212,9 +222,9 @@ export default function MeetingPage() {
   const isHost = selfParticipant?.isHost;
 
   return (
-    <div className="w-full h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+    <div className="w-full h-full bg-gray-900 text-white flex flex-col">
         {/* Main Content Area */}
-        <div className="relative flex-grow min-h-0">
+        <div className="relative flex-grow">
             {isClient && meetingId && user?.uid && (
               <MeetingClient
                   meetingId={meetingId as string}
@@ -224,58 +234,17 @@ export default function MeetingPage() {
                   localStream={localStream}
                   micOn={isMicOn}
                   camOn={isCameraOn}
-                  isScreenSharing={isScreenSharing}
               />
             )}
-            
-            {/* Top Controls Overlay */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between pointer-events-none">
-              <div className="flex items-center gap-2 pointer-events-auto">
-                   <SidebarTrigger className="md:hidden text-white">
-                     <PanelLeftOpen className="h-6 w-6" />
-                   </SidebarTrigger>
-                   <SidebarTrigger className="hidden md:flex text-white" />
-              </div>
-              <div className="flex items-center gap-2 pointer-events-auto">
-                  <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="rounded-full bg-black/30 hover:bg-black/50 text-white">
-                              <MoreVertical className="h-5 w-5" />
-                          </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-xl w-56">
-                          <DropdownMenuItem asChild className="cursor-pointer">
-                              <Link href={`/dashboard/meeting/${meetingId}/whiteboard`}>
-                                  <Brush className="mr-2 h-4 w-4" />
-                                  <span>Whiteboard</span>
-                              </Link>
-                          </DropdownMenuItem>
-                           <DropdownMenuItem asChild className="cursor-pointer">
-                             <Link href={`/dashboard/meeting/${meetingId}/chat`}>
-                              <MessageSquare className="mr-2 h-4 w-4" />
-                              <span>Chat</span>
-                            </Link>
-                          </DropdownMenuItem>
-                           <DropdownMenuItem asChild className="cursor-pointer">
-                             <Link href={`/dashboard/meeting/${meetingId}/participants`}>
-                              <Users className="mr-2 h-4 w-4" />
-                              <span>Participants</span>
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild className="cursor-pointer">
-                            <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`}>
-                              <Settings className="mr-2 h-4 w-4" />
-                              <span>Meeting Settings</span>
-                            </Link>
-                          </DropdownMenuItem>
-                      </DropdownMenuContent>
-                  </DropdownMenu>
-              </div>
-            </div>
+        </div>
 
-            {/* Bottom Controls Overlay */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-                <div className="flex items-center gap-3 p-3 bg-black/30 backdrop-blur-md rounded-full shadow-2xl border border-white/10">
+        {/* Bottom Controls */}
+        <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium truncate">{topic}</span>
+                </div>
+                <div className="flex items-center gap-3">
                     <Button
                       onClick={handleToggleMic}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", 
@@ -296,36 +265,28 @@ export default function MeetingPage() {
                       {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
                     </Button>
 
-                    <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
-                       <AlertDialogTrigger asChild>
-                           <Button
-                              variant="ghost"
-                              className={cn(
-                                "h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/20 text-white",
-                                isScreenSharing && "bg-primary text-primary-foreground hover:bg-primary/90"
-                              )}
-                              aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}
-                            >
-                               {isScreenSharing ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
-                            </Button>
-                       </AlertDialogTrigger>
-                       <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Share Your Screen?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will allow everyone in the meeting to see your screen. You can choose to share your entire screen, a window, or a tab.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleScreenShare}>Share Screen</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-
+                    <Button
+                      onClick={handleToggleHandRaise}
+                      className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
+                        isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-white/10 hover:bg-white/20 text-white"
+                      )}
+                      aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
+                    >
+                      <Hand className="h-6 w-6" />
+                    </Button>
+                    
                     <div className="h-8 w-px bg-white/20 mx-2" />
 
-                    <Sheet>
+                    <Button
+                      onClick={handleLeave}
+                      className="h-14 w-14 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 transition-colors"
+                      aria-label="Leave Meeting"
+                    >
+                      <PhoneOff className="h-6 w-6" />
+                    </Button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Sheet>
                       <SheetTrigger asChild>
                          <Button
                             variant="ghost"
@@ -370,26 +331,32 @@ export default function MeetingPage() {
                         </ScrollArea>
                       </SheetContent>
                     </Sheet>
-
-                    <Button
-                      onClick={handleToggleHandRaise}
-                      className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-white/10 hover:bg-white/20 text-white"
-                      )}
-                      aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
-                    >
-                      <Hand className="h-6 w-6" />
-                    </Button>
-                    
-                    <div className="h-8 w-px bg-white/20 mx-2" />
-
-                    <Button
-                      onClick={handleLeave}
-                      className="h-14 w-14 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 transition-colors"
-                      aria-label="Leave Meeting"
-                    >
-                      <PhoneOff className="h-6 w-6" />
-                    </Button>
+                     <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
+                       <AlertDialogTrigger asChild>
+                           <Button
+                              variant="ghost"
+                              className={cn(
+                                "h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/20 text-white",
+                                isScreenSharing && "bg-primary text-primary-foreground hover:bg-primary/90"
+                              )}
+                              aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}
+                            >
+                               {isScreenSharing ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
+                            </Button>
+                       </AlertDialogTrigger>
+                       <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Share Your Screen?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will allow everyone in the meeting to see your screen. You can choose to share your entire screen, a window, or a tab.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleScreenShare}>Share Screen</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             </div>
         </div>
