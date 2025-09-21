@@ -7,15 +7,17 @@ import { Mic, MicOff, Video, VideoOff, Hand, Users, PhoneOff } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export default function MeetingPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null); // Use a ref to hold the stream
+  const streamRef = useRef<MediaStream | null>(null);
 
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { user } = useAuth();
   
-  // Get initial states from URL params, defaulting to true if not present
   const initialCamState = searchParams.get('cam') !== 'false';
   const initialMicState = searchParams.get('mic') !== 'false';
 
@@ -24,27 +26,18 @@ export default function MeetingPage() {
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(true);
 
-  // Function to start the camera
-  const startCamera = useCallback(async () => {
-    // Avoid starting if already on
-    if (streamRef.current?.getVideoTracks().some(t => t.readyState === 'live')) {
-        return;
-    }
+  const startCamera = async () => {
     try {
       setLoadingMedia(true);
+      // Always request a fresh stream when turning camera ON
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      
-      // If there's an existing stream with audio, add the new video track
-      if (streamRef.current) {
-         stream.getVideoTracks().forEach(track => streamRef.current!.addTrack(track));
-      } else {
-         streamRef.current = stream;
-      }
-      
+      streamRef.current = stream;
+
       if (videoRef.current) {
-        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {}); // ensure playback
       }
+
       setIsCameraOn(true);
     } catch (err) {
       console.error("Error starting camera:", err);
@@ -53,32 +46,31 @@ export default function MeetingPage() {
           title: "Camera Error",
           description: "Could not start camera. Please check browser permissions."
       });
-      setIsCameraOn(false); // Ensure state is correct on failure
+      setIsCameraOn(false);
     } finally {
       setLoadingMedia(false);
     }
-  }, [toast]);
+  };
 
-  // Function to stop the camera
-  const stopCamera = useCallback(() => {
+  const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getVideoTracks().forEach(track => {
-        track.stop();
-        streamRef.current!.removeTrack(track); // Also remove it
-      });
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
-    // Don't nullify the streamRef if audio is still running
-    if (streamRef.current?.getAudioTracks().length === 0) {
-        streamRef.current = null;
-    }
-
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setIsCameraOn(false);
-  }, []);
+  };
+  
+  const handleToggleCamera = () => {
+    if (isCameraOn) {
+      stopCamera();
+    } else {
+      startCamera();
+    }
+  };
 
-  // Initial media setup
   useEffect(() => {
     async function setupMedia() {
       try {
@@ -110,7 +102,6 @@ export default function MeetingPage() {
     }
     setupMedia();
 
-    // Cleanup on unmount
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -118,13 +109,6 @@ export default function MeetingPage() {
     };
   }, [initialCamState, initialMicState, toast]);
 
-  const handleToggleCamera = () => {
-    if (isCameraOn) {
-      stopCamera();
-    } else {
-      startCamera();
-    }
-  };
 
   const handleToggleMic = useCallback(() => {
     if (!streamRef.current) return;
@@ -147,6 +131,9 @@ export default function MeetingPage() {
   };
 
 
+  const userName = user?.displayName || 'User';
+  const userAvatar = user?.photoURL;
+
   return (
     <div className="w-full h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
       {/* Video or Avatar */}
@@ -162,9 +149,12 @@ export default function MeetingPage() {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-32 h-32 flex items-center justify-center rounded-full bg-gray-700 text-4xl font-bold">
-            A
-          </div>
+            <Avatar className="w-32 h-32 border-4 border-background shadow-lg">
+                {userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar"/>}
+                <AvatarFallback className="text-6xl bg-gray-700 text-white">
+                {userName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+            </Avatar>
         )}
       </div>
 
@@ -229,5 +219,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
-    
