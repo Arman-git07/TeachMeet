@@ -168,6 +168,27 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       return <div className="text-muted-foreground">Initializing...</div>;
     }
     
+    const activeScreenSharer = allParticipants.find(p => p.isScreenSharing);
+    if (activeScreenSharer) {
+      const otherParticipants = allParticipants.filter(p => p.id !== activeScreenSharer.id);
+      return (
+        <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
+          <div className="flex-1 min-h-0">
+            <VideoTile user={activeScreenSharer} full />
+          </div>
+          {otherParticipants.length > 0 && (
+            <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
+              {otherParticipants.map(p => (
+                <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
+                   <VideoTile user={p} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
     if (count === 1) {
       return (
         <div className="w-full h-full flex items-center justify-center p-4">
@@ -242,7 +263,4 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
 };
 
 export default MeetingClient;
-
-    
-
-    
+ 

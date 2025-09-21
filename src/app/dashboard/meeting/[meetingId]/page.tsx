@@ -130,20 +130,18 @@ export default function MeetingPage() {
   };
 
   const handleToggleCamera = useCallback(() => {
-    const stream = isScreenSharing ? screenStreamRef.current : localStreamRef.current;
-    if (!stream) return;
-    
-    // Camera can only be toggled if not screen sharing
-    if (!isScreenSharing) {
-        const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack) {
-            const nextState = !isCameraOn;
-            videoTrack.enabled = nextState;
-            setIsCameraOn(nextState);
-            updateMyStatus({ isCameraOn: nextState });
-        }
-    } else {
+    // Camera can only be toggled if not screen sharing.
+    // The actual track management is handled by handleScreenShare.
+    if (isScreenSharing) {
         toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
+        return;
+    }
+    
+    if (localStreamRef.current) {
+        const nextState = !isCameraOn;
+        localStreamRef.current.getVideoTracks().forEach(track => track.enabled = nextState);
+        setIsCameraOn(nextState);
+        updateMyStatus({ isCameraOn: nextState });
     }
   }, [isScreenSharing, isCameraOn, toast]);
 
@@ -167,9 +165,16 @@ export default function MeetingPage() {
   
   const handleScreenShare = async () => {
     setShowScreenShareConfirm(false);
-    if (isScreenSharing) { // Stop sharing
-        localStreamRef.current?.getVideoTracks().forEach(t => t.enabled = isCameraOn);
-        setLocalStream(localStreamRef.current);
+    if (isScreenSharing) {
+        // Stop sharing
+        localStreamRef.current?.getTracks().forEach(t => {
+            if (t.kind === 'video') t.enabled = isCameraOn;
+        });
+        
+        const videoTrack = localStreamRef.current?.getVideoTracks()[0];
+        if (videoTrack) {
+            setLocalStream(new MediaStream([videoTrack, ...localStreamRef.current!.getAudioTracks()]));
+        }
 
         screenStreamRef.current?.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
@@ -363,5 +368,4 @@ export default function MeetingPage() {
     </div>
   );
 }
-
-    
+ 
