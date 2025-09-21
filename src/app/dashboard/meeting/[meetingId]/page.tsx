@@ -28,11 +28,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
 
 
 export default function MeetingPage() {
   const params = useSearchParams();
   const router = useRouter();
+  const { setHeaderContent } = useDynamicHeader();
   
   // A simple way to get the meetingId from the URL since `useParams` can be tricky with client components
   const [meetingId, setMeetingId] = useState('');
@@ -72,6 +74,12 @@ export default function MeetingPage() {
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
 
   const selfParticipant = participants.find(p => p.id === user?.uid);
+
+  useEffect(() => {
+    setHeaderContent(<span className="text-sm font-medium truncate">{topic}</span>);
+    return () => setHeaderContent(null);
+  }, [topic, setHeaderContent]);
+
 
   useEffect(() => {
     async function setupMedia() {
@@ -244,7 +252,7 @@ export default function MeetingPage() {
         <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate">{topic}</span>
+                    {/* Topic display removed from here */}
                 </div>
                 <div className="flex items-center gap-3">
                     <Button

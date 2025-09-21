@@ -29,21 +29,17 @@ export function DashboardHeader() {
   return (
     <header className={cn(
         "sticky top-0 z-40 w-full",
-        headerContent && "border-b bg-background/80 backdrop-blur-md"
+        "border-b bg-background/80 backdrop-blur-md"
     )}>
       <div className={cn(
-          "container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8",
-          headerContent ? "h-16" : "h-12"
+          "container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16"
       )}>
         <div className="flex items-center gap-2 sm:gap-4">
           <SidebarTrigger className="md:hidden">
             <PanelLeftOpen className="h-6 w-6" />
           </SidebarTrigger>
           <SidebarTrigger className="hidden md:flex" />
-        </div>
-        
-        <div className="flex-grow flex items-center px-4">
-          {headerContent}
+           {headerContent}
         </div>
         
         <div className="flex items-center gap-2">
