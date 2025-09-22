@@ -64,7 +64,7 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
-  meeting: (id, item) => `/dashboard/meeting/${id}/wait?topic=${encodeURIComponent(item.title)}&host=true`,
+  meeting: (id, item) => `/dashboard/meeting/${id}?topic=${encodeURIComponent(item.title)}`,
   document: (id) => `/dashboard/documents`,
   recording: (id) => `/dashboard/recordings`,
   chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
@@ -91,21 +91,26 @@ export default function HomePage() {
     let ongoingMeetings: MeetingActivityItem[] = [];
 
     if (user && startedMeetingsRaw) {
-      let storedMeetings = JSON.parse(startedMeetingsRaw);
-      if (Array.isArray(storedMeetings)) {
-        const now = Date.now();
-        const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < THIRTY_MINUTES_IN_MS));
-        
-        if(validMeetings.length < storedMeetings.length) {
-          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(validMeetings));
-        }
+      try {
+        let storedMeetings = JSON.parse(startedMeetingsRaw);
+        if (Array.isArray(storedMeetings)) {
+          const now = Date.now();
+          const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < THIRTY_MINUTES_IN_MS));
+          
+          if(validMeetings.length < storedMeetings.length) {
+            localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(validMeetings));
+          }
 
-        ongoingMeetings = validMeetings.map((m: any) => ({
-          ...m,
-          type: 'meeting',
-          id: `meeting-${m.id}`,
-          timestamp: m.startedAt,
-        }));
+          ongoingMeetings = validMeetings.map((m: any) => ({
+            type: 'meeting',
+            id: m.id, // Use the raw meetingId
+            title: m.title || "Ongoing Meeting",
+            timestamp: m.startedAt,
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to parse started meetings from localStorage", e);
+        localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear corrupted data
       }
     }
     
@@ -241,7 +246,7 @@ export default function HomePage() {
               <ul className="space-y-3 text-left">
                 {allActivity.map((item) => {
                   const Icon = itemIcons[item.type];
-                  const rawId = item.id.split('-').slice(1).join('-');
+                  const rawId = item.id;
                   const link = itemLinks[item.type](rawId, item);
                   return (
                     <li key={item.id} className="flex items-center gap-2">
