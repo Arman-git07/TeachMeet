@@ -56,25 +56,34 @@ export default function MeetingPage() {
   const initialCamState = isClient ? params.get('cam') !== 'false' : true;
   const initialMicState = isClient ? params.get('mic') !== 'false' : true;
 
- // ------- Camera: robust start/stop/restart logic (drop-in) -------
- const videoRef = useRef<HTMLVideoElement | null>(null);
- const streamRef = useRef<MediaStream | null>(null);
- const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
- const [loadingMedia, setLoadingMedia] = useState<boolean>(false);
+  const [isMicOn, setIsMicOn] = useState(initialMicState);
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
- const userPhotoUrl = user?.photoURL || `https://placehold.co/128x128.png?text=${user?.displayName?.charAt(0) ?? 'U'}`;
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  
+  const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
 
- const attachStreamToVideo = (stream: MediaStream | null) => {
-   try {
-     if (videoRef.current) {
-       videoRef.current.srcObject = stream;
-     }
-   } catch (e) {
-     console.warn("attachStreamToVideo failed:", e);
-   }
- };
+  // ------- Camera: robust start/stop/restart logic (drop-in) -------
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
+  const [loadingMedia, setLoadingMedia] = useState<boolean>(false);
 
- const replaceVideoTrackForPeers = (newTrack: MediaStreamTrack | null) => {
+  const userPhotoUrl = user?.photoURL || `https://placehold.co/128x128.png?text=${user?.displayName?.charAt(0) ?? 'U'}`;
+
+  const attachStreamToVideo = (stream: MediaStream | null) => {
+    try {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (e) {
+      console.warn("attachStreamToVideo failed:", e);
+    }
+  };
+
+  const replaceVideoTrackForPeers = (newTrack: MediaStreamTrack | null) => {
     if (!newTrack || !localStream) return;
     const pcs: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ ?? [];
     pcs.forEach((pc: RTCPeerConnection) => {
@@ -87,81 +96,72 @@ export default function MeetingPage() {
             console.warn("replaceVideoTrackForPeers error:", e);
         }
     });
- };
+  };
 
- const startCamera = async () => {
-   setLoadingMedia(true);
-   try {
-     if (streamRef.current) {
-       streamRef.current.getTracks().forEach((t) => {
-         try { t.stop(); } catch {}
-       });
-       streamRef.current = null;
-     }
+  const startCamera = async () => {
+    setLoadingMedia(true);
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => {
+          try { t.stop(); } catch {}
+        });
+        streamRef.current = null;
+      }
 
-     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-     streamRef.current = stream;
-     setLocalStream(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream;
+      setLocalStream(stream);
 
 
-     attachStreamToVideo(stream);
+      attachStreamToVideo(stream);
 
-     try {
-       await videoRef.current?.play();
-     } catch (e) {}
+      try {
+        await videoRef.current?.play();
+      } catch (e) {}
 
-     setIsCameraOn(true);
+      setIsCameraOn(true);
 
-     const newTrack = stream.getVideoTracks()[0];
-     if (newTrack) replaceVideoTrackForPeers(newTrack);
-   } catch (err) {
-     console.error("startCamera error:", err);
-   } finally {
-     setLoadingMedia(false);
-   }
- };
+      const newTrack = stream.getVideoTracks()[0];
+      if (newTrack) replaceVideoTrackForPeers(newTrack);
+    } catch (err) {
+      console.error("startCamera error:", err);
+    } finally {
+      setLoadingMedia(false);
+    }
+  };
 
- const stopCamera = () => {
-   try {
-     if (streamRef.current) {
-       streamRef.current.getTracks().forEach((t) => {
-         try { t.stop(); } catch {}
-       });
-       streamRef.current = null;
-     }
-     attachStreamToVideo(null);
-   } catch (e) {
-     console.warn("stopCamera error:", e);
-   } finally {
-     setIsCameraOn(false);
-     setLocalStream(null);
-   }
- };
+  const stopCamera = () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => {
+          try { t.stop(); } catch {}
+        });
+        streamRef.current = null;
+      }
+      attachStreamToVideo(null);
+    } catch (e) {
+      console.warn("stopCamera error:", e);
+    } finally {
+      setIsCameraOn(false);
+      setLocalStream(null);
+    }
+  };
 
- const toggleCamera = async () => {
+  const toggleCamera = async () => {
     if (isScreenSharing) {
         toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
         return;
     }
-   if (isCameraOn) {
-     stopCamera();
-   } else {
-     await startCamera();
-   }
-   updateMyStatus({ isCameraOn: !isCameraOn });
- };
+    if (isCameraOn) {
+      stopCamera();
+    } else {
+      await startCamera();
+    }
+    updateMyStatus({ isCameraOn: !isCameraOn });
+  };
 
 
   const screenStreamRef = useRef<MediaStream | null>(null);
-  
-  const [isMicOn, setIsMicOn] = useState(initialMicState);
-  const [isHandRaised, setIsHandRaised] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-
-  const [participants, setParticipants] = useState<any[]>([]);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  
-  const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
 
   const selfParticipant = participants.find(p => p.id === user?.uid);
   const previousRaisedHands = useRef(new Set());
@@ -179,13 +179,19 @@ export default function MeetingPage() {
         } else {
             setIsCameraOn(false);
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-                stream.getVideoTracks().forEach(t => t.enabled = false);
-                streamRef.current = stream;
+                // Get mic-only stream if camera is off initially
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 setLocalStream(stream);
             } catch(err) {
                  console.error("Error getting mic-only stream:", err);
+                 toast({ variant: 'destructive', title: 'Mic Access Denied', description: 'Could not access your microphone.' });
             }
+        }
+
+        // Apply initial mic state
+        if (localStream) {
+            localStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+            setIsMicOn(initialMicState);
         }
     })();
 
@@ -197,7 +203,8 @@ export default function MeetingPage() {
         screenStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [initialCamState]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleUserJoined = useCallback((socketId: string) => {
   }, []);
@@ -243,7 +250,7 @@ export default function MeetingPage() {
   };
 
   const handleToggleMic = useCallback(() => {
-    const streamToToggle = localStream;
+    const streamToToggle = localStream || streamRef.current;
     if (!streamToToggle) return;
 
     const audioTracks = streamToToggle.getAudioTracks();
@@ -352,6 +359,7 @@ export default function MeetingPage() {
                        src={userPhotoUrl}
                        alt="Profile"
                        className="w-32 h-32 rounded-full object-cover"
+                       data-ai-hint="user avatar"
                      />
                    )}
                 </div>
