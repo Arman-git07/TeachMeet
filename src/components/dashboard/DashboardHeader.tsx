@@ -7,24 +7,47 @@ import { PanelLeftOpen, MoreVertical, Brush, MessageSquare, Users, Settings } fr
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
 export function DashboardHeader() {
   const { headerContent } = useDynamicHeader();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const topic = searchParams.get('topic');
 
   const meetingId = useMemo(() => {
     const parts = pathname.split('/');
     const meetingIndex = parts.indexOf('meeting');
     if (meetingIndex !== -1 && parts.length > meetingIndex + 1) {
-      return parts[meetingIndex + 1];
+      const potentialId = parts[meetingIndex + 1];
+      // Ensure it's a valid meeting ID and not a sub-page like 'chat'
+      if (potentialId && !['chat', 'participants', 'whiteboard', 'prejoin', 'wait'].includes(potentialId)) {
+        return potentialId;
+      }
     }
+    // Fallback for sub-pages
+    const meetingIdFromParams = searchParams.get('meetingId');
+    if(meetingIdFromParams) return meetingIdFromParams;
+    
+    // Check if we are on a subpage and extract from path
+    if (meetingIndex !== -1 && parts.length > meetingIndex + 1) {
+        return parts[meetingIndex+1];
+    }
+    
     return null;
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   const isMeetingRelatedPage = !!meetingId;
+  
+  const constructUrl = (page: string) => {
+    let url = `/dashboard/meeting/${meetingId}/${page}`;
+    if (topic) {
+        url += `?topic=${encodeURIComponent(topic)}`;
+    }
+    return url;
+  };
 
   return (
     <header className={cn(
@@ -52,25 +75,25 @@ export function DashboardHeader() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl w-56">
                 <DropdownMenuItem asChild className="cursor-pointer">
-                  <Link href={`/dashboard/meeting/${meetingId}/whiteboard`}>
+                  <Link href={constructUrl('whiteboard')}>
                     <Brush className="mr-2 h-4 w-4" />
                     <span>Whiteboard</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer">
-                   <Link href={`/dashboard/meeting/${meetingId}/chat`}>
+                   <Link href={constructUrl('chat')}>
                     <MessageSquare className="mr-2 h-4 w-4" />
                     <span>Chat</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer">
-                   <Link href={`/dashboard/meeting/${meetingId}/participants`}>
+                   <Link href={constructUrl('participants')}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Participants</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer">
-                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings`}>
+                  <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`}>
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Meeting Settings</span>
                   </Link>
