@@ -36,7 +36,6 @@ export default function MeetingPage() {
   const router = useRouter();
   const { setHeaderContent } = useDynamicHeader();
   
-  // A simple way to get the meetingId from the URL since `useParams` can be tricky with client components
   const [meetingId, setMeetingId] = useState('');
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -123,7 +122,8 @@ export default function MeetingPage() {
 
   // Notification for hand raises
   useEffect(() => {
-    if (selfParticipant?.isHost) {
+    const isHost = participants.find(p => p.id === user?.uid)?.isHost;
+    if (isHost) {
       const currentRaisedHands = new Set();
       participants.forEach(p => {
         if (p.isHandRaised && !p.isHost) {
@@ -145,7 +145,7 @@ export default function MeetingPage() {
       });
       previousRaisedHands.current = currentRaisedHands;
     }
-  }, [participants, selfParticipant, toast]);
+  }, [participants, user?.uid, toast]);
   
   const updateMyStatus = async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
     if (user && meetingId) {
@@ -270,7 +270,7 @@ export default function MeetingPage() {
 
         {/* Bottom Controls */}
         <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center relative">
                 <div className="flex items-center gap-3">
                     <Button
                       onClick={handleToggleMic}
@@ -291,8 +291,8 @@ export default function MeetingPage() {
                     >
                       {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
                     </Button>
-
-                     <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
+                    
+                    <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
                        <AlertDialogTrigger asChild>
                            <Button
                               variant="ghost"
@@ -322,21 +322,21 @@ export default function MeetingPage() {
                     <Button
                       onClick={handleToggleHandRaise}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
+                        isHandRaised ? "bg-green-500 hover:bg-green-600" : "bg-destructive hover:bg-destructive/90"
                       )}
                       aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
                     >
                       <Hand className="h-6 w-6" />
                     </Button>
-                    
-                    <div className="h-8 w-px bg-white/20 mx-2" />
-
+                </div>
+                 <div className="absolute right-0 top-1/2 -translate-y-1/2">
                     <Button
                       onClick={handleLeave}
-                      className="h-14 w-14 rounded-full flex items-center justify-center bg-destructive hover:bg-destructive/90 transition-colors"
+                      className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6"
                       aria-label="Leave Meeting"
                     >
                       <PhoneOff className="h-6 w-6" />
+                      <span className="ml-2 font-semibold hidden sm:inline">Leave</span>
                     </Button>
                 </div>
             </div>
@@ -344,11 +344,3 @@ export default function MeetingPage() {
     </div>
   );
 }
- 
-
-    
-
-    
-
-
-    
