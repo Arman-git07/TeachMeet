@@ -273,16 +273,20 @@ export default function MeetingPage() {
   };
 
   const handleToggleMic = useCallback(() => {
-    const stream = isScreenSharing ? screenStreamRef.current : streamRef.current;
-    if (!stream) return;
-    const audioTrack = stream.getAudioTracks()[0];
-    if (audioTrack) {
-      const nextState = !isMicOn;
-      audioTrack.enabled = nextState;
-      setIsMicOn(nextState);
-      updateMyStatus({ isMicOn: nextState });
+    const streamToToggle = localStream; // Use the unified localStream state
+    if (!streamToToggle) return;
+
+    const audioTracks = streamToToggle.getAudioTracks();
+    if (audioTracks.length > 0) {
+        const nextState = !isMicOn;
+        audioTracks.forEach(track => {
+            track.enabled = nextState;
+        });
+        setIsMicOn(nextState);
+        updateMyStatus({ isMicOn: nextState });
     }
-  }, [isMicOn, isScreenSharing]);
+}, [isMicOn, localStream]);
+
 
   const handleToggleHandRaise = () => {
     const nextState = !isHandRaised;
@@ -464,3 +468,4 @@ export default function MeetingPage() {
     </div>
   );
 }
+
