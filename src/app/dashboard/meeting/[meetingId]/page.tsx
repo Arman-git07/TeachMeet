@@ -82,7 +82,7 @@ export default function MeetingPage() {
 
  /** Helper: if you have peer connections, replace the outgoing video sender track */
  const replaceVideoTrackForPeers = (newTrack: MediaStreamTrack | null) => {
-   if (!newTrack || !localStream) return;
+    if (!newTrack || !localStream) return;
     const pcs: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ ?? []; // adjust this to your app's PCs if needed
     pcs.forEach((pc: RTCPeerConnection) => {
         try {
@@ -442,7 +442,7 @@ export default function MeetingPage() {
                     <Button
                       onClick={handleToggleHandRaise}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-accent hover:bg-accent/90" : "bg-secondary/50 hover:bg-secondary/70"
+                        isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-gray-700 hover:bg-gray-600"
                       )}
                       aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
                     >
