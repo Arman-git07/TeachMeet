@@ -442,7 +442,7 @@ export default function MeetingPage() {
                     <Button
                       onClick={handleToggleHandRaise}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-gray-700 hover:bg-gray-600"
+                        isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
                       )}
                       aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
                     >
