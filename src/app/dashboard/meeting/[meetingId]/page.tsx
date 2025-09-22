@@ -53,7 +53,7 @@ export default function MeetingPage() {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => { setIsClient(true) }, []);
 
-  // ------- Camera: robust start/stop/restart logic (drop-in) -------
+ // ------- Camera: robust start/stop/restart logic (drop-in) -------
  const videoRef = useRef<HTMLVideoElement | null>(null);
  const streamRef = useRef<MediaStream | null>(null);
  const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
@@ -407,7 +407,7 @@ export default function MeetingPage() {
                            <Button
                               variant="ghost"
                               className={cn(
-                                "h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/20 text-white",
+                                "h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-secondary/50 hover:bg-secondary/70 text-white",
                                 isScreenSharing && "bg-primary text-primary-foreground hover:bg-primary/90"
                               )}
                               aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}
@@ -432,7 +432,7 @@ export default function MeetingPage() {
                     <Button
                       onClick={handleToggleHandRaise}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-green-500 hover:bg-green-600" : "bg-destructive hover:bg-destructive/90"
+                        isHandRaised ? "bg-accent hover:bg-accent/90" : "bg-destructive hover:bg-destructive/90"
                       )}
                       aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
                     >
