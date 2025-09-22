@@ -250,10 +250,7 @@ export default function MeetingPage() {
 
         {/* Bottom Controls */}
         <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    {/* Topic display removed from here */}
-                </div>
+            <div className="flex items-center justify-center">
                 <div className="flex items-center gap-3">
                     <Button
                       onClick={handleToggleMic}
@@ -321,9 +318,6 @@ export default function MeetingPage() {
                     >
                       <PhoneOff className="h-6 w-6" />
                     </Button>
-                </div>
-                <div className="flex items-center gap-3">
-                     {/* Placeholder for right-aligned controls if needed */}
                 </div>
             </div>
         </div>
