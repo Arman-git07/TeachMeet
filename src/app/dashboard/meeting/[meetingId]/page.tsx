@@ -66,14 +66,13 @@ export default function MeetingPage() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const [participants, setParticipants] = useState<any[]>([]);
-  const [participantCount, setParticipantCount] = useState(0);
-  const [blink, setBlink] = useState(false);
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
 
   const selfParticipant = participants.find(p => p.id === user?.uid);
+  const previousRaisedHands = useRef(new Set());
 
   useEffect(() => {
     setHeaderContent(<span className="text-sm font-medium truncate">{topic}</span>);
@@ -120,12 +119,33 @@ export default function MeetingPage() {
   
   const handleParticipantsChange = useCallback((newParticipants: any[]) => {
     setParticipants(newParticipants);
-    if (newParticipants.length > participantCount) {
-      setBlink(true);
-      setTimeout(() => setBlink(false), 2000); // Animation duration
+  }, []);
+
+  // Notification for hand raises
+  useEffect(() => {
+    if (selfParticipant?.isHost) {
+      const currentRaisedHands = new Set();
+      participants.forEach(p => {
+        if (p.isHandRaised && !p.isHost) {
+          currentRaisedHands.add(p.id);
+        }
+      });
+
+      // Find new hand raises
+      currentRaisedHands.forEach(id => {
+        if (!previousRaisedHands.current.has(id)) {
+          const participant = participants.find(p => p.id === id);
+          if (participant) {
+            toast({
+              title: "Hand Raised",
+              description: `${participant.name} raised their hand.`,
+            });
+          }
+        }
+      });
+      previousRaisedHands.current = currentRaisedHands;
     }
-    setParticipantCount(newParticipants.length);
-  }, [participantCount]);
+  }, [participants, selfParticipant, toast]);
   
   const updateMyStatus = async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
     if (user && meetingId) {
@@ -327,5 +347,8 @@ export default function MeetingPage() {
  
 
     
+
+    
+
 
     
