@@ -59,17 +59,11 @@ export default function MeetingPage() {
  // ------- Camera: robust start/stop/restart logic (drop-in) -------
  const videoRef = useRef<HTMLVideoElement | null>(null);
  const streamRef = useRef<MediaStream | null>(null);
- const [isCameraOn, setIsCameraOn] = useState<boolean>(initialCamState);
+ const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
  const [loadingMedia, setLoadingMedia] = useState<boolean>(false);
- const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
- /**
- * Optional: replace this with your real user's profile image variable.
- * e.g. if you have `currentUser` from auth: const userPhotoUrl = currentUser?.photoURL || "/default-avatar.png"
- */
  const userPhotoUrl = user?.photoURL || `https://placehold.co/128x128.png?text=${user?.displayName?.charAt(0) ?? 'U'}`;
 
- /** Replace video srcObject safely */
  const attachStreamToVideo = (stream: MediaStream | null) => {
    try {
      if (videoRef.current) {
@@ -80,24 +74,14 @@ export default function MeetingPage() {
    }
  };
 
- /** Helper: if you have peer connections, replace the outgoing video sender track */
  const replaceVideoTrackForPeers = (newTrack: MediaStreamTrack | null) => {
     if (!newTrack || !localStream) return;
-    const pcs: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ ?? []; // adjust this to your app's PCs if needed
+    const pcs: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ ?? [];
     pcs.forEach((pc: RTCPeerConnection) => {
         try {
             const sender = pc.getSenders().find((s) => s.track?.kind === "video");
             if (sender && sender.replaceTrack) {
                 sender.replaceTrack(newTrack);
-            } else {
-                // Fallback for Safari or older browsers
-                const videoTrack = localStream.getVideoTracks()[0];
-                if (videoTrack) {
-                    const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-                    if (sender) {
-                        sender.replaceTrack(videoTrack);
-                    }
-                }
             }
         } catch (e) {
             console.warn("replaceVideoTrackForPeers error:", e);
@@ -105,11 +89,9 @@ export default function MeetingPage() {
     });
  };
 
- /** Start camera: always requests a fresh stream and attaches it */
  const startCamera = async () => {
    setLoadingMedia(true);
    try {
-     // Stop any leftover stream first
      if (streamRef.current) {
        streamRef.current.getTracks().forEach((t) => {
          try { t.stop(); } catch {}
@@ -117,7 +99,6 @@ export default function MeetingPage() {
        streamRef.current = null;
      }
 
-     // Request new stream (fresh every time)
      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
      streamRef.current = stream;
      setLocalStream(stream);
@@ -125,28 +106,21 @@ export default function MeetingPage() {
 
      attachStreamToVideo(stream);
 
-     // ensure playback is started
      try {
        await videoRef.current?.play();
-     } catch (e) {
-       // autoplay policy may block audio unmuted; we are muted so this usually fine
-     }
+     } catch (e) {}
 
      setIsCameraOn(true);
 
-     // ensure peers get new track
      const newTrack = stream.getVideoTracks()[0];
      if (newTrack) replaceVideoTrackForPeers(newTrack);
    } catch (err) {
      console.error("startCamera error:", err);
-     // Keep UI untouched; you can show a small alert if you want:
-     // alert("Camera permission denied or not available");
    } finally {
      setLoadingMedia(false);
    }
  };
 
- /** Stop camera: stop tracks, clear srcObject, set state */
  const stopCamera = () => {
    try {
      if (streamRef.current) {
@@ -164,7 +138,6 @@ export default function MeetingPage() {
    }
  };
 
- /** Toggle camera: off -> stop, on -> start (fresh stream) */
  const toggleCamera = async () => {
     if (isScreenSharing) {
         toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
@@ -178,6 +151,7 @@ export default function MeetingPage() {
    updateMyStatus({ isCameraOn: !isCameraOn });
  };
 
+
   const screenStreamRef = useRef<MediaStream | null>(null);
   
   const [isMicOn, setIsMicOn] = useState(initialMicState);
@@ -185,6 +159,7 @@ export default function MeetingPage() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const [participants, setParticipants] = useState<any[]>([]);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
 
@@ -198,13 +173,11 @@ export default function MeetingPage() {
 
 
   useEffect(() => {
-    // start camera automatically based on pre-join setting
     (async () => {
         if (initialCamState) {
             await startCamera();
         } else {
             setIsCameraOn(false);
-            // Still get a stream for mic, but with video track disabled
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
                 stream.getVideoTracks().forEach(t => t.enabled = false);
@@ -227,14 +200,12 @@ export default function MeetingPage() {
   }, [initialCamState]);
 
   const handleUserJoined = useCallback((socketId: string) => {
-    // This function can be used to notify about new users if needed
   }, []);
   
   const handleParticipantsChange = useCallback((newParticipants: any[]) => {
     setParticipants(newParticipants);
   }, []);
 
-  // Notification for hand raises
   useEffect(() => {
     const isHost = participants.find(p => p.id === user?.uid)?.isHost;
     if (isHost) {
@@ -245,7 +216,6 @@ export default function MeetingPage() {
         }
       });
 
-      // Find new hand raises
       currentRaisedHands.forEach(id => {
         if (!previousRaisedHands.current.has(id)) {
           const participant = participants.find(p => p.id === id);
@@ -273,7 +243,7 @@ export default function MeetingPage() {
   };
 
   const handleToggleMic = useCallback(() => {
-    const streamToToggle = localStream; // Use the unified localStream state
+    const streamToToggle = localStream;
     if (!streamToToggle) return;
 
     const audioTracks = streamToToggle.getAudioTracks();
@@ -297,10 +267,9 @@ export default function MeetingPage() {
   const handleScreenShare = async () => {
     setShowScreenShareConfirm(false);
     if (isScreenSharing) {
-        // Stop sharing
         const cameraVideoTrack = streamRef.current?.getVideoTracks()[0];
         if (cameraVideoTrack) {
-            cameraVideoTrack.enabled = isCameraOn; // Restore original camera state
+            cameraVideoTrack.enabled = isCameraOn;
             const newStream = new MediaStream([cameraVideoTrack, ...streamRef.current!.getAudioTracks()]);
             setLocalStream(newStream);
         }
@@ -312,12 +281,11 @@ export default function MeetingPage() {
         return;
     }
 
-    // Start sharing
     try {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         
         screenStream.getVideoTracks()[0].onended = () => {
-            handleScreenShare(); // Call again to stop sharing
+            handleScreenShare();
         };
         
         streamRef.current?.getVideoTracks().forEach(t => t.enabled = false);
@@ -343,7 +311,6 @@ export default function MeetingPage() {
       const participantRef = doc(db, "meetings", meetingId as string, "participants", user.uid);
       try {
         await deleteDoc(participantRef);
-        // If host leaves, consider ending the meeting for all (more complex logic)
       } catch (error) {
         console.error("Error leaving meeting:", error);
       }
@@ -357,7 +324,6 @@ export default function MeetingPage() {
 
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
-        {/* Main Content Area */}
         <div className="relative flex-grow">
             {isClient && meetingId && user?.uid ? (
               <MeetingClient
@@ -371,28 +337,27 @@ export default function MeetingPage() {
               />
             ) : (
                 <div className="flex-1 flex items-center justify-center w-full bg-black">
-                    {loadingMedia ? (
-                        <div className="text-lg text-gray-400">Initializing Media...</div>
-                    ) : isCameraOn && streamRef.current ? (
-                        <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <img
-                        src={userPhotoUrl}
-                        alt="Profile"
-                        className="w-32 h-32 rounded-full object-cover"
-                        />
-                    )}
+                   {loadingMedia ? (
+                     <div className="text-lg text-gray-400">Initializing Media...</div>
+                   ) : isCameraOn && streamRef.current ? (
+                     <video
+                       ref={videoRef}
+                       autoPlay
+                       playsInline
+                       muted
+                       className="w-full h-full object-cover"
+                     />
+                   ) : (
+                     <img
+                       src={userPhotoUrl}
+                       alt="Profile"
+                       className="w-32 h-32 rounded-full object-cover"
+                     />
+                   )}
                 </div>
             )}
         </div>
 
-        {/* Bottom Controls */}
         <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
             <div className="flex items-center justify-center relative">
                 <div className="flex items-center justify-center gap-3">
@@ -469,3 +434,6 @@ export default function MeetingPage() {
   );
 }
 
+
+
+    
