@@ -25,7 +25,7 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, loading, router]);
 
-  const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
+  const isMeetingPage = pathname.startsWith('/dashboard/meeting/') && pathname.split('/').length > 3 && !pathname.endsWith('/prejoin');
   const isPrejoinPage = pathname === '/dashboard/meeting/prejoin';
 
   if (loading) {
