@@ -58,6 +58,7 @@ export default function MeetingPage() {
  const streamRef = useRef<MediaStream | null>(null);
  const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
  const [loadingMedia, setLoadingMedia] = useState<boolean>(false);
+ const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
  /**
  * Optional: replace this with your real user's profile image variable.
@@ -185,8 +186,6 @@ export default function MeetingPage() {
 
   const [participants, setParticipants] = useState<any[]>([]);
   
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
 
   const selfParticipant = participants.find(p => p.id === user?.uid);
@@ -199,10 +198,21 @@ export default function MeetingPage() {
 
 
   useEffect(() => {
-    // start camera automatically the first time
+    // start camera automatically based on pre-join setting
     (async () => {
         if (initialCamState) {
             await startCamera();
+        } else {
+            setIsCameraOn(false);
+            // Still get a stream for mic, but with video track disabled
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                stream.getVideoTracks().forEach(t => t.enabled = false);
+                streamRef.current = stream;
+                setLocalStream(stream);
+            } catch(err) {
+                 console.error("Error getting mic-only stream:", err);
+            }
         }
     })();
 
@@ -432,7 +442,7 @@ export default function MeetingPage() {
                     <Button
                       onClick={handleToggleHandRaise}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-accent hover:bg-accent/90" : "bg-destructive hover:bg-destructive/90"
+                        isHandRaised ? "bg-accent hover:bg-accent/90" : "bg-secondary/50 hover:bg-secondary/70"
                       )}
                       aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
                     >
@@ -454,3 +464,5 @@ export default function MeetingPage() {
     </div>
   );
 }
+
+    
