@@ -90,7 +90,7 @@ export default function HomePage() {
     const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
     let ongoingMeetings: MeetingActivityItem[] = [];
 
-    if (user && startedMeetingsRaw) {
+    if (startedMeetingsRaw) {
       try {
         let storedMeetings = JSON.parse(startedMeetingsRaw);
         if (Array.isArray(storedMeetings)) {
@@ -123,7 +123,7 @@ export default function HomePage() {
 
     setAllActivity(combined);
     setIsLoading(false);
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     // We only want to load activities once authentication is resolved.
