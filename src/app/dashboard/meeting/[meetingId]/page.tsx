@@ -53,10 +53,13 @@ export default function MeetingPage() {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => { setIsClient(true) }, []);
 
+  const initialCamState = isClient ? params.get('cam') !== 'false' : true;
+  const initialMicState = isClient ? params.get('mic') !== 'false' : true;
+
  // ------- Camera: robust start/stop/restart logic (drop-in) -------
  const videoRef = useRef<HTMLVideoElement | null>(null);
  const streamRef = useRef<MediaStream | null>(null);
- const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
+ const [isCameraOn, setIsCameraOn] = useState<boolean>(initialCamState);
  const [loadingMedia, setLoadingMedia] = useState<boolean>(false);
  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
@@ -177,9 +180,6 @@ export default function MeetingPage() {
 
   const screenStreamRef = useRef<MediaStream | null>(null);
   
-  const initialCamState = isClient ? params.get('cam') !== 'false' : true;
-  const initialMicState = isClient ? params.get('mic') !== 'false' : true;
-
   const [isMicOn, setIsMicOn] = useState(initialMicState);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -417,8 +417,8 @@ export default function MeetingPage() {
                            <Button
                               variant="ghost"
                               className={cn(
-                                "h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-secondary/50 hover:bg-secondary/70 text-white",
-                                isScreenSharing && "bg-primary text-primary-foreground hover:bg-primary/90"
+                                "h-14 w-14 rounded-full flex items-center justify-center transition-colors",
+                                isScreenSharing ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-secondary/50 hover:bg-secondary/70 text-white"
                               )}
                               aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}
                             >
@@ -464,5 +464,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-
-    
