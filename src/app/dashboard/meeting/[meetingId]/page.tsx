@@ -84,47 +84,56 @@ export default function MeetingPage() {
   };
 
   const replaceVideoTrackForPeers = (newTrack: MediaStreamTrack | null) => {
-    if (!localStream) return;
     const pcs: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ ?? [];
-    pcs.forEach((pc: RTCPeerConnection) => {
-        try {
-            const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-            if (sender) {
-                sender.replaceTrack(newTrack);
-            }
-        } catch (e) {
-            console.warn("replaceVideoTrackForPeers error:", e);
-        }
+    pcs.forEach((pc) => {
+      const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+      if (sender) {
+        sender.replaceTrack(newTrack).catch((e) =>
+          console.warn("replaceTrack failed:", e)
+        );
+      } else if (newTrack && localStream) {
+        pc.addTrack(newTrack, localStream);
+      }
     });
   };
 
   const startCamera = async () => {
     setLoadingMedia(true);
     try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => {
+      // Kill any old video tracks
+      if (localStream) {
+        localStream.getVideoTracks().forEach((t) => {
           try { t.stop(); } catch {}
+          localStream.removeTrack(t);
         });
-        streamRef.current = null;
       }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      streamRef.current = stream;
-      setLocalStream(stream);
-
-
-      attachStreamToVideo(stream);
-
-      try {
-        await videoRef.current?.play();
-      } catch (e) {}
-
+  
+      // Get fresh video stream
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoTrack = stream.getVideoTracks()[0];
+  
+      if (!videoTrack) throw new Error("No video track found");
+  
+      let currentLocalStream = localStream;
+      if (!currentLocalStream) {
+        // If we didn’t already have an audio stream, create new
+        const base = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setLocalStream(base);
+        streamRef.current = base;
+        currentLocalStream = base;
+      }
+  
+      // Add video track to existing localStream
+      currentLocalStream?.addTrack(videoTrack);
+      attachStreamToVideo(currentLocalStream);
+  
+      // Replace in all peer connections
+      replaceVideoTrackForPeers(videoTrack);
+  
       setIsCameraOn(true);
-
-      const newTrack = stream.getVideoTracks()[0];
-      if (newTrack) replaceVideoTrackForPeers(newTrack);
     } catch (err) {
       console.error("startCamera error:", err);
+      toast({ variant: "destructive", title: "Camera Error", description: "Could not start camera." });
     } finally {
       setLoadingMedia(false);
     }
@@ -132,14 +141,14 @@ export default function MeetingPage() {
 
   const stopCamera = () => {
     try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => {
+      if (localStream) {
+        localStream.getVideoTracks().forEach((t) => {
           try { t.stop(); } catch {}
+          localStream.removeTrack(t);
         });
-        streamRef.current = null;
       }
       attachStreamToVideo(null);
-      replaceVideoTrackForPeers(null); // Inform peers that video is off
+      replaceVideoTrackForPeers(null);
     } catch (e) {
       console.warn("stopCamera error:", e);
     } finally {
@@ -174,37 +183,29 @@ export default function MeetingPage() {
 
   useEffect(() => {
     (async () => {
+      try {
         if (initialCamState) {
-            await startCamera();
+          await startCamera();
         } else {
-            setIsCameraOn(false);
-            setLoadingMedia(false); // Ensure loading is false if camera starts off
-            try {
-                // Get mic-only stream if camera is off initially
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                setLocalStream(stream);
-            } catch(err) {
-                 console.error("Error getting mic-only stream:", err);
-                 toast({ variant: 'destructive', title: 'Mic Access Denied', description: 'Could not access your microphone.' });
-            }
-        }
-
-        // Apply initial mic state
-        if (localStream) {
-            localStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+          // mic-only stream
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          setLocalStream(micStream);
+          streamRef.current = micStream;
         }
         setIsMicOn(initialMicState);
+      } catch (err) {
+        console.error("Init stream error:", err);
+      } finally {
+        setLoadingMedia(false);
+      }
     })();
-
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach(track => track.stop());
-      }
+ 
+     return () => {
+      localStream?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleUserJoined = useCallback((socketId: string) => {
