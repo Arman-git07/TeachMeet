@@ -53,7 +53,6 @@ export default function MeetingPage() {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => { setIsClient(true) }, []);
 
-  const initialCamState = isClient ? params.get('cam') !== 'false' : true;
   const initialMicState = isClient ? params.get('mic') !== 'false' : true;
 
   const [isMicOn, setIsMicOn] = useState(initialMicState);
@@ -61,28 +60,24 @@ export default function MeetingPage() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const [participants, setParticipants] = useState<any[]>([]);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
 
-  // ------- Camera: robust start/stop/restart logic (drop-in) -------
+  // --- Camera State + Helpers ---
+
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [loadingMedia, setLoadingMedia] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
-  const [loadingMedia, setLoadingMedia] = useState<boolean>(true);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
-  const userPhotoUrl = user?.photoURL || `https://placehold.co/128x128.png?text=${user?.displayName?.charAt(0) ?? 'U'}`;
-
+  // Attach stream to local <video>
   const attachStreamToVideo = (stream: MediaStream | null) => {
-    try {
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (e) {
-      console.warn("attachStreamToVideo failed:", e);
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
     }
   };
 
+  // Replace video track for all peers
   const replaceVideoTrackForPeers = (newTrack: MediaStreamTrack | null) => {
     const pcs: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ ?? [];
     pcs.forEach((pc) => {
@@ -97,56 +92,55 @@ export default function MeetingPage() {
     });
   };
 
+  // Start Camera
   const startCamera = async () => {
     setLoadingMedia(true);
     try {
-      // Kill any old video tracks
-      if (localStream) {
-        localStream.getVideoTracks().forEach((t) => {
-          try { t.stop(); } catch {}
-          localStream.removeTrack(t);
-        });
-      }
-  
-      // Get fresh video stream
+      // Kill old video tracks if any
+      localStream?.getVideoTracks().forEach((t) => {
+        try { t.stop(); } catch {}
+        localStream.removeTrack(t);
+      });
+
+      // Request new video
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       const videoTrack = stream.getVideoTracks()[0];
-  
-      if (!videoTrack) throw new Error("No video track found");
-  
-      let currentLocalStream = localStream;
-      if (!currentLocalStream) {
-        // If we didn’t already have an audio stream, create new
-        const base = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setLocalStream(base);
-        streamRef.current = base;
-        currentLocalStream = base;
+      if (!videoTrack) throw new Error("No video track");
+
+      // Ensure we have a base stream with mic
+      let baseStream = localStream;
+      if (!baseStream) {
+        baseStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setLocalStream(baseStream);
       }
-  
-      // Add video track to existing localStream
-      currentLocalStream?.addTrack(videoTrack);
-      attachStreamToVideo(currentLocalStream);
-  
-      // Replace in all peer connections
+
+      // Add new track
+      baseStream.addTrack(videoTrack);
+      attachStreamToVideo(baseStream);
+
+      // Update peers
       replaceVideoTrackForPeers(videoTrack);
-  
+
       setIsCameraOn(true);
     } catch (err) {
       console.error("startCamera error:", err);
-      toast({ variant: "destructive", title: "Camera Error", description: "Could not start camera." });
+      toast({
+        variant: "destructive",
+        title: "Camera Error",
+        description: "Could not start your camera.",
+      });
     } finally {
       setLoadingMedia(false);
     }
   };
 
+  // Stop Camera
   const stopCamera = () => {
     try {
-      if (localStream) {
-        localStream.getVideoTracks().forEach((t) => {
-          try { t.stop(); } catch {}
-          localStream.removeTrack(t);
-        });
-      }
+      localStream?.getVideoTracks().forEach((t) => {
+        try { t.stop(); } catch {}
+        localStream.removeTrack(t);
+      });
       attachStreamToVideo(null);
       replaceVideoTrackForPeers(null);
     } catch (e) {
@@ -156,22 +150,38 @@ export default function MeetingPage() {
     }
   };
 
-  const toggleCamera = async () => {
-    if (isScreenSharing) {
-        toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
-        return;
-    }
-    if (isCameraOn) {
-      stopCamera();
-    } else {
-      await startCamera();
-    }
-    updateMyStatus({ isCameraOn: !isCameraOn });
-  };
+  // --- Initialize on Page Load (respect ?cam=true/false) ---
+  useEffect(() => {
+    (async () => {
+      // Use isClient check to ensure window is available
+      if (typeof window === 'undefined') return;
 
+      const url = new URL(window.location.href);
+      const camParam = url.searchParams.get("cam");
+      const initialCam = camParam === "true";
+
+      try {
+        if (initialCam) {
+          await startCamera();
+        } else {
+          // mic-only init
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          setLocalStream(micStream);
+        }
+      } catch (err) {
+        console.error("Init media error:", err);
+      } finally {
+        setLoadingMedia(false);
+      }
+    })();
+
+    return () => {
+      localStream?.getTracks().forEach((t) => t.stop());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
 
   const screenStreamRef = useRef<MediaStream | null>(null);
-
   const selfParticipant = participants.find(p => p.id === user?.uid);
   const previousRaisedHands = useRef(new Set());
 
@@ -179,34 +189,6 @@ export default function MeetingPage() {
     setHeaderContent(<span className="text-sm font-medium truncate">{topic}</span>);
     return () => setHeaderContent(null);
   }, [topic, setHeaderContent]);
-
-
-  useEffect(() => {
-    (async () => {
-      try {
-        if (initialCamState) {
-          await startCamera();
-        } else {
-          // mic-only stream
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          setLocalStream(micStream);
-          streamRef.current = micStream;
-        }
-        setIsMicOn(initialMicState);
-      } catch (err) {
-        console.error("Init stream error:", err);
-      } finally {
-        setLoadingMedia(false);
-      }
-    })();
- 
-     return () => {
-      localStream?.getTracks().forEach((t) => t.stop());
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleUserJoined = useCallback((socketId: string) => {
   }, []);
@@ -280,13 +262,9 @@ export default function MeetingPage() {
         screenStreamRef.current = null;
         
         // Restore camera track if it was on
-        const cameraVideoTrack = streamRef.current?.getVideoTracks()[0];
+        const cameraVideoTrack = localStream?.getVideoTracks()[0]; // Re-check localStream
         if (cameraVideoTrack) {
           replaceVideoTrackForPeers(cameraVideoTrack);
-          if(localStream) {
-            localStream.removeTrack(localStream.getVideoTracks()[0]);
-            localStream.addTrack(cameraVideoTrack);
-          }
         } else {
           replaceVideoTrackForPeers(null);
         }
@@ -305,15 +283,7 @@ export default function MeetingPage() {
         
         const screenVideoTrack = screenStream.getVideoTracks()[0];
         if (localStream) {
-          // Replace existing video track with screen track for peers
           replaceVideoTrackForPeers(screenVideoTrack);
-          
-          // Also update the local stream to reflect this change
-          const existingVideoTrack = localStream.getVideoTracks()[0];
-          if(existingVideoTrack) {
-            localStream.removeTrack(existingVideoTrack);
-          }
-          localStream.addTrack(screenVideoTrack);
         }
         
         screenStreamRef.current = screenStream;
@@ -335,7 +305,7 @@ export default function MeetingPage() {
         console.error("Error leaving meeting:", error);
       }
     }
-    streamRef.current?.getTracks().forEach(track => track.stop());
+    localStream?.getTracks().forEach(track => track.stop());
     screenStreamRef.current?.getTracks().forEach(track => track.stop());
     router.push("/");
   };
@@ -362,7 +332,7 @@ export default function MeetingPage() {
                         <Loader2 className="h-8 w-8 animate-spin mb-2" />
                         <span>Initializing Media...</span>
                       </div>
-                   ) : isCameraOn && streamRef.current ? (
+                   ) : isCameraOn ? (
                      <video
                        ref={videoRef}
                        autoPlay
@@ -372,7 +342,7 @@ export default function MeetingPage() {
                      />
                    ) : (
                      <img
-                       src={userPhotoUrl}
+                       src={user?.photoURL || `https://placehold.co/128x128.png?text=${user?.displayName?.charAt(0) ?? 'U'}`}
                        alt="Profile"
                        className="w-32 h-32 rounded-full object-cover"
                        data-ai-hint="user avatar"
@@ -396,7 +366,7 @@ export default function MeetingPage() {
                     </Button>
 
                     <Button
-                      onClick={toggleCamera}
+                      onClick={() => (isCameraOn ? stopCamera() : startCamera())}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
                         isCameraOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
                       )}
