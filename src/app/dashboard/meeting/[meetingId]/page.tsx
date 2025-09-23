@@ -69,7 +69,7 @@ export default function MeetingPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
-  const [loadingMedia, setLoadingMedia] = useState<boolean>(false);
+  const [loadingMedia, setLoadingMedia] = useState<boolean>(true);
 
   const userPhotoUrl = user?.photoURL || `https://placehold.co/128x128.png?text=${user?.displayName?.charAt(0) ?? 'U'}`;
 
@@ -84,12 +84,12 @@ export default function MeetingPage() {
   };
 
   const replaceVideoTrackForPeers = (newTrack: MediaStreamTrack | null) => {
-    if (!newTrack || !localStream) return;
+    if (!localStream) return;
     const pcs: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ ?? [];
     pcs.forEach((pc: RTCPeerConnection) => {
         try {
             const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-            if (sender && sender.replaceTrack) {
+            if (sender) {
                 sender.replaceTrack(newTrack);
             }
         } catch (e) {
@@ -139,11 +139,11 @@ export default function MeetingPage() {
         streamRef.current = null;
       }
       attachStreamToVideo(null);
+      replaceVideoTrackForPeers(null); // Inform peers that video is off
     } catch (e) {
       console.warn("stopCamera error:", e);
     } finally {
       setIsCameraOn(false);
-      setLocalStream(null);
     }
   };
 
@@ -178,6 +178,7 @@ export default function MeetingPage() {
             await startCamera();
         } else {
             setIsCameraOn(false);
+            setLoadingMedia(false); // Ensure loading is false if camera starts off
             try {
                 // Get mic-only stream if camera is off initially
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -191,8 +192,8 @@ export default function MeetingPage() {
         // Apply initial mic state
         if (localStream) {
             localStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
-            setIsMicOn(initialMicState);
         }
+        setIsMicOn(initialMicState);
     })();
 
     return () => {
@@ -250,10 +251,9 @@ export default function MeetingPage() {
   };
 
   const handleToggleMic = useCallback(() => {
-    const streamToToggle = localStream || streamRef.current;
-    if (!streamToToggle) return;
+    if (!localStream) return;
 
-    const audioTracks = streamToToggle.getAudioTracks();
+    const audioTracks = localStream.getAudioTracks();
     if (audioTracks.length > 0) {
         const nextState = !isMicOn;
         audioTracks.forEach(track => {
@@ -274,15 +274,22 @@ export default function MeetingPage() {
   const handleScreenShare = async () => {
     setShowScreenShareConfirm(false);
     if (isScreenSharing) {
-        const cameraVideoTrack = streamRef.current?.getVideoTracks()[0];
-        if (cameraVideoTrack) {
-            cameraVideoTrack.enabled = isCameraOn;
-            const newStream = new MediaStream([cameraVideoTrack, ...streamRef.current!.getAudioTracks()]);
-            setLocalStream(newStream);
-        }
-
+        // Stop screen share
         screenStreamRef.current?.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
+        
+        // Restore camera track if it was on
+        const cameraVideoTrack = streamRef.current?.getVideoTracks()[0];
+        if (cameraVideoTrack) {
+          replaceVideoTrackForPeers(cameraVideoTrack);
+          if(localStream) {
+            localStream.removeTrack(localStream.getVideoTracks()[0]);
+            localStream.addTrack(cameraVideoTrack);
+          }
+        } else {
+          replaceVideoTrackForPeers(null);
+        }
+        
         setIsScreenSharing(false);
         await updateMyStatus({ isScreenSharing: false });
         return;
@@ -292,17 +299,22 @@ export default function MeetingPage() {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         
         screenStream.getVideoTracks()[0].onended = () => {
-            handleScreenShare();
+            handleScreenShare(); // Toggle off when browser UI's "Stop sharing" is clicked
         };
         
-        streamRef.current?.getVideoTracks().forEach(t => t.enabled = false);
-
-        const newStream = new MediaStream([
-            ...screenStream.getVideoTracks(),
-            ...streamRef.current!.getAudioTracks()
-        ]);
+        const screenVideoTrack = screenStream.getVideoTracks()[0];
+        if (localStream) {
+          // Replace existing video track with screen track for peers
+          replaceVideoTrackForPeers(screenVideoTrack);
+          
+          // Also update the local stream to reflect this change
+          const existingVideoTrack = localStream.getVideoTracks()[0];
+          if(existingVideoTrack) {
+            localStream.removeTrack(existingVideoTrack);
+          }
+          localStream.addTrack(screenVideoTrack);
+        }
         
-        setLocalStream(newStream);
         screenStreamRef.current = screenStream;
         setIsScreenSharing(true);
         await updateMyStatus({ isScreenSharing: true });
@@ -332,7 +344,7 @@ export default function MeetingPage() {
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
         <div className="relative flex-grow">
-            {isClient && meetingId && user?.uid ? (
+             {isClient && meetingId && user?.uid ? (
               <MeetingClient
                   meetingId={meetingId as string}
                   userId={user.uid}
@@ -345,7 +357,10 @@ export default function MeetingPage() {
             ) : (
                 <div className="flex-1 flex items-center justify-center w-full bg-black">
                    {loadingMedia ? (
-                     <div className="text-lg text-gray-400">Initializing Media...</div>
+                      <div className="flex flex-col items-center text-muted-foreground">
+                        <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                        <span>Initializing Media...</span>
+                      </div>
                    ) : isCameraOn && streamRef.current ? (
                      <video
                        ref={videoRef}
@@ -392,10 +407,11 @@ export default function MeetingPage() {
                     <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
                        <AlertDialogTrigger asChild>
                            <Button
+                              onClick={() => { isScreenSharing ? handleScreenShare() : setShowScreenShareConfirm(true) }}
                               variant="ghost"
                               className={cn(
                                 "h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                                isScreenSharing ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-secondary/50 hover:bg-secondary/70 text-white"
+                                isScreenSharing ? "bg-green-600 text-white hover:bg-green-700" : "bg-secondary/50 hover:bg-secondary/70 text-white"
                               )}
                               aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}
                             >
@@ -406,7 +422,7 @@ export default function MeetingPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Share Your Screen?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will allow everyone in the meeting to see your screen. You can choose to share your entire screen, a window, or a tab.
+                              This will allow everyone in the meeting to see your screen. You can choose to share your entire screen, a window, or a tab. Your camera will be turned off during screen sharing.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -419,7 +435,7 @@ export default function MeetingPage() {
                     <Button
                       onClick={handleToggleHandRaise}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                        isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
+                        isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-secondary/50 hover:bg-secondary/70 text-white"
                       )}
                       aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
                     >
@@ -441,7 +457,5 @@ export default function MeetingPage() {
     </div>
   );
 }
-
-
 
     
