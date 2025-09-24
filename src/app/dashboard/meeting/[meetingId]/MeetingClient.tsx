@@ -36,10 +36,25 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   
   useEffect(() => {
-    if (videoRef.current && user.stream) {
-      videoRef.current.srcObject = user.stream;
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    if (user.stream && !user.isCamOff) {
+      // Attach the stream
+      videoEl.srcObject = user.stream;
+      
+      // Force video to play (important for some browsers)
+      const playPromise = videoEl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.error("Video play blocked:", err);
+        });
+      }
+    } else {
+      // Remove stream when camera is off
+      videoEl.srcObject = null;
     }
-  }, [user.stream]);
+  }, [user.stream, user.isCamOff]);
 
   return (
     <div className={cn(
@@ -266,5 +281,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
 };
 
 export default MeetingClient;
+
+    
 
     
