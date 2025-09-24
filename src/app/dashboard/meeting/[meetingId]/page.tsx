@@ -154,12 +154,20 @@ export default function MeetingPage() {
       } catch (err) {
         console.error("Init media error:", err);
         toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.' });
+        try {
+            // Fallback to audio-only
+            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+            setLocalStream(audioStream);
+        } catch (audioErr) {
+             console.error("Audio-only fallback failed:", audioErr);
+        }
       } finally {
         setLoadingMedia(false);
       }
     })();
     
-    // Listen for pre-join page updates
+    // Listen for pre-join page updates for mic
     const handleStorage = (e: StorageEvent) => {
         if (e.key === "micState") {
           const state = e.newValue === "true";

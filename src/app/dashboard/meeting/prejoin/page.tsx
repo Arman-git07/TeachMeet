@@ -155,6 +155,7 @@ export default function PreJoinPage() {
       }
       window.removeEventListener("storage", handleStorage);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
 
   const toggleCamera = () => {

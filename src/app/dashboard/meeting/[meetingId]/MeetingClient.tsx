@@ -41,27 +41,29 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
 
-    if (user.stream && !user.isCamOff) {
+    if (user.stream) {
       videoEl.srcObject = user.stream;
       const playPromise = videoEl.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
           if (err.name !== 'NotAllowedError') {
-             console.error("Video play error:", err);
+             console.error("Video play error for user", user.id, err);
           }
         });
       }
     } else {
       videoEl.srcObject = null;
     }
-  }, [user.stream, user.isCamOff]);
+  }, [user.stream, user.id]);
+
+  const showVideo = user.stream && !user.isCamOff;
 
   return (
     <div className={cn(
         "bg-gray-800 flex items-center justify-center relative rounded-lg overflow-hidden",
         full ? "w-full h-full" : "w-full h-full"
     )}>
-        {user.stream && !user.isCamOff ? (
+        {showVideo ? (
             <video
               autoPlay
               playsInline
@@ -73,9 +75,9 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
           <div className="flex flex-col items-center text-muted-foreground">
              <Avatar className={cn(
                 "w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg transition-all duration-200",
-                user.isLocal && user.isMicOff === false && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
+                user.isLocal && !user.isMicOff && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
               )} style={{
-                  boxShadow: user.isLocal && user.isMicOff === false ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
+                  boxShadow: user.isLocal && !user.isMicOff ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
               }}>
                 <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="user avatar" />
                 <AvatarFallback className="text-4xl md:text-6xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
