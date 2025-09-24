@@ -415,7 +415,7 @@ export default function ClassroomPage() {
         };
     }, [classroomId, classroom, assignments]);
 
-    async function handleDeleteItem() {
+    const handleDeleteItem = useCallback(async () => {
         if (!itemToDelete || !classroomId) return;
         const { collectionName, item } = itemToDelete;
         
@@ -451,10 +451,10 @@ export default function ClassroomPage() {
             // Reset the state to close the dialog.
             setItemToDelete(null);
         }
-    }
+    }, [classroomId, itemToDelete, toast]);
 
 
-    const handleApproveRequest = async (request: JoinRequest) => {
+    const handleApproveRequest = useCallback(async (request: JoinRequest) => {
         if (!canUserManage) return;
         setIsProcessingRequest(request.id);
         
@@ -472,9 +472,9 @@ export default function ClassroomPage() {
         }
         
         setIsProcessingRequest(null);
-    };
+    }, [canUserManage, classroomId, toast]);
     
-    const handleDenyRequest = async (request: JoinRequest) => {
+    const handleDenyRequest = useCallback(async (request: JoinRequest) => {
         if (!canUserManage) return;
         setIsProcessingRequest(request.id);
         
@@ -491,9 +491,9 @@ export default function ClassroomPage() {
             toast({ variant: 'destructive', title: 'Action Failed', description: result.error || 'An error occurred.' });
         }
         setIsProcessingRequest(null);
-    };
+    }, [canUserManage, classroomId, toast]);
     
-     const handleRemoveParticipant = async () => {
+     const handleRemoveParticipant = useCallback(async () => {
         if (!canUserManage || !participantToRemove) return;
         
         const participant = participantToRemove;
@@ -525,9 +525,9 @@ export default function ClassroomPage() {
             console.error("Failed to remove participant:", error);
             toast({ variant: 'destructive', title: 'Removal Failed', description: 'Could not remove the participant. Check Firestore rules and console for details.' });
         }
-    };
+    }, [canUserManage, classroomId, participantToRemove, toast]);
 
-    const onFeeSubmit = async (data: z.infer<typeof feeSchema>) => {
+    const onFeeSubmit = useCallback(async (data: z.infer<typeof feeSchema>) => {
         try {
             await updateDoc(doc(db, 'classrooms', classroomId), {
                 feeAmount: data.amount,
@@ -538,9 +538,9 @@ export default function ClassroomPage() {
             console.error('Error updating fee:', error);
             toast({ variant: 'destructive', title: 'Update Failed' });
         }
-    };
+    }, [classroomId, toast]);
 
-    const onPaymentDetailsSubmit = async (data: z.infer<typeof paymentDetailsSchema>) => {
+    const onPaymentDetailsSubmit = useCallback(async (data: z.infer<typeof paymentDetailsSchema>) => {
         try {
             let qrCodeUrl = classroom?.paymentDetails?.qrCodeUrl;
             if (data.qrCode && data.qrCode[0]) {
@@ -560,9 +560,9 @@ export default function ClassroomPage() {
             console.error('Error updating payment details:', error);
             toast({ variant: 'destructive', title: 'Update Failed' });
         }
-    };
+    }, [classroomId, classroom?.paymentDetails?.qrCodeUrl, toast]);
     
-    const handleMaterialUpload = async () => {
+    const handleMaterialUpload = useCallback(async () => {
         if (!materialFile || !user) return;
         setIsUploadingMaterial(true);
         const toastId = `upload-${Date.now()}`;
@@ -590,9 +590,9 @@ export default function ClassroomPage() {
         } finally {
             setIsUploadingMaterial(false);
         }
-    };
+    }, [materialFile, user, classroomId, toast]);
 
-    const handleLinkShare = async () => {
+    const handleLinkShare = useCallback(async () => {
         if (!materialLink.trim() || !materialName.trim() || !user) {
             toast({ variant: "destructive", title: "Invalid Input", description: "Please provide both a name and a valid URL for the link." });
             return;
@@ -617,9 +617,9 @@ export default function ClassroomPage() {
         } finally {
             setIsUploadingMaterial(false);
         }
-    };
+    }, [materialLink, materialName, user, classroomId, toast]);
 
-    const onExamSubmit = async (data: z.infer<typeof examSchema>) => {
+    const onExamSubmit = useCallback(async (data: z.infer<typeof examSchema>) => {
         if (!canUserManage || !user) return;
         examForm.clearErrors();
 
@@ -661,9 +661,9 @@ export default function ClassroomPage() {
             console.error("Error creating exam:", error);
             toast.update(toastId, { variant: 'destructive', title: "Creation Failed" });
         }
-    };
+    }, [canUserManage, user, classroomId, toast, examForm]);
     
-    const onAssignmentSubmit = async (data: z.infer<typeof assignmentSchema>) => {
+    const onAssignmentSubmit = useCallback(async (data: z.infer<typeof assignmentSchema>) => {
         if (!canUserManage || !user) return;
         const answerKeyFile = data.answerKey?.[0];
         if (!answerKeyFile) {
@@ -697,9 +697,9 @@ export default function ClassroomPage() {
             console.error("Error creating assignment:", error);
             toast.update(toastId, { variant: 'destructive', title: "Creation Failed", description: "Could not create the assignment." });
         }
-    };
+    }, [canUserManage, user, classroomId, toast, assignmentForm]);
 
-    const handleStudentSubmission = async (e: React.FormEvent<HTMLFormElement>, assignmentId: string, studentId: string, studentName: string) => {
+    const handleStudentSubmission = useCallback(async (e: React.FormEvent<HTMLFormElement>, assignmentId: string, studentId: string, studentName: string) => {
         e.preventDefault();
         const form = e.currentTarget;
         const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement;
@@ -735,9 +735,9 @@ export default function ClassroomPage() {
             console.error("Error submitting assignment:", error);
             toast.update(submissionToastId, { variant: 'destructive', title: "Submission Failed", description: "Could not submit your assignment." });
         }
-    };
+    }, [classroomId, toast]);
 
-    const handleGradeAssignment = async (assignment: Assignment, submission: Submission) => {
+    const handleGradeAssignment = useCallback(async (assignment: Assignment, submission: Submission) => {
         if (!canUserManage || !assignment.answerKeyUrl || !submission.submissionUrl) return;
 
         const submissionRef = doc(db, "classrooms", classroomId, "assignments", assignment.id, "submissions", submission.studentId);
@@ -773,16 +773,16 @@ export default function ClassroomPage() {
             toast({ variant: "destructive", title: "Grading Failed", description: "The AI grader encountered an error." });
             await updateDoc(submissionRef, { isGrading: false });
         }
-    };
+    }, [canUserManage, classroomId, toast]);
 
 
     if (isLoading) return <div className="container mx-auto p-4"><Skeleton className="h-64 w-full" /></div>;
     if (!classroom) return <div className="container mx-auto p-4">Classroom not found.</div>;
 
-    const currencySymbols: { [key: string]: React.ReactNode } = {
+    const currencySymbols: { [key: string]: React.ReactNode } = useMemo(() => ({
         INR: <IndianRupee className="h-6 w-6" />, USD: <DollarSign className="h-6 w-6" />,
         EUR: <Euro className="h-6 w-6" />, GBP: <PoundSterling className="h-6 w-6" />,
-    };
+    }), []);
 
     return (
     <AlertDialog open={!!itemToDelete} onOpenChange={(isOpen) => !isOpen && setItemToDelete(null)}>
