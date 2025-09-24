@@ -68,6 +68,7 @@ export default function MeetingPage() {
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
+  // Initialize stream on page load
   useEffect(() => {
     (async () => {
       setLoadingMedia(true);
@@ -76,9 +77,13 @@ export default function MeetingPage() {
           video: initialCamState,
           audio: true
         });
-
-        stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
-        stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+        
+        // Disable video tracks if camera is meant to be off initially
+        if (!initialCamState) {
+            stream.getVideoTracks().forEach(track => { track.enabled = false; });
+        }
+        // Always apply initial mic state
+        stream.getAudioTracks().forEach(track => { track.enabled = initialMicState; });
 
         setLocalStream(stream);
         setIsCameraOn(initialCamState);
@@ -86,12 +91,12 @@ export default function MeetingPage() {
 
       } catch (err) {
         console.error("Init media error:", err);
-        // Fallback to audio-only if camera fails or is denied
         try {
+            // Fallback to audio-only if video fails
             const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
             setLocalStream(audioStream);
-            setIsCameraOn(false); // Ensure camera is marked as off
+            setIsCameraOn(false);
             toast({ variant: 'destructive', title: 'Video Error', description: 'Could not access camera. Starting with audio only.' });
         } catch (audioErr) {
             console.error("Audio-only fallback error:", audioErr);
@@ -161,40 +166,29 @@ export default function MeetingPage() {
     }
   };
 
-  const toggleCamera = useCallback(async () => {
-    if (isScreenSharing) {
-        toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
-        return;
-    }
-
+  const toggleCamera = async () => {
     if (!localStream) return;
-    
-    let videoTrack = localStream.getVideoTracks()[0];
-    
-    if (videoTrack) {
-        const nextState = !videoTrack.enabled;
-        videoTrack.enabled = nextState;
-        setIsCameraOn(nextState);
-        updateMyStatus({ isCameraOn: nextState });
-    } else if (!isCameraOn) {
-        // If there's no video track and we want to turn it on
-        try {
-            setLoadingMedia(true);
-            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const newVideoTrack = videoStream.getVideoTracks()[0];
-            localStream.addTrack(newVideoTrack);
-            setIsCameraOn(true);
-            updateMyStatus({ isCameraOn: true });
-            
-            // This logic to update peers will be handled by MeetingClient when localStream prop changes
-        } catch (err) {
-            console.error("Error starting camera:", err);
-            toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
-        } finally {
-            setLoadingMedia(false);
-        }
+    const videoTracks = localStream.getVideoTracks();
+    if (videoTracks.length === 0) { // If no video track, try to get one
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newVideoTrack = videoStream.getVideoTracks()[0];
+        localStream.addTrack(newVideoTrack);
+        setIsCameraOn(true);
+        updateMyStatus({ isCameraOn: true });
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
+      }
+      return;
     }
-  }, [isCameraOn, localStream, isScreenSharing, toast]);
+    
+    const nextState = !isCameraOn;
+    videoTracks.forEach(track => {
+        track.enabled = nextState;
+    });
+    setIsCameraOn(nextState);
+    updateMyStatus({ isCameraOn: nextState });
+  };
 
   const handleToggleMic = useCallback(() => {
     if (!localStream) return;
