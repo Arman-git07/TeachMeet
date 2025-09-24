@@ -38,23 +38,10 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   
   useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-
-    if (user.stream) {
-      videoEl.srcObject = user.stream;
-      const playPromise = videoEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          if (err.name !== 'NotAllowedError') {
-             console.error("Video play error for user", user.id, err);
-          }
-        });
-      }
-    } else {
-      videoEl.srcObject = null;
+    if (videoRef.current && user.stream) {
+      videoRef.current.srcObject = user.stream;
     }
-  }, [user.stream, user.id]);
+  }, [user.stream]);
 
   const showVideo = user.stream && !user.isCamOff;
 
@@ -65,19 +52,20 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
     )}>
         {showVideo ? (
             <video
+              ref={videoRef}
               autoPlay
               playsInline
               muted={user.isLocal}
-              ref={videoRef}
               className="w-full h-full object-cover"
+              onLoadedMetadata={() => videoRef.current?.play().catch(e => console.error("Video play error:", e))}
             />
         ) : (
           <div className="flex flex-col items-center text-muted-foreground">
              <Avatar className={cn(
                 "w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg transition-all duration-200",
-                user.isLocal && !user.isMicOff && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
+                 !user.isMicOff && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
               )} style={{
-                  boxShadow: user.isLocal && !user.isMicOff && (user.volumeLevel || 0) > 0.01 ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
+                  boxShadow: !user.isMicOff && (user.volumeLevel || 0) > 0.01 ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
               }}>
                 <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="user avatar" />
                 <AvatarFallback className="text-4xl md:text-6xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
@@ -96,7 +84,6 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
 
 const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn, volumeLevel }: Props) => {
   const { user } = useAuth();
-  const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>>(new Map());
 
@@ -121,17 +108,13 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       setRemoteStreams(prev => new Map(prev).set(socketId, stream));
     },
     onRemoteLeft: (socketId) => {
-      setRemoteSocketIds(prev => prev.filter(id => id !== socketId));
       setRemoteStreams(prev => {
         const newMap = new Map(prev);
         newMap.delete(socketId);
         return newMap;
       });
     },
-    onUserJoined: (socketId: string) => {
-      setRemoteSocketIds(prev => [...prev, socketId]);
-      onUserJoined(socketId);
-    },
+    onUserJoined: onUserJoined,
   }), [meetingId, userId, onUserJoined]);
 
 
@@ -151,7 +134,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
     const self: Participant = { 
       id: userId, 
       name: localUserDetails?.name || user?.displayName || "You", 
-      avatar: localUserDetails?.photoURL || user?.photoURL || undefined, 
+      avatar: localUserDetails?.photoURL || user?.photoURL || `https://placehold.co/128x128.png?text=${(user?.displayName || 'Y').charAt(0)}`,
       isCamOff: !camOn, 
       isMicOff: !micOn,
       isHandRaised: localUserDetails?.isHandRaised,
@@ -170,7 +153,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
         return {
           id,
           name: data.name || `User ${id.substring(0, 4)}`,
-          avatar: data.photoURL,
+          avatar: data.photoURL || `https://placehold.co/128x128.png?text=${(data.name || 'G').charAt(0)}`,
           isHandRaised: data.isHandRaised,
           isScreenSharing: data.isScreenSharing,
           isCamOff: data.isScreenSharing ? false : (videoTracks.length === 0 || !videoTracks.some(t => t.enabled && !t.muted)),

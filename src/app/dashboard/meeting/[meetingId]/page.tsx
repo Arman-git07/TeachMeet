@@ -135,6 +135,8 @@ export default function MeetingPage() {
   // Initialize camera + microphone
   useEffect(() => {
     let mounted = true;
+    let activeStream: MediaStream;
+
     (async () => {
       setLoadingMedia(true);
       try {
@@ -142,18 +144,14 @@ export default function MeetingPage() {
           video: true,
           audio: true
         });
+        activeStream = stream;
         
         if (!mounted) {
             stream.getTracks().forEach(track => track.stop());
             return;
         }
-
-        // Apply initial camera toggle state
-        if (!initialCamState) {
-          stream.getVideoTracks().forEach(track => track.enabled = false);
-        }
         
-        // Apply initial mic toggle state
+        stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
         stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
         
         setLocalStream(stream);
@@ -165,7 +163,8 @@ export default function MeetingPage() {
         // Fallback to audio only if video fails
         try {
           const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          if (!mounted) {
+          activeStream = audioStream;
+           if (!mounted) {
               audioStream.getTracks().forEach(track => track.stop());
               return;
           }
@@ -184,8 +183,9 @@ export default function MeetingPage() {
 
     return () => {
       mounted = false;
-      localStream?.getTracks().forEach(track => track.stop());
-      screenStreamRef.current?.getTracks().forEach(track => track.stop());
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -197,7 +197,7 @@ export default function MeetingPage() {
     }
   };
   
-  // Sync local mic state with Firestore
+  // Sync mic state with Firestore
   useEffect(() => {
     updateMyStatus({ isMicOn });
   }, [isMicOn]);
@@ -210,34 +210,29 @@ export default function MeetingPage() {
     const videoTracks = localStream.getVideoTracks();
     const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
 
-    if (!isCameraOn) {
-      // Turn camera ON
-      if (videoTracks.length === 0) {
-        try {
-          const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          const newTrack = newStream.getVideoTracks()[0];
-          localStream.addTrack(newTrack);
-          
-          peerConnections.forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind === "video");
-            if (sender) sender.replaceTrack(newTrack);
-            else pc.addTrack(newTrack, localStream);
-          });
-        } catch (err) {
-          toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
-          return;
-        }
-      } else {
-        videoTracks.forEach(track => track.enabled = true);
+    const nextState = !isCameraOn;
+
+    if (nextState && videoTracks.length === 0) { // Turning ON, but no track exists
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = newStream.getVideoTracks()[0];
+        localStream.addTrack(newTrack);
+        
+        peerConnections.forEach(pc => {
+          const sender = pc.getSenders().find(s => s.track?.kind === "video");
+          if (sender) sender.replaceTrack(newTrack);
+          else pc.addTrack(newTrack, localStream);
+        });
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
+        return; // Don't change state if we failed
       }
-      setIsCameraOn(true);
-      updateMyStatus({ isCameraOn: true });
-    } else {
-      // Turn camera OFF
-      videoTracks.forEach(track => track.enabled = false);
-      setIsCameraOn(false);
-      updateMyStatus({ isCameraOn: false });
+    } else { // Toggling existing track
+      videoTracks.forEach(track => track.enabled = nextState);
     }
+    
+    setIsCameraOn(nextState);
+    updateMyStatus({ isCameraOn: nextState });
   };
 
 
