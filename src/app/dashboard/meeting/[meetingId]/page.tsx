@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
 
+
 // --------------------------- Microphone Hook ---------------------------
 function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsMicOn: (value: boolean) => void) {
   const [volumeLevel, setVolumeLevel] = useState(0);
