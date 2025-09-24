@@ -20,6 +20,7 @@ type Participant = {
   isLocal?: boolean;
   stream: MediaStream | null;
   isScreenSharing?: boolean;
+  volumeLevel?: number;
 };
 
 type Props = { 
@@ -30,6 +31,7 @@ type Props = {
   localStream: MediaStream | null;
   micOn: boolean;
   camOn: boolean;
+  volumeLevel: number;
 };
 
 const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
@@ -70,7 +72,12 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
             />
         ) : (
           <div className="flex flex-col items-center text-muted-foreground">
-             <Avatar className="w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg">
+             <Avatar className={cn(
+                "w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg transition-all duration-200",
+                user.isLocal && user.isMicOff === false && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
+              )} style={{
+                  boxShadow: user.isLocal && user.isMicOff === false ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
+              }}>
                 <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="user avatar" />
                 <AvatarFallback className="text-4xl md:text-6xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
              </Avatar>
@@ -86,7 +93,7 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
   );
 }
 
-const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn }: Props) => {
+const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn, volumeLevel }: Props) => {
   const { user } = useAuth();
   const [remoteSocketIds, setRemoteSocketIds] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
@@ -149,7 +156,8 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       isHandRaised: localUserDetails?.isHandRaised,
       isScreenSharing: localUserDetails?.isScreenSharing,
       isLocal: true,
-      stream: localStream
+      stream: localStream,
+      volumeLevel: volumeLevel
     };
 
     const remotes: Participant[] = Array.from(liveParticipants.entries())
@@ -171,7 +179,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       });
 
     return [self, ...remotes];
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevel]);
 
 
   useEffect(() => {

@@ -68,6 +68,13 @@ export default function MeetingPage() {
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
+  // --- Volume Indicator Logic ---
+  const [volumeLevel, setVolumeLevel] = useState(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
   // Initialize stream on page load
   useEffect(() => {
     (async () => {
@@ -123,6 +130,45 @@ export default function MeetingPage() {
     return () => setHeaderContent(null);
   }, [topic, setHeaderContent]);
 
+  // Volume indicator setup
+  useEffect(() => {
+    if (!localStream || !isMicOn) {
+      setVolumeLevel(0);
+      return;
+    };
+
+    if (!audioContextRef.current) {
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      const source = audioContext.createMediaStreamSource(localStream);
+      
+      source.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      sourceRef.current = source;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateVolume = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / dataArray.length;
+        setVolumeLevel(avg / 255); // normalize 0-1
+        animationFrameRef.current = requestAnimationFrame(updateVolume);
+      };
+      updateVolume();
+    }
+
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      // Don't close the context here as the stream might still be active
+    };
+  }, [localStream, isMicOn]);
+
   const handleUserJoined = useCallback((socketId: string) => {
   }, []);
   
@@ -169,36 +215,58 @@ export default function MeetingPage() {
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
-    if (videoTracks.length === 0) { // If no video track, try to get one
-      try {
-        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const newVideoTrack = videoStream.getVideoTracks()[0];
-        localStream.addTrack(newVideoTrack);
+    
+    // If turning camera ON
+    if (!isCameraOn) {
+        if (videoTracks.length === 0) { // If no video track exists, try to get one
+            try {
+                const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const newVideoTrack = videoStream.getVideoTracks()[0];
+                localStream.addTrack(newVideoTrack); // Add new track to existing stream
+                
+                const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
+                peerConnections.forEach(pc => {
+                    const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(newVideoTrack);
+                    } else {
+                        pc.addTrack(newVideoTrack, localStream);
+                    }
+                });
+
+            } catch (err) {
+                toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
+                return; // Exit if we fail to get the camera
+            }
+        } else {
+            videoTracks.forEach(track => { track.enabled = true; }); // Re-enable existing track
+        }
         setIsCameraOn(true);
         updateMyStatus({ isCameraOn: true });
-      } catch (err) {
-        toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
-      }
-      return;
+    } else { // If turning camera OFF
+        videoTracks.forEach(track => { track.enabled = false; });
+        setIsCameraOn(false);
+        updateMyStatus({ isCameraOn: false });
     }
-    
-    const nextState = !isCameraOn;
-    videoTracks.forEach(track => {
-        track.enabled = nextState;
-    });
-    setIsCameraOn(nextState);
-    updateMyStatus({ isCameraOn: nextState });
   };
 
-  const handleToggleMic = useCallback(() => {
+  const toggleMic = useCallback(() => {
     if (!localStream) return;
     const nextState = !isMicOn;
-    localStream.getAudioTracks().forEach(track => {
-        track.enabled = nextState;
+    localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
+
+    const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
+    peerConnections.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track?.kind === "audio");
+      if (sender) {
+        const trackToSend = nextState ? localStream.getAudioTracks()[0] : null;
+        sender.replaceTrack(trackToSend);
+      }
     });
+
     setIsMicOn(nextState);
     updateMyStatus({ isMicOn: nextState });
-}, [isMicOn, localStream]);
+  }, [localStream, isMicOn, updateMyStatus]);
 
 
   const handleToggleHandRaise = () => {
@@ -289,6 +357,7 @@ export default function MeetingPage() {
                     localStream={localStream}
                     micOn={isMicOn}
                     camOn={isCameraOn}
+                    volumeLevel={volumeLevel}
                 />
              )}
         </div>
@@ -297,7 +366,7 @@ export default function MeetingPage() {
             <div className="flex items-center justify-center relative">
                 <div className="flex items-center justify-center gap-3">
                     <Button
-                      onClick={handleToggleMic}
+                      onClick={toggleMic}
                       className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", 
                         isMicOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"
                       )}
