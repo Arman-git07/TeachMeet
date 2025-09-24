@@ -56,75 +56,42 @@ export default function MeetingPage() {
   const initialCamState = isClient ? params.get('cam') === 'true' : false;
   const initialMicState = isClient ? params.get('mic') !== 'false' : true;
 
+  const [isCameraOn, setIsCameraOn] = useState(initialCamState);
   const [isMicOn, setIsMicOn] = useState(initialMicState);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-
-  const [participants, setParticipants] = useState<any[]>([]);
   
-  const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
-
-  // --- Camera State + Helpers ---
-  const [isCameraOn, setIsCameraOn] = useState(initialCamState);
-  const [loadingMedia, setLoadingMedia] = useState(true);
+  const [participants, setParticipants] = useState<any[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [loadingMedia, setLoadingMedia] = useState(true);
+
+  const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // Toggle camera ON/OFF by enabling/disabling the track
-  const toggleCamera = useCallback(async () => {
-    if (isScreenSharing) {
-      toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
-      return;
-    }
-
-    if (isCameraOn && localStream) {
-      // Turn camera off
-      localStream.getVideoTracks().forEach((track) => (track.enabled = false));
-      setIsCameraOn(false);
-      updateMyStatus({ isCameraOn: false });
-    } else {
-      if (!localStream || localStream.getVideoTracks().length === 0) {
-        // First time turning on camera or stream doesn't have video
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          setLocalStream(stream);
-          setIsCameraOn(true);
-          updateMyStatus({ isCameraOn: true });
-        } catch (err) {
-            console.error("Error starting camera:", err);
-            toast({ variant: "destructive", title: "Camera Error", description: "Could not start camera." });
-        }
-      } else {
-        // Turn existing camera track on
-        localStream.getVideoTracks().forEach((track) => (track.enabled = true));
-        setIsCameraOn(true);
-        updateMyStatus({ isCameraOn: true });
-      }
-    }
-  }, [isCameraOn, localStream, isScreenSharing, toast]);
-
-  // --- Initialize on Page Load (respect ?cam=true/false) ---
   useEffect(() => {
     (async () => {
+      setLoadingMedia(true);
       try {
-        // Always request audio to start, request video based on initial state.
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: initialCamState });
-        
-        // Disable tracks based on pre-join choices
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: initialCamState,
+          audio: true
+        });
+
+        stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
         stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
-        if(!initialCamState) {
-            stream.getVideoTracks().forEach(track => track.enabled = false);
-        }
-        
+
         setLocalStream(stream);
+        setIsCameraOn(initialCamState);
+        setIsMicOn(initialMicState);
+
       } catch (err) {
         console.error("Init media error:", err);
-        // Fallback to audio-only if video fails
+        // Fallback to audio-only if camera fails or is denied
         try {
             const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
             setLocalStream(audioStream);
-            setIsCameraOn(false);
+            setIsCameraOn(false); // Ensure camera is marked as off
             toast({ variant: 'destructive', title: 'Video Error', description: 'Could not access camera. Starting with audio only.' });
         } catch (audioErr) {
             console.error("Audio-only fallback error:", audioErr);
@@ -140,7 +107,8 @@ export default function MeetingPage() {
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient, initialCamState, initialMicState]);
+  }, [isClient]);
+  
 
   const selfParticipant = participants.find(p => p.id === user?.uid);
   const previousRaisedHands = useRef(new Set());
@@ -192,6 +160,41 @@ export default function MeetingPage() {
       }
     }
   };
+
+  const toggleCamera = useCallback(async () => {
+    if (isScreenSharing) {
+        toast({ title: "Camera Disabled", description: "You cannot turn on your camera while screen sharing."});
+        return;
+    }
+
+    if (!localStream) return;
+    
+    let videoTrack = localStream.getVideoTracks()[0];
+    
+    if (videoTrack) {
+        const nextState = !videoTrack.enabled;
+        videoTrack.enabled = nextState;
+        setIsCameraOn(nextState);
+        updateMyStatus({ isCameraOn: nextState });
+    } else if (!isCameraOn) {
+        // If there's no video track and we want to turn it on
+        try {
+            setLoadingMedia(true);
+            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const newVideoTrack = videoStream.getVideoTracks()[0];
+            localStream.addTrack(newVideoTrack);
+            setIsCameraOn(true);
+            updateMyStatus({ isCameraOn: true });
+            
+            // This logic to update peers will be handled by MeetingClient when localStream prop changes
+        } catch (err) {
+            console.error("Error starting camera:", err);
+            toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
+        } finally {
+            setLoadingMedia(false);
+        }
+    }
+  }, [isCameraOn, localStream, isScreenSharing, toast]);
 
   const handleToggleMic = useCallback(() => {
     if (!localStream) return;

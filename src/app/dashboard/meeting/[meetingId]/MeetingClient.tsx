@@ -40,18 +40,17 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
     if (!videoEl) return;
 
     if (user.stream && !user.isCamOff) {
-      // Attach the stream
       videoEl.srcObject = user.stream;
-      
-      // Force video to play (important for some browsers)
       const playPromise = videoEl.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
-          console.error("Video play blocked:", err);
+          // Ignore the error if the user hasn't interacted with the page yet.
+          if (err.name !== 'NotAllowedError') {
+             console.error("Video play error:", err);
+          }
         });
       }
     } else {
-      // Remove stream when camera is off
       videoEl.srcObject = null;
     }
   }, [user.stream, user.isCamOff]);
@@ -281,7 +280,3 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
 };
 
 export default MeetingClient;
-
-    
-
-    
