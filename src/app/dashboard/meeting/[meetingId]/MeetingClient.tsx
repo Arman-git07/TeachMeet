@@ -88,7 +88,7 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
            {user.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
            <span className="text-sm">{user.name}{user.isLocal ? " (You)" : ""}</span>
         </div>
-        {user.isCamOff && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
+        {user.isCamOff && !user.isScreenSharing && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
         {user.isHandRaised && <Hand className="h-5 w-5 absolute top-2 left-2 text-yellow-400 bg-black/50 p-1 rounded-full" />}
     </div>
   );

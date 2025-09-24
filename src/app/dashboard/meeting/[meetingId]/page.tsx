@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useDynamicHeader } from "@/contexts/DynamicHeaderContext";
+import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 
 // --------------------------- Microphone Hook ---------------------------
