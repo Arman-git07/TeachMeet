@@ -100,9 +100,15 @@ export default function PreJoinPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    let mounted = true;
     const getCameraPermission = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+        if (!mounted) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+        }
+
         setHasCameraPermission(true);
         setLocalStream(stream);
 
@@ -125,12 +131,22 @@ export default function PreJoinPage() {
         console.error('Error accessing camera:', error);
         setHasCameraPermission(false);
         setIsCameraOn(false);
-        setIsMicOn(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings to use this app.',
-        });
+        // Try getting mic only
+         try {
+            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (!mounted) return;
+            setLocalStream(audioStream);
+            const desiredMicState = localStorage.getItem('teachmeet-mic-default') !== 'off';
+            setIsMicOn(desiredMicState);
+            audioStream.getAudioTracks().forEach(track => track.enabled = desiredMicState);
+            localStorage.setItem("micState", desiredMicState ? "true" : "false");
+        } catch (audioError) {
+             toast({
+              variant: 'destructive',
+              title: 'Media Access Denied',
+              description: 'Please enable camera and microphone permissions in your browser settings to use this app.',
+            });
+        }
       }
     };
 
@@ -150,6 +166,7 @@ export default function PreJoinPage() {
 
     // Cleanup function: stop all tracks when the component unmounts
     return () => {
+      mounted = false;
       if (localStream) {
         localStream.getTracks().forEach((track) => track.stop());
       }

@@ -38,7 +38,7 @@ function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsM
     const nextState = !isMicOn;
     localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
     
-    // Sync state with pre-join page
+    // Persist state for pre-join page sync
     localStorage.setItem("micState", nextState ? "true" : "false");
     
     // Update peers
@@ -134,69 +134,60 @@ export default function MeetingPage() {
 
   // Initialize camera + microphone
   useEffect(() => {
+    let mounted = true;
     (async () => {
       setLoadingMedia(true);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: initialCamState,
+          video: true,
           audio: true
         });
         
-        if (!initialCamState) stream.getVideoTracks().forEach(track => track.enabled = false);
+        if (!mounted) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+        }
+
+        // Apply initial camera toggle state
+        if (!initialCamState) {
+          stream.getVideoTracks().forEach(track => track.enabled = false);
+        }
+        
+        // Apply initial mic toggle state
         stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
         
         setLocalStream(stream);
         setIsCameraOn(initialCamState);
         setIsMicOn(initialMicState);
 
-        // Persist initial state for pre-join sync
-        localStorage.setItem("micState", initialMicState ? "true" : "false");
-
       } catch (err) {
-        console.error("Init media error:", err);
-        toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.' });
+        console.error("Failed to get media:", err);
+        // Fallback to audio only if video fails
         try {
-            // Fallback to audio-only
-            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
-            setLocalStream(audioStream);
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          if (!mounted) {
+              audioStream.getTracks().forEach(track => track.stop());
+              return;
+          }
+          audioStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
+          setLocalStream(audioStream);
+          setIsCameraOn(false); // Ensure camera is off if video failed
+          toast({ variant: 'destructive', title: 'Video Error', description: 'Could not access camera. Starting with audio only.' });
         } catch (audioErr) {
-             console.error("Audio-only fallback failed:", audioErr);
+          console.error("Audio-only fallback failed:", audioErr);
+           toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.' });
         }
       } finally {
-        setLoadingMedia(false);
+        if(mounted) setLoadingMedia(false);
       }
     })();
-    
-    // Listen for pre-join page updates for mic
-    const handleStorage = (e: StorageEvent) => {
-        if (e.key === "micState") {
-          const state = e.newValue === "true";
-          setIsMicOn(state);
-          if (localStream) {
-            localStream.getAudioTracks().forEach(track => (track.enabled = state));
-          }
-        }
-      };
-    window.addEventListener("storage", handleStorage);
-    
+
     return () => {
+      mounted = false;
       localStream?.getTracks().forEach(track => track.stop());
       screenStreamRef.current?.getTracks().forEach(track => track.stop());
-      window.removeEventListener("storage", handleStorage);
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const { toggleMic, volumeLevel } = useMeetingMic(localStream, isMicOn, setIsMicOn);
-
-  useEffect(() => {
-    setHeaderContent(<span className="text-sm font-medium truncate">{topic}</span>);
-    return () => setHeaderContent(null);
-  }, [topic, setHeaderContent]);
-  
-  const handleParticipantsChange = useCallback((newParticipants: any[]) => {
-    setParticipants(newParticipants);
   }, []);
 
   const updateMyStatus = async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
@@ -211,36 +202,53 @@ export default function MeetingPage() {
     updateMyStatus({ isMicOn });
   }, [isMicOn]);
   
+  const { toggleMic, volumeLevel } = useMeetingMic(localStream, isMicOn, setIsMicOn);
+
+  // Camera toggle logic
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
     const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
-    
+
     if (!isCameraOn) {
+      // Turn camera ON
       if (videoTracks.length === 0) {
         try {
-          const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          const newTrack = videoStream.getVideoTracks()[0];
+          const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const newTrack = newStream.getVideoTracks()[0];
           localStream.addTrack(newTrack);
+          
           peerConnections.forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+            const sender = pc.getSenders().find(s => s.track?.kind === "video");
             if (sender) sender.replaceTrack(newTrack);
             else pc.addTrack(newTrack, localStream);
           });
-        } catch {
+        } catch (err) {
           toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
           return;
         }
-      } else videoTracks.forEach(t => t.enabled = true);
-      
+      } else {
+        videoTracks.forEach(track => track.enabled = true);
+      }
       setIsCameraOn(true);
       updateMyStatus({ isCameraOn: true });
     } else {
-      videoTracks.forEach(t => t.enabled = false);
+      // Turn camera OFF
+      videoTracks.forEach(track => track.enabled = false);
       setIsCameraOn(false);
       updateMyStatus({ isCameraOn: false });
     }
   };
+
+
+  useEffect(() => {
+    setHeaderContent(<span className="text-sm font-medium truncate">{topic}</span>);
+    return () => setHeaderContent(null);
+  }, [topic, setHeaderContent]);
+  
+  const handleParticipantsChange = useCallback((newParticipants: any[]) => {
+    setParticipants(newParticipants);
+  }, []);
 
   const handleToggleHandRaise = () => {
     const next = !isHandRaised;
