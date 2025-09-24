@@ -46,7 +46,6 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
       const playPromise = videoEl.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
-          // Ignore the error if the user hasn't interacted with the page yet.
           if (err.name !== 'NotAllowedError') {
              console.error("Video play error:", err);
           }

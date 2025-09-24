@@ -75,10 +75,8 @@ export default function PreJoinPage() {
 
   // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(
-    null
-  );
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
 
@@ -106,7 +104,7 @@ export default function PreJoinPage() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
         setHasCameraPermission(true);
-        streamRef.current = stream;
+        setLocalStream(stream);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -120,6 +118,9 @@ export default function PreJoinPage() {
 
         stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
         stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
+        
+        // Persist initial state for meeting page sync
+        localStorage.setItem("micState", desiredMicState ? "true" : "false");
       } catch (error) {
         console.error('Error accessing camera:', error);
         setHasCameraPermission(false);
@@ -135,33 +136,43 @@ export default function PreJoinPage() {
 
     getCameraPermission();
 
+    // Listen for meeting page updates
+    const handleStorage = (e: StorageEvent) => {
+        if (e.key === "micState") {
+            const state = e.newValue === "true";
+            setIsMicOn(state);
+            if (localStream) {
+              localStream.getAudioTracks().forEach(track => (track.enabled = state));
+            }
+        }
+    };
+    window.addEventListener("storage", handleStorage);
+
     // Cleanup function: stop all tracks when the component unmounts
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+      if (localStream) {
+        localStream.getTracks().forEach((track) => track.stop());
       }
+      window.removeEventListener("storage", handleStorage);
     };
   }, [toast]);
 
   const toggleCamera = () => {
+    if (!localStream) return;
     const nextState = !isCameraOn;
     setIsCameraOn(nextState);
-    if (streamRef.current) {
-      streamRef.current.getVideoTracks().forEach((track) => {
-        track.enabled = nextState;
-      });
-    }
+    localStream.getVideoTracks().forEach((track) => {
+      track.enabled = nextState;
+    });
     localStorage.setItem('teachmeet-camera-default', nextState ? 'on' : 'off');
   };
   
   const toggleMic = () => {
+    if (!localStream) return;
     const nextState = !isMicOn;
     setIsMicOn(nextState);
-    if (streamRef.current) {
-      streamRef.current.getAudioTracks().forEach((track) => {
-        track.enabled = nextState;
-      });
-    }
+    localStream.getAudioTracks().forEach((track) => (track.enabled = nextState));
+    localStorage.setItem("micState", nextState ? "true" : "false");
     localStorage.setItem('teachmeet-mic-default', nextState ? 'on' : 'off');
   };
 
@@ -469,5 +480,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    

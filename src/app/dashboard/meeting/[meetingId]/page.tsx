@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -35,55 +36,64 @@ function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsM
     if (!localStream) return;
     const nextState = !isMicOn;
     localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
+    
+    // Sync state with pre-join page
+    localStorage.setItem("micState", nextState ? "true" : "false");
+    
+    // Update peers
+    const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
+    peerConnections.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track?.kind === "audio");
+      if (sender) sender.replaceTrack(nextState ? localStream.getAudioTracks()[0] : null);
+    });
+
     setIsMicOn(nextState);
   }, [localStream, isMicOn, setIsMicOn]);
 
+  // Volume indicator setup
   useEffect(() => {
-    if (!localStream || !isMicOn || localStream.getAudioTracks().length === 0) {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    if (!localStream || localStream.getAudioTracks().length === 0) {
+      if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       setVolumeLevel(0);
       return;
-    }
-    
-    if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-    }
-    const audioContext = audioContextRef.current;
+    };
 
-    if (!sourceRef.current || sourceRef.current.mediaStream.id !== localStream.id) {
-        sourceRef.current?.disconnect();
-        sourceRef.current = audioContext.createMediaStreamSource(localStream);
-    }
-    const source = sourceRef.current;
-    
-    if (!analyserRef.current) {
-        analyserRef.current = audioContext.createAnalyser();
-        analyserRef.current.fftSize = 256;
-    }
-    const analyser = analyserRef.current;
+    if (audioContextRef.current) return; // Already initialized
 
-    source.connect(analyser);
+    try {
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      const source = audioContext.createMediaStreamSource(localStream);
+      source.connect(analyser);
 
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      sourceRef.current = source;
 
-    const updateVolume = () => {
-      if (analyserRef.current) {
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const updateVolume = () => {
+        if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
         const avg = sum / dataArray.length;
         setVolumeLevel(avg / 255); // normalize 0-1
-      }
-      animationFrameRef.current = requestAnimationFrame(updateVolume);
-    };
-
-    updateVolume();
-
+        animationFrameRef.current = requestAnimationFrame(updateVolume);
+      };
+      updateVolume();
+    } catch (err) {
+      console.error("Failed to initialize audio context for volume meter", err);
+    }
+    
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      source?.disconnect();
+      sourceRef.current?.disconnect();
+      audioContextRef.current?.close().catch(() => {});
+      audioContextRef.current = null;
     };
-  }, [localStream, isMicOn]);
+  }, [localStream]);
 
   return { toggleMic, volumeLevel };
 }
@@ -137,6 +147,10 @@ export default function MeetingPage() {
         setLocalStream(stream);
         setIsCameraOn(initialCamState);
         setIsMicOn(initialMicState);
+
+        // Persist initial state for pre-join sync
+        localStorage.setItem("micState", initialMicState ? "true" : "false");
+
       } catch (err) {
         console.error("Init media error:", err);
         toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.' });
@@ -145,9 +159,22 @@ export default function MeetingPage() {
       }
     })();
     
+    // Listen for pre-join page updates
+    const handleStorage = (e: StorageEvent) => {
+        if (e.key === "micState") {
+          const state = e.newValue === "true";
+          setIsMicOn(state);
+          if (localStream) {
+            localStream.getAudioTracks().forEach(track => (track.enabled = state));
+          }
+        }
+      };
+    window.addEventListener("storage", handleStorage);
+    
     return () => {
       localStream?.getTracks().forEach(track => track.stop());
       screenStreamRef.current?.getTracks().forEach(track => track.stop());
+      window.removeEventListener("storage", handleStorage);
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
