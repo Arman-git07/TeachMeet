@@ -128,7 +128,8 @@ export default function MeetingPage() {
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // Initialize camera + microphone ONCE
+  // --- CORRECT CAMERA INITIALIZATION ---
+  // Initialize camera + microphone ONCE when the component mounts.
   useEffect(() => {
     let stream: MediaStream | null = null;
     let mounted = true;
@@ -146,6 +147,7 @@ export default function MeetingPage() {
             return;
         }
 
+        // Set initial track states based on parameters from pre-join page
         stream.getVideoTracks().forEach(track => { track.enabled = initialCamState; });
         stream.getAudioTracks().forEach(track => { track.enabled = initialMicState; });
 
@@ -163,12 +165,14 @@ export default function MeetingPage() {
     
     initMedia();
 
+    // Cleanup function: stop all tracks when the component unmounts
     return () => {
       mounted = false;
       stream?.getTracks().forEach(t => t.stop());
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once.
+
 
   const updateMyStatus = async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
     if (user && meetingId) {
@@ -184,6 +188,8 @@ export default function MeetingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMicOn]);
 
+  // --- CORRECT CAMERA TOGGLE ---
+  // This function ONLY enables or disables the track on the PERSISTENT stream.
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
@@ -191,7 +197,7 @@ export default function MeetingPage() {
 
     const nextState = !isCameraOn;
     videoTracks.forEach(track => (track.enabled = nextState));
-    setIsCameraOn(nextState);
+    setIsCameraOn(nextState); // This line is crucial to trigger a re-render
     updateMyStatus({ isCameraOn: nextState });
   };
 

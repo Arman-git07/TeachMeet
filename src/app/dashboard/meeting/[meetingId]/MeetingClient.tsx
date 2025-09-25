@@ -37,6 +37,8 @@ type Props = {
 const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   
+  // --- RELIABLE STREAM BINDING ---
+  // This useEffect ensures the stream is always correctly attached to the video element.
   useEffect(() => {
     if (videoRef.current && user.stream) {
       if (videoRef.current.srcObject !== user.stream) {
