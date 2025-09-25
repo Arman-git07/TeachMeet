@@ -134,23 +134,23 @@ export default function MeetingPage() {
 
   // Initialize camera + microphone
   useEffect(() => {
+    let stream: MediaStream;
     let mounted = true;
-    let activeStream: MediaStream;
 
     (async () => {
       setLoadingMedia(true);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true, // Always request video to get the track
           audio: true
         });
-        activeStream = stream;
-        
+
         if (!mounted) {
             stream.getTracks().forEach(track => track.stop());
             return;
         }
         
+        // Apply initial states by enabling/disabling tracks
         stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
         stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
         
@@ -163,18 +163,16 @@ export default function MeetingPage() {
         // Fallback to audio only if video fails
         try {
           const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          activeStream = audioStream;
-           if (!mounted) {
-              audioStream.getTracks().forEach(track => track.stop());
-              return;
-          }
+          if (!mounted) return;
           audioStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
           setLocalStream(audioStream);
-          setIsCameraOn(false); // Ensure camera is off if video failed
+          setIsCameraOn(false); // Ensure camera is marked as off
           toast({ variant: 'destructive', title: 'Video Error', description: 'Could not access camera. Starting with audio only.' });
         } catch (audioErr) {
           console.error("Audio-only fallback failed:", audioErr);
+          if (mounted) {
            toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.' });
+          }
         }
       } finally {
         if(mounted) setLoadingMedia(false);
@@ -183,9 +181,10 @@ export default function MeetingPage() {
 
     return () => {
       mounted = false;
-      if (activeStream) {
-        activeStream.getTracks().forEach(track => track.stop());
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
       }
+      screenStreamRef.current?.getTracks().forEach(track => track.stop());
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -208,16 +207,15 @@ export default function MeetingPage() {
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
-    const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
-
     const nextState = !isCameraOn;
-
+  
     if (nextState && videoTracks.length === 0) { // Turning ON, but no track exists
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const newTrack = newStream.getVideoTracks()[0];
         localStream.addTrack(newTrack);
         
+        const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
         peerConnections.forEach(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind === "video");
           if (sender) sender.replaceTrack(newTrack);
