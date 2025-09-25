@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
+
 // --------------------------- Microphone Hook ---------------------------
 function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsMicOn: (value: boolean) => void) {
   const [volumeLevel, setVolumeLevel] = useState(0);
@@ -131,59 +132,43 @@ export default function MeetingPage() {
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // Initialize camera + microphone
+  // Initialize camera + microphone ONCE
   useEffect(() => {
-    let stream: MediaStream;
-    let mounted = true;
+    let stream: MediaStream | null = null;
 
     (async () => {
       setLoadingMedia(true);
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: true, // Always request video to get the track
-          audio: true
+          video: true,
+          audio: true,
         });
 
-        if (!mounted) {
-            stream.getTracks().forEach(track => track.stop());
-            return;
-        }
-        
-        // Apply initial states by enabling/disabling tracks
-        stream.getVideoTracks().forEach(track => track.enabled = initialCamState);
-        stream.getAudioTracks().forEach(track => track.enabled = initialMicState);
-        
+        // Set initial states based on query params
+        stream.getVideoTracks().forEach(track => {
+          track.enabled = initialCamState;
+        });
+        stream.getAudioTracks().forEach(track => {
+          track.enabled = initialMicState;
+        });
+
         setLocalStream(stream);
         setIsCameraOn(initialCamState);
         setIsMicOn(initialMicState);
-
       } catch (err) {
-        console.error("Failed to get media:", err);
-        // Fallback to audio only if video fails
-        try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          if (!mounted) return;
-          audioStream.getAudioTracks().forEach(track => track.enabled = initialMicState);
-          setLocalStream(audioStream);
-          setIsCameraOn(false); // Ensure camera is marked as off
-          toast({ variant: 'destructive', title: 'Video Error', description: 'Could not access camera. Starting with audio only.' });
-        } catch (audioErr) {
-          console.error("Audio-only fallback failed:", audioErr);
-          if (mounted) {
-           toast({ variant: 'destructive', title: 'Media Error', description: 'Could not access camera or microphone.' });
-          }
-        }
+        console.error("Media init error:", err);
+        toast({
+          variant: "destructive",
+          title: "Media Error",
+          description: "Could not access camera or microphone.",
+        });
       } finally {
-        if(mounted) setLoadingMedia(false);
+        setLoadingMedia(false);
       }
     })();
 
     return () => {
-      mounted = false;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      screenStreamRef.current?.getTracks().forEach(track => track.stop());
+      stream?.getTracks().forEach(t => t.stop());
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -201,34 +186,17 @@ export default function MeetingPage() {
   // Sync mic state with Firestore (and peers)
   useEffect(() => {
     updateMyStatus({ isMicOn });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMicOn]);
 
   // Camera toggle logic - now correctly enables/disables track
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
+    if (videoTracks.length === 0) return;
+
     const nextState = !isCameraOn;
-  
-    if (nextState && videoTracks.length === 0) { // Turning ON, but no track exists
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const newTrack = newStream.getVideoTracks()[0];
-        localStream.addTrack(newTrack);
-        
-        const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
-        peerConnections.forEach(pc => {
-          const sender = pc.getSenders().find(s => s.track?.kind === "video");
-          if (sender) sender.replaceTrack(newTrack);
-          else pc.addTrack(newTrack, localStream);
-        });
-      } catch (err) {
-        toast({ variant: 'destructive', title: 'Camera Error', description: 'Could not access camera.' });
-        return; // Don't change state if we failed
-      }
-    } else { // Toggling existing track
-      videoTracks.forEach(track => track.enabled = nextState);
-    }
-    
+    videoTracks.forEach(track => (track.enabled = nextState));
     setIsCameraOn(nextState);
     updateMyStatus({ isCameraOn: nextState });
   };
