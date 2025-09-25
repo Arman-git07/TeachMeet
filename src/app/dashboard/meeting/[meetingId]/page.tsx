@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
-
 // --------------------------- Microphone Hook ---------------------------
 function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsMicOn: (value: boolean) => void) {
   const [volumeLevel, setVolumeLevel] = useState(0);
@@ -196,12 +195,13 @@ export default function MeetingPage() {
     }
   };
   
-  // Sync mic state with Firestore (already part of toggleMic, but camera needs it here)
-  useEffect(() => {
-    updateMyStatus({ isCameraOn });
-  }, [isCameraOn]);
-  
+  // Use the microphone hook
   const { toggleMic, volumeLevel } = useMeetingMic(localStream, isMicOn, setIsMicOn);
+
+  // Sync mic state with Firestore (and peers)
+  useEffect(() => {
+    updateMyStatus({ isMicOn });
+  }, [isMicOn]);
 
   // Camera toggle logic - now correctly enables/disables track
   const toggleCamera = async () => {
@@ -230,7 +230,7 @@ export default function MeetingPage() {
     }
     
     setIsCameraOn(nextState);
-    // The useEffect above handles the Firestore update
+    updateMyStatus({ isCameraOn: nextState });
   };
 
 
