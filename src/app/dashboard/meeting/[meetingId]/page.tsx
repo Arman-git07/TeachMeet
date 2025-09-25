@@ -196,14 +196,14 @@ export default function MeetingPage() {
     }
   };
   
-  // Sync mic state with Firestore
+  // Sync mic state with Firestore (already part of toggleMic, but camera needs it here)
   useEffect(() => {
-    updateMyStatus({ isMicOn });
-  }, [isMicOn]);
+    updateMyStatus({ isCameraOn });
+  }, [isCameraOn]);
   
   const { toggleMic, volumeLevel } = useMeetingMic(localStream, isMicOn, setIsMicOn);
 
-  // Camera toggle logic
+  // Camera toggle logic - now correctly enables/disables track
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
@@ -230,7 +230,7 @@ export default function MeetingPage() {
     }
     
     setIsCameraOn(nextState);
-    updateMyStatus({ isCameraOn: nextState });
+    // The useEffect above handles the Firestore update
   };
 
 

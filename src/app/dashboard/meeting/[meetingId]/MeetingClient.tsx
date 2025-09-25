@@ -39,7 +39,11 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
   
   useEffect(() => {
     if (videoRef.current && user.stream) {
-      videoRef.current.srcObject = user.stream;
+      // Always re-assign the srcObject when the stream object changes.
+      // This is crucial for React's lifecycle.
+      if (videoRef.current.srcObject !== user.stream) {
+        videoRef.current.srcObject = user.stream;
+      }
     }
   }, [user.stream]);
 
