@@ -41,25 +41,26 @@ function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsM
     // Persist state for pre-join page sync
     localStorage.setItem("micState", nextState ? "true" : "false");
     
-    // Update peers
-    const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
-    peerConnections.forEach(pc => {
-      const sender = pc.getSenders().find(s => s.track?.kind === "audio");
-      if (sender) sender.replaceTrack(nextState ? localStream.getAudioTracks()[0] : null);
-    });
-
     setIsMicOn(nextState);
   }, [localStream, isMicOn, setIsMicOn]);
 
   // Volume indicator setup
   useEffect(() => {
-    if (!localStream || localStream.getAudioTracks().length === 0) {
+    if (!localStream || localStream.getAudioTracks().length === 0 || !isMicOn) {
       if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       setVolumeLevel(0);
       return;
     };
 
-    if (audioContextRef.current) return; // Already initialized
+    if (audioContextRef.current) {
+        if(isMicOn) {
+            audioContextRef.current.resume();
+        } else {
+            audioContextRef.current.suspend();
+            setVolumeLevel(0);
+        }
+        return;
+    }
 
     try {
       const audioContext = new AudioContext();
@@ -75,7 +76,11 @@ function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsM
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
       const updateVolume = () => {
-        if (!analyserRef.current) return;
+        if (!analyserRef.current || !isMicOn) {
+            setVolumeLevel(0);
+            if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            return;
+        };
         analyserRef.current.getByteFrequencyData(dataArray);
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
@@ -94,7 +99,7 @@ function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsM
       audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
     };
-  }, [localStream]);
+  }, [localStream, isMicOn]);
 
   return { toggleMic, volumeLevel };
 }
@@ -167,8 +172,19 @@ export default function MeetingPage() {
       }
     })();
 
+    // Listen for mic state changes from prejoin page
+    const handleStorage = (e: StorageEvent) => {
+        if (e.key === "micState" && stream) {
+            const state = e.newValue === "true";
+            setIsMicOn(state);
+            stream.getAudioTracks().forEach(track => (track.enabled = state));
+        }
+    };
+    window.addEventListener("storage", handleStorage);
+
     return () => {
       stream?.getTracks().forEach(t => t.stop());
+      window.removeEventListener("storage", handleStorage);
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -227,10 +243,12 @@ export default function MeetingPage() {
         screenStreamRef.current = null;
         
         const cameraTrack = localStream.getVideoTracks().find(t => t.kind === 'video' && !t.label.includes('screen'));
-        peerConnections.forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-            if (sender) sender.replaceTrack(cameraTrack || null);
-        });
+        if (cameraTrack) {
+             peerConnections.forEach(pc => {
+                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) sender.replaceTrack(cameraTrack);
+            });
+        }
         
         setIsScreenSharing(false);
         await updateMyStatus({ isScreenSharing: false });
