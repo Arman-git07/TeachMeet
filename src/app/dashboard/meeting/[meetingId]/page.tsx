@@ -38,13 +38,11 @@ function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsM
     const nextState = !isMicOn;
     localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
     
-    // Persist state for pre-join page sync
     localStorage.setItem("micState", nextState ? "true" : "false");
     
     setIsMicOn(nextState);
   }, [localStream, isMicOn, setIsMicOn]);
 
-  // Volume indicator setup
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !isMicOn) {
       if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
@@ -52,52 +50,45 @@ function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsM
       return;
     };
 
-    if (audioContextRef.current) {
-        if(isMicOn) {
-            audioContextRef.current.resume();
-        } else {
-            audioContextRef.current.suspend();
-            setVolumeLevel(0);
-        }
-        return;
-    }
+    if (!audioContextRef.current) {
+        try {
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            const source = audioContext.createMediaStreamSource(localStream);
+            source.connect(analyser);
 
-    try {
-      const audioContext = new AudioContext();
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      const source = audioContext.createMediaStreamSource(localStream);
-      source.connect(analyser);
-
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
-      sourceRef.current = source;
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-      const updateVolume = () => {
-        if (!analyserRef.current || !isMicOn) {
-            setVolumeLevel(0);
-            if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            audioContextRef.current = audioContext;
+            analyserRef.current = analyser;
+            sourceRef.current = source;
+        } catch (err) {
+            console.error("Failed to initialize audio context for volume meter", err);
             return;
-        };
-        analyserRef.current.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const avg = sum / dataArray.length;
-        setVolumeLevel(avg / 255); // normalize 0-1
-        animationFrameRef.current = requestAnimationFrame(updateVolume);
-      };
-      updateVolume();
-    } catch (err) {
-      console.error("Failed to initialize audio context for volume meter", err);
+        }
     }
+    
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const updateVolume = () => {
+      if (!analyserRef.current || !isMicOn) {
+          setVolumeLevel(0);
+          if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+          return;
+      };
+      analyserRef.current.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+      const avg = sum / dataArray.length;
+      setVolumeLevel(avg / 255); // normalize 0-1
+      animationFrameRef.current = requestAnimationFrame(updateVolume);
+    };
+    updateVolume();
     
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      sourceRef.current?.disconnect();
-      audioContextRef.current?.close().catch(() => {});
-      audioContextRef.current = null;
     };
   }, [localStream, isMicOn]);
 
@@ -149,30 +140,22 @@ export default function MeetingPage() {
           video: true,
           audio: true,
         });
-
+        
         if (!mounted) {
             stream.getTracks().forEach(t => t.stop());
             return;
         }
 
-        // Set initial states based on query params
-        stream.getVideoTracks().forEach(track => {
-          track.enabled = initialCamState;
-        });
-        stream.getAudioTracks().forEach(track => {
-          track.enabled = initialMicState;
-        });
+        stream.getVideoTracks().forEach(track => { track.enabled = initialCamState; });
+        stream.getAudioTracks().forEach(track => { track.enabled = initialMicState; });
 
         setLocalStream(stream);
         setIsCameraOn(initialCamState);
         setIsMicOn(initialMicState);
+
       } catch (err) {
         console.error("Media init error:", err);
-        toast({
-          variant: "destructive",
-          title: "Media Error",
-          description: "Could not access camera or microphone.",
-        });
+        toast({ variant: "destructive", title: "Media Error", description: "Could not access camera or microphone." });
       } finally {
         if(mounted) setLoadingMedia(false);
       }
@@ -180,20 +163,9 @@ export default function MeetingPage() {
     
     initMedia();
 
-    // Listen for mic state changes from prejoin page
-    const handleStorage = (e: StorageEvent) => {
-        if (e.key === "micState" && stream) {
-            const state = e.newValue === "true";
-            setIsMicOn(state);
-            stream.getAudioTracks().forEach(track => (track.enabled = state));
-        }
-    };
-    window.addEventListener("storage", handleStorage);
-
     return () => {
       mounted = false;
       stream?.getTracks().forEach(t => t.stop());
-      window.removeEventListener("storage", handleStorage);
     };
      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -205,16 +177,13 @@ export default function MeetingPage() {
     }
   };
   
-  // Use the microphone hook
   const { toggleMic, volumeLevel } = useMeetingMic(localStream, isMicOn, setIsMicOn);
 
-  // Sync mic state with Firestore (and peers)
   useEffect(() => {
     updateMyStatus({ isMicOn });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMicOn]);
 
-  // CORRECT Camera toggle logic
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();

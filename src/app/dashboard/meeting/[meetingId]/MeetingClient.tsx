@@ -52,34 +52,34 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
         "bg-gray-800 flex items-center justify-center relative rounded-lg overflow-hidden",
         full ? "w-full h-full" : "w-full h-full"
     )}>
-        {showVideo ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted={user.isLocal}
-              className="w-full h-full object-cover"
-              onLoadedMetadata={() => videoRef.current?.play().catch(e => console.error("Video play error:", e))}
-            />
-        ) : (
-          <div className="flex flex-col items-center text-muted-foreground">
-             <Avatar className={cn(
-                "w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg transition-all duration-200",
-                 user.isLocal && !user.isMicOff && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
-              )} style={{
-                  boxShadow: user.isLocal && !user.isMicOff && (user.volumeLevel || 0) > 0.01 ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
-              }}>
-                <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="user avatar" />
-                <AvatarFallback className="text-4xl md:text-6xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
-             </Avatar>
-           </div>
-        )}
-        <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
-           {user.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
-           <span className="text-sm">{user.name}{user.isLocal ? " (You)" : ""}</span>
+      {showVideo ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={user.isLocal}
+          className="w-full h-full object-cover"
+          onLoadedMetadata={() => videoRef.current?.play().catch(e => console.error("Video play error:", e))}
+        />
+      ) : (
+        <div className="flex flex-col items-center text-muted-foreground">
+          <Avatar className={cn(
+            "w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg transition-all duration-200",
+            user.isLocal && !user.isMicOff && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
+          )} style={{
+              boxShadow: user.isLocal && !user.isMicOff && (user.volumeLevel || 0) > 0.01 ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
+          }}>
+            <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="user avatar" />
+            <AvatarFallback className="text-4xl md:text-6xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+          </Avatar>
         </div>
-        {user.isCamOff && !user.isScreenSharing && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
-        {user.isHandRaised && <Hand className="h-5 w-5 absolute top-2 left-2 text-yellow-400 bg-black/50 p-1 rounded-full" />}
+      )}
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
+        {user.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
+        <span className="text-sm">{user.name}{user.isLocal ? " (You)" : ""}</span>
+      </div>
+      {user.isCamOff && !user.isScreenSharing && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
+      {user.isHandRaised && <Hand className="h-5 w-5 absolute top-2 left-2 text-yellow-400 bg-black/50 p-1 rounded-full" />}
     </div>
   );
 }
