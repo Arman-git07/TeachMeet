@@ -140,14 +140,20 @@ export default function MeetingPage() {
   // Initialize camera + microphone ONCE
   useEffect(() => {
     let stream: MediaStream | null = null;
+    let mounted = true;
 
-    (async () => {
+    const initMedia = async () => {
       setLoadingMedia(true);
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
+
+        if (!mounted) {
+            stream.getTracks().forEach(t => t.stop());
+            return;
+        }
 
         // Set initial states based on query params
         stream.getVideoTracks().forEach(track => {
@@ -168,9 +174,11 @@ export default function MeetingPage() {
           description: "Could not access camera or microphone.",
         });
       } finally {
-        setLoadingMedia(false);
+        if(mounted) setLoadingMedia(false);
       }
-    })();
+    };
+    
+    initMedia();
 
     // Listen for mic state changes from prejoin page
     const handleStorage = (e: StorageEvent) => {
@@ -183,6 +191,7 @@ export default function MeetingPage() {
     window.addEventListener("storage", handleStorage);
 
     return () => {
+      mounted = false;
       stream?.getTracks().forEach(t => t.stop());
       window.removeEventListener("storage", handleStorage);
     };
@@ -205,7 +214,7 @@ export default function MeetingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMicOn]);
 
-  // Camera toggle logic - now correctly enables/disables track
+  // CORRECT Camera toggle logic
   const toggleCamera = async () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
