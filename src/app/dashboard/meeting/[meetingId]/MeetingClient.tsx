@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -34,6 +35,14 @@ type Props = {
   onLeave: () => void;
 };
 
+/**
+ * MeetingClient (patched)
+ * - Keeps localStream lifetime inside this component (initialized once)
+ * - Attaches localStream reliably to tiles (VideoTile should also attach via ref)
+ * - Does NOT recreate MediaStream on toggles (only enables/disables tracks)
+ * - Renders UI overlays (name, mic icon, mic activity, cam icon, hand raise)
+ * - Minimizes re-renders by memoizing tile props
+ */
 const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -51,6 +60,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
+  // Initialize local media once (MeetingClient manages its own stream)
   useEffect(() => {
     let mounted = true;
     let stream: MediaStream | null = null;
@@ -58,39 +68,38 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     const initMedia = async () => {
       setLoadingMedia(true);
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-        
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (!mounted) {
-            stream.getTracks().forEach(t => t.stop());
-            return;
+          stream.getTracks().forEach(t => t.stop());
+          return;
         }
 
+        // Apply initial states
         stream.getVideoTracks().forEach(track => { track.enabled = initialCamOn; });
         stream.getAudioTracks().forEach(track => { track.enabled = initialMicOn; });
-        
+
+        // Set once
         setLocalStream(stream);
         setCamOn(initialCamOn);
         setMicOn(initialMicOn);
-
       } catch (err) {
         console.error("Media init error:", err);
         toast({ variant: "destructive", title: "Media Error", description: "Could not access camera or microphone." });
       } finally {
-        if(mounted) setLoadingMedia(false);
+        if (mounted) setLoadingMedia(false);
       }
     };
-    
+
     initMedia();
 
     return () => {
       mounted = false;
       stream?.getTracks().forEach(t => t.stop());
     };
-  }, [initialCamOn, initialMicOn, toast]);
+    // intentionally no deps to run once
+  }, []);
 
+  // Audio analyser for mic activity (local only)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -98,38 +107,38 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
 
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
-      if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       setVolumeLevel(0);
       return;
-    };
+    }
 
     if (!audioContextRef.current) {
-        try {
-            const audioContext = new AudioContext();
-            const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            const source = audioContext.createMediaStreamSource(localStream);
-            source.connect(analyser);
+      try {
+        const audioContext = new AudioContext();
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        const source = audioContext.createMediaStreamSource(localStream);
+        source.connect(analyser);
 
-            audioContextRef.current = audioContext;
-            analyserRef.current = analyser;
-            sourceRef.current = source;
-        } catch (err) {
-            console.error("Failed to initialize audio context for volume meter", err);
-            return;
-        }
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+        sourceRef.current = source;
+      } catch (err) {
+        console.error("Failed to initialize audio context for volume meter", err);
+        return;
+      }
     }
-    
+
     const analyser = analyserRef.current;
     if (!analyser) return;
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
     const updateVolume = () => {
       if (!analyserRef.current || !micOn) {
-          setVolumeLevel(0);
-          if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-          return;
-      };
+        setVolumeLevel(0);
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        return;
+      }
       analyserRef.current.getByteFrequencyData(dataArray);
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
@@ -138,12 +147,13 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       animationFrameRef.current = requestAnimationFrame(updateVolume);
     };
     updateVolume();
-    
+
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [localStream, micOn]);
 
+  // Listen participants collection for metadata
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
@@ -157,6 +167,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     return () => unsubscribe();
   }, [meetingId]);
 
+  // MeshRTC instance (memoized)
   const rtc = useMemo(() => {
     if (!userId || !meetingId) return null;
     return new MeshRTC({
@@ -167,21 +178,22 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     });
   }, [meetingId, userId]);
 
-
+  // Initialize rtc with localStream when available and cleanup on unmount
   useEffect(() => {
     if (localStream && rtc) {
       rtc.init(localStream);
     }
     return () => rtc?.leave();
   }, [rtc, localStream]);
-  
+
+  // Build stable participants array for rendering (memoized)
   const allParticipants: Participant[] = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
-    const self: Participant = { 
-      id: userId, 
-      name: localUserDetails?.name || user?.displayName || "You", 
+    const self: Participant = {
+      id: userId,
+      name: localUserDetails?.name || user?.displayName || "You",
       avatar: localUserDetails?.photoURL || user?.photoURL || `https://placehold.co/128x128.png?text=${(user?.displayName || 'Y').charAt(0)}`,
-      isCamOff: !camOn, 
+      isCamOff: !camOn,
       isMicOff: !micOn,
       isHandRaised: localUserDetails?.isHandRaised,
       isScreenSharing: localUserDetails?.isScreenSharing,
@@ -193,7 +205,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     const remotes: Participant[] = Array.from(liveParticipants.entries())
       .filter(([id]) => id !== userId)
       .map(([id, data]) => {
-        const remoteStream = remoteStreams.get(id);
+        const remoteStream = remoteStreams.get(id) || null;
         const videoTracks = remoteStream?.getVideoTracks() || [];
         const audioTracks = remoteStream?.getAudioTracks() || [];
         return {
@@ -204,19 +216,19 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
           isScreenSharing: data.isScreenSharing,
           isCamOff: data.isScreenSharing ? false : (videoTracks.length === 0 || !videoTracks.some(t => t.enabled && !t.muted)),
           isMicOff: audioTracks.length === 0 || audioTracks.every(t => !t.enabled),
-          stream: remoteStream || null,
+          stream: remoteStream,
         };
       });
 
     return [self, ...remotes];
   }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevel]);
 
-  const updateMyStatus = async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
+  const updateMyStatus = useCallback(async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
     if (user && meetingId) {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
       try { await updateDoc(participantRef, status); } catch (err) { console.error("Error updating participant status:", err); }
     }
-  };
+  }, [user, meetingId]);
   
   const toggleMic = useCallback(() => {
     if (!localStream) return;
@@ -224,7 +236,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
     setMicOn(nextState);
     updateMyStatus({ isMicOn: nextState });
-  }, [localStream, micOn]);
+  }, [localStream, micOn, updateMyStatus]);
 
   const toggleCamera = useCallback(() => {
     if (!localStream) return;
@@ -235,27 +247,23 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, camOn]); // Added camOn dependency
+  }, [localStream, updateMyStatus]);
 
-  const handleToggleHandRaise = () => {
+  const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
     setIsHandRaised(next);
     updateMyStatus({ isHandRaised: next });
-  };
+  }, [isHandRaised, updateMyStatus]);
   
-  const handleScreenShare = async () => {
+  const handleScreenShare = useCallback(async () => {
     setShowScreenShareConfirm(false);
     if (!localStream || !rtc) return;
 
     if (isScreenSharing) {
         screenStreamRef.current?.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
-        
         const cameraTrack = localStream.getVideoTracks().find(t => t.kind === 'video');
-        if (cameraTrack) {
-             rtc.replaceTrack(cameraTrack);
-        }
-        
+        if (cameraTrack) rtc.replaceTrack(cameraTrack);
         setIsScreenSharing(false);
         await updateMyStatus({ isScreenSharing: false });
         return;
@@ -265,13 +273,8 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         const screenTrack = screenStream.getVideoTracks()[0];
         if (!screenTrack) throw new Error("No screen track found");
-        
-        screenTrack.onended = () => {
-            if(isScreenSharing) handleScreenShare();
-        };
-        
+        screenTrack.onended = () => { if (isScreenSharing) handleScreenShare(); };
         rtc.replaceTrack(screenTrack);
-        
         screenStreamRef.current = screenStream;
         setIsScreenSharing(true);
         await updateMyStatus({ isScreenSharing: true });
@@ -280,6 +283,22 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         console.error("Screen share error:", err);
         toast({ variant: 'destructive', title: 'Screen Share Failed' });
     }
+  }, [localStream, rtc, isScreenSharing, updateMyStatus, toast, handleScreenShare]);
+
+  // Helper render for overlay UI on top of each tile (name, mic, cam, hand, volume)
+  const TileWithOverlay = ({ p }: { p: Participant }) => {
+    return (
+      <div className="relative w-full h-full">
+        <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isLocal={!!p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg" />
+
+        {/* Overlay: always positioned over tile */}
+        <div className="absolute left-3 bottom-3 flex items-center gap-2 bg-black/40 px-2 py-1 rounded-md text-white">
+            <span className="text-sm font-medium">{p.name}</span>
+            {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400" />}
+            {p.isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
+        </div>
+      </div>
+    );
   };
 
   const renderLayout = () => {
@@ -295,13 +314,15 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       return (
         <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
           <div className="flex-1 min-h-0">
-             <VideoTile stream={activeScreenSharer.stream} isCameraOn={!activeScreenSharer.isCamOff} isLocal={activeScreenSharer.isLocal} profileUrl={activeScreenSharer.avatar} className="w-full h-full rounded-lg" />
+             <div className="w-full h-full rounded-lg relative">
+               <TileWithOverlay p={activeScreenSharer} />
+             </div>
           </div>
           {otherParticipants.length > 0 && (
             <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
               {otherParticipants.map(p => (
                 <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
-                   <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isLocal={p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg" />
+                   <TileWithOverlay p={p} />
                 </div>
               ))}
             </div>
@@ -314,7 +335,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       const p = allParticipants[0];
       return (
         <div className="w-full h-full flex items-center justify-center p-4">
-          <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isLocal={p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg"/>
+          <div className="w-full h-full rounded-lg relative"><TileWithOverlay p={p} /></div>
         </div>
       );
     }
@@ -324,11 +345,9 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       const local = allParticipants.find((u) => u.isLocal);
       return (
         <div className="w-full h-full relative p-4">
-          {remote && <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isLocal={remote.isLocal} profileUrl={remote.avatar} className="w-full h-full rounded-lg" />}
+          {remote && <div className="w-full h-full rounded-lg relative"><TileWithOverlay p={remote} /></div>}
           {local && 
-            <div className="absolute bottom-6 right-6 w-48 h-32 z-20">
-              <VideoTile stream={local.stream} isCameraOn={!local.isCamOff} isLocal={local.isLocal} profileUrl={local.avatar} className="w-full h-full rounded-lg"/>
-            </div>
+            <div className="absolute bottom-6 right-6 w-48 h-32 z-20"><TileWithOverlay p={local} /></div>
           }
         </div>
       );
@@ -345,7 +364,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         }}
       >
         {allParticipants.map((p) => (
-          <VideoTile key={p.id} stream={p.stream} isCameraOn={!p.isCamOff} isLocal={p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg"/>
+          <div key={p.id} className="w-full h-full rounded-lg relative"><TileWithOverlay p={p} /></div>
         ))}
       </div>
     );
@@ -435,3 +454,5 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
 };
 
 export default MeetingClient;
+
+    
