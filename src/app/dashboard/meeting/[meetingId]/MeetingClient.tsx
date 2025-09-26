@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -96,7 +95,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       mounted = false;
       stream?.getTracks().forEach(t => t.stop());
     };
-    // intentionally no deps to run once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Audio analyser for mic activity (local only)
@@ -247,7 +246,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, updateMyStatus]);
+  }, [localStream, updateMyStatus, camOn]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
@@ -283,7 +282,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         console.error("Screen share error:", err);
         toast({ variant: 'destructive', title: 'Screen Share Failed' });
     }
-  }, [localStream, rtc, isScreenSharing, updateMyStatus, toast, handleScreenShare]);
+  }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
 
   // Helper render for overlay UI on top of each tile (name, mic, cam, hand, volume)
   const TileWithOverlay = ({ p }: { p: Participant }) => {
@@ -454,5 +453,3 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
 };
 
 export default MeetingClient;
-
-    
