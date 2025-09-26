@@ -1,27 +1,15 @@
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { MeshRTC } from "@/lib/webrtc/mesh";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2 } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
 
 
@@ -50,13 +38,11 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Media State - now managed within MeetingClient
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [camOn, setCamOn] = useState(initialCamOn);
   const [micOn, setMicOn] = useState(initialMicOn);
   const [loadingMedia, setLoadingMedia] = useState(true);
 
-  // Meeting State
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>>(new Map());
   const [volumeLevel, setVolumeLevel] = useState(0);
@@ -65,7 +51,6 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // Initialize media ONCE when component mounts
   useEffect(() => {
     let mounted = true;
     let stream: MediaStream | null = null;
@@ -85,7 +70,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
 
         stream.getVideoTracks().forEach(track => { track.enabled = initialCamOn; });
         stream.getAudioTracks().forEach(track => { track.enabled = initialMicOn; });
-
+        
         setLocalStream(stream);
         setCamOn(initialCamOn);
         setMicOn(initialMicOn);
@@ -106,7 +91,6 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     };
   }, [initialCamOn, initialMicOn, toast]);
 
-  // Volume Meter Logic
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -150,7 +134,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
       const avg = sum / dataArray.length;
-      setVolumeLevel(avg / 255); // normalize 0-1
+      setVolumeLevel(avg / 255);
       animationFrameRef.current = requestAnimationFrame(updateVolume);
     };
     updateVolume();
@@ -160,7 +144,6 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     };
   }, [localStream, micOn]);
 
-  // Firestore listener for participants
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
@@ -252,7 +235,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream]);
+  }, [localStream, camOn]); // Added camOn dependency
 
   const handleToggleHandRaise = () => {
     const next = !isHandRaised;
@@ -268,7 +251,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         screenStreamRef.current?.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
         
-        const cameraTrack = localStream.getVideoTracks().find(t => t.kind === 'video'); // Assume there's only one video track initially
+        const cameraTrack = localStream.getVideoTracks().find(t => t.kind === 'video');
         if (cameraTrack) {
              rtc.replaceTrack(cameraTrack);
         }
@@ -284,7 +267,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         if (!screenTrack) throw new Error("No screen track found");
         
         screenTrack.onended = () => {
-            if(isScreenSharing) handleScreenShare(); // Call again to toggle off
+            if(isScreenSharing) handleScreenShare();
         };
         
         rtc.replaceTrack(screenTrack);
@@ -351,7 +334,6 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       );
     }
 
-    // Grid layout for 3+ participants
     const cols = Math.ceil(Math.sqrt(count));
     const rows = Math.ceil(count / cols);
     return (
