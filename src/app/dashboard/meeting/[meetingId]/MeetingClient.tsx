@@ -110,43 +110,45 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       setVolumeLevel(0);
       return;
     }
-
-    if (!audioContextRef.current) {
-      try {
-        const audioContext = new AudioContext();
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        const source = audioContext.createMediaStreamSource(localStream);
-        source.connect(analyser);
-
-        audioContextRef.current = audioContext;
-        analyserRef.current = analyser;
-        sourceRef.current = source;
-      } catch (err) {
-        console.error("Failed to initialize audio context for volume meter", err);
-        return;
-      }
+  
+    let lastUpdate = 0;
+    const audioContext = audioContextRef.current || new AudioContext();
+    const analyser = analyserRef.current || audioContext.createAnalyser();
+    analyser.fftSize = 256;
+  
+    if (!audioContextRef.current) audioContextRef.current = audioContext;
+    if (!analyserRef.current) analyserRef.current = analyser;
+  
+    if (!sourceRef.current) {
+      const source = audioContext.createMediaStreamSource(localStream);
+      source.connect(analyser);
+      sourceRef.current = source;
     }
-
-    const analyser = analyserRef.current;
-    if (!analyser) return;
+  
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-    const updateVolume = () => {
-      if (!analyserRef.current || !micOn) {
-        setVolumeLevel(0);
+  
+    const updateVolume = (time: number) => {
+      if (!micOn || !analyserRef.current) {
         if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        setVolumeLevel(0);
         return;
-      }
+      };
+
       analyserRef.current.getByteFrequencyData(dataArray);
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
       const avg = sum / dataArray.length;
-      setVolumeLevel(avg / 255);
+  
+      // ⚠️ Throttle updates to ~6 per second (every 150ms)
+      if (time - lastUpdate > 150) {
+        setVolumeLevel(avg / 255);
+        lastUpdate = time;
+      }
       animationFrameRef.current = requestAnimationFrame(updateVolume);
     };
-    updateVolume();
-
+  
+    animationFrameRef.current = requestAnimationFrame(updateVolume);
+  
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
@@ -216,6 +218,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
           isCamOff: data.isScreenSharing ? false : (videoTracks.length === 0 || !videoTracks.some(t => t.enabled && !t.muted)),
           isMicOff: audioTracks.length === 0 || audioTracks.every(t => !t.enabled),
           stream: remoteStream,
+          volumeLevel: 0, // default for now
         };
       });
 
@@ -246,7 +249,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, updateMyStatus, camOn]);
+  }, [localStream, camOn, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
