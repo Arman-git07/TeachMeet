@@ -22,6 +22,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import VideoTile from "./VideoTile";
+
 
 type Participant = {
   id: string;
@@ -44,60 +46,11 @@ type Props = {
   onLeave: () => void;
 };
 
-const VideoTile = ({ user }: { user: Participant; }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  
-  useEffect(() => {
-    if (videoRef.current && user.stream) {
-      if (videoRef.current.srcObject !== user.stream) {
-        videoRef.current.srcObject = user.stream;
-      }
-    }
-  }, [user.stream]);
-
-  const showVideo = user.stream && !user.isCamOff;
-
-  return (
-    <div className={cn(
-        "bg-gray-800 flex items-center justify-center relative rounded-lg overflow-hidden w-full h-full"
-    )}>
-      {showVideo ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={user.isLocal}
-          className="w-full h-full object-cover"
-          onLoadedMetadata={() => videoRef.current?.play().catch(e => console.error("Video play error:", e))}
-        />
-      ) : (
-        <div className="flex flex-col items-center text-muted-foreground">
-          <Avatar className={cn(
-            "w-24 h-24 md:w-48 md:h-48 border-4 border-background shadow-lg transition-all duration-200",
-            user.isLocal && !user.isMicOff && "ring-4 ring-offset-2 ring-offset-gray-800 ring-green-500"
-          )} style={{
-              boxShadow: user.isLocal && !user.isMicOff && (user.volumeLevel || 0) > 0.01 ? `0 0 0 ${4 + (user.volumeLevel || 0) * 12}px rgba(52, 211, 153, ${0.2 + (user.volumeLevel || 0) * 0.3})` : undefined
-          }}>
-            <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="user avatar" />
-            <AvatarFallback className="text-4xl md:text-6xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
-        </div>
-      )}
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
-        {user.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400"/>}
-        <span className="text-sm">{user.name}{user.isLocal ? " (You)" : ""}</span>
-      </div>
-      {user.isCamOff && !user.isScreenSharing && <VideoOff className="h-5 w-5 absolute top-2 right-2 text-red-400 bg-black/50 p-1 rounded-full"/>}
-      {user.isHandRaised && <Hand className="h-5 w-5 absolute top-2 left-2 text-yellow-400 bg-black/50 p-1 rounded-full" />}
-    </div>
-  );
-}
-
 const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Media State
+  // Media State - now managed within MeetingClient
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [camOn, setCamOn] = useState(initialCamOn);
   const [micOn, setMicOn] = useState(initialMicOn);
@@ -112,10 +65,10 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // Initialize media ONCE
+  // Initialize media ONCE when component mounts
   useEffect(() => {
-    let stream: MediaStream | null = null;
     let mounted = true;
+    let stream: MediaStream | null = null;
 
     const initMedia = async () => {
       setLoadingMedia(true);
@@ -288,18 +241,18 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
     setMicOn(nextState);
     updateMyStatus({ isMicOn: nextState });
-  }, [localStream, micOn, updateMyStatus]);
+  }, [localStream, micOn]);
 
-  const toggleCamera = async () => {
+  const toggleCamera = useCallback(() => {
     if (!localStream) return;
-    const videoTracks = localStream.getVideoTracks();
-    if (videoTracks.length === 0) return;
-
-    const nextState = !camOn;
-    videoTracks.forEach(track => (track.enabled = nextState));
-    setCamOn(nextState);
-    updateMyStatus({ isCameraOn: nextState });
-  };
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+        const nextState = !videoTrack.enabled;
+        videoTrack.enabled = nextState;
+        setCamOn(nextState);
+        updateMyStatus({ isCameraOn: nextState });
+    }
+  }, [localStream]);
 
   const handleToggleHandRaise = () => {
     const next = !isHandRaised;
@@ -359,13 +312,13 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       return (
         <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
           <div className="flex-1 min-h-0">
-            <VideoTile user={activeScreenSharer} />
+             <VideoTile stream={activeScreenSharer.stream} isCameraOn={!activeScreenSharer.isCamOff} isLocal={activeScreenSharer.isLocal} profileUrl={activeScreenSharer.avatar} className="w-full h-full rounded-lg" />
           </div>
           {otherParticipants.length > 0 && (
             <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
               {otherParticipants.map(p => (
                 <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
-                   <VideoTile user={p} />
+                   <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isLocal={p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg" />
                 </div>
               ))}
             </div>
@@ -375,9 +328,10 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     }
     
     if (count === 1) {
+      const p = allParticipants[0];
       return (
         <div className="w-full h-full flex items-center justify-center p-4">
-          <VideoTile user={allParticipants[0]} />
+          <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isLocal={p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg"/>
         </div>
       );
     }
@@ -387,46 +341,17 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       const local = allParticipants.find((u) => u.isLocal);
       return (
         <div className="w-full h-full relative p-4">
-          {remote && <VideoTile user={remote} />}
+          {remote && <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isLocal={remote.isLocal} profileUrl={remote.avatar} className="w-full h-full rounded-lg" />}
           {local && 
             <div className="absolute bottom-6 right-6 w-48 h-32 z-20">
-              <VideoTile user={local} />
+              <VideoTile stream={local.stream} isCameraOn={!local.isCamOff} isLocal={local.isLocal} profileUrl={local.avatar} className="w-full h-full rounded-lg"/>
             </div>
           }
         </div>
       );
     }
 
-    if (count === 3) {
-       const remotes = allParticipants.filter((u) => !u.isLocal);
-       const local = allParticipants.find((u) => u.isLocal);
-       return (
-        <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
-            <div className="flex-1">
-                {remotes[0] && <VideoTile user={remotes[0]} />}
-            </div>
-            <div className="flex-1 flex flex-col gap-2">
-                <div className="flex-1">
-                    {remotes[1] && <VideoTile user={remotes[1]} />}
-                </div>
-                <div className="flex-1">
-                    {local && <VideoTile user={local} />}
-                </div>
-            </div>
-        </div>
-      );
-    }
-  
-    if (count === 4) {
-      return (
-        <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2 p-2">
-          {allParticipants.map((u) => (
-            <VideoTile key={u.id} user={u} />
-          ))}
-        </div>
-      );
-    }
-  
+    // Grid layout for 3+ participants
     const cols = Math.ceil(Math.sqrt(count));
     const rows = Math.ceil(count / cols);
     return (
@@ -437,8 +362,8 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
           gridTemplateRows: `repeat(${rows}, 1fr)`,
         }}
       >
-        {allParticipants.map((u) => (
-          <VideoTile key={u.id} user={u} />
+        {allParticipants.map((p) => (
+          <VideoTile key={p.id} stream={p.stream} isCameraOn={!p.isCamOff} isLocal={p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg"/>
         ))}
       </div>
     );

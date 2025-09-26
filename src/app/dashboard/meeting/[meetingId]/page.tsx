@@ -40,13 +40,15 @@ export default function MeetingPage() {
 
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
-      <MeetingClient
-        meetingId={meetingId}
-        userId={user?.uid || ''}
-        initialCamOn={params.get('cam') === 'true'}
-        initialMicOn={params.get('mic') !== 'false'}
-        onLeave={handleLeave}
-      />
+      {meetingId && user?.uid && (
+        <MeetingClient
+          meetingId={meetingId}
+          userId={user.uid}
+          initialCamOn={params.get('cam') !== 'false'}
+          initialMicOn={params.get('mic') !== 'false'}
+          onLeave={handleLeave}
+        />
+      )}
     </div>
   );
 }
