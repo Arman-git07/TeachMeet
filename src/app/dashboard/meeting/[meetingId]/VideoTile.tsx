@@ -79,7 +79,7 @@ function VideoTileComponent({
       {(!isCameraOn || !stream) && (
         <div className="absolute inset-0 flex items-center justify-center">
             <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-                <AvatarImage src={profileUrl || undefined} alt="avatar" data-ai-hint="avatar user"/>
+                <AvatarImage src={profileUrl || undefined} alt="avatar" />
                 <AvatarFallback className="text-4xl">U</AvatarFallback>
             </Avatar>
         </div>

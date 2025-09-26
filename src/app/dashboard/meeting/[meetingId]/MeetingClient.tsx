@@ -12,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
 
-
 type Participant = {
   id: string;
   name: string;
@@ -34,15 +33,7 @@ type Props = {
   onLeave: () => void;
 };
 
-/**
- * MeetingClient (patched)
- * - Keeps localStream lifetime inside this component (initialized once)
- * - Attaches localStream reliably to tiles (VideoTile should also attach via ref)
- * - Does NOT recreate MediaStream on toggles (only enables/disables tracks)
- * - Renders UI overlays (name, mic icon, mic activity, cam icon, hand raise)
- * - Minimizes re-renders by memoizing tile props
- */
-const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave }: Props) => {
+export default function MeetingClient({ meetingId, userId, initialCamOn, initialMicOn, onLeave }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -53,11 +44,24 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
 
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>>(new Map());
-  const [volumeLevel, setVolumeLevel] = useState(0);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
+
+  // mic levels map (id -> level 0..1) stored in state but updated throttled
+  const [volumeLevels, setVolumeLevels] = useState<Map<string, number>>(new Map());
+
+  // Refs for local analyser
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const localAnimationRef = useRef<number | null>(null);
+  const lastLocalUpdateRef = useRef<number>(0);
+
+  // Refs for remote analysers: map socketId -> { analyser, rafId, dataArray }
+  const remoteAnalysersRef = useRef<Map<string, { analyser: AnalyserNode; rafId: number | null; dataArray: Uint8Array }>>(new Map());
+  const lastRemoteUpdateRef = useRef<number>(0);
 
   // Initialize local media once (MeetingClient manages its own stream)
   useEffect(() => {
@@ -73,11 +77,9 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
           return;
         }
 
-        // Apply initial states
         stream.getVideoTracks().forEach(track => { track.enabled = initialCamOn; });
         stream.getAudioTracks().forEach(track => { track.enabled = initialMicOn; });
 
-        // Set once
         setLocalStream(stream);
         setCamOn(initialCamOn);
         setMicOn(initialMicOn);
@@ -94,65 +96,16 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     return () => {
       mounted = false;
       stream?.getTracks().forEach(t => t.stop());
+      // cleanup analysers if any
+      if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
+      audioContextRef.current?.close().catch(() => {});
+      remoteAnalysersRef.current.forEach(entry => {
+        if (entry.rafId) cancelAnimationFrame(entry.rafId);
+      });
+      remoteAnalysersRef.current.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Audio analyser for mic activity (local only)
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      setVolumeLevel(0);
-      return;
-    }
-  
-    let lastUpdate = 0;
-    const audioContext = audioContextRef.current || new AudioContext();
-    const analyser = analyserRef.current || audioContext.createAnalyser();
-    analyser.fftSize = 256;
-  
-    if (!audioContextRef.current) audioContextRef.current = audioContext;
-    if (!analyserRef.current) analyserRef.current = analyser;
-  
-    if (!sourceRef.current) {
-      const source = audioContext.createMediaStreamSource(localStream);
-      source.connect(analyser);
-      sourceRef.current = source;
-    }
-  
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-  
-    const updateVolume = (time: number) => {
-      if (!micOn || !analyserRef.current) {
-        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-        setVolumeLevel(0);
-        return;
-      };
-
-      analyserRef.current.getByteFrequencyData(dataArray);
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-      const avg = sum / dataArray.length;
-  
-      // ⚠️ Throttle updates to ~6 per second (every 150ms)
-      if (time - lastUpdate > 150) {
-        setVolumeLevel(avg / 255);
-        lastUpdate = time;
-      }
-      animationFrameRef.current = requestAnimationFrame(updateVolume);
-    };
-  
-    animationFrameRef.current = requestAnimationFrame(updateVolume);
-  
-    return () => {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    };
-  }, [localStream, micOn]);
+    // run once on mount
+  }, []); // eslint-disable-line
 
   // Listen participants collection for metadata
   useEffect(() => {
@@ -174,8 +127,29 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     return new MeshRTC({
       roomId: meetingId,
       userId,
-      onRemoteStream: (socketId, stream) => setRemoteStreams(prev => new Map(prev).set(socketId, stream)),
-      onRemoteLeft: (socketId) => setRemoteStreams(prev => { const newMap = new Map(prev); newMap.delete(socketId); return newMap; }),
+      onRemoteStream: (socketId, stream) => {
+        setRemoteStreams(prev => {
+          const next = new Map(prev);
+          next.set(socketId, stream);
+          return next;
+        });
+      },
+      onRemoteLeft: (socketId) => {
+        setRemoteStreams(prev => {
+          const next = new Map(prev);
+          next.delete(socketId);
+          return next;
+        });
+        // cleanup analyser for that socket
+        const entry = remoteAnalysersRef.current.get(socketId);
+        if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
+        remoteAnalysersRef.current.delete(socketId);
+        setVolumeLevels(prev => {
+          const next = new Map(prev);
+          next.delete(socketId);
+          return next;
+        });
+      },
     });
   }, [meetingId, userId]);
 
@@ -186,6 +160,130 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     }
     return () => rtc?.leave();
   }, [rtc, localStream]);
+
+  // Local analyser: throttle updates to ~150ms to avoid re-render storms
+  useEffect(() => {
+    if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
+      if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
+      setVolumeLevels(prev => {
+        const next = new Map(prev);
+        next.set(userId, 0);
+        return next;
+      });
+      return;
+    }
+
+    // create AudioContext/analyser once
+    if (!audioContextRef.current) {
+      try {
+        const audioContext = new AudioContext();
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        const source = audioContext.createMediaStreamSource(localStream);
+        source.connect(analyser);
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+        sourceRef.current = source;
+      } catch (err) {
+        console.error("Failed to init local audio analyser:", err);
+        return;
+      }
+    }
+
+    const analyser = analyserRef.current!;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const step = (time: number) => {
+      if (!analyserRef.current || !micOn) return;
+      analyserRef.current.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+      const avg = sum / dataArray.length;
+      // throttle to ~150ms
+      if (time - lastLocalUpdateRef.current > 150) {
+        setVolumeLevels(prev => {
+          const next = new Map(prev);
+          next.set(userId, Math.min(1, avg / 255));
+          return next;
+        });
+        lastLocalUpdateRef.current = time;
+      }
+      localAnimationRef.current = requestAnimationFrame(step);
+    };
+
+    localAnimationRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
+      // keep audioContext alive to avoid re-creation cost (closed on unmount)
+    };
+  }, [localStream, micOn, userId]);
+
+  // Remote analysers: create analyser for each incoming remote stream and sample their audio levels throttled
+  useEffect(() => {
+    // For each remote stream in remoteStreams, ensure an analyser exists
+    remoteStreams.forEach((stream, id) => {
+      if (!stream) return;
+      if (remoteAnalysersRef.current.has(id)) return; // already created
+
+      try {
+        const audioCtx = audioContextRef.current || new AudioContext();
+        if (!audioContextRef.current) audioContextRef.current = audioCtx;
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const entry = { analyser, rafId: null as number | null, dataArray };
+        remoteAnalysersRef.current.set(id, entry);
+
+        const stepRemote = (time: number) => {
+          const ent = remoteAnalysersRef.current.get(id);
+          if (!ent || !ent.analyser) return;
+          ent.analyser.getByteFrequencyData(ent.dataArray);
+          let sum = 0;
+          for (let i = 0; i < ent.dataArray.length; i++) sum += ent.dataArray[i];
+          const avg = sum / ent.dataArray.length;
+          // throttle global remote updates to ~150ms
+          if (time - lastRemoteUpdateRef.current > 150) {
+            setVolumeLevels(prev => {
+              const next = new Map(prev);
+              next.set(id, Math.min(1, avg / 255));
+              return next;
+            });
+            lastRemoteUpdateRef.current = time;
+          }
+          const raf = requestAnimationFrame(stepRemote);
+          const ent2 = remoteAnalysersRef.current.get(id);
+          if (ent2) ent2.rafId = raf;
+        };
+
+        // start sampling
+        entry.rafId = requestAnimationFrame(stepRemote);
+
+      } catch (err) {
+        console.error("Failed to create analyser for remote stream", id, err);
+      }
+    });
+
+    // Clean up analysers for removed streams
+    const existingIds = Array.from(remoteAnalysersRef.current.keys());
+    existingIds.forEach(id => {
+      if (!remoteStreams.has(id)) {
+        const ent = remoteAnalysersRef.current.get(id);
+        if (ent && ent.rafId) cancelAnimationFrame(ent.rafId);
+        remoteAnalysersRef.current.delete(id);
+        setVolumeLevels(prev => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteStreams]);
 
   // Build stable participants array for rendering (memoized)
   const allParticipants: Participant[] = useMemo(() => {
@@ -200,7 +298,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       isScreenSharing: localUserDetails?.isScreenSharing,
       isLocal: true,
       stream: localStream,
-      volumeLevel: volumeLevel
+      volumeLevel: volumeLevels.get(userId) ?? 0
     };
 
     const remotes: Participant[] = Array.from(liveParticipants.entries())
@@ -218,12 +316,13 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
           isCamOff: data.isScreenSharing ? false : (videoTracks.length === 0 || !videoTracks.some(t => t.enabled && !t.muted)),
           isMicOff: audioTracks.length === 0 || audioTracks.every(t => !t.enabled),
           stream: remoteStream,
-          volumeLevel: 0, // default for now
+          volumeLevel: volumeLevels.get(id) ?? 0,
         };
       });
 
     return [self, ...remotes];
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevel]);
+    // include volumeLevels since we want tiles to update with levels; throttled earlier
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels]);
 
   const updateMyStatus = useCallback(async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
     if (user && meetingId) {
@@ -231,14 +330,20 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       try { await updateDoc(participantRef, status); } catch (err) { console.error("Error updating participant status:", err); }
     }
   }, [user, meetingId]);
-  
+
   const toggleMic = useCallback(() => {
     if (!localStream) return;
     const nextState = !micOn;
     localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
     setMicOn(nextState);
     updateMyStatus({ isMicOn: nextState });
-  }, [localStream, micOn, updateMyStatus]);
+    // ensure local level updates immediately when muted/unmuted
+    setVolumeLevels(prev => {
+      const next = new Map(prev);
+      next.set(userId, nextState ? (next.get(userId) ?? 0) : 0);
+      return next;
+    });
+  }, [localStream, micOn, updateMyStatus, userId]);
 
   const toggleCamera = useCallback(() => {
     if (!localStream) return;
@@ -249,14 +354,14 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, camOn, updateMyStatus]);
+  }, [localStream, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
     setIsHandRaised(next);
     updateMyStatus({ isHandRaised: next });
   }, [isHandRaised, updateMyStatus]);
-  
+
   const handleScreenShare = useCallback(async () => {
     setShowScreenShareConfirm(false);
     if (!localStream || !rtc) return;
@@ -280,7 +385,6 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
         screenStreamRef.current = screenStream;
         setIsScreenSharing(true);
         await updateMyStatus({ isScreenSharing: true });
-
     } catch (err) {
         console.error("Screen share error:", err);
         toast({ variant: 'destructive', title: 'Screen Share Failed' });
@@ -291,13 +395,22 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
   const TileWithOverlay = ({ p }: { p: Participant }) => {
     return (
       <div className="relative w-full h-full">
-        <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isLocal={!!p.isLocal} profileUrl={p.avatar} className="w-full h-full rounded-lg" />
+        <VideoTile
+          stream={p.stream}
+          isCameraOn={!p.isCamOff}
+          isMicOn={!p.isMicOff}
+          isHandRaised={p.isHandRaised}
+          volumeLevel={p.volumeLevel}
+          isLocal={!!p.isLocal}
+          profileUrl={p.avatar}
+          className="w-full h-full rounded-lg"
+        />
 
         {/* Overlay: always positioned over tile */}
         <div className="absolute left-3 bottom-3 flex items-center gap-2 bg-black/40 px-2 py-1 rounded-md text-white">
-            <span className="text-sm font-medium">{p.name}</span>
-            {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400" />}
-            {p.isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
+          <span className="text-sm font-medium">{p.name}</span>
+          {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400" />}
+          {p.isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
         </div>
       </div>
     );
@@ -453,6 +566,4 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
       </div>
     </div>
   );
-};
-
-export default MeetingClient;
+}
