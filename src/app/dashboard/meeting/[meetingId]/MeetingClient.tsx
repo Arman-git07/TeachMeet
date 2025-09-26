@@ -31,10 +31,9 @@ type Props = {
   localStream: MediaStream | null;
   micOn: boolean;
   camOn: boolean;
-  volumeLevel: number;
 };
 
-const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
+const VideoTile = ({ user }: { user: Participant; }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   
   // --- RELIABLE STREAM BINDING ---
@@ -51,8 +50,7 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
 
   return (
     <div className={cn(
-        "bg-gray-800 flex items-center justify-center relative rounded-lg overflow-hidden",
-        full ? "w-full h-full" : "w-full h-full"
+        "bg-gray-800 flex items-center justify-center relative rounded-lg overflow-hidden w-full h-full"
     )}>
       {showVideo ? (
         <video
@@ -86,10 +84,68 @@ const VideoTile = ({ user, full }: { user: Participant; full?: boolean }) => {
   );
 }
 
-const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn, volumeLevel }: Props) => {
+const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, localStream, micOn, camOn }: Props) => {
   const { user } = useAuth();
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>>(new Map());
+  const [volumeLevel, setVolumeLevel] = useState(0);
+
+  // --- START: Volume Meter Logic (Moved here) ---
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
+      if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      setVolumeLevel(0);
+      return;
+    };
+
+    if (!audioContextRef.current) {
+        try {
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            const source = audioContext.createMediaStreamSource(localStream);
+            source.connect(analyser);
+
+            audioContextRef.current = audioContext;
+            analyserRef.current = analyser;
+            sourceRef.current = source;
+        } catch (err) {
+            console.error("Failed to initialize audio context for volume meter", err);
+            return;
+        }
+    }
+    
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const updateVolume = () => {
+      if (!analyserRef.current || !micOn) {
+          setVolumeLevel(0);
+          if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+          return;
+      };
+      analyserRef.current.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+      const avg = sum / dataArray.length;
+      setVolumeLevel(avg / 255); // normalize 0-1
+      animationFrameRef.current = requestAnimationFrame(updateVolume);
+    };
+    updateVolume();
+    
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, [localStream, micOn]);
+  // --- END: Volume Meter Logic ---
+
 
   // Firestore listener for participants
   useEffect(() => {
@@ -187,7 +243,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       return (
         <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
           <div className="flex-1 min-h-0">
-            <VideoTile user={activeScreenSharer} full />
+            <VideoTile user={activeScreenSharer} />
           </div>
           {otherParticipants.length > 0 && (
             <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
@@ -205,7 +261,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
     if (count === 1) {
       return (
         <div className="w-full h-full flex items-center justify-center p-4">
-          <VideoTile user={allParticipants[0]} full />
+          <VideoTile user={allParticipants[0]} />
         </div>
       );
     }
@@ -215,7 +271,7 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
       const local = allParticipants.find((u) => u.isLocal);
       return (
         <div className="w-full h-full relative p-4">
-          {remote && <VideoTile user={remote} full />}
+          {remote && <VideoTile user={remote} />}
           {local && 
             <div className="absolute bottom-6 right-6 w-48 h-32 z-20">
               <VideoTile user={local} />
@@ -231,14 +287,14 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
        return (
         <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
             <div className="flex-1">
-                {remotes[0] && <VideoTile user={remotes[0]} full/>}
+                {remotes[0] && <VideoTile user={remotes[0]} />}
             </div>
             <div className="flex-1 flex flex-col gap-2">
                 <div className="flex-1">
-                    {remotes[1] && <VideoTile user={remotes[1]} full/>}
+                    {remotes[1] && <VideoTile user={remotes[1]} />}
                 </div>
                 <div className="flex-1">
-                    {local && <VideoTile user={local} full/>}
+                    {local && <VideoTile user={local} />}
                 </div>
             </div>
         </div>
@@ -276,5 +332,3 @@ const MeetingClient = ({ meetingId, userId, onUserJoined, onParticipantsChange, 
 };
 
 export default MeetingClient;
-
-    

@@ -25,77 +25,6 @@ import {
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 
 
-// --------------------------- Microphone Hook ---------------------------
-function useMeetingMic(localStream: MediaStream | null, isMicOn: boolean, setIsMicOn: (value: boolean) => void) {
-  const [volumeLevel, setVolumeLevel] = useState(0);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-
-  const toggleMic = useCallback(() => {
-    if (!localStream) return;
-    const nextState = !isMicOn;
-    localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
-    
-    localStorage.setItem("micState", nextState ? "true" : "false");
-    
-    setIsMicOn(nextState);
-  }, [localStream, isMicOn, setIsMicOn]);
-
-  useEffect(() => {
-    if (!localStream || localStream.getAudioTracks().length === 0 || !isMicOn) {
-      if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      setVolumeLevel(0);
-      return;
-    };
-
-    if (!audioContextRef.current) {
-        try {
-            const audioContext = new AudioContext();
-            const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            const source = audioContext.createMediaStreamSource(localStream);
-            source.connect(analyser);
-
-            audioContextRef.current = audioContext;
-            analyserRef.current = analyser;
-            sourceRef.current = source;
-        } catch (err) {
-            console.error("Failed to initialize audio context for volume meter", err);
-            return;
-        }
-    }
-    
-    const analyser = analyserRef.current;
-    if (!analyser) return;
-
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-    const updateVolume = () => {
-      if (!analyserRef.current || !isMicOn) {
-          setVolumeLevel(0);
-          if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-          return;
-      };
-      analyserRef.current.getByteFrequencyData(dataArray);
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-      const avg = sum / dataArray.length;
-      setVolumeLevel(avg / 255); // normalize 0-1
-      animationFrameRef.current = requestAnimationFrame(updateVolume);
-    };
-    updateVolume();
-    
-    return () => {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    };
-  }, [localStream, isMicOn]);
-
-  return { toggleMic, volumeLevel };
-}
-
-
 // --------------------------- Meeting Page ---------------------------
 export default function MeetingPage() {
   const params = useSearchParams();
@@ -181,12 +110,16 @@ export default function MeetingPage() {
     }
   };
   
-  const { toggleMic, volumeLevel } = useMeetingMic(localStream, isMicOn, setIsMicOn);
-
-  useEffect(() => {
-    updateMyStatus({ isMicOn });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMicOn]);
+  const toggleMic = useCallback(() => {
+    if (!localStream) return;
+    const nextState = !isMicOn;
+    localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
+    
+    localStorage.setItem("micState", nextState ? "true" : "false");
+    
+    setIsMicOn(nextState);
+    updateMyStatus({ isMicOn: nextState });
+  }, [localStream, isMicOn]);
 
   // --- CORRECT CAMERA TOGGLE ---
   // This function ONLY enables or disables the track on the PERSISTENT stream.
@@ -283,7 +216,6 @@ export default function MeetingPage() {
             localStream={localStream}
             micOn={isMicOn}
             camOn={isCameraOn}
-            volumeLevel={volumeLevel}
           />
         )}
       </div>
