@@ -221,18 +221,22 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     return () => unsubscribe();
   }, [meetingId]);
 
-  const rtc = useMemo(() => new MeshRTC({
-    roomId: meetingId,
-    userId,
-    onRemoteStream: (socketId, stream) => setRemoteStreams(prev => new Map(prev).set(socketId, stream)),
-    onRemoteLeft: (socketId) => setRemoteStreams(prev => { const newMap = new Map(prev); newMap.delete(socketId); return newMap; }),
-  }), [meetingId, userId]);
+  const rtc = useMemo(() => {
+    if (!userId || !meetingId) return null;
+    return new MeshRTC({
+      roomId: meetingId,
+      userId,
+      onRemoteStream: (socketId, stream) => setRemoteStreams(prev => new Map(prev).set(socketId, stream)),
+      onRemoteLeft: (socketId) => setRemoteStreams(prev => { const newMap = new Map(prev); newMap.delete(socketId); return newMap; }),
+    });
+  }, [meetingId, userId]);
+
 
   useEffect(() => {
-    if (localStream) {
+    if (localStream && rtc) {
       rtc.init(localStream);
     }
-    return () => rtc.leave();
+    return () => rtc?.leave();
   }, [rtc, localStream]);
   
   const allParticipants: Participant[] = useMemo(() => {
@@ -305,19 +309,15 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
   
   const handleScreenShare = async () => {
     setShowScreenShareConfirm(false);
-    if (!localStream) return;
-    const peerConnections: RTCPeerConnection[] = (window as any).__PEER_CONNECTIONS__ || [];
+    if (!localStream || !rtc) return;
 
     if (isScreenSharing) {
         screenStreamRef.current?.getTracks().forEach(t => t.stop());
         screenStreamRef.current = null;
         
-        const cameraTrack = localStream.getVideoTracks().find(t => t.kind === 'video' && !t.label.includes('screen'));
+        const cameraTrack = localStream.getVideoTracks().find(t => t.kind === 'video'); // Assume there's only one video track initially
         if (cameraTrack) {
-             peerConnections.forEach(pc => {
-                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) sender.replaceTrack(cameraTrack);
-            });
+             rtc.replaceTrack(cameraTrack);
         }
         
         setIsScreenSharing(false);
@@ -328,13 +328,13 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
     try {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         const screenTrack = screenStream.getVideoTracks()[0];
-        screenTrack.onended = () => handleScreenShare();
+        if (!screenTrack) throw new Error("No screen track found");
         
-        peerConnections.forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-            if (sender) sender.replaceTrack(screenTrack);
-            else pc.addTrack(screenTrack, screenStream);
-        });
+        screenTrack.onended = () => {
+            if(isScreenSharing) handleScreenShare(); // Call again to toggle off
+        };
+        
+        rtc.replaceTrack(screenTrack);
         
         screenStreamRef.current = screenStream;
         setIsScreenSharing(true);
@@ -445,14 +445,16 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
   };
 
   return (
-    <>
-      {loadingMedia ? (
-        <div className="w-full h-full flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        renderLayout()
-      )}
+    <div className="flex flex-col h-full">
+      <div className="relative flex-grow min-h-0">
+        {loadingMedia ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          renderLayout()
+        )}
+      </div>
       <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
         <div className="flex items-center justify-center relative">
           <div className="flex items-center justify-center gap-3">
@@ -521,7 +523,7 @@ const MeetingClient = ({ meetingId, userId, initialCamOn, initialMicOn, onLeave 
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

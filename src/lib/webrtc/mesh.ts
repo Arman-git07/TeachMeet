@@ -63,7 +63,8 @@ export class MeshRTC {
     });
 
     this.socket.on("signal:offer", async ({ from, sdp }) => {
-      const { pc, negotiating } = await this.makePeerIfMissing(from, false);
+      const remote = await this.makePeerIfMissing(from, false);
+      const { pc, negotiating } = remote;
 
       const isPolite = this.socket.id > from;
       if (negotiating || pc.signalingState !== "stable") {
@@ -108,6 +109,12 @@ export class MeshRTC {
     if (remote) return remote;
 
     const pc = new RTCPeerConnection({ iceServers: ICE });
+    // Keep a map of peer connections to share with screen share logic
+    if (!(window as any).__PEER_CONNECTIONS__) {
+      (window as any).__PEER_CONNECTIONS__ = [];
+    }
+    (window as any).__PEER_CONNECTIONS__.push(pc);
+
     const remoteStream = new MediaStream();
 
     remote = { pc, stream: remoteStream, negotiating: false };
@@ -155,10 +162,22 @@ export class MeshRTC {
 
     return remote;
   }
+  
+  public replaceTrack(track: MediaStreamTrack) {
+    this.remotes.forEach(({ pc }) => {
+      const sender = pc.getSenders().find(s => s.track?.kind === track.kind);
+      if (sender) {
+        sender.replaceTrack(track).catch(e => console.error("replaceTrack failed:", e));
+      }
+    });
+  }
 
   private cleanupRemote(socketId: string) {
     const remote = this.remotes.get(socketId);
     if (remote) {
+        if ((window as any).__PEER_CONNECTIONS__) {
+          (window as any).__PEER_CONNECTIONS__ = (window as any).__PEER_CONNECTIONS__.filter((pc: RTCPeerConnection) => pc !== remote.pc);
+        }
         remote.pc.close();
         this.remotes.delete(socketId);
     }
@@ -170,6 +189,9 @@ export class MeshRTC {
     } catch {}
     this.remotes.forEach(({ pc }) => pc.close());
     this.remotes.clear();
+    if ((window as any).__PEER_CONNECTIONS__) {
+      (window as any).__PEER_CONNECTIONS__ = [];
+    }
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = undefined;
     this.initialized = false;
