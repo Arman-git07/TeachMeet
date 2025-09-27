@@ -1,8 +1,8 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MicOff, VideoOff, Hand, ScreenShare } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, ScreenShare } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Props = {
   stream: MediaStream | null;
@@ -15,6 +15,7 @@ type Props = {
   className?: string;
   volumeLevel?: number;
   isScreenSharing?: boolean;
+  name?: string;
 };
 
 function VideoTileComponent({
@@ -28,6 +29,7 @@ function VideoTileComponent({
   className = "",
   volumeLevel = 0,
   isScreenSharing = false,
+  name = "User",
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -67,7 +69,7 @@ function VideoTileComponent({
   }, [isCameraOn, stream]);
 
   return (
-    <div className={`relative bg-gray-800 overflow-hidden ${className}`} style={{ minHeight: 80 }}>
+    <div className={cn(`relative bg-gray-800 overflow-hidden`, className)} style={{ minHeight: 80 }}>
       <video
         ref={videoRef}
         autoPlay
@@ -81,9 +83,22 @@ function VideoTileComponent({
         <div className="absolute inset-0 flex items-center justify-center">
             <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
                 <AvatarImage src={profileUrl || undefined} alt="avatar" />
-                <AvatarFallback className="text-4xl">U</AvatarFallback>
+                <AvatarFallback className="text-4xl">{name.charAt(0)}</AvatarFallback>
             </Avatar>
         </div>
+      )}
+      
+      {/* --- OVERLAY --- Moved from MeetingClient.tsx into here */}
+      <div className="absolute left-3 bottom-3 flex items-center gap-2 bg-black/40 px-2 py-1 rounded-md text-white text-sm font-medium">
+          <span>{name}</span>
+          {isMicOn ? <Mic className="h-4 w-4 text-green-400" /> : <MicOff className="h-4 w-4 text-red-400" />}
+          {isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
+      </div>
+       {isMicOn && volumeLevel > 0.01 && (
+        <div 
+          className="absolute inset-0 rounded-lg border-2 transition-colors duration-100 pointer-events-none"
+          style={{ borderColor: `rgba(50, 205, 50, ${Math.min(volumeLevel * 2, 1)})` }} 
+        />
       )}
     </div>
   );
@@ -94,11 +109,12 @@ export default React.memo(
   (prev, next) =>
     prev.stream === next.stream &&
     prev.isCameraOn === next.isCameraOn &&
-    prev.profileUrl === next.profileUrl &&
-    prev.mirror === next.mirror &&
-    prev.isLocal === next.isLocal &&
     prev.isMicOn === next.isMicOn &&
     prev.isHandRaised === next.isHandRaised &&
     prev.volumeLevel === next.volumeLevel &&
-    prev.isScreenSharing === next.isScreenSharing
+    prev.isScreenSharing === next.isScreenSharing &&
+    prev.profileUrl === next.profileUrl &&
+    prev.mirror === next.mirror &&
+    prev.isLocal === next.isLocal &&
+    prev.name === next.name
 );

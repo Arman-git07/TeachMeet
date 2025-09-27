@@ -381,30 +381,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
   }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
   
-  // DEBUGGING LOGS: Added here to run after every render
-  useEffect(() => {
-    console.log("--- DEBUG LOGS ---");
-    // 1. Log all video elements
-    const allVideos = document.querySelectorAll('video');
-    console.log(`Found ${allVideos.length} <video> elements:`, allVideos);
-
-    // 2. Log srcObject of the first video element
-    const firstVideo = document.querySelector('video');
-    if (firstVideo) {
-        console.log("srcObject of first <video> element:", firstVideo.srcObject);
-        if (firstVideo.srcObject instanceof MediaStream) {
-            // 3. Log video track status if srcObject is a MediaStream
-            const tracks = firstVideo.srcObject.getVideoTracks();
-            console.log(`Video tracks in first <video>'s stream (${tracks.length}):`, tracks.map(t => ({ enabled: t.enabled, readyState: t.readyState })));
-        } else {
-            console.log("srcObject of first <video> is NOT a MediaStream.");
-        }
-    } else {
-        console.log("No <video> elements found on the page.");
-    }
-    console.log("--- END DEBUG LOGS ---");
-  }); // Runs after every render to give the latest status
-
   const TileWithOverlay = ({ p }: { p: Participant }) => {
     return (
       <div className="relative w-full h-full">
@@ -417,12 +393,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           isLocal={!!p.isLocal}
           profileUrl={p.avatar}
           className="w-full h-full rounded-lg"
+          name={p.name}
         />
-        <div className="absolute left-3 bottom-3 flex items-center gap-2 bg-black/40 px-2 py-1 rounded-md text-white text-sm font-medium">
-          {p.name}
-          {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400" />}
-          {p.isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
-        </div>
       </div>
     );
   };
