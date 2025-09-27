@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -99,8 +98,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       stream?.getTracks().forEach(t => t.stop());
       // cleanup analysers if any
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(() => {});
+      if (audioContextRef.current?.state !== 'closed') {
+        audioContextRef.current?.close().catch(() => {});
       }
       remoteAnalysersRef.current.forEach(entry => {
         if (entry.rafId) cancelAnimationFrame(entry.rafId);
@@ -177,7 +176,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
 
     // create AudioContext/analyser once
-    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+    if (!audioContextRef.current) {
       try {
         const audioContext = new AudioContext();
         const analyser = audioContext.createAnalyser();
@@ -345,7 +344,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, micOn, updateMyStatus]);
+  }, [localStream, camOn, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
@@ -381,6 +380,30 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         toast({ variant: 'destructive', title: 'Screen Share Failed' });
     }
   }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
+  
+  // DEBUGGING LOGS: Added here to run after every render
+  useEffect(() => {
+    console.log("--- DEBUG LOGS ---");
+    // 1. Log all video elements
+    const allVideos = document.querySelectorAll('video');
+    console.log(`Found ${allVideos.length} <video> elements:`, allVideos);
+
+    // 2. Log srcObject of the first video element
+    const firstVideo = document.querySelector('video');
+    if (firstVideo) {
+        console.log("srcObject of first <video> element:", firstVideo.srcObject);
+        if (firstVideo.srcObject instanceof MediaStream) {
+            // 3. Log video track status if srcObject is a MediaStream
+            const tracks = firstVideo.srcObject.getVideoTracks();
+            console.log(`Video tracks in first <video>'s stream (${tracks.length}):`, tracks.map(t => ({ enabled: t.enabled, readyState: t.readyState })));
+        } else {
+            console.log("srcObject of first <video> is NOT a MediaStream.");
+        }
+    } else {
+        console.log("No <video> elements found on the page.");
+    }
+    console.log("--- END DEBUG LOGS ---");
+  }); // Runs after every render to give the latest status
 
   const TileWithOverlay = ({ p }: { p: Participant }) => {
     return (
@@ -555,4 +578,3 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
-
