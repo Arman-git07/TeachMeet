@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -98,7 +99,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       stream?.getTracks().forEach(t => t.stop());
       // cleanup analysers if any
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
-      audioContextRef.current?.close().catch(() => {});
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+      }
       remoteAnalysersRef.current.forEach(entry => {
         if (entry.rafId) cancelAnimationFrame(entry.rafId);
       });
@@ -174,7 +177,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
 
     // create AudioContext/analyser once
-    if (!audioContextRef.current) {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
       try {
         const audioContext = new AudioContext();
         const analyser = audioContext.createAnalyser();
@@ -215,20 +218,19 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
     return () => {
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
-      // keep audioContext alive to avoid re-creation cost (closed on unmount)
     };
   }, [localStream, micOn, userId]);
 
   // Remote analysers: create analyser for each incoming remote stream and sample their audio levels throttled
   useEffect(() => {
-    // For each remote stream in remoteStreams, ensure an analyser exists
     remoteStreams.forEach((stream, id) => {
-      if (!stream) return;
-      if (remoteAnalysersRef.current.has(id)) return; // already created
+      if (!stream || stream.getAudioTracks().length === 0) return;
+      if (remoteAnalysersRef.current.has(id)) return;
 
       try {
-        const audioCtx = audioContextRef.current || new AudioContext();
-        if (!audioContextRef.current) audioContextRef.current = audioCtx;
+        const audioCtx = audioContextRef.current;
+        if (!audioCtx || audioCtx.state === 'closed') return;
+        
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         const source = audioCtx.createMediaStreamSource(stream);
@@ -245,7 +247,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           let sum = 0;
           for (let i = 0; i < ent.dataArray.length; i++) sum += ent.dataArray[i];
           const avg = sum / ent.dataArray.length;
-          // throttle global remote updates to ~150ms
+          
           if (time - lastRemoteUpdateRef.current > 150) {
             setVolumeLevels(prev => {
               const next = new Map(prev);
@@ -254,20 +256,14 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             });
             lastRemoteUpdateRef.current = time;
           }
-          const raf = requestAnimationFrame(stepRemote);
-          const ent2 = remoteAnalysersRef.current.get(id);
-          if (ent2) ent2.rafId = raf;
+          entry.rafId = requestAnimationFrame(stepRemote);
         };
-
-        // start sampling
         entry.rafId = requestAnimationFrame(stepRemote);
-
       } catch (err) {
         console.error("Failed to create analyser for remote stream", id, err);
       }
     });
 
-    // Clean up analysers for removed streams
     const existingIds = Array.from(remoteAnalysersRef.current.keys());
     existingIds.forEach(id => {
       if (!remoteStreams.has(id)) {
@@ -281,11 +277,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         });
       }
     });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteStreams]);
 
-  // Build stable participants array for rendering (memoized)
   const allParticipants: Participant[] = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
     const self: Participant = {
@@ -321,7 +314,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       });
 
     return [self, ...remotes];
-    // include volumeLevels since we want tiles to update with levels; throttled earlier
   }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels]);
 
   const updateMyStatus = useCallback(async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
@@ -337,7 +329,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     localStream.getAudioTracks().forEach(track => (track.enabled = nextState));
     setMicOn(nextState);
     updateMyStatus({ isMicOn: nextState });
-    // ensure local level updates immediately when muted/unmuted
     setVolumeLevels(prev => {
       const next = new Map(prev);
       next.set(userId, nextState ? (next.get(userId) ?? 0) : 0);
@@ -354,7 +345,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, updateMyStatus]);
+  }, [localStream, micOn, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
@@ -391,7 +382,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
   }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
 
-  // Helper render for overlay UI on top of each tile (name, mic, cam, hand, volume)
   const TileWithOverlay = ({ p }: { p: Participant }) => {
     return (
       <div className="relative w-full h-full">
@@ -405,10 +395,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           profileUrl={p.avatar}
           className="w-full h-full rounded-lg"
         />
-
-        {/* Overlay: always positioned over tile */}
-        <div className="absolute left-3 bottom-3 flex items-center gap-2 bg-black/40 px-2 py-1 rounded-md text-white">
-          <span className="text-sm font-medium">{p.name}</span>
+        <div className="absolute left-3 bottom-3 flex items-center gap-2 bg-black/40 px-2 py-1 rounded-md text-white text-sm font-medium">
+          {p.name}
           {p.isMicOff ? <MicOff className="h-4 w-4 text-red-400" /> : <Mic className="h-4 w-4 text-green-400" />}
           {p.isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
         </div>
@@ -567,3 +555,4 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
+
