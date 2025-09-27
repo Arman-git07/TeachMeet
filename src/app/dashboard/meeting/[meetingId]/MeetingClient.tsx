@@ -107,7 +107,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       remoteAnalysersRef.current.clear();
     };
     // run once on mount
-  }, []); // eslint-disable-line
+  }, [initialCamOn, initialMicOn, toast]);
 
   // Listen participants collection for metadata
   useEffect(() => {
@@ -175,21 +175,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       return;
     }
 
-    // create AudioContext/analyser once
     if (!audioContextRef.current) {
-      try {
         const audioContext = new AudioContext();
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        const source = audioContext.createMediaStreamSource(localStream);
-        source.connect(analyser);
+        analyserRef.current = audioContext.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        sourceRef.current = audioContext.createMediaStreamSource(localStream);
+        sourceRef.current.connect(analyserRef.current);
         audioContextRef.current = audioContext;
-        analyserRef.current = analyser;
-        sourceRef.current = source;
-      } catch (err) {
-        console.error("Failed to init local audio analyser:", err);
-        return;
-      }
     }
 
     const analyser = analyserRef.current!;
@@ -201,7 +193,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
       const avg = sum / dataArray.length;
-      // throttle to ~150ms
+
       if (time - lastLocalUpdateRef.current > 150) {
         setVolumeLevels(prev => {
           const next = new Map(prev);
@@ -344,7 +336,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, camOn, updateMyStatus]);
+  }, [localStream, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
