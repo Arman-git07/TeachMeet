@@ -1,5 +1,3 @@
-// full file: meeting client (replaces previous MeetingClient.tsx)
-// — only layout/pinning/interaction logic added, media/rtc logic preserved
 
 "use client";
 
@@ -339,7 +337,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, camOn, updateMyStatus]);
+  }, [localStream, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;

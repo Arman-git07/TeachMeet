@@ -35,7 +35,7 @@ export default function MeetingPage() {
 
   const handleLeave = async () => {
     if (user && meetingId) await deleteDoc(doc(db, "meetings", meetingId, "participants", user.uid)).catch(console.error);
-    router.push("/");
+    router.push("/dashboard/classrooms");
   };
 
   return (
