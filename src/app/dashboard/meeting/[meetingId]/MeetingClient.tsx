@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -50,10 +49,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // mic levels map (id -> level 0..1) stored in state but updated throttled
   const [volumeLevels, setVolumeLevels] = useState<Map<string, number>>(new Map());
 
-  // Refs for analysers etc (same as before)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -62,10 +59,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const remoteAnalysersRef = useRef<Map<string, { analyser: AnalyserNode; rafId: number | null; dataArray: Uint8Array }>>(new Map());
   const lastRemoteUpdateRef = useRef<number>(0);
 
-  // pin / fullscreen (app-level)
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
-  // initialization and RTC logic (kept intact)
   useEffect(() => {
     let mounted = true;
     let stream: MediaStream | null = null;
@@ -107,10 +102,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       });
       remoteAnalysersRef.current.clear();
     };
-    // run once on mount
   }, [initialCamOn, initialMicOn, toast]);
 
-  // participants metadata
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
@@ -124,7 +117,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => unsubscribe();
   }, [meetingId]);
 
-  // MeshRTC creation
   const rtc = useMemo(() => {
     if (!userId || !meetingId) return null;
     return new MeshRTC({
@@ -163,8 +155,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => rtc?.leave();
   }, [rtc, localStream]);
 
-  // audio analysers (same throttled logic) ...
-  // (kept identical to your version so behavior is consistent)
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
@@ -213,7 +203,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     };
   }, [localStream, micOn, userId]);
 
-  // remote analysers (kept)
   useEffect(() => {
     remoteStreams.forEach((stream, id) => {
       if (!stream || stream.getAudioTracks().length === 0) return;
@@ -337,7 +326,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, updateMyStatus]);
+  }, [localStream, updateMyStatus, camOn]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
@@ -372,9 +361,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         console.error("Screen share error:", err);
         toast({ variant: 'destructive', title: 'Screen Share Failed' });
     }
-  }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
+  }, [isScreenSharing, localStream, rtc, toast, updateMyStatus]);
 
-  // toggle pin / fullscreen for a participant
   const togglePin = useCallback((id: string) => {
     setPinnedId(prev => prev === id ? null : id);
   }, []);
@@ -382,7 +370,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const renderLayout = () => {
     const count = allParticipants.length;
 
-    // pinned view
     if (pinnedId) {
       const pinned = allParticipants.find(p => p.id === pinnedId);
       const others = allParticipants.filter(p => p.id !== pinnedId);
@@ -433,7 +420,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // screen sharing (unchanged layout)
     const activeScreenSharer = allParticipants.find(p => p.isScreenSharing);
     if (activeScreenSharer) {
       const otherParticipants = allParticipants.filter(p => p.id !== activeScreenSharer.id);
@@ -481,31 +467,28 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // 1 participant -> full
     if (count === 1) {
       const p = allParticipants[0];
       return (
-        <div className="w-full h-full flex items-center justify-center p-0">
-          <div className="w-full h-full rounded-lg relative">
-            <VideoTile
-              stream={p.stream}
-              isCameraOn={!p.isCamOff}
-              isMicOn={!p.isMicOff}
-              isHandRaised={p.isHandRaised}
-              volumeLevel={p.volumeLevel}
-              isLocal={!!p.isLocal}
-              profileUrl={p.avatar}
-              name={p.name}
-              isScreenSharing={p.isScreenSharing}
-              onTogglePin={() => togglePin(p.id)}
-              onDoubleClick={() => togglePin(p.id)}
-            />
-          </div>
+        <div className="w-full h-full p-0">
+          <VideoTile
+            stream={p.stream}
+            isCameraOn={!p.isCamOff}
+            isMicOn={!p.isMicOff}
+            isHandRaised={p.isHandRaised}
+            volumeLevel={p.volumeLevel}
+            isLocal={!!p.isLocal}
+            profileUrl={p.avatar}
+            name={p.name}
+            isScreenSharing={p.isScreenSharing}
+            onTogglePin={() => togglePin(p.id)}
+            onDoubleClick={() => togglePin(p.id)}
+            className="w-full h-full"
+          />
         </div>
       );
     }
 
-    // 2 participants: remote full, local PiP (draggable)
     if (count === 2) {
       const remote = allParticipants.find((u) => !u.isLocal);
       const local = allParticipants.find((u) => u.isLocal);
@@ -550,7 +533,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // >=3 participants: responsive grid (cols = ceil(sqrt(n))) with aspect ratio
     const cols = Math.ceil(Math.sqrt(count));
     return (
       <div
