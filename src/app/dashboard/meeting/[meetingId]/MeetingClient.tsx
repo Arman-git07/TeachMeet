@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -62,6 +63,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   // Refs for remote analysers: map socketId -> { analyser, rafId, dataArray }
   const remoteAnalysersRef = useRef<Map<string, { analyser: AnalyserNode; rafId: number | null; dataArray: Uint8Array }>>(new Map());
   const lastRemoteUpdateRef = useRef<number>(0);
+
+  // pin / fullscreen state
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
 
   // Initialize local media once (MeetingClient manages its own stream)
   useEffect(() => {
@@ -151,6 +155,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           next.delete(socketId);
           return next;
         });
+        // if pinned user left, unpin
+        setPinnedId(prev => prev === socketId ? null : prev);
       },
     });
   }, [meetingId, userId]);
@@ -372,14 +378,65 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         toast({ variant: 'destructive', title: 'Screen Share Failed' });
     }
   }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
-  
+
+  // toggle pin / fullscreen for a participant
+  const togglePin = useCallback((id: string) => {
+    setPinnedId(prev => prev === id ? null : id);
+  }, []);
+
   const renderLayout = () => {
     const count = allParticipants.length;
 
-    if (count === 0) {
-      return <div className="text-muted-foreground">Initializing...</div>;
+    // if pinned -> show pinned large and others as small thumbnails
+    if (pinnedId) {
+      const pinned = allParticipants.find(p => p.id === pinnedId);
+      const others = allParticipants.filter(p => p.id !== pinnedId);
+      return (
+        <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
+          <div className="flex-1 min-h-0 relative">
+            {pinned && (
+              <div className="w-full h-full rounded-lg relative">
+                <VideoTile
+                  stream={pinned.stream}
+                  isCameraOn={!pinned.isCamOff}
+                  isMicOn={!pinned.isMicOff}
+                  isHandRaised={pinned.isHandRaised}
+                  volumeLevel={pinned.volumeLevel}
+                  isLocal={!!pinned.isLocal}
+                  profileUrl={pinned.avatar}
+                  name={pinned.name}
+                  isScreenSharing={pinned.isScreenSharing}
+                  isPinned={true}
+                  onTogglePin={() => togglePin(pinned.id)}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
+            {others.map(p => (
+              <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
+                <VideoTile
+                  stream={p.stream}
+                  isCameraOn={!p.isCamOff}
+                  isMicOn={!p.isMicOff}
+                  isHandRaised={p.isHandRaised}
+                  volumeLevel={p.volumeLevel}
+                  isLocal={!!p.isLocal}
+                  profileUrl={p.avatar}
+                  name={p.name}
+                  isScreenSharing={p.isScreenSharing}
+                  isPinned={false}
+                  onTogglePin={() => togglePin(p.id)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
     }
-    
+
+    // Screen sharing fallback: keep previous behavior
     const activeScreenSharer = allParticipants.find(p => p.isScreenSharing);
     if (activeScreenSharer) {
       const otherParticipants = allParticipants.filter(p => p.id !== activeScreenSharer.id);
@@ -397,6 +454,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   profileUrl={activeScreenSharer.avatar}
                   name={activeScreenSharer.name}
                   isScreenSharing={activeScreenSharer.isScreenSharing}
+                  onTogglePin={() => togglePin(activeScreenSharer.id)}
                 />
              </div>
           </div>
@@ -414,6 +472,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                       profileUrl={p.avatar}
                       name={p.name}
                       isScreenSharing={p.isScreenSharing}
+                      onTogglePin={() => togglePin(p.id)}
                     />
                 </div>
               ))}
@@ -422,11 +481,12 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         </div>
       );
     }
-    
+
+    // 1 participant -> full screen
     if (count === 1) {
       const p = allParticipants[0];
       return (
-        <div className="w-full h-full flex items-center justify-center p-4">
+        <div className="w-full h-full flex items-center justify-center p-0">
           <div className="w-full h-full rounded-lg relative">
             <VideoTile
               stream={p.stream}
@@ -438,17 +498,19 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               profileUrl={p.avatar}
               name={p.name}
               isScreenSharing={p.isScreenSharing}
+              onTogglePin={() => togglePin(p.id)}
             />
           </div>
         </div>
       );
     }
-  
+
+    // 2 participants: remote full, local small PiP bottom-right
     if (count === 2) {
       const remote = allParticipants.find((u) => !u.isLocal);
       const local = allParticipants.find((u) => u.isLocal);
       return (
-        <div className="w-full h-full relative p-4">
+        <div className="w-full h-full relative p-0">
           {remote && 
             <div className="w-full h-full rounded-lg relative">
               <VideoTile
@@ -461,11 +523,12 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 profileUrl={remote.avatar}
                 name={remote.name}
                 isScreenSharing={remote.isScreenSharing}
+                onTogglePin={() => togglePin(remote.id)}
               />
             </div>
           }
           {local && 
-            <div className="absolute bottom-6 right-6 w-48 h-32 z-20">
+            <div className="absolute bottom-6 right-6 w-48 h-32 z-20 shadow-lg">
               <VideoTile
                 stream={local.stream}
                 isCameraOn={!local.isCamOff}
@@ -476,6 +539,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 profileUrl={local.avatar}
                 name={local.name}
                 isScreenSharing={local.isScreenSharing}
+                onTogglePin={() => togglePin(local.id)}
               />
             </div>
           }
@@ -483,18 +547,17 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
+    // >=3 participants: responsive grid like Google Meet
     const cols = Math.ceil(Math.sqrt(count));
-    const rows = Math.ceil(count / cols);
     return (
-      <div 
+      <div
         className="w-full h-full grid gap-2 p-2"
         style={{
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gridTemplateRows: `repeat(${rows}, 1fr)`,
+          gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`,
         }}
       >
         {allParticipants.map((p) => (
-          <div key={p.id} className="w-full h-full rounded-lg relative">
+          <div key={p.id} className="w-full h-full rounded-lg relative aspect-video">
             <VideoTile
               stream={p.stream}
               isCameraOn={!p.isCamOff}
@@ -505,6 +568,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               profileUrl={p.avatar}
               name={p.name}
               isScreenSharing={p.isScreenSharing}
+              onTogglePin={() => togglePin(p.id)}
             />
           </div>
         ))}

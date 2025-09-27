@@ -1,7 +1,7 @@
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MicOff, Mic, VideoOff, Video, Hand, ScreenShare } from "lucide-react";
+import { MicOff, Mic, VideoOff, Video, Hand, ScreenShare, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -16,6 +16,8 @@ type Props = {
   volumeLevel?: number;
   isScreenSharing?: boolean;
   name?: string;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
 };
 
 const VideoTile = ({
@@ -30,6 +32,8 @@ const VideoTile = ({
   volumeLevel = 0,
   isScreenSharing = false,
   name = "User",
+  isPinned = false,
+  onTogglePin,
 }: Props) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -43,6 +47,7 @@ const VideoTile = ({
     if (stream && stream !== streamRef.current) {
       streamRef.current = stream;
       videoEl.srcObject = stream;
+      // autoplay attempt
       videoEl.play().catch(() => {});
     }
 
@@ -61,7 +66,7 @@ const VideoTile = ({
     }
   }, [isCameraOn, stream]);
 
-  // Smooth mic volume animation without re-rendering
+  // Smooth mic volume animation without heavy re-rendering
   useEffect(() => {
     if (volumeBarRef.current) {
       volumeBarRef.current.style.width = `${Math.min(1, volumeLevel) * 100}%`;
@@ -70,7 +75,7 @@ const VideoTile = ({
 
   return (
     <div className={cn("relative bg-gray-900 rounded-lg overflow-hidden", className)}>
-      {/* Video */}
+      {/* Video element */}
       <video
         ref={videoRef}
         autoPlay
@@ -85,56 +90,54 @@ const VideoTile = ({
         <div className="absolute inset-0 flex items-center justify-center">
           <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
             <AvatarImage src={profileUrl || undefined} alt="avatar" />
-            <AvatarFallback className="text-4xl">{name.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="text-4xl">{name?.charAt(0) ?? "U"}</AvatarFallback>
           </Avatar>
         </div>
       )}
 
       {/* Overlay UI */}
-      <div className="absolute left-3 bottom-3 right-3 flex items-center justify-between bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-sm">
-        {/* Avatar + Name */}
+      <div className="absolute left-3 bottom-3 right-3 flex items-center justify-between bg-black/40 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-sm">
+        {/* Left: Avatar + Name */}
         <div className="flex items-center gap-2 min-w-0">
           <Avatar className="w-8 h-8 shrink-0">
             <AvatarImage src={profileUrl || undefined} alt={name} />
-            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{name?.charAt(0) ?? "U"}</AvatarFallback>
           </Avatar>
           <div className="font-medium truncate">{name}</div>
         </div>
 
-        {/* Status icons */}
+        {/* Right: status icons */}
         <div className="flex items-center gap-3 shrink-0 ml-2">
-          {/* Mic */}
+          {/* Mic + volume */}
           <div className="flex items-center gap-1">
-            {isMicOn ? (
-              <Mic className="h-4 w-4 text-green-400" />
-            ) : (
-              <MicOff className="h-4 w-4 text-red-400" />
-            )}
+            {isMicOn ? <Mic className="h-4 w-4 text-green-400" /> : <MicOff className="h-4 w-4 text-red-400" />}
             {isMicOn && (
               <div className="w-12 h-2 bg-gray-700 rounded overflow-hidden">
-                <div
-                  ref={volumeBarRef}
-                  className="h-2 bg-green-400 transition-all duration-150"
-                  style={{ width: `0%` }} // Initial width, will be updated by useEffect
-                />
+                <div ref={volumeBarRef} className="h-2 bg-green-400 transition-all duration-150" style={{ width: `${Math.min(1, volumeLevel) * 100}%` }} />
               </div>
             )}
           </div>
 
           {/* Camera */}
-          {isCameraOn ? (
-            <Video className="h-4 w-4 text-white" />
-          ) : (
-            <VideoOff className="h-4 w-4 text-red-400" />
-          )}
+          {isCameraOn ? <Video className="h-4 w-4 text-white" /> : <VideoOff className="h-4 w-4 text-red-400" />}
 
-          {/* Hand Raised */}
+          {/* Hand raised */}
           {isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
 
-          {/* Screen Sharing */}
+          {/* Screen sharing */}
           {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
         </div>
       </div>
+
+      {/* Pin / Fullscreen button (bottom-right corner) */}
+      <button
+        onClick={onTogglePin}
+        aria-label={isPinned ? "Unpin" : "Pin"}
+        className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-black/50 hover:bg-black/60 text-white"
+        title={isPinned ? "Unpin participant" : "Pin participant (make full screen)"}
+      >
+        {isPinned ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+      </button>
     </div>
   );
 };
