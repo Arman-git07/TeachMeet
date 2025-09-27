@@ -1,3 +1,5 @@
+// full file: meeting client (replaces previous MeetingClient.tsx)
+// — only layout/pinning/interaction logic added, media/rtc logic preserved
 
 "use client";
 
@@ -53,21 +55,19 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   // mic levels map (id -> level 0..1) stored in state but updated throttled
   const [volumeLevels, setVolumeLevels] = useState<Map<string, number>>(new Map());
 
-  // Refs for local analyser
+  // Refs for analysers etc (same as before)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const localAnimationRef = useRef<number | null>(null);
   const lastLocalUpdateRef = useRef<number>(0);
-
-  // Refs for remote analysers: map socketId -> { analyser, rafId, dataArray }
   const remoteAnalysersRef = useRef<Map<string, { analyser: AnalyserNode; rafId: number | null; dataArray: Uint8Array }>>(new Map());
   const lastRemoteUpdateRef = useRef<number>(0);
 
-  // pin / fullscreen state
+  // pin / fullscreen (app-level)
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
-  // Initialize local media once (MeetingClient manages its own stream)
+  // initialization and RTC logic (kept intact)
   useEffect(() => {
     let mounted = true;
     let stream: MediaStream | null = null;
@@ -100,7 +100,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => {
       mounted = false;
       stream?.getTracks().forEach(t => t.stop());
-      // cleanup analysers if any
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
       if (audioContextRef.current?.state !== 'closed') {
         audioContextRef.current?.close().catch(() => {});
@@ -113,7 +112,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     // run once on mount
   }, [initialCamOn, initialMicOn, toast]);
 
-  // Listen participants collection for metadata
+  // participants metadata
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
@@ -127,7 +126,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => unsubscribe();
   }, [meetingId]);
 
-  // MeshRTC instance (memoized)
+  // MeshRTC creation
   const rtc = useMemo(() => {
     if (!userId || !meetingId) return null;
     return new MeshRTC({
@@ -146,7 +145,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           next.delete(socketId);
           return next;
         });
-        // cleanup analyser for that socket
         const entry = remoteAnalysersRef.current.get(socketId);
         if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
         remoteAnalysersRef.current.delete(socketId);
@@ -155,13 +153,11 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           next.delete(socketId);
           return next;
         });
-        // if pinned user left, unpin
         setPinnedId(prev => prev === socketId ? null : prev);
       },
     });
   }, [meetingId, userId]);
 
-  // Initialize rtc with localStream when available and cleanup on unmount
   useEffect(() => {
     if (localStream && rtc) {
       rtc.init(localStream);
@@ -169,7 +165,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => rtc?.leave();
   }, [rtc, localStream]);
 
-  // Local analyser: throttle updates to ~150ms to avoid re-render storms
+  // audio analysers (same throttled logic) ...
+  // (kept identical to your version so behavior is consistent)
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
@@ -218,7 +215,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     };
   }, [localStream, micOn, userId]);
 
-  // Remote analysers: create analyser for each incoming remote stream and sample their audio levels throttled
+  // remote analysers (kept)
   useEffect(() => {
     remoteStreams.forEach((stream, id) => {
       if (!stream || stream.getAudioTracks().length === 0) return;
@@ -342,7 +339,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, updateMyStatus]);
+  }, [localStream, camOn, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
@@ -387,7 +384,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const renderLayout = () => {
     const count = allParticipants.length;
 
-    // if pinned -> show pinned large and others as small thumbnails
+    // pinned view
     if (pinnedId) {
       const pinned = allParticipants.find(p => p.id === pinnedId);
       const others = allParticipants.filter(p => p.id !== pinnedId);
@@ -408,6 +405,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   isScreenSharing={pinned.isScreenSharing}
                   isPinned={true}
                   onTogglePin={() => togglePin(pinned.id)}
+                  onDoubleClick={() => togglePin(pinned.id)}
                 />
               </div>
             )}
@@ -428,6 +426,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   isScreenSharing={p.isScreenSharing}
                   isPinned={false}
                   onTogglePin={() => togglePin(p.id)}
+                  onDoubleClick={() => togglePin(p.id)}
                 />
               </div>
             ))}
@@ -436,7 +435,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // Screen sharing fallback: keep previous behavior
+    // screen sharing (unchanged layout)
     const activeScreenSharer = allParticipants.find(p => p.isScreenSharing);
     if (activeScreenSharer) {
       const otherParticipants = allParticipants.filter(p => p.id !== activeScreenSharer.id);
@@ -455,6 +454,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   name={activeScreenSharer.name}
                   isScreenSharing={activeScreenSharer.isScreenSharing}
                   onTogglePin={() => togglePin(activeScreenSharer.id)}
+                  onDoubleClick={() => togglePin(activeScreenSharer.id)}
                 />
              </div>
           </div>
@@ -473,6 +473,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                       name={p.name}
                       isScreenSharing={p.isScreenSharing}
                       onTogglePin={() => togglePin(p.id)}
+                      onDoubleClick={() => togglePin(p.id)}
                     />
                 </div>
               ))}
@@ -482,7 +483,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // 1 participant -> full screen
+    // 1 participant -> full
     if (count === 1) {
       const p = allParticipants[0];
       return (
@@ -499,13 +500,14 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               name={p.name}
               isScreenSharing={p.isScreenSharing}
               onTogglePin={() => togglePin(p.id)}
+              onDoubleClick={() => togglePin(p.id)}
             />
           </div>
         </div>
       );
     }
 
-    // 2 participants: remote full, local small PiP bottom-right
+    // 2 participants: remote full, local PiP (draggable)
     if (count === 2) {
       const remote = allParticipants.find((u) => !u.isLocal);
       const local = allParticipants.find((u) => u.isLocal);
@@ -524,11 +526,12 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 name={remote.name}
                 isScreenSharing={remote.isScreenSharing}
                 onTogglePin={() => togglePin(remote.id)}
+                onDoubleClick={() => togglePin(remote.id)}
               />
             </div>
           }
           {local && 
-            <div className="absolute bottom-6 right-6 w-48 h-32 z-20 shadow-lg">
+            <div className="absolute bottom-6 right-6 w-48 h-32 z-50 shadow-lg">
               <VideoTile
                 stream={local.stream}
                 isCameraOn={!local.isCamOff}
@@ -540,6 +543,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 name={local.name}
                 isScreenSharing={local.isScreenSharing}
                 onTogglePin={() => togglePin(local.id)}
+                onDoubleClick={() => togglePin(local.id)}
+                draggable={true}
               />
             </div>
           }
@@ -547,7 +552,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // >=3 participants: responsive grid like Google Meet
+    // >=3 participants: responsive grid (cols = ceil(sqrt(n))) with aspect ratio
     const cols = Math.ceil(Math.sqrt(count));
     return (
       <div
@@ -569,6 +574,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               name={p.name}
               isScreenSharing={p.isScreenSharing}
               onTogglePin={() => togglePin(p.id)}
+              onDoubleClick={() => togglePin(p.id)}
             />
           </div>
         ))}
@@ -587,6 +593,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           renderLayout()
         )}
       </div>
+
       <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
         <div className="flex items-center justify-center relative">
           <div className="flex items-center justify-center gap-3">
@@ -608,6 +615,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             >
               {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
             </Button>
+
             <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
                <AlertDialogTrigger asChild>
                    <Button
@@ -633,6 +641,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
             <Button
               onClick={handleToggleHandRaise}
               className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
@@ -643,6 +652,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               <Hand className="h-6 w-6" />
             </Button>
           </div>
+
           <div className="absolute right-0 top-1/2 -translate-y-1/2">
             <Button
               onClick={onLeave}

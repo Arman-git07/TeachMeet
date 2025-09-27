@@ -1,5 +1,5 @@
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MicOff, Mic, VideoOff, Video, Hand, ScreenShare, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,9 @@ type Props = {
   isScreenSharing?: boolean;
   name?: string;
   isPinned?: boolean;
-  onTogglePin?: () => void;
+  onTogglePin?: () => void;         // toggles app-level pin
+  onDoubleClick?: () => void;       // double click handler
+  draggable?: boolean;              // small PiP tile draggable
 };
 
 const VideoTile = ({
@@ -34,12 +36,19 @@ const VideoTile = ({
   name = "User",
   isPinned = false,
   onTogglePin,
+  onDoubleClick,
+  draggable = false,
 }: Props) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const volumeBarRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Bind stream only once and never reset video on state changes
+  // for draggable PiP
+  const dragRef = useRef<{ startX: number; startY: number; left: number; top: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Bind stream once and preserve srcObject
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
@@ -47,17 +56,16 @@ const VideoTile = ({
     if (stream && stream !== streamRef.current) {
       streamRef.current = stream;
       videoEl.srcObject = stream;
-      // autoplay attempt
       videoEl.play().catch(() => {});
     }
 
     if (!stream && videoEl.srcObject) {
-      videoEl.srcObject = null;
+      try { videoEl.srcObject = null; } catch {}
       streamRef.current = null;
     }
   }, [stream]);
 
-  // Only toggle visibility, never re-render video element
+  // Toggle visibility only
   useEffect(() => {
     const videoEl = videoRef.current;
     if (videoEl) {
@@ -66,16 +74,95 @@ const VideoTile = ({
     }
   }, [isCameraOn, stream]);
 
-  // Smooth mic volume animation without heavy re-rendering
+  // Volume bar DOM update (lightweight)
   useEffect(() => {
     if (volumeBarRef.current) {
       volumeBarRef.current.style.width = `${Math.min(1, volumeLevel) * 100}%`;
     }
   }, [volumeLevel]);
 
+  // Fullscreen toggle (browser fullscreen)
+  const [isFs, setIsFs] = useState(false);
+  const toggleFullscreen = async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen({ navigationUI: "hide" } as any);
+        setIsFs(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFs(false);
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  // Keep track of fullscreen change to update button
+  useEffect(() => {
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  // Double click handler
+  const handleDoubleClick = () => {
+    if (onDoubleClick) onDoubleClick();
+  };
+
+  // Drag handlers for PiP tiles
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !draggable) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      setIsDragging(true);
+      const rect = el.getBoundingClientRect();
+      dragRef.current = { startX: e.clientX, startY: e.clientY, left: rect.left, top: rect.top };
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      const left = dragRef.current.left + dx;
+      const top = dragRef.current.top + dy;
+      el.style.position = "fixed";
+      el.style.left = `${Math.max(8, Math.min(window.innerWidth - rectWidth(el), left))}px`;
+      el.style.top = `${Math.max(8, Math.min(window.innerHeight - rectHeight(el), top))}px`;
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      setIsDragging(false);
+      dragRef.current = null;
+    };
+
+    // helper to get element dimensions
+    const rectWidth = (el: HTMLElement) => el.getBoundingClientRect().width;
+    const rectHeight = (el: HTMLElement) => el.getBoundingClientRect().height;
+
+    el.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+
+    return () => {
+      el.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [draggable]);
+
   return (
-    <div className={cn("relative bg-gray-900 rounded-lg overflow-hidden", className)}>
-      {/* Video element */}
+    <div
+      ref={containerRef}
+      onDoubleClick={handleDoubleClick}
+      className={cn("relative bg-gray-900 rounded-lg overflow-hidden", className, draggable ? "cursor-grab" : "")}
+      style={{
+        // if draggable and position already fixed by user, we keep inline styles applied
+      }}
+    >
       <video
         ref={videoRef}
         autoPlay
@@ -85,30 +172,26 @@ const VideoTile = ({
         style={{ opacity: isCameraOn && stream ? 1 : 0 }}
       />
 
-      {/* Avatar fallback */}
       {(!isCameraOn || !stream) && (
         <div className="absolute inset-0 flex items-center justify-center">
           <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-            <AvatarImage src={profileUrl || undefined} alt="avatar" />
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
             <AvatarFallback className="text-4xl">{name?.charAt(0) ?? "U"}</AvatarFallback>
           </Avatar>
         </div>
       )}
 
-      {/* Overlay UI */}
+      {/* Overlay */}
       <div className="absolute left-3 bottom-3 right-3 flex items-center justify-between bg-black/40 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-sm">
-        {/* Left: Avatar + Name */}
         <div className="flex items-center gap-2 min-w-0">
           <Avatar className="w-8 h-8 shrink-0">
-            <AvatarImage src={profileUrl || undefined} alt={name} />
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
             <AvatarFallback>{name?.charAt(0) ?? "U"}</AvatarFallback>
           </Avatar>
           <div className="font-medium truncate">{name}</div>
         </div>
 
-        {/* Right: status icons */}
         <div className="flex items-center gap-3 shrink-0 ml-2">
-          {/* Mic + volume */}
           <div className="flex items-center gap-1">
             {isMicOn ? <Mic className="h-4 w-4 text-green-400" /> : <MicOff className="h-4 w-4 text-red-400" />}
             {isMicOn && (
@@ -118,26 +201,34 @@ const VideoTile = ({
             )}
           </div>
 
-          {/* Camera */}
           {isCameraOn ? <Video className="h-4 w-4 text-white" /> : <VideoOff className="h-4 w-4 text-red-400" />}
-
-          {/* Hand raised */}
           {isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
-
-          {/* Screen sharing */}
           {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
         </div>
       </div>
 
-      {/* Pin / Fullscreen button (bottom-right corner) */}
-      <button
-        onClick={onTogglePin}
-        aria-label={isPinned ? "Unpin" : "Pin"}
-        className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-black/50 hover:bg-black/60 text-white"
-        title={isPinned ? "Unpin participant" : "Pin participant (make full screen)"}
-      >
-        {isPinned ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-      </button>
+      {/* Right-bottom controls: Pin + Fullscreen */}
+      <div className="absolute bottom-3 right-3 z-30 flex gap-1">
+        {/* Pin (app-level) */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onTogglePin && onTogglePin(); }}
+          aria-label={isPinned ? "Unpin" : "Pin"}
+          className="p-1 rounded-md bg-black/50 hover:bg-black/60 text-white"
+          title={isPinned ? "Unpin participant" : "Pin participant (make full screen)"}
+        >
+          {isPinned ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
+
+        {/* Browser fullscreen */}
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+          aria-label={isFs ? "Exit fullscreen" : "Enter fullscreen"}
+          className="p-1 rounded-md bg-black/50 hover:bg-black/60 text-white"
+          title={isFs ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFs ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
+      </div>
     </div>
   );
 };
