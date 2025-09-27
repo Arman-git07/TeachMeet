@@ -184,7 +184,7 @@ const VideoTile = ({
       {(!isCameraOn || !stream) && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <Avatar className="w-28 h-28 border-4 border-background shadow-lg">
-            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
             <AvatarFallback className="text-5xl">{name?.charAt(0) ?? "U"}</AvatarFallback>
           </Avatar>
         </div>
@@ -194,7 +194,7 @@ const VideoTile = ({
       <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
         <div className="flex items-center gap-2 min-w-0">
           <Avatar className="w-7 h-7 shrink-0">
-            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
             <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
           </Avatar>
           <div className="text-sm font-medium truncate max-w-[160px]">{name}</div>

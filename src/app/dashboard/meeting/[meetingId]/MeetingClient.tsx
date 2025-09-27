@@ -274,7 +274,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     });
   }, [remoteStreams]);
 
-
   // Build participants list (same as you had)
   const allParticipants: Participant[] = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
@@ -312,7 +311,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
     return [self, ...remotes];
   }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels]);
-  
+
   const updateMyStatus = useCallback(async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
     if (user && meetingId) {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
@@ -387,15 +386,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const renderLayout = () => {
     const count = allParticipants.length;
 
-    // pinned (app-level) view: pinned participant occupies the whole meeting area
+    // pinned view
     if (pinnedId) {
       const pinned = allParticipants.find(p => p.id === pinnedId);
       const others = allParticipants.filter(p => p.id !== pinnedId);
       return (
-        <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
+        <div className="w-full h-full flex gap-2 p-0">
           <div className="flex-1 min-h-0 relative">
             {pinned && (
-              <div className="w-full h-full rounded-lg relative">
+              <div className="w-full h-full relative">
                 <VideoTile
                   stream={pinned.stream}
                   isCameraOn={!pinned.isCamOff}
@@ -409,31 +408,35 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   isPinned={true}
                   onTogglePin={() => togglePin(pinned.id)}
                   onDoubleClick={() => togglePin(pinned.id)}
+                  className="w-full h-full"
                 />
               </div>
             )}
           </div>
 
-          <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
-            {others.map(p => (
-              <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
-                <VideoTile
-                  stream={p.stream}
-                  isCameraOn={!p.isCamOff}
-                  isMicOn={!p.isMicOff}
-                  isHandRaised={p.isHandRaised}
-                  volumeLevel={p.volumeLevel}
-                  isLocal={!!p.isLocal}
-                  profileUrl={p.avatar}
-                  name={p.name}
-                  isScreenSharing={p.isScreenSharing}
-                  isPinned={false}
-                  onTogglePin={() => togglePin(p.id)}
-                  onDoubleClick={() => togglePin(p.id)}
-                />
-              </div>
-            ))}
-          </div>
+          {/* thumbnails column */}
+          {others.length > 0 && (
+            <div className="w-48 hidden md:flex md:flex-col gap-2 overflow-auto">
+              {others.map(p => (
+                <div key={p.id} className="h-28 rounded-lg">
+                  <VideoTile
+                    stream={p.stream}
+                    isCameraOn={!p.isCamOff}
+                    isMicOn={!p.isMicOff}
+                    isHandRaised={p.isHandRaised}
+                    volumeLevel={p.volumeLevel}
+                    isLocal={!!p.isLocal}
+                    profileUrl={p.avatar}
+                    name={p.name}
+                    isScreenSharing={p.isScreenSharing}
+                    onTogglePin={() => togglePin(p.id)}
+                    onDoubleClick={() => togglePin(p.id)}
+                    className="w-full h-full"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
@@ -502,6 +505,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             profileUrl={p.avatar}
             name={p.name}
             isScreenSharing={p.isScreenSharing}
+            onTogglePin={count > 1 ? () => togglePin(p.id) : undefined}
+            onDoubleClick={count > 1 ? () => togglePin(p.id) : undefined}
             className="w-full h-full"
           />
         </div>
@@ -670,4 +675,3 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
-```
