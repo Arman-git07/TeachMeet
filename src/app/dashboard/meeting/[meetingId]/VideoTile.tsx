@@ -223,14 +223,16 @@ const VideoTile = ({
       </div>
 
       {/* Pin button bottom-right (app-level fullscreen/pin). Single button only. */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onTogglePin?.(); }}
-        aria-label={isPinned ? "Unpin participant" : "Pin participant"}
-        className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-black/60 hover:bg-black/70 text-white"
-        title={isPinned ? "Unpin participant (restore grid)" : "Pin participant (make full meeting view)"}
-      >
-        {isPinned ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-      </button>
+      {onTogglePin && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onTogglePin?.(); }}
+          aria-label={isPinned ? "Unpin participant" : "Pin participant"}
+          className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-black/60 hover:bg-black/70 text-white"
+          title={isPinned ? "Unpin participant (restore grid)" : "Pin participant (make full meeting view)"}
+        >
+          {isPinned ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
+      )}
     </div>
   );
 };
