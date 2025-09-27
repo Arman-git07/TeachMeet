@@ -381,24 +381,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
   }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
   
-  const TileWithOverlay = ({ p }: { p: Participant }) => {
-    return (
-      <div className="relative w-full h-full">
-        <VideoTile
-          stream={p.stream}
-          isCameraOn={!p.isCamOff}
-          isMicOn={!p.isMicOff}
-          isHandRaised={p.isHandRaised}
-          volumeLevel={p.volumeLevel}
-          isLocal={!!p.isLocal}
-          profileUrl={p.avatar}
-          className="w-full h-full rounded-lg"
-          name={p.name}
-        />
-      </div>
-    );
-  };
-
   const renderLayout = () => {
     const count = allParticipants.length;
 
@@ -413,14 +395,34 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
           <div className="flex-1 min-h-0">
              <div className="w-full h-full rounded-lg relative">
-               <TileWithOverlay p={activeScreenSharer} />
+               <VideoTile
+                  stream={activeScreenSharer.stream}
+                  isCameraOn={!activeScreenSharer.isCamOff}
+                  isMicOn={!activeScreenSharer.isMicOff}
+                  isHandRaised={activeScreenSharer.isHandRaised}
+                  volumeLevel={activeScreenSharer.volumeLevel}
+                  isLocal={!!activeScreenSharer.isLocal}
+                  profileUrl={activeScreenSharer.avatar}
+                  name={activeScreenSharer.name}
+                  isScreenSharing={activeScreenSharer.isScreenSharing}
+                />
              </div>
           </div>
           {otherParticipants.length > 0 && (
             <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
               {otherParticipants.map(p => (
                 <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
-                   <TileWithOverlay p={p} />
+                   <VideoTile
+                      stream={p.stream}
+                      isCameraOn={!p.isCamOff}
+                      isMicOn={!p.isMicOff}
+                      isHandRaised={p.isHandRaised}
+                      volumeLevel={p.volumeLevel}
+                      isLocal={!!p.isLocal}
+                      profileUrl={p.avatar}
+                      name={p.name}
+                      isScreenSharing={p.isScreenSharing}
+                    />
                 </div>
               ))}
             </div>
@@ -433,7 +435,19 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const p = allParticipants[0];
       return (
         <div className="w-full h-full flex items-center justify-center p-4">
-          <div className="w-full h-full rounded-lg relative"><TileWithOverlay p={p} /></div>
+          <div className="w-full h-full rounded-lg relative">
+            <VideoTile
+              stream={p.stream}
+              isCameraOn={!p.isCamOff}
+              isMicOn={!p.isMicOff}
+              isHandRaised={p.isHandRaised}
+              volumeLevel={p.volumeLevel}
+              isLocal={!!p.isLocal}
+              profileUrl={p.avatar}
+              name={p.name}
+              isScreenSharing={p.isScreenSharing}
+            />
+          </div>
         </div>
       );
     }
@@ -443,9 +457,35 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const local = allParticipants.find((u) => u.isLocal);
       return (
         <div className="w-full h-full relative p-4">
-          {remote && <div className="w-full h-full rounded-lg relative"><TileWithOverlay p={remote} /></div>}
+          {remote && 
+            <div className="w-full h-full rounded-lg relative">
+              <VideoTile
+                stream={remote.stream}
+                isCameraOn={!remote.isCamOff}
+                isMicOn={!remote.isMicOff}
+                isHandRaised={remote.isHandRaised}
+                volumeLevel={remote.volumeLevel}
+                isLocal={!!remote.isLocal}
+                profileUrl={remote.avatar}
+                name={remote.name}
+                isScreenSharing={remote.isScreenSharing}
+              />
+            </div>
+          }
           {local && 
-            <div className="absolute bottom-6 right-6 w-48 h-32 z-20"><TileWithOverlay p={local} /></div>
+            <div className="absolute bottom-6 right-6 w-48 h-32 z-20">
+              <VideoTile
+                stream={local.stream}
+                isCameraOn={!local.isCamOff}
+                isMicOn={!local.isMicOff}
+                isHandRaised={local.isHandRaised}
+                volumeLevel={local.volumeLevel}
+                isLocal={!!local.isLocal}
+                profileUrl={local.avatar}
+                name={local.name}
+                isScreenSharing={local.isScreenSharing}
+              />
+            </div>
           }
         </div>
       );
@@ -462,7 +502,19 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         }}
       >
         {allParticipants.map((p) => (
-          <div key={p.id} className="w-full h-full rounded-lg relative"><TileWithOverlay p={p} /></div>
+          <div key={p.id} className="w-full h-full rounded-lg relative">
+            <VideoTile
+              stream={p.stream}
+              isCameraOn={!p.isCamOff}
+              isMicOn={!p.isMicOff}
+              isHandRaised={p.isHandRaised}
+              volumeLevel={p.volumeLevel}
+              isLocal={!!p.isLocal}
+              profileUrl={p.avatar}
+              name={p.name}
+              isScreenSharing={p.isScreenSharing}
+            />
+          </div>
         ))}
       </div>
     );

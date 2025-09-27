@@ -1,7 +1,7 @@
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Mic, MicOff, Video, VideoOff, Hand, ScreenShare } from "lucide-react";
+import { MicOff, Mic, VideoOff, Video, Hand, ScreenShare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,7 +18,7 @@ type Props = {
   name?: string;
 };
 
-function VideoTileComponent({
+const VideoTile = ({
   stream,
   isCameraOn,
   isMicOn = true,
@@ -30,11 +30,12 @@ function VideoTileComponent({
   volumeLevel = 0,
   isScreenSharing = false,
   name = "User",
-}: Props) {
+}: Props) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const volumeBarRef = useRef<HTMLDivElement | null>(null);
 
-  // --- always bind the incoming stream to the <video> element reliably ---
+  // Bind stream only once and never reset video on state changes
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
@@ -42,8 +43,7 @@ function VideoTileComponent({
     if (stream && stream !== streamRef.current) {
       streamRef.current = stream;
       videoEl.srcObject = stream;
-      const p = videoEl.play();
-      if (p && typeof p.catch === "function") p.catch(() => {});
+      videoEl.play().catch(() => {});
     }
 
     if (!stream && videoEl.srcObject) {
@@ -52,69 +52,91 @@ function VideoTileComponent({
     }
   }, [stream]);
 
-  // --- show/hide the video via opacity ---
+  // Only toggle visibility, never re-render video element
   useEffect(() => {
     const videoEl = videoRef.current;
-    if (!videoEl) return;
-
-    if (isCameraOn && stream) {
-      videoEl.style.opacity = "1";
-      videoEl.style.pointerEvents = "auto";
-      const p = videoEl.play();
-      if (p && typeof p.catch === "function") p.catch(() => {});
-    } else {
-      videoEl.style.opacity = "0";
-      videoEl.style.pointerEvents = "none";
+    if (videoEl) {
+      videoEl.style.opacity = isCameraOn && stream ? "1" : "0";
+      videoEl.style.pointerEvents = isCameraOn && stream ? "auto" : "none";
     }
   }, [isCameraOn, stream]);
 
+  // Smooth mic volume animation without re-rendering
+  useEffect(() => {
+    if (volumeBarRef.current) {
+      volumeBarRef.current.style.width = `${Math.min(1, volumeLevel) * 100}%`;
+    }
+  }, [volumeLevel]);
+
   return (
-    <div className={cn(`relative bg-gray-800 overflow-hidden`, className)} style={{ minHeight: 80 }}>
+    <div className={cn("relative bg-gray-900 rounded-lg overflow-hidden", className)}>
+      {/* Video */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted={isLocal}
-        className={`w-full h-full object-cover transition-opacity duration-150 ${mirror ? "scale-x-[-1]" : ""}`}
-        style={{ display: "block", width: "100%", height: "100%", opacity: (isCameraOn && stream) ? 1 : 0 }}
+        className={`w-full h-full object-cover transition-opacity duration-200 ${mirror ? "scale-x-[-1]" : ""}`}
+        style={{ opacity: isCameraOn && stream ? 1 : 0 }}
       />
 
+      {/* Avatar fallback */}
       {(!isCameraOn || !stream) && (
         <div className="absolute inset-0 flex items-center justify-center">
-            <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-                <AvatarImage src={profileUrl || undefined} alt="avatar" />
-                <AvatarFallback className="text-4xl">{name.charAt(0)}</AvatarFallback>
-            </Avatar>
+          <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
+            <AvatarImage src={profileUrl || undefined} alt="avatar" />
+            <AvatarFallback className="text-4xl">{name.charAt(0)}</AvatarFallback>
+          </Avatar>
         </div>
       )}
-      
-      {/* --- OVERLAY --- Moved from MeetingClient.tsx into here */}
-      <div className="absolute left-3 bottom-3 flex items-center gap-2 bg-black/40 px-2 py-1 rounded-md text-white text-sm font-medium">
-          <span>{name}</span>
-          {isMicOn ? <Mic className="h-4 w-4 text-green-400" /> : <MicOff className="h-4 w-4 text-red-400" />}
+
+      {/* Overlay UI */}
+      <div className="absolute left-3 bottom-3 right-3 flex items-center justify-between bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-sm">
+        {/* Avatar + Name */}
+        <div className="flex items-center gap-2 min-w-0">
+          <Avatar className="w-8 h-8 shrink-0">
+            <AvatarImage src={profileUrl || undefined} alt={name} />
+            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div className="font-medium truncate">{name}</div>
+        </div>
+
+        {/* Status icons */}
+        <div className="flex items-center gap-3 shrink-0 ml-2">
+          {/* Mic */}
+          <div className="flex items-center gap-1">
+            {isMicOn ? (
+              <Mic className="h-4 w-4 text-green-400" />
+            ) : (
+              <MicOff className="h-4 w-4 text-red-400" />
+            )}
+            {isMicOn && (
+              <div className="w-12 h-2 bg-gray-700 rounded overflow-hidden">
+                <div
+                  ref={volumeBarRef}
+                  className="h-2 bg-green-400 transition-all duration-150"
+                  style={{ width: `0%` }} // Initial width, will be updated by useEffect
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Camera */}
+          {isCameraOn ? (
+            <Video className="h-4 w-4 text-white" />
+          ) : (
+            <VideoOff className="h-4 w-4 text-red-400" />
+          )}
+
+          {/* Hand Raised */}
           {isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
+
+          {/* Screen Sharing */}
+          {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
+        </div>
       </div>
-       {isMicOn && volumeLevel > 0.01 && (
-        <div 
-          className="absolute inset-0 rounded-lg border-2 transition-colors duration-100 pointer-events-none"
-          style={{ borderColor: `rgba(50, 205, 50, ${Math.min(volumeLevel * 2, 1)})` }} 
-        />
-      )}
     </div>
   );
-}
+};
 
-export default React.memo(
-  VideoTileComponent,
-  (prev, next) =>
-    prev.stream === next.stream &&
-    prev.isCameraOn === next.isCameraOn &&
-    prev.isMicOn === next.isMicOn &&
-    prev.isHandRaised === next.isHandRaised &&
-    prev.volumeLevel === next.volumeLevel &&
-    prev.isScreenSharing === next.isScreenSharing &&
-    prev.profileUrl === next.profileUrl &&
-    prev.mirror === next.mirror &&
-    prev.isLocal === next.isLocal &&
-    prev.name === next.name
-);
+export default React.memo(VideoTile);
