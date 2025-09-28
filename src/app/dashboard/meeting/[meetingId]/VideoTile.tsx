@@ -166,6 +166,12 @@ const VideoTile = ({
         className={`w-full h-full object-cover transition-opacity duration-200 ${mirror ? "scale-x-[-1]" : ""}`}
         style={{ opacity: isCameraOn && stream ? 1 : 0 }}
       />
+      
+      {isHandRaised && (
+        <div className="absolute top-3 left-3 z-20 bg-yellow-500 text-white p-2 rounded-full shadow-md flex items-center justify-center">
+          <Hand className="h-5 w-5" />
+        </div>
+      )}
 
       {/* Camera icon top-right */}
       <div className="absolute top-3 right-3 z-30">
@@ -184,7 +190,7 @@ const VideoTile = ({
       {(!isCameraOn || !stream) && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <Avatar className="w-28 h-28 border-4 border-background shadow-lg">
-            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
             <AvatarFallback className="text-5xl">{name?.charAt(0) ?? "U"}</AvatarFallback>
           </Avatar>
         </div>
@@ -214,8 +220,8 @@ const VideoTile = ({
             )}
           </div>
 
-          {/* hand */}
-          {isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />}
+          {/* hand - Now moved to top-left */}
+          {/* {isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />} */}
 
           {/* screen share */}
           {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}

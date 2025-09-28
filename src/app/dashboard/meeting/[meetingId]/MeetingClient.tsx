@@ -1,6 +1,4 @@
-// full file: meeting client (replaces previous MeetingClient.tsx)
-// — only layout/pinning/interaction logic added, media/rtc logic preserved
-
+// src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -649,8 +647,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
             <Button
               onClick={handleToggleHandRaise}
-              className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                isHandRaised ? "bg-yellow-500 hover:bg-yellow-600" : "bg-secondary/50 hover:bg-secondary/70 text-white"
+              className={cn(
+                "h-14 w-14 rounded-full flex items-center justify-center transition-colors",
+                isHandRaised ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"
               )}
               aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
             >
