@@ -674,8 +674,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <Button
               onClick={handleToggleHandRaise}
               className={cn(
-                "h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-secondary hover:bg-secondary/80"
+                "h-14 w-14 rounded-full flex items-center justify-center transition-colors text-white",
+                isHandRaised
+                  ? "bg-[hsl(98,60%,50%)] hover:bg-[hsl(98,60%,45%)]" // Green when raised
+                  : "bg-[hsl(0,72%,51%)] hover:bg-[hsl(0,72%,45%)]"  // Red when not raised
               )}
               aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
             >
