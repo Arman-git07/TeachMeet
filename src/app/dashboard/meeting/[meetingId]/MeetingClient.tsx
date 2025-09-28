@@ -559,7 +559,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // >=3 participants: responsive grid (cols = ceil(sqrt(n))) with aspect ratio
+    // >=3 participants: responsive grid (cols = ceil(sqrt(n)))
     const cols = Math.ceil(Math.sqrt(count));
     return (
       <div
@@ -675,3 +675,4 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
+```
