@@ -52,6 +52,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
 export default function PreJoinPage() {
   const searchParams = useSearchParams();
@@ -223,6 +225,26 @@ export default function PreJoinPage() {
     }
 
     setIsCreatingMeeting(true);
+
+    try {
+        const rawMeetings = localStorage.getItem(STARTED_MEETINGS_KEY);
+        let meetings = [];
+        if (rawMeetings) {
+            try {
+                const now = Date.now();
+                meetings = JSON.parse(rawMeetings).filter((m: any) => m && m.id && m.startedAt && (now - m.startedAt < THIRTY_MINUTES_IN_MS));
+            } catch (e) {
+                console.error("Error parsing stored meetings, resetting.", e);
+            }
+        }
+        if (!meetings.some((m: any) => m.id === meetingId)) {
+            meetings.push({ id: meetingId, title: topic.trim(), startedAt: Date.now() });
+            localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings));
+            window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+        }
+    } catch (e) {
+        console.error("Failed to update localStorage for ongoing meetings", e);
+    }
     
     // Redirect to the meeting page with camera and mic status as query parameters.
     const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;

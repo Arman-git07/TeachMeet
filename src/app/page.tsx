@@ -10,6 +10,7 @@ import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Lo
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 
 
 export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement';
@@ -63,8 +64,9 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   announcement: Megaphone,
 };
 
+// Updated itemLinks to handle meeting re-join logic
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
-  meeting: (id, item) => `/dashboard/meeting/${id}?topic=${encodeURIComponent(item.title)}`,
+  meeting: (id, item) => `/dashboard/meeting/prejoin?meetingId=${id}&topic=${encodeURIComponent(item.title)}`,
   document: (id) => `/dashboard/documents`,
   recording: (id) => `/dashboard/recordings`,
   chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
@@ -80,6 +82,7 @@ export default function HomePage() {
 
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   
   const loadActivities = useCallback(() => {
     setIsLoading(true);
@@ -248,10 +251,24 @@ export default function HomePage() {
                   const Icon = itemIcons[item.type];
                   const rawId = item.id;
                   const link = itemLinks[item.type](rawId, item);
+                  const isMeeting = item.type === 'meeting';
+
+                  const handleClick = (e: React.MouseEvent) => {
+                    if (isMeeting) {
+                      e.preventDefault();
+                      if (!user) {
+                        router.push(`/auth/signin?redirect=${encodeURIComponent(link)}`);
+                      } else {
+                        router.push(link);
+                      }
+                    }
+                  };
+
                   return (
                     <li key={item.id} className="flex items-center gap-2">
                       <Link
                         href={link}
+                        onClick={handleClick}
                         className="w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow"
                       >
                         <Icon className="mr-3 h-5 w-5 text-primary/80" />
