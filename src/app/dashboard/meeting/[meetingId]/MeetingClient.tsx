@@ -26,6 +26,14 @@ type Participant = {
   volumeLevel?: number;
 };
 
+type LiveParticipantInfo = {
+    name: string;
+    photoURL?: string;
+    isHandRaised?: boolean;
+    isScreenSharing?: boolean;
+};
+
+
 type Props = { 
   meetingId: string; 
   userId: string;
@@ -44,7 +52,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [loadingMedia, setLoadingMedia] = useState(true);
 
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
-  const [liveParticipants, setLiveParticipants] = useState<Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>>(new Map());
+  const [liveParticipants, setLiveParticipants] = useState<Map<string, LiveParticipantInfo>>(new Map());
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
@@ -110,14 +118,32 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     // run once on mount
   }, [initialCamOn, initialMicOn, toast]);
 
+  const prevLiveParticipantsRef = useRef<Map<string, LiveParticipantInfo>>();
+  useEffect(() => {
+      if (prevLiveParticipantsRef.current) {
+          liveParticipants.forEach((participant, id) => {
+              const prevParticipant = prevLiveParticipantsRef.current?.get(id);
+              // Check if hand was just raised and it's not the local user
+              if (participant.isHandRaised && (!prevParticipant || !prevParticipant.isHandRaised) && id !== userId) {
+                  toast({
+                      title: `👋 Hand Raised`,
+                      description: `${participant.name || 'Someone'} raised their hand.`,
+                  });
+              }
+          });
+      }
+      prevLiveParticipantsRef.current = liveParticipants;
+  }, [liveParticipants, userId, toast]);
+
+
   // participants metadata
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
     const unsubscribe = onSnapshot(participantsCol, (snapshot) => {
-      const newParticipants = new Map<string, {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean}>();
+      const newParticipants = new Map<string, LiveParticipantInfo>();
       snapshot.forEach(doc => {
-        newParticipants.set(doc.id, doc.data() as {name: string, photoURL?: string, isHandRaised?: boolean, isScreenSharing?: boolean});
+        newParticipants.set(doc.id, doc.data() as LiveParticipantInfo);
       });
       setLiveParticipants(newParticipants);
     });
@@ -649,7 +675,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               onClick={handleToggleHandRaise}
               className={cn(
                 "h-14 w-14 rounded-full flex items-center justify-center transition-colors",
-                isHandRaised ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"
+                isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-secondary hover:bg-secondary/80"
               )}
               aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
             >
