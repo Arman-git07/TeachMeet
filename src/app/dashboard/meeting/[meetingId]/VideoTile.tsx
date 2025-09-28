@@ -167,12 +167,6 @@ const VideoTile = ({
         style={{ opacity: isCameraOn && stream ? 1 : 0 }}
       />
       
-      {isHandRaised && (
-        <div className="absolute top-3 left-3 z-20 bg-yellow-500 text-white p-2 rounded-full shadow-md flex items-center justify-center">
-          <Hand className="h-5 w-5" />
-        </div>
-      )}
-
       {/* Camera icon top-right */}
       <div className="absolute top-3 right-3 z-30">
         {isCameraOn ? (
@@ -220,9 +214,6 @@ const VideoTile = ({
             )}
           </div>
 
-          {/* hand - Now moved to top-left */}
-          {/* {isHandRaised && <Hand className="h-4 w-4 text-yellow-400" />} */}
-
           {/* screen share */}
           {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
         </div>
@@ -238,6 +229,13 @@ const VideoTile = ({
         >
           {isPinned ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
+      )}
+
+      {/* Hand Raised Icon (Top-Left) */}
+      {isHandRaised && (
+        <div className="absolute top-3 left-3 z-50 bg-[hsl(98,60%,50%)] p-2 rounded-full shadow-lg flex items-center justify-center">
+          <Hand className="h-5 w-5 text-white" />
+        </div>
       )}
     </div>
   );
