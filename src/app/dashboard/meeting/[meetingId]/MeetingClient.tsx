@@ -1,4 +1,6 @@
-// src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
+// full file: meeting client (replaces previous MeetingClient.tsx)
+// — only layout/pinning/interaction logic added, media/rtc logic preserved
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -65,9 +67,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   // pin / fullscreen (app-level)
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
-  // ... (keep your init media, rtc, analysers, and controls exactly as before)
-  // I left unchanged all the code you provided earlier for media init, analysers, rtc, toggleMic/toggleCamera, screen share etc.
-  // Only layout/pin handling and renderLayout below were adjusted.
   // initialization and RTC logic (kept intact)
   useEffect(() => {
     let mounted = true;
@@ -274,7 +273,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     });
   }, [remoteStreams]);
 
-  // Build participants list (same as you had)
   const allParticipants: Participant[] = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
     const self: Participant = {
@@ -675,4 +673,3 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
-```

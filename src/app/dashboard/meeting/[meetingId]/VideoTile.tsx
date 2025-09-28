@@ -184,7 +184,7 @@ const VideoTile = ({
       {(!isCameraOn || !stream) && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <Avatar className="w-28 h-28 border-4 border-background shadow-lg">
-            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
             <AvatarFallback className="text-5xl">{name?.charAt(0) ?? "U"}</AvatarFallback>
           </Avatar>
         </div>
