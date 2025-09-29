@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -240,8 +239,17 @@ const VideoTile = ({
 
       {/* Hand Raised Icon (Top-Left) */}
       {isHandRaised && (
-        <div className="absolute top-3 left-3 z-50 bg-[hsl(98,60%,50%)] p-2 rounded-full shadow-lg flex items-center justify-center">
-          <Hand className="h-5 w-5 text-white" />
+        <div
+          className="absolute top-3 left-3 z-50"
+          style={{ pointerEvents: 'none' }}
+          title="Hand raised"
+        >
+          <div
+            className="rounded-full p-2 shadow-md flex items-center justify-center animate-pulse"
+            style={{ backgroundColor: 'hsl(98 60% 50%)' }}
+          >
+            <Hand className="h-5 w-5 text-white" />
+          </div>
         </div>
       )}
     </div>

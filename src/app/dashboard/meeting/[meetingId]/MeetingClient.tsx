@@ -118,22 +118,46 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     // run once on mount
   }, [initialCamOn, initialMicOn, toast]);
 
-  const prevLiveParticipantsRef = useRef<Map<string, LiveParticipantInfo>>();
+  // place near other useEffects (after you set liveParticipants)
+  const previousRaisedHands = useRef<Set<string>>(new Set());
+  const firstParticipantsSnapshot = useRef(true);
+
   useEffect(() => {
-      if (prevLiveParticipantsRef.current) {
-          liveParticipants.forEach((participant, id) => {
-              const prevParticipant = prevLiveParticipantsRef.current?.get(id);
-              // Check if hand was just raised and it's not the local user
-              if (participant.isHandRaised && (!prevParticipant || !prevParticipant.isHandRaised) && id !== userId) {
-                  toast({
-                      title: `👋 Hand Raised`,
-                      description: `${participant.name || 'Someone'} raised their hand.`,
-                  });
-              }
-          });
-      }
-      prevLiveParticipantsRef.current = liveParticipants;
-  }, [liveParticipants, userId, toast]);
+    // wait until we have participants data
+    if (!liveParticipants || liveParticipants.size === 0) return;
+
+    // on first load: populate previousRaisedHands but do not notify
+    if (firstParticipantsSnapshot.current) {
+        const initial = new Set<string>();
+        liveParticipants.forEach((meta, id) => {
+        if (meta?.isHandRaised) initial.add(id);
+        });
+        previousRaisedHands.current = initial;
+        firstParticipantsSnapshot.current = false;
+        return;
+    }
+
+    // compare and notify for newly raised hands
+    liveParticipants.forEach((meta, id) => {
+        const nowRaised = !!meta?.isHandRaised;
+        const wasRaised = previousRaisedHands.current.has(id);
+
+        if (nowRaised && !wasRaised) {
+            // show toast to everyone (safe, non-blocking)
+            toast({
+                title: "Hand Raised",
+                description: `${meta?.name || 'Someone'} raised their hand.`,
+            });
+        }
+    });
+
+    // rebuild the previous set to the current raised set
+    const nextSet = new Set<string>();
+    liveParticipants.forEach((meta, id) => {
+        if (meta?.isHandRaised) nextSet.add(id);
+    });
+    previousRaisedHands.current = nextSet;
+  }, [liveParticipants, toast]);
 
 
   // participants metadata
