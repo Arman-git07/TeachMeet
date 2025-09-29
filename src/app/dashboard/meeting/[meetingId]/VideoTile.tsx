@@ -163,6 +163,7 @@ const VideoTile = ({
       onDoubleClick={handleDouble}
       className={cn("relative bg-black rounded-lg overflow-visible w-full h-full", className, draggable ? "cursor-grab" : "")}
       role="group"
+      style={{ overflow: "visible" }}
     >
       {/* Video */}
       <video
@@ -176,11 +177,15 @@ const VideoTile = ({
 
       {isHandRaised && (
         <div
-            className="absolute top-3 left-3 flex items-center justify-center bg-[hsl(98,60%,50%)] text-white p-2 rounded-full shadow-xl z-[9999] pointer-events-none"
-            style={{ zIndex: 9999 }}
-            title="Hand Raised"
+          className="absolute top-2 left-2 flex items-center justify-center bg-[hsl(98,60%,50%)] text-white p-2 rounded-full shadow-2xl pointer-events-none"
+          style={{
+            zIndex: 999999,         // 👈 ensure it's always on top
+            position: "absolute",
+            overflow: "visible",
+          }}
+          title="Hand Raised"
         >
-            <Hand className="h-6 w-6" />
+          <Hand className="h-5 w-5" />
         </div>
       )}
       
