@@ -14,8 +14,11 @@ const nextConfig = {
   // },
   experimental: {
     optimizePackageImports: ['lucide-react'],
+    fontLoaders: [
+      { loader: '@next/font/google', options: { subsets: ['latin'] } },
+    ],
   },
 };
 
-// Incrementing this comment to force a cache clear: 8
+// Incrementing this comment to force a cache clear: 9
 module.exports = nextConfig;
