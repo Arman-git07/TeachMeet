@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,7 +12,6 @@ type Props = {
   isHandRaised?: boolean;
   isLocal?: boolean;
   profileUrl?: string | null;
-  mirror?: boolean;
   className?: string;
   volumeLevel?: number; // throttled (150ms) from parent
   isScreenSharing?: boolean;
@@ -31,7 +31,6 @@ const VideoTile = ({
   isHandRaised = false,
   isLocal = false,
   profileUrl = null,
-  mirror = false,
   className = "",
   volumeLevel = 0,
   isScreenSharing = false,
@@ -44,6 +43,14 @@ const VideoTile = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const [mirror, setMirror] = useState(false);
+
+  useEffect(() => {
+    if (isLocal) {
+      setMirror(localStorage.getItem('teachmeet-camera-mirror') === 'true');
+    }
+  }, [isLocal]);
 
   // lightweight DOM driven mic pulse (no heavy re-renders)
   const micIconRef = useRef<SVGElement | null>(null);

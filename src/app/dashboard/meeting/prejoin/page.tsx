@@ -120,20 +120,20 @@ export default function PreJoinPage() {
         
         const desiredMicState = localStorage.getItem('teachmeet-mic-default') !== 'off';
         const desiredCamState = localStorage.getItem('teachmeet-camera-default') !== 'off';
-        
+        const savedMirror = localStorage.getItem('teachmeet-camera-mirror') === 'true';
+
         setIsMicOn(desiredMicState);
         setIsCameraOn(desiredCamState);
+        setMirrorVideo(savedMirror);
 
         stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
         stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
         
-        // Persist initial state for meeting page sync
         localStorage.setItem("micState", desiredMicState ? "true" : "false");
       } catch (error) {
         console.error('Error accessing camera:', error);
         setHasCameraPermission(false);
         setIsCameraOn(false);
-        // Try getting mic only
          try {
             const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             if (!mounted) return;
@@ -154,7 +154,6 @@ export default function PreJoinPage() {
 
     getCameraPermission();
 
-    // Listen for meeting page updates
     const handleStorage = (e: StorageEvent) => {
         if (e.key === "micState") {
             const state = e.newValue === "true";
@@ -166,7 +165,6 @@ export default function PreJoinPage() {
     };
     window.addEventListener("storage", handleStorage);
 
-    // Cleanup function: stop all tracks when the component unmounts
     return () => {
       mounted = false;
       if (localStream) {
@@ -174,8 +172,12 @@ export default function PreJoinPage() {
       }
       window.removeEventListener("storage", handleStorage);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
+
+  const handleMirrorToggle = (checked: boolean) => {
+    setMirrorVideo(checked);
+    localStorage.setItem('teachmeet-camera-mirror', String(checked));
+  };
 
   const toggleCamera = () => {
     if (!localStream) return;
@@ -246,7 +248,6 @@ export default function PreJoinPage() {
         console.error("Failed to update localStorage for ongoing meetings", e);
     }
     
-    // Redirect to the meeting page with camera and mic status as query parameters.
     const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
     router.push(meetingPath);
   };
@@ -366,7 +367,7 @@ export default function PreJoinPage() {
               <Switch
                 id="mirror-video"
                 checked={mirrorVideo}
-                onCheckedChange={setMirrorVideo}
+                onCheckedChange={handleMirrorToggle}
               />
             </div>
             <div className="flex items-center justify-between">
