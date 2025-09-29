@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -44,6 +45,8 @@ const VideoTile = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [mirror, setMirror] = useState(false);
+
+  console.log("👋 Hand Raised status for", name, ":", isHandRaised);
 
   useEffect(() => {
     if (isLocal) {
