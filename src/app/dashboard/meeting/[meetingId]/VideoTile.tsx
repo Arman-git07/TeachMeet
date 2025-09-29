@@ -46,8 +46,6 @@ const VideoTile = ({
 
   const [mirror, setMirror] = useState(false);
 
-  console.log("👋 Hand Raised status for", name, ":", isHandRaised);
-
   useEffect(() => {
     if (isLocal) {
       setMirror(localStorage.getItem('teachmeet-camera-mirror') === 'true');
