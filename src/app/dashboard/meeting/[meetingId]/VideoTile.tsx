@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -163,7 +162,7 @@ const VideoTile = ({
     <div
       ref={containerRef}
       onDoubleClick={handleDouble}
-      className={cn("relative bg-black rounded-lg overflow-visible", className, draggable ? "cursor-grab" : "")}
+      className={cn("relative bg-black rounded-lg overflow-visible w-full h-full", className, draggable ? "cursor-grab" : "")}
       role="group"
     >
       {/* Video */}
@@ -178,16 +177,11 @@ const VideoTile = ({
 
       {isHandRaised && (
         <div
-          className="absolute top-4 left-4 flex items-center justify-center bg-[hsl(98,60%,50%)] text-white p-2 rounded-full shadow-xl z-[9999] pointer-events-none"
-          style={{
-            position: "absolute",
-            top: "1rem",
-            left: "1rem",
-            zIndex: 9999,
-          }}
-          title="Hand Raised"
+            className="absolute top-3 left-3 flex items-center justify-center bg-[hsl(98,60%,50%)] text-white p-2 rounded-full shadow-xl z-[9999] pointer-events-none"
+            style={{ zIndex: 9999 }}
+            title="Hand Raised"
         >
-          <Hand className="h-6 w-6" />
+            <Hand className="h-6 w-6" />
         </div>
       )}
       
