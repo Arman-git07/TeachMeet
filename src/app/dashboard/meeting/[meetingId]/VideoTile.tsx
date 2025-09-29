@@ -163,7 +163,7 @@ const VideoTile = ({
     <div
       ref={containerRef}
       onDoubleClick={handleDouble}
-      className={cn("relative bg-black rounded-lg overflow-hidden", className, draggable ? "cursor-grab" : "")}
+      className={cn("relative bg-black rounded-lg overflow-visible", className, draggable ? "cursor-grab" : "")}
       role="group"
     >
       {/* Video */}
@@ -172,23 +172,22 @@ const VideoTile = ({
         autoPlay
         playsInline
         muted={isLocal}
-        className={`w-full h-full object-cover transition-opacity duration-200 ${mirror ? "scale-x-[-1]" : ""}`}
+        className={`w-full h-full object-cover transition-opacity duration-200 rounded-lg ${mirror ? "scale-x-[-1]" : ""}`}
         style={{ opacity: isCameraOn && stream ? 1 : 0 }}
       />
 
-      {/* Hand Raised Icon (Top-Left) */}
       {isHandRaised && (
         <div
-          className="absolute top-3 left-3 z-50"
-          style={{ pointerEvents: 'none' }}
-          title="Hand raised"
+          className="absolute top-4 left-4 flex items-center justify-center bg-[hsl(98,60%,50%)] text-white p-2 rounded-full shadow-xl z-[9999] pointer-events-none"
+          style={{
+            position: "absolute",
+            top: "1rem",
+            left: "1rem",
+            zIndex: 9999,
+          }}
+          title="Hand Raised"
         >
-          <div
-            className="rounded-full p-2 shadow-md flex items-center justify-center animate-pulse"
-            style={{ backgroundColor: 'hsl(98 60% 50%)' }}
-          >
-            <Hand className="h-5 w-5 text-white" />
-          </div>
+          <Hand className="h-6 w-6" />
         </div>
       )}
       
