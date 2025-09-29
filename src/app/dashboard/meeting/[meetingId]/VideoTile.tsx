@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -172,6 +173,22 @@ const VideoTile = ({
         className={`w-full h-full object-cover transition-opacity duration-200 ${mirror ? "scale-x-[-1]" : ""}`}
         style={{ opacity: isCameraOn && stream ? 1 : 0 }}
       />
+
+      {/* Hand Raised Icon (Top-Left) */}
+      {isHandRaised && (
+        <div
+          className="absolute top-3 left-3 z-50"
+          style={{ pointerEvents: 'none' }}
+          title="Hand raised"
+        >
+          <div
+            className="rounded-full p-2 shadow-md flex items-center justify-center animate-pulse"
+            style={{ backgroundColor: 'hsl(98 60% 50%)' }}
+          >
+            <Hand className="h-5 w-5 text-white" />
+          </div>
+        </div>
+      )}
       
       {/* Camera icon top-right */}
       <div className="absolute top-3 right-3 z-30">
@@ -237,21 +254,6 @@ const VideoTile = ({
         </button>
       )}
 
-      {/* Hand Raised Icon (Top-Left) */}
-      {isHandRaised && (
-        <div
-          className="absolute top-3 left-3 z-50"
-          style={{ pointerEvents: 'none' }}
-          title="Hand raised"
-        >
-          <div
-            className="rounded-full p-2 shadow-md flex items-center justify-center animate-pulse"
-            style={{ backgroundColor: 'hsl(98 60% 50%)' }}
-          >
-            <Hand className="h-5 w-5 text-white" />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

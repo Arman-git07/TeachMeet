@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -426,7 +427,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   // toggle pin / fullscreen for a participant (app-level pin)
   const togglePin = useCallback((id: string) => {
-    setPinnedId(prev => prev === id ? null : id);
+    setPinnedId(prev => prev === id ? null : prev);
   }, []);
 
   const renderLayout = () => {
