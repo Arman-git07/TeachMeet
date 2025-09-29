@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -161,34 +160,54 @@ const VideoTile = ({
     <div
       ref={containerRef}
       onDoubleClick={handleDouble}
-      className={cn("relative bg-black rounded-lg overflow-visible w-full h-full", className, draggable ? "cursor-grab" : "")}
+      className={cn("relative w-full h-full bg-black rounded-lg", className, draggable ? "cursor-grab" : "")}
       role="group"
-      style={{ overflow: "visible" }}
+      style={{
+        position: "relative",
+        overflow: "visible",
+        zIndex: 0,
+       }}
     >
-      {/* Video */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={isLocal}
-        className={`w-full h-full object-cover transition-opacity duration-200 rounded-lg ${mirror ? "scale-x-[-1]" : ""}`}
-        style={{ opacity: isCameraOn && stream ? 1 : 0 }}
-      />
-
       {isHandRaised && (
         <div
           className="absolute top-2 left-2 flex items-center justify-center bg-[hsl(98,60%,50%)] text-white p-2 rounded-full shadow-2xl pointer-events-none"
           style={{
-            zIndex: 999999,         // 👈 ensure it's always on top
             position: "absolute",
+            zIndex: 999999,
             overflow: "visible",
+            pointerEvents: "none",
           }}
           title="Hand Raised"
         >
-          <Hand className="h-5 w-5" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="h-5 w-5"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M7 11V5a2 2 0 114 0v6m0 0V4a2 2 0 114 0v7m0 0V6a2 2 0 114 0v5m0 0v-2a2 2 0 114 0v2m-8 0h8"
+            />
+          </svg>
         </div>
       )}
-      
+
+      {/* Video */}
+      <div className="relative w-full h-full">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isLocal}
+          className={`w-full h-full object-cover transition-opacity duration-200 rounded-lg ${mirror ? "scale-x-[-1]" : ""}`}
+          style={{ opacity: isCameraOn && stream ? 1 : 0, position: "relative", zIndex: 10 }}
+        />
+      </div>
+
       {/* Camera icon top-right */}
       <div className="absolute top-3 right-3 z-30">
         {isCameraOn ? (
