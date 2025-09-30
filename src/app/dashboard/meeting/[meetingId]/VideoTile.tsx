@@ -102,7 +102,7 @@ const VideoTile: React.FC<VideoTileProps> = React.memo(
             </div>
           )}
         </div>
-
+    
         {/* ✋ Hand Raised Icon (Top-Left) */}
         {isHandRaised && (
           <div
@@ -115,12 +115,12 @@ const VideoTile: React.FC<VideoTileProps> = React.memo(
             <Hand className="h-5 w-5 text-white drop-shadow-[0_0_6px_rgba(0,0,0,0.7)]" />
           </div>
         )}
-
+    
         {/* Camera Status (Top-Right) */}
         <div className="absolute top-3 right-3 z-50 p-1 rounded-md bg-black/50">
           {isCameraOn ? <Video className="h-5 w-5 text-white" /> : <VideoOff className="h-5 w-5 text-red-400" />}
         </div>
-
+    
         {/* Bottom Overlay: Name + Mic + ScreenShare */}
         <div className="absolute left-3 bottom-3 z-50 flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
           <Avatar className="w-7 h-7 shrink-0">
@@ -133,7 +133,7 @@ const VideoTile: React.FC<VideoTileProps> = React.memo(
             {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
           </div>
         </div>
-
+    
         {/* Pin Button */}
         {onTogglePin && (
           <button
