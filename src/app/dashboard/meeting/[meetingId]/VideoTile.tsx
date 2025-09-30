@@ -151,7 +151,7 @@ const VideoTile = ({
     };
   }, [draggable]);
 
-  const handleDouble = (e: React.MouseEvent) => {
+  const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDoubleClick?.();
   };
@@ -159,40 +159,21 @@ const VideoTile = ({
   return (
     <div
       ref={containerRef}
-      onDoubleClick={handleDouble}
-      className={cn("relative w-full h-full bg-black rounded-lg", className, draggable ? "cursor-grab" : "")}
+      onDoubleClick={handleDoubleClick}
+      className={cn(
+        "relative bg-black rounded-lg overflow-visible", // ✅ overflow-visible to fix clipping
+        className,
+        draggable ? "cursor-grab active:cursor-grabbing" : ""
+      )}
       role="group"
-      style={{
-        position: "relative",
-        overflow: "visible",
-        zIndex: 0,
-       }}
     >
+      {/* ✋ Hand Raised Icon (Top-Left) */}
       {isHandRaised && (
         <div
-          className="absolute top-2 left-2 flex items-center justify-center bg-[hsl(98,60%,50%)] text-white p-2 rounded-full shadow-2xl pointer-events-none"
-          style={{
-            position: "absolute",
-            zIndex: 999999,
-            overflow: "visible",
-            pointerEvents: "none",
-          }}
+          className="absolute top-3 left-3 p-2 rounded-full bg-[hsl(98,60%,50%)] shadow-lg z-[9999] flex items-center justify-center pointer-events-none"
           title="Hand Raised"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className="h-5 w-5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M7 11V5a2 2 0 114 0v6m0 0V4a2 2 0 114 0v7m0 0V6a2 2 0 114 0v5m0 0v-2a2 2 0 114 0v2m-8 0h8"
-            />
-          </svg>
+          <Hand className="h-5 w-5 text-white" />
         </div>
       )}
 
