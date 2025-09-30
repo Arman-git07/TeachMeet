@@ -69,13 +69,13 @@ const VideoTile: React.FC<VideoTileProps> = React.memo(
         ref={containerRef}
         onDoubleClick={handleDoubleClick}
         className={cn(
-          "relative bg-black rounded-lg overflow-visible",
+          "relative bg-black rounded-lg overflow-visible", // ✅ overflow-visible to fix clipping
           className,
           draggable ? "cursor-grab active:cursor-grabbing" : ""
         )}
         role="group"
       >
-        {/* ✋ Hand Raised Icon */}
+        {/* ✋ Hand Raised Icon (Top-Left) */}
         {isHandRaised && (
           <div
             className="absolute top-2 left-2 z-[9999] flex items-center justify-center bg-yellow-500 rounded-full p-2 shadow-lg"
