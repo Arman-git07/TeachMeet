@@ -1,4 +1,3 @@
-// src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,7 +20,6 @@ type Props = {
   isLocal?: boolean;
   profileUrl?: string | null;
   className?: string;
-  volumeLevel?: number; // throttled (150ms) from parent
   isScreenSharing?: boolean;
   name?: string;
   isPinned?: boolean;
@@ -29,8 +27,6 @@ type Props = {
   onDoubleClick?: () => void;
   draggable?: boolean;
 };
-
-const clamp = (v: number) => Math.max(0, Math.min(1, v));
 
 const VideoTile: React.FC<Props> = ({
   stream,
@@ -40,7 +36,6 @@ const VideoTile: React.FC<Props> = ({
   isLocal = false,
   profileUrl = null,
   className = "",
-  volumeLevel = 0,
   isScreenSharing = false,
   name = "User",
   isPinned = false,
@@ -49,105 +44,56 @@ const VideoTile: React.FC<Props> = ({
   draggable = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const volumeBarRef = useRef<HTMLDivElement | null>(null);
 
-  // bind stream once (per stream object)
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
-
-    // new stream -> attach and play
-    if (stream && stream !== streamRef.current) {
-      streamRef.current = stream;
-      try {
-        // assign srcObject
-        (videoEl as any).srcObject = stream;
-      } catch {
-        // some browsers can throw; guard
-        videoEl.src = URL.createObjectURL(stream as any);
-      }
+    if (stream && videoEl.srcObject !== stream) {
+      videoEl.srcObject = stream;
       videoEl.play().catch(() => {});
     }
-
-    // remove src when stream removed
-    if (!stream && videoEl.srcObject) {
-      try {
-        (videoEl as any).srcObject = null;
-      } catch {}
-      streamRef.current = null;
-    }
+    if (!stream) videoEl.srcObject = null;
   }, [stream]);
-
-  // only toggle visibility; never re-create the video element
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-    videoEl.style.opacity = isCameraOn && stream ? "1" : "0";
-    videoEl.style.pointerEvents = isCameraOn && stream ? "auto" : "none";
-  }, [isCameraOn, stream]);
-
-  // volume bar DOM update (no heavy re-renders)
-  useEffect(() => {
-    if (volumeBarRef.current) {
-      const w = `${Math.round(Math.min(1, clamp(volumeLevel)) * 100)}%`;
-      volumeBarRef.current.style.width = w;
-    }
-  }, [volumeLevel]);
-
-  const handleDouble = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDoubleClick?.();
-  };
 
   return (
     <div
-      // IMPORTANT: overflow-visible + isolation ensures overlays (hand icon) are NOT clipped
+      onDoubleClick={onDoubleClick}
       className={cn(
-        "relative rounded-lg bg-black overflow-visible",
+        "relative bg-black rounded-lg overflow-visible", // 🔥 important for hand icon visibility
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : ""
       )}
-      style={{ isolation: "isolate" }} // creates independent stacking context so z-index works predictably
-      onDoubleClick={handleDouble}
+      style={{ isolation: "isolate" }}
       role="group"
     >
-      {/* Hand Raised Icon (Top-Left) - always above everything when visible */}
+      {/* ✋ Hand Raised Icon - Top Left */}
       {isHandRaised && (
         <div
-          className="absolute top-2 left-2 z-[9999] flex items-center justify-center p-2 rounded-full shadow-xl pointer-events-none"
-          // use TeachMeet green explicitly so it matches your palette and stands out.
-          style={{
-            backgroundColor: "hsl(98 60% 50%)",
-            transform: "translateZ(0)", // force compositing layer so it stays above video on all browsers
-          }}
+          className="absolute top-2 left-2 z-[99999] flex items-center justify-center p-2 bg-yellow-500 rounded-full shadow-xl pointer-events-none"
+          style={{ transform: "translateZ(0)" }}
         >
-          <Hand className="h-5 w-5 text-white drop-shadow-[0_0_6px_rgba(0,0,0,0.6)]" />
+          <Hand className="h-5 w-5 text-white" />
         </div>
       )}
 
-      {/* Video area (kept under overlays via z-0) */}
+      {/* Video Layer */}
       <div className="relative w-full h-full z-0">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={isLocal}
-          className="w-full h-full object-cover transition-opacity duration-200 rounded-lg"
-          style={{
-            opacity: isCameraOn && stream ? 1 : 0,
-            position: "relative",
-            zIndex: 0, // explicitly place video below overlays
-            // avoid pointer issues
-            touchAction: "none",
-          }}
+          className={cn(
+            "w-full h-full object-cover transition-opacity duration-200 rounded-lg z-0",
+            isCameraOn && stream ? "opacity-100" : "opacity-0"
+          )}
         />
 
-        {/* Avatar fallback (shown when camera off or no stream) */}
+        {/* Avatar fallback */}
         {(!isCameraOn || !stream) && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <Avatar className="w-28 h-28 border-4 border-background shadow-lg">
-              <AvatarImage src={profileUrl || undefined} alt={name} />
+              <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
               <AvatarFallback className="text-5xl">
                 {name?.charAt(0) ?? "U"}
               </AvatarFallback>
@@ -165,43 +111,26 @@ const VideoTile: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Bottom-left overlay: avatar + name + mic + volume + screen-share */}
-      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full text-white text-sm">
+      {/* Bottom-left info */}
+      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
         <Avatar className="w-7 h-7 shrink-0">
-          <AvatarImage src={profileUrl || undefined} alt={name} />
+          <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
           <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
         </Avatar>
-        <div className="font-medium truncate max-w-[160px]">{name}</div>
+        <div className="text-sm font-medium truncate max-w-[160px]">{name}</div>
 
+        {/* Mic + screen share */}
         <div className="flex items-center gap-2">
-          {/* Mic icon */}
-          <div
-            className="p-1 rounded-md flex items-center justify-center"
-            title={isMicOn ? "Microphone on" : "Microphone off"}
-          >
-            {isMicOn ? (
-              <Mic className="h-4 w-4 text-green-400" />
-            ) : (
-              <MicOff className="h-4 w-4 text-red-400" />
-            )}
-          </div>
-
-          {/* Microphone activity bar (DOM updated) */}
-          {isMicOn && (
-            <div className="w-14 h-2 bg-gray-700 rounded overflow-hidden">
-              <div
-                ref={volumeBarRef}
-                className="h-2 bg-green-400 transition-all duration-150"
-                style={{ width: "0%" }}
-              />
-            </div>
+          {isMicOn ? (
+            <Mic className="h-4 w-4 text-green-400" />
+          ) : (
+            <MicOff className="h-4 w-4 text-red-400" />
           )}
-
           {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
         </div>
       </div>
 
-      {/* Pin / fullscreen toggle (bottom-right) */}
+      {/* Pin toggle (bottom-right) */}
       {onTogglePin && (
         <button
           onClick={(e) => {
