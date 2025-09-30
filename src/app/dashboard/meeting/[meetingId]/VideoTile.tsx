@@ -78,10 +78,10 @@ const VideoTile: React.FC<VideoTileProps> = React.memo(
         {/* ✋ Hand Raised Icon */}
         {isHandRaised && (
           <div
-            className="absolute top-3 left-3 p-2 rounded-full bg-[hsl(98,60%,50%)] shadow-lg z-[9999] flex items-center justify-center pointer-events-none"
+            className="absolute top-2 left-2 z-[9999] flex items-center justify-center bg-yellow-500 rounded-full p-2 shadow-lg"
             title="Hand Raised"
           >
-            <Hand className="w-5 h-5 text-white" />
+            <Hand className="h-5 w-5 text-white" />
           </div>
         )}
 
