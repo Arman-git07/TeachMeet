@@ -26,6 +26,7 @@ type Props = {
   onTogglePin?: () => void;
   onDoubleClick?: () => void;
   draggable?: boolean;
+  volumeLevel?: number; // Added back from previous context for completeness
 };
 
 const VideoTile: React.FC<Props> = ({
@@ -59,20 +60,21 @@ const VideoTile: React.FC<Props> = ({
     <div
       onDoubleClick={onDoubleClick}
       className={cn(
-        "relative bg-black rounded-lg overflow-visible", // 🔥 important for hand icon visibility
+        "relative bg-black rounded-lg overflow-visible isolate", // ✅ Fixed: allow overflow + stacking context
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : ""
       )}
-      style={{ isolation: "isolate" }}
       role="group"
     >
-      {/* ✋ Hand Raised Icon - Top Left */}
+      {/* ✅ Hand Raised Icon */}
       {isHandRaised && (
         <div
-          className="absolute top-2 left-2 z-[99999] flex items-center justify-center p-2 bg-yellow-500 rounded-full shadow-xl pointer-events-none"
-          style={{ transform: "translateZ(0)" }}
+          className="absolute top-2 left-2 z-[50] flex items-center justify-center bg-yellow-500 rounded-full p-2 shadow-lg"
+          style={{
+            pointerEvents: "none", // ensures it doesn't block clicks
+          }}
         >
-          <Hand className="h-5 w-5 text-white" />
+          <Hand className="text-white w-5 h-5" />
         </div>
       )}
 
@@ -84,7 +86,7 @@ const VideoTile: React.FC<Props> = ({
           playsInline
           muted={isLocal}
           className={cn(
-            "w-full h-full object-cover transition-opacity duration-200 rounded-lg z-0",
+            "w-full h-full object-cover transition-opacity duration-200 rounded-lg relative z-[10]", // ✅ Fixed
             isCameraOn && stream ? "opacity-100" : "opacity-0"
           )}
         />
@@ -103,7 +105,7 @@ const VideoTile: React.FC<Props> = ({
       </div>
 
       {/* Camera status (top-right) */}
-      <div className="absolute top-3 right-3 z-30 p-1 rounded-md bg-black/50">
+      <div className="absolute top-3 right-3 z-[20] p-1 rounded-md bg-black/50">
         {isCameraOn ? (
           <Video className="h-5 w-5 text-white" />
         ) : (
@@ -112,7 +114,7 @@ const VideoTile: React.FC<Props> = ({
       </div>
 
       {/* Bottom-left info */}
-      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
+      <div className="absolute left-3 bottom-3 z-[20] flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
         <Avatar className="w-7 h-7 shrink-0">
           <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user"/>
           <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
@@ -138,7 +140,7 @@ const VideoTile: React.FC<Props> = ({
             onTogglePin?.();
           }}
           aria-label={isPinned ? "Unpin participant" : "Pin participant"}
-          className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-black/60 hover:bg-black/70 text-white"
+          className="absolute bottom-3 right-3 z-[20] p-1 rounded-md bg-black/60 hover:bg-black/70 text-white"
           title={isPinned ? "Unpin (restore grid)" : "Pin (fullscreen)"}
         >
           {isPinned ? (
