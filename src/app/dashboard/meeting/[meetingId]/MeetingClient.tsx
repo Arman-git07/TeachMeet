@@ -446,7 +446,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   stream={pinned.stream}
                   isCameraOn={!pinned.isCamOff}
                   isMicOn={!pinned.isMicOff}
-                  isHandRaised={pinned.isHandRaised}
+                  isHandRaised={pinned.isHandRaised || false}
                   volumeLevel={pinned.volumeLevel}
                   isLocal={!!pinned.isLocal}
                   profileUrl={pinned.avatar}
@@ -470,7 +470,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     stream={p.stream}
                     isCameraOn={!p.isCamOff}
                     isMicOn={!p.isMicOff}
-                    isHandRaised={p.isHandRaised}
+                    isHandRaised={p.isHandRaised || false}
                     volumeLevel={p.volumeLevel}
                     isLocal={!!p.isLocal}
                     profileUrl={p.avatar}
@@ -500,7 +500,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   stream={activeScreenSharer.stream}
                   isCameraOn={!activeScreenSharer.isCamOff}
                   isMicOn={!activeScreenSharer.isMicOff}
-                  isHandRaised={activeScreenSharer.isHandRaised}
+                  isHandRaised={activeScreenSharer.isHandRaised || false}
                   volumeLevel={activeScreenSharer.volumeLevel}
                   isLocal={!!activeScreenSharer.isLocal}
                   profileUrl={activeScreenSharer.avatar}
@@ -520,7 +520,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                       stream={p.stream}
                       isCameraOn={!p.isCamOff}
                       isMicOn={!p.isMicOff}
-                      isHandRaised={p.isHandRaised}
+                      isHandRaised={p.isHandRaised || false}
                       volumeLevel={p.volumeLevel}
                       isLocal={!!p.isLocal}
                       profileUrl={p.avatar}
@@ -546,7 +546,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             stream={p.stream}
             isCameraOn={!p.isCamOff}
             isMicOn={!p.isMicOff}
-            isHandRaised={p.isHandRaised}
+            isHandRaised={p.isHandRaised || false}
             volumeLevel={p.volumeLevel}
             isLocal={!!p.isLocal}
             profileUrl={p.avatar}
@@ -572,7 +572,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 stream={remote.stream}
                 isCameraOn={!remote.isCamOff}
                 isMicOn={!remote.isMicOff}
-                isHandRaised={remote.isHandRaised}
+                isHandRaised={remote.isHandRaised || false}
                 volumeLevel={remote.volumeLevel}
                 isLocal={!!remote.isLocal}
                 profileUrl={remote.avatar}
@@ -590,7 +590,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 stream={local.stream}
                 isCameraOn={!local.isCamOff}
                 isMicOn={!local.isMicOff}
-                isHandRaised={local.isHandRaised}
+                isHandRaised={local.isHandRaised || false}
                 volumeLevel={local.volumeLevel}
                 isLocal={!!local.isLocal}
                 profileUrl={local.avatar}
@@ -621,7 +621,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               stream={p.stream}
               isCameraOn={!p.isCamOff}
               isMicOn={!p.isMicOff}
-              isHandRaised={p.isHandRaised}
+              isHandRaised={p.isHandRaised || false}
               volumeLevel={p.volumeLevel}
               isLocal={!!p.isLocal}
               profileUrl={p.avatar}
