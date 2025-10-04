@@ -270,4 +270,25 @@ html, body, #__next {
   to { transform: translateX(0) scale(1); opacity: 1; }
 }
 
+@keyframes handWave {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(0.8);
+    opacity: 0;
+  }
+  40% {
+    transform: translateY(-10px) rotate(-8deg) scale(1.1);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(0) rotate(6deg) scale(1.05);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
+.animate-hand-wave {
+  animation: handWave 0.8s ease-out 1;
+}
+
     

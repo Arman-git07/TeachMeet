@@ -7,12 +7,12 @@ import {
   Mic,
   VideoOff,
   Video,
-  Hand,
   ScreenShare,
   Maximize2,
   Minimize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import HandRaiseIcon from "./HandRaiseIcon";
 
 // --- Main VideoTile Component ---
 type Props = {
@@ -63,9 +63,6 @@ const VideoTile: React.FC<Props> = ({
     }
     if (!stream) videoEl.srcObject = null;
   }, [stream]);
-  
-  const green = "hsl(98, 60%, 50%)";
-  const isFilled = raisedCount > 1 && isHandRaised;
 
   return (
     <div
@@ -77,35 +74,13 @@ const VideoTile: React.FC<Props> = ({
       )}
       role="group"
     >
-      {isHandRaised && (
-        <div
-          className={cn(
-            "absolute top-2 left-2 z-30 w-8 h-8 cursor-pointer hover:scale-110",
-            isHandRaised && "scale-110"
-          )}
-          style={{ filter: "drop-shadow(2px 2px 4px rgba(0,0,0,0.15))", transition: "transform 0.2s ease" }}
-          title={isFirstHand ? "First hand raised" : "Hand raised"}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="100%"
-            height="100%"
-            xmlns="http://www.w3.org/2000/svg"
-            fill={isFilled ? green : "none"}
-            stroke={green}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            {/* ✋ Real full hand icon */}
-            <path d="M7 11V4a1 1 0 0 1 2 0v7" />
-            <path d="M11 11V2a1 1 0 0 1 2 0v9" />
-            <path d="M15 11V5a1 1 0 0 1 2 0v6" />
-            <path d="M19 11V7a1 1 0 0 1 2 0v4" />
-            <path d="M5 11a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6z" />
-          </svg>
-        </div>
-      )}
+      <div className="absolute top-2 left-2 z-30">
+        <HandRaiseIcon
+          isRaised={isHandRaised}
+          totalRaisedHands={raisedCount}
+          isFirst={isFirstHand}
+        />
+      </div>
 
       {/* Video Layer */}
       <div className="relative w-full h-full z-0">
