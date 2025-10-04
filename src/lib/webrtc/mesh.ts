@@ -22,11 +22,6 @@ const ICE: RTCIceServer[] = [
   { urls: "stun:global.stun.twilio.com:3478" },
 ];
 
-// Storing connections globally to be accessible for track replacement
-if (typeof window !== 'undefined' && !(window as any).__PEER_CONNECTIONS__) {
-  (window as any).__PEER_CONNECTIONS__ = new Map<string, RTCPeerConnection>();
-}
-
 export class MeshRTC {
   private socket!: Socket;
   private localStream?: MediaStream;
@@ -37,12 +32,15 @@ export class MeshRTC {
   // Keep a map of screen senders per peer connection (keyed by pc)
   private screenSenders = new WeakMap<RTCPeerConnection, RTCRtpSender[]>();
 
+
   constructor(private opts: MeshOptions) {}
 
-  public static getAllConnections(): RTCPeerConnection[] {
-    if (typeof window === 'undefined') return [];
-    const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
-    return Array.from(connectionMap.values());
+  public getAllPeerConnections(): RTCPeerConnection[] {
+    return Array.from(this.remotes.values()).map(r => r.pc);
+  }
+
+  public getPeerConnectionById(peerId: string): RTCPeerConnection | undefined {
+    return this.remotes.get(peerId)?.pc;
   }
 
   async init(stream: MediaStream) {
@@ -51,8 +49,7 @@ export class MeshRTC {
 
     this.localStream = stream;
 
-    // IMPORTANT: create socket once
-    this.socket = io({ path: "/api/socketio" });
+    this.socket = io({ path: "/api/socketio", auth: { name: this.opts.userId } });
 
     this.roomId = this.opts.roomId;
     this.userId = this.opts.userId;
@@ -66,7 +63,6 @@ export class MeshRTC {
   private registerSocketEvents() {
     this.socket.on("user-joined", async ({ socketId }) => {
       this.opts.onUserJoined?.(socketId);
-      // create offer to the newcomer
       await this.makePeerIfMissing(socketId, true);
     });
 
@@ -86,7 +82,6 @@ export class MeshRTC {
            return;
         } else {
            console.log("Ignoring offer as impolite peer", this.socket.id, "vs", from);
-           // Allow our own offer to proceed
            return;
         }
       }
@@ -123,26 +118,18 @@ export class MeshRTC {
 
     const pc = new RTCPeerConnection({ iceServers: ICE });
     
-    // Add connection to global map
-    const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
-    connectionMap.set(remoteSocketId, pc);
-
-
     const remoteStream = new MediaStream();
 
     remote = { pc, stream: remoteStream, negotiating: false };
     this.remotes.set(remoteSocketId, remote);
 
-    // Forward local tracks to this peer
     this.localStream?.getTracks().forEach((t) => pc.addTrack(t, this.localStream!));
 
-    // Receive tracks
     pc.ontrack = (e) => {
       e.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
       this.opts.onRemoteStream(remoteSocketId, remoteStream);
     };
 
-    // ICE
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         this.socket.emit("signal:ice", {
@@ -185,13 +172,62 @@ export class MeshRTC {
     });
   }
 
+  public addScreenTrackToAll(screenTrack: MediaStreamTrack, stream?: MediaStream) {
+    const added: { pc: RTCPeerConnection; sender: RTCRtpSender }[] = [];
+    this.getAllPeerConnections().forEach((pc) => {
+      try {
+        const sender = pc.addTrack(screenTrack, stream ?? new MediaStream([screenTrack]));
+        const arr = this.screenSenders.get(pc) ?? [];
+        arr.push(sender);
+        this.screenSenders.set(pc, arr);
+        added.push({ pc, sender });
+      } catch (e) {
+        console.warn("MeshRTC.addScreenTrackToAll: failed to add track for pc", e);
+      }
+    });
+    return added;
+  }
+
+  public removeScreenTrackFromAll(screenTrack?: MediaStreamTrack) {
+    this.getAllPeerConnections().forEach((pc) => {
+      const arr = this.screenSenders.get(pc);
+      if (!arr || arr.length === 0) return;
+      const remaining: RTCRtpSender[] = [];
+      arr.forEach((sender) => {
+        try {
+          const senderTrack = sender.track;
+          if (!screenTrack || senderTrack === screenTrack) {
+            pc.removeTrack(sender);
+          } else {
+            remaining.push(sender);
+          }
+        } catch (e) {
+          console.warn("MeshRTC.removeScreenTrackFromAll: removeTrack failed", e);
+        }
+      });
+      if (remaining.length === 0) this.screenSenders.delete(pc);
+      else this.screenSenders.set(pc, remaining);
+    });
+  }
+
+  public forceStopShareForPeer(peerId: string) {
+    const pc = this.getPeerConnectionById(peerId);
+    if (!pc) return;
+    const arr = this.screenSenders.get(pc);
+    if (!arr) return;
+    arr.forEach((sender) => {
+      try {
+        pc.removeTrack(sender);
+      } catch (e) {
+        console.warn("MeshRTC.forceStopShareForPeer removeTrack failed", e);
+      }
+    });
+    this.screenSenders.delete(pc);
+  }
+
   private cleanupRemote(socketId: string) {
     const remote = this.remotes.get(socketId);
     if (remote) {
-        // Remove from global map
-        const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
-        connectionMap.delete(socketId);
-        
         remote.pc.close();
         this.remotes.delete(socketId);
     }
@@ -204,10 +240,6 @@ export class MeshRTC {
     this.remotes.forEach(({ pc }) => pc.close());
     this.remotes.clear();
     
-    // Clear global map on leave
-    const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
-    connectionMap.clear();
-
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = undefined;
     this.initialized = false;

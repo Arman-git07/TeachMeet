@@ -61,6 +61,39 @@ export default function handler(req: NextApiRequest, res: NextApiResponseServerI
       socket.on("signal:ice", ({ roomId, to, from, candidate }) => {
         io.to(to).emit("signal:ice", { from, candidate, socketId: socket.id });
       });
+
+      // Screen sharing events
+      socket.on("request-screen-share", ({ meetingId, participantId }) => {
+        const hostSocketId = getHostSocketId(meetingId);
+        if (hostSocketId) {
+          const name = rooms.get(meetingId)?.participants.has(participantId) ? participantId : "Unknown";
+          io.to(hostSocketId).emit("screen-share-request", { meetingId, participantId, name });
+        }
+      });
+
+      socket.on("approve-screen-share", ({ meetingId, participantId, approved }) => {
+        const participantSocketId = getSocketIdForParticipant(meetingId, participantId);
+        if (participantSocketId) {
+          io.to(participantSocketId).emit("screen-share-approval", { meetingId, approved });
+        }
+      });
+
+      socket.on("notify-screen-share-started", ({ meetingId, participantId }) => {
+        socket.to(meetingId).emit("participant-started-sharing", { participantId });
+      });
+
+      socket.on("notify-screen-share-stopped", ({ meetingId, participantId }) => {
+        socket.to(meetingId).emit("participant-stopped-sharing", { participantId });
+      });
+
+      socket.on("host-stop-participant-share", ({ meetingId, targetParticipantId }) => {
+        if (!isSocketHostForMeeting(socket, meetingId)) return;
+        const participantSocketId = getSocketIdForParticipant(meetingId, targetParticipantId);
+        if (participantSocketId) {
+          io.to(participantSocketId).emit("force-stop-screen-share", { meetingId });
+          socket.to(meetingId).emit("participant-stopped-sharing", { participantId: targetParticipantId });
+        }
+      });
       
       socket.on("disconnecting", () => {
         const roomsToNotify = [...socket.rooms].filter((r) => r !== socket.id);
