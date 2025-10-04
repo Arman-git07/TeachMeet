@@ -27,7 +27,6 @@ type Props = {
   onTogglePin?: () => void;
   onDoubleClick?: () => void;
   draggable?: boolean;
-  volumeLevel?: number; // Added back for completeness
 };
 
 const VideoTile: React.FC<Props> = ({
@@ -68,19 +67,20 @@ const VideoTile: React.FC<Props> = ({
       style={{ isolation: "isolate" }}
       role="group"
     >
-      {/* ✋ Hand Raised Icon - Top Left */}
       {isHandRaised && (
         <div
-          className="absolute top-2 left-2 z-[999999] animate-pulse-slow"
+          className="absolute top-2 left-2 z-[999999]"
           style={{
-            filter: "drop-shadow(0 0 12px rgba(72,239,128,0.9)) drop-shadow(0 0 20px rgba(72,239,128,0.6))",
+            filter:
+              "drop-shadow(0 0 12px rgba(72,239,128,0.9)) drop-shadow(0 0 20px rgba(72,239,128,0.6))",
             transform: "translateZ(0)",
+            animation: "handWave 0.8s ease-out 1, handGlow 2s infinite ease-in-out 0.8s",
           }}
         >
           <Hand
             className="h-8 w-8 text-[hsl(145,63%,48%)]"
             style={{
-              animation: "handGlow 2s infinite ease-in-out",
+              animation: "handGlow 2s infinite ease-in-out 0.8s",
             }}
           />
           <style jsx>{`
@@ -91,14 +91,32 @@ const VideoTile: React.FC<Props> = ({
                 transform: scale(1);
               }
               50% {
-                filter: drop-shadow(0 0 16px rgba(72, 239, 128, 1))
-                        drop-shadow(0 0 28px rgba(72, 239, 128, 0.8));
+                filter: drop-shadow(0 0 18px rgba(72, 239, 128, 1))
+                        drop-shadow(0 0 30px rgba(72, 239, 128, 0.9));
                 transform: scale(1.08);
               }
               100% {
                 filter: drop-shadow(0 0 6px rgba(72, 239, 128, 0.8))
                         drop-shadow(0 0 12px rgba(72, 239, 128, 0.6));
                 transform: scale(1);
+              }
+            }
+
+            /* 👋 One-time bounce wave when hand appears */
+            @keyframes handWave {
+              0% {
+                transform: translateY(0) rotate(0deg) scale(0.8);
+                opacity: 0;
+              }
+              40% {
+                transform: translateY(-10px) rotate(-8deg) scale(1.1);
+                opacity: 1;
+              }
+              70% {
+                transform: translateY(0) rotate(6deg) scale(1.05);
+              }
+              100% {
+                transform: translateY(0) rotate(0deg) scale(1);
               }
             }
           `}</style>
