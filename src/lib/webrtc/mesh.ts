@@ -34,6 +34,8 @@ export class MeshRTC {
   private roomId!: string;
   private userId!: string;
   private initialized = false;
+  // Keep a map of screen senders per peer connection (keyed by pc)
+  private screenSenders = new WeakMap<RTCPeerConnection, RTCRtpSender[]>();
 
   constructor(private opts: MeshOptions) {}
 

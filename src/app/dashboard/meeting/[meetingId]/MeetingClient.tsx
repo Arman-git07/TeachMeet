@@ -57,9 +57,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [liveParticipants, setLiveParticipants] = useState<Map<string, LiveParticipantInfo>>(new Map());
   const [isHandRaised, setIsHandRaised] = useState(false);
+  
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
-  
   const screenStreamRef = useRef<MediaStream | null>(null);
 
   // mic levels map (id -> level 0..1) stored in state but updated throttled
@@ -402,6 +402,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         console.error("❌ Cannot restore camera, localStream is missing.");
         return;
     }
+
+    screenStreamRef.current?.getTracks().forEach(track => track.stop());
+    screenStreamRef.current = null;
+    
     const cameraTrack = localStream.getVideoTracks()[0];
     if (cameraTrack) {
         MeshRTC.getAllConnections().forEach((pc) => {
@@ -415,9 +419,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         console.error("❌ Failed to find camera track to restore.");
     }
 
-    screenStreamRef.current?.getTracks().forEach(track => track.stop());
-    screenStreamRef.current = null;
-    
     setIsScreenSharing(false);
     await updateMyStatus({ isScreenSharing: false });
   }, [localStream, updateMyStatus]);
@@ -749,8 +750,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               className={cn(
                 "h-14 w-14 rounded-full flex items-center justify-center transition-colors text-white",
                 isHandRaised
-                  ? "bg-primary hover:bg-primary/90" // Green when raised
-                  : "bg-destructive hover:bg-destructive/90" // Red when not raised
+                  ? "bg-primary hover:bg-primary/90"
+                  : "bg-destructive hover:bg-destructive/90"
               )}
               aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
             >
