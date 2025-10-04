@@ -22,6 +22,11 @@ const ICE: RTCIceServer[] = [
   { urls: "stun:global.stun.twilio.com:3478" },
 ];
 
+// Storing connections globally to be accessible for track replacement
+if (typeof window !== 'undefined' && !(window as any).__PEER_CONNECTIONS__) {
+  (window as any).__PEER_CONNECTIONS__ = new Map<string, RTCPeerConnection>();
+}
+
 export class MeshRTC {
   private socket!: Socket;
   private localStream?: MediaStream;
@@ -31,6 +36,12 @@ export class MeshRTC {
   private initialized = false;
 
   constructor(private opts: MeshOptions) {}
+
+  public static getAllConnections(): RTCPeerConnection[] {
+    if (typeof window === 'undefined') return [];
+    const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
+    return Array.from(connectionMap.values());
+  }
 
   async init(stream: MediaStream) {
     if (this.initialized) return;
@@ -109,11 +120,11 @@ export class MeshRTC {
     if (remote) return remote;
 
     const pc = new RTCPeerConnection({ iceServers: ICE });
-    // Keep a map of peer connections to share with screen share logic
-    if (!(window as any).__PEER_CONNECTIONS__) {
-      (window as any).__PEER_CONNECTIONS__ = [];
-    }
-    (window as any).__PEER_CONNECTIONS__.push(pc);
+    
+    // Add connection to global map
+    const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
+    connectionMap.set(remoteSocketId, pc);
+
 
     const remoteStream = new MediaStream();
 
@@ -175,9 +186,10 @@ export class MeshRTC {
   private cleanupRemote(socketId: string) {
     const remote = this.remotes.get(socketId);
     if (remote) {
-        if ((window as any).__PEER_CONNECTIONS__) {
-          (window as any).__PEER_CONNECTIONS__ = (window as any).__PEER_CONNECTIONS__.filter((pc: RTCPeerConnection) => pc !== remote.pc);
-        }
+        // Remove from global map
+        const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
+        connectionMap.delete(socketId);
+        
         remote.pc.close();
         this.remotes.delete(socketId);
     }
@@ -189,9 +201,11 @@ export class MeshRTC {
     } catch {}
     this.remotes.forEach(({ pc }) => pc.close());
     this.remotes.clear();
-    if ((window as any).__PEER_CONNECTIONS__) {
-      (window as any).__PEER_CONNECTIONS__ = [];
-    }
+    
+    // Clear global map on leave
+    const connectionMap = (window as any).__PEER_CONNECTIONS__ as Map<string, RTCPeerConnection>;
+    connectionMap.clear();
+
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = undefined;
     this.initialized = false;

@@ -59,12 +59,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
+  
   const screenStreamRef = useRef<MediaStream | null>(null);
 
   // mic levels map (id -> level 0..1) stored in state but updated throttled
   const [volumeLevels, setVolumeLevels] = useState<Map<string, number>>(new Map());
 
-  // Refs for analysers etc (same as before)
+  // Refs for analysers etc
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -76,7 +77,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   // pin / fullscreen (app-level)
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
-  // initialization and RTC logic (kept intact)
   useEffect(() => {
     let mounted = true;
     let stream: MediaStream | null = null;
@@ -118,18 +118,14 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       });
       remoteAnalysersRef.current.clear();
     };
-    // run once on mount
   }, [initialCamOn, initialMicOn, toast]);
 
-  // place near other useEffects (after you set liveParticipants)
   const previousRaisedHands = useRef<Set<string>>(new Set());
   const firstParticipantsSnapshot = useRef(true);
 
   useEffect(() => {
-    // wait until we have participants data
     if (!liveParticipants || liveParticipants.size === 0) return;
 
-    // on first load: populate previousRaisedHands but do not notify
     if (firstParticipantsSnapshot.current) {
         const initial = new Set<string>();
         liveParticipants.forEach((meta, id) => {
@@ -140,13 +136,11 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         return;
     }
 
-    // compare and notify for newly raised hands
     liveParticipants.forEach((meta, id) => {
         const nowRaised = !!meta?.isHandRaised;
         const wasRaised = previousRaisedHands.current.has(id);
 
         if (nowRaised && !wasRaised) {
-            // show toast to everyone (safe, non-blocking)
             toast({
                 title: "Hand Raised",
                 description: `${meta?.name || 'Someone'} raised their hand.`,
@@ -154,7 +148,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         }
     });
 
-    // rebuild the previous set to the current raised set
     const nextSet = new Set<string>();
     liveParticipants.forEach((meta, id) => {
         if (meta?.isHandRaised) nextSet.add(id);
@@ -163,7 +156,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [liveParticipants, toast]);
 
 
-  // participants metadata
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
@@ -177,7 +169,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => unsubscribe();
   }, [meetingId]);
 
-  // MeshRTC creation
   const rtc = useMemo(() => {
     if (!userId || !meetingId) return null;
     return new MeshRTC({
@@ -216,8 +207,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => rtc?.leave();
   }, [rtc, localStream]);
 
-  // audio analysers (same throttled logic) ...
-  // (kept identical to your version so behavior is consistent)
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
@@ -266,7 +255,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     };
   }, [localStream, micOn, userId]);
 
-  // remote analysers (kept)
   useEffect(() => {
     remoteStreams.forEach((stream, id) => {
       if (!stream || stream.getAudioTracks().length === 0) return;
@@ -334,9 +322,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       isMicOff: !micOn,
       isHandRaised: isHandRaised, // Use local state for local user
       handRaisedAt: localUserDetails?.handRaisedAt,
-      isScreenSharing: localUserDetails?.isScreenSharing,
+      isScreenSharing: isScreenSharing,
       isLocal: true,
-      stream: localStream,
+      stream: isScreenSharing ? screenStreamRef.current : localStream,
       volumeLevel: volumeLevels.get(userId) ?? 0
     };
 
@@ -369,7 +357,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const raisedCount = all.filter(p => p.isHandRaised).length;
 
     return { allParticipants: all, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isScreenSharing]);
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (user && meetingId) {
@@ -400,43 +388,78 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setCamOn(nextState);
         updateMyStatus({ isCameraOn: nextState });
     }
-  }, [localStream, updateMyStatus]);
+  }, [localStream, updateMyStatus, camOn]);
 
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
     setIsHandRaised(next);
-    // When raising hand, set timestamp. When lowering, set to null.
     updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null });
   }, [isHandRaised, updateMyStatus]);
-
-  const handleScreenShare = useCallback(async () => {
-    setShowScreenShareConfirm(false);
-    if (!localStream || !rtc) return;
-
-    if (isScreenSharing) {
-        screenStreamRef.current?.getTracks().forEach(t => t.stop());
-        screenStreamRef.current = null;
-        const cameraTrack = localStream.getVideoTracks().find(t => t.kind === 'video');
-        if (cameraTrack) rtc.replaceTrack(cameraTrack);
-        setIsScreenSharing(false);
-        await updateMyStatus({ isScreenSharing: false });
+  
+  const stopScreenShareAndRestoreCamera = useCallback(async () => {
+    console.log("🔄 Restoring camera...");
+    if (!localStream) {
+        console.error("❌ Cannot restore camera, localStream is missing.");
         return;
     }
-
-    try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        const screenTrack = screenStream.getVideoTracks()[0];
-        if (!screenTrack) throw new Error("No screen track found");
-        screenTrack.onended = () => { if (isScreenSharing) handleScreenShare(); };
-        rtc.replaceTrack(screenTrack);
-        screenStreamRef.current = screenStream;
-        setIsScreenSharing(true);
-        await updateMyStatus({ isScreenSharing: true });
-    } catch (err) {
-        console.error("Screen share error:", err);
-        toast({ variant: 'destructive', title: 'Screen Share Failed' });
+    const cameraTrack = localStream.getVideoTracks()[0];
+    if (cameraTrack) {
+        MeshRTC.getAllConnections().forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+          if (sender) {
+            sender.replaceTrack(cameraTrack).catch(e => console.error("Failed to restore camera track:", e));
+          }
+        });
+        console.log("✅ Camera restored.");
+    } else {
+        console.error("❌ Failed to find camera track to restore.");
     }
-  }, [localStream, rtc, isScreenSharing, updateMyStatus, toast]);
+
+    screenStreamRef.current?.getTracks().forEach(track => track.stop());
+    screenStreamRef.current = null;
+    
+    setIsScreenSharing(false);
+    await updateMyStatus({ isScreenSharing: false });
+  }, [localStream, updateMyStatus]);
+  
+  const startScreenShare = useCallback(async () => {
+    setShowScreenShareConfirm(false); // Close dialog
+    try {
+      console.log("🔄 Requesting screen share...");
+      
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: "always" } as any,
+        audio: true,
+      });
+  
+      const screenTrack = screenStream.getVideoTracks()[0];
+      if (!screenTrack) throw new Error("No video track found from display media.");
+  
+      console.log("✅ Screen stream acquired.");
+      screenStreamRef.current = screenStream;
+  
+      MeshRTC.getAllConnections().forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+          console.log("📺 Replaced video track with screen track for a peer.");
+        }
+      });
+  
+      screenTrack.onended = async () => {
+        console.log("📴 Screen share stopped by user (via browser UI).");
+        await stopScreenShareAndRestoreCamera();
+      };
+      
+      setIsScreenSharing(true);
+      await updateMyStatus({ isScreenSharing: true });
+      console.log("✅ Screen sharing started.");
+  
+    } catch (err: any) {
+      console.error("❌ Screen share failed:", err);
+      toast({ variant: 'destructive', title: "Screen Share Failed", description: "Please ensure you've granted permission and try again."});
+    }
+  }, [stopScreenShareAndRestoreCamera, updateMyStatus, toast]);
 
   // toggle pin / fullscreen for a participant (app-level pin)
   const togglePin = useCallback((id: string) => {
@@ -505,7 +528,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // screen sharing view (kept similar)
     const activeScreenSharer = allParticipants.find(p => p.isScreenSharing);
     if (activeScreenSharer) {
       const otherParticipants = allParticipants.filter(p => p.id !== activeScreenSharer.id);
@@ -558,7 +580,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // 1 participant -> truly full meeting area (no padding)
     if (count === 1) {
       const p = allParticipants[0];
       return (
@@ -583,7 +604,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // 2 participants: remote full, local PiP (draggable)
     if (count === 2) {
       const remote = allParticipants.find((u) => !u.isLocal);
       const local = allParticipants.find((u) => u.isLocal);
@@ -633,7 +653,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
 
-    // >=3 participants: responsive grid (cols = ceil(sqrt(n)))
     const cols = Math.ceil(Math.sqrt(count));
     return (
       <div
@@ -702,7 +721,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
                <AlertDialogTrigger asChild>
                    <Button
-                      onClick={() => { isScreenSharing ? handleScreenShare() : setShowScreenShareConfirm(true) }}
+                      onClick={() => { isScreenSharing ? stopScreenShareAndRestoreCamera() : setShowScreenShareConfirm(true) }}
                       variant="ghost"
                       className={cn(
                         "h-14 w-14 rounded-full flex items-center justify-center transition-colors",
@@ -720,7 +739,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleScreenShare}>Share Screen</AlertDialogAction>
+                    <AlertDialogAction onClick={startScreenShare}>Share Screen</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -731,7 +750,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 "h-14 w-14 rounded-full flex items-center justify-center transition-colors text-white",
                 isHandRaised
                   ? "bg-[hsl(98,60%,50%)] hover:bg-[hsl(98,60%,45%)]" // Green when raised
-                  : "bg-[hsl(0,72%,51%)] hover:bg-[hsl(0,72%,45%)]"  // Red when not raised
+                  : "bg-secondary/50 hover:bg-secondary/70"
               )}
               aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}
             >
