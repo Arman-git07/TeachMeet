@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,11 +14,54 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// --- 3D Hand Component ---
+const Hand3D = ({ isFirst }: { isFirst: boolean }) => (
+  <div className="relative">
+    <Hand
+      className="h-10 w-10 text-green-500"
+      style={{
+        background: "linear-gradient(145deg, #22c55e, #16a34a)",
+        WebkitTextStroke: "1px #0f5132",
+        borderRadius: "6px",
+        padding: "4px",
+        boxShadow: "2px 2px 6px rgba(0,0,0,0.3), inset -2px -2px 4px rgba(255,255,255,0.15)",
+        transform: "perspective(800px) rotateX(10deg) rotateY(-5deg)",
+        animation: "popIn 0.3s ease-out",
+      }}
+    />
+    {isFirst && (
+      <span
+        className="absolute -top-1 -right-1 text-yellow-400 text-xs font-bold"
+        style={{
+          textShadow: "0 0 6px rgba(255,215,0,0.7)",
+        }}
+      >
+        ⭐
+      </span>
+    )}
+    <style jsx>{`
+      @keyframes popIn {
+        0% {
+          transform: scale(0.7) perspective(800px) rotateX(15deg) rotateY(-5deg);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1) perspective(800px) rotateX(10deg) rotateY(-5deg);
+          opacity: 1;
+        }
+      }
+    `}</style>
+  </div>
+);
+
+
+// --- Main VideoTile Component ---
 type Props = {
   stream: MediaStream | null;
   isCameraOn: boolean;
   isMicOn?: boolean;
   isHandRaised?: boolean;
+  isFirstHand?: boolean; // New prop
   isLocal?: boolean;
   profileUrl?: string | null;
   className?: string;
@@ -27,6 +71,7 @@ type Props = {
   onTogglePin?: () => void;
   onDoubleClick?: () => void;
   draggable?: boolean;
+  volumeLevel?: number;
 };
 
 const VideoTile: React.FC<Props> = ({
@@ -34,6 +79,7 @@ const VideoTile: React.FC<Props> = ({
   isCameraOn,
   isMicOn = true,
   isHandRaised = false,
+  isFirstHand = false, // Default to false
   isLocal = false,
   profileUrl = null,
   className = "",
@@ -60,68 +106,19 @@ const VideoTile: React.FC<Props> = ({
     <div
       onDoubleClick={onDoubleClick}
       className={cn(
-        "relative bg-black rounded-lg overflow-visible", // 🔥 important for hand icon visibility
+        "relative bg-black rounded-lg overflow-visible", // Use overflow-visible
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : ""
       )}
-      style={{ isolation: "isolate" }}
+      style={{ isolation: "isolate" }} // Create stacking context
       role="group"
     >
-      {isHandRaised && (
-        <div
-          className="absolute top-2 left-2 z-[999999]"
-          style={{
-            filter:
-              "drop-shadow(0 0 12px rgba(72,239,128,0.9)) drop-shadow(0 0 20px rgba(72,239,128,0.6))",
-            transform: "translateZ(0)",
-            animation: "handWave 0.8s ease-out 1, handGlow 2s infinite ease-in-out 0.8s",
-          }}
-        >
-          <Hand
-            className="h-8 w-8 text-[hsl(145,63%,48%)]"
-            style={{
-              animation: "handGlow 2s infinite ease-in-out 0.8s",
-            }}
-          />
-          <style jsx>{`
-            @keyframes handGlow {
-              0% {
-                filter: drop-shadow(0 0 6px rgba(72, 239, 128, 0.8))
-                        drop-shadow(0 0 12px rgba(72, 239, 128, 0.6));
-                transform: scale(1);
-              }
-              50% {
-                filter: drop-shadow(0 0 18px rgba(72, 239, 128, 1))
-                        drop-shadow(0 0 30px rgba(72, 239, 128, 0.9));
-                transform: scale(1.08);
-              }
-              100% {
-                filter: drop-shadow(0 0 6px rgba(72, 239, 128, 0.8))
-                        drop-shadow(0 0 12px rgba(72, 239, 128, 0.6));
-                transform: scale(1);
-              }
-            }
-
-            /* 👋 One-time bounce wave when hand appears */
-            @keyframes handWave {
-              0% {
-                transform: translateY(0) rotate(0deg) scale(0.8);
-                opacity: 0;
-              }
-              40% {
-                transform: translateY(-10px) rotate(-8deg) scale(1.1);
-                opacity: 1;
-              }
-              70% {
-                transform: translateY(0) rotate(6deg) scale(1.05);
-              }
-              100% {
-                transform: translateY(0) rotate(0deg) scale(1);
-              }
-            }
-          `}</style>
-        </div>
-      )}
+       {/* ✋ Hand Raised Icon - Top Left */}
+       {isHandRaised && (
+         <div className="absolute top-2 left-2 z-[9999]">
+            <Hand3D isFirst={isFirstHand} />
+         </div>
+       )}
 
       {/* Video Layer */}
       <div className="relative w-full h-full z-0">

@@ -6,7 +6,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2 } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ type Participant = {
   isCamOff: boolean;
   isMicOff: boolean;
   isHandRaised?: boolean;
+  handRaisedAt?: number | null; // For sorting
   isLocal?: boolean;
   stream: MediaStream | null;
   isScreenSharing?: boolean;
@@ -31,6 +32,7 @@ type LiveParticipantInfo = {
     name: string;
     photoURL?: string;
     isHandRaised?: boolean;
+    handRaisedAt?: number | null;
     isScreenSharing?: boolean;
 };
 
@@ -322,7 +324,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     });
   }, [remoteStreams]);
 
-  const allParticipants: Participant[] = useMemo(() => {
+  const { allParticipants, firstHandRaisedId } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
     const self: Participant = {
       id: userId,
@@ -331,6 +333,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       isCamOff: !camOn,
       isMicOff: !micOn,
       isHandRaised: isHandRaised, // Use local state for local user
+      handRaisedAt: localUserDetails?.handRaisedAt,
       isScreenSharing: localUserDetails?.isScreenSharing,
       isLocal: true,
       stream: localStream,
@@ -348,6 +351,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           name: data.name || `User ${id.substring(0, 4)}`,
           avatar: data.photoURL || `https://placehold.co/128x128.png?text=${(data.name || 'G').charAt(0)}`,
           isHandRaised: data.isHandRaised,
+          handRaisedAt: data.handRaisedAt,
           isScreenSharing: data.isScreenSharing,
           isCamOff: data.isScreenSharing ? false : (videoTracks.length === 0 || !videoTracks.some(t => t.enabled && !t.muted)),
           isMicOff: audioTracks.length === 0 || audioTracks.every(t => !t.enabled),
@@ -356,10 +360,16 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         };
       });
 
-    return [self, ...remotes];
+    const all = [self, ...remotes];
+
+    const firstHandRaised = all
+      .filter(p => p.isHandRaised && p.handRaisedAt)
+      .sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
+
+    return { allParticipants: all, firstHandRaisedId: firstHandRaised?.id || null };
   }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised]);
 
-  const updateMyStatus = useCallback(async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
+  const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (user && meetingId) {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
       try { await updateDoc(participantRef, status); } catch (err) { console.error("Error updating participant status:", err); }
@@ -393,7 +403,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const handleToggleHandRaise = useCallback(() => {
     const next = !isHandRaised;
     setIsHandRaised(next);
-    updateMyStatus({ isHandRaised: next });
+    // When raising hand, set timestamp. When lowering, set to null.
+    updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null });
   }, [isHandRaised, updateMyStatus]);
 
   const handleScreenShare = useCallback(async () => {
@@ -447,6 +458,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   isCameraOn={!pinned.isCamOff}
                   isMicOn={!pinned.isMicOff}
                   isHandRaised={pinned.isHandRaised || false}
+                  isFirstHand={pinned.id === firstHandRaisedId}
                   volumeLevel={pinned.volumeLevel}
                   isLocal={!!pinned.isLocal}
                   profileUrl={pinned.avatar}
@@ -471,6 +483,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     isCameraOn={!p.isCamOff}
                     isMicOn={!p.isMicOff}
                     isHandRaised={p.isHandRaised || false}
+                    isFirstHand={p.id === firstHandRaisedId}
                     volumeLevel={p.volumeLevel}
                     isLocal={!!p.isLocal}
                     profileUrl={p.avatar}
@@ -501,6 +514,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   isCameraOn={!activeScreenSharer.isCamOff}
                   isMicOn={!activeScreenSharer.isMicOff}
                   isHandRaised={activeScreenSharer.isHandRaised || false}
+                  isFirstHand={activeScreenSharer.id === firstHandRaisedId}
                   volumeLevel={activeScreenSharer.volumeLevel}
                   isLocal={!!activeScreenSharer.isLocal}
                   profileUrl={activeScreenSharer.avatar}
@@ -521,6 +535,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                       isCameraOn={!p.isCamOff}
                       isMicOn={!p.isMicOff}
                       isHandRaised={p.isHandRaised || false}
+                      isFirstHand={p.id === firstHandRaisedId}
                       volumeLevel={p.volumeLevel}
                       isLocal={!!p.isLocal}
                       profileUrl={p.avatar}
@@ -547,6 +562,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             isCameraOn={!p.isCamOff}
             isMicOn={!p.isMicOff}
             isHandRaised={p.isHandRaised || false}
+            isFirstHand={p.id === firstHandRaisedId}
             volumeLevel={p.volumeLevel}
             isLocal={!!p.isLocal}
             profileUrl={p.avatar}
@@ -573,6 +589,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 isCameraOn={!remote.isCamOff}
                 isMicOn={!remote.isMicOff}
                 isHandRaised={remote.isHandRaised || false}
+                isFirstHand={remote.id === firstHandRaisedId}
                 volumeLevel={remote.volumeLevel}
                 isLocal={!!remote.isLocal}
                 profileUrl={remote.avatar}
@@ -591,6 +608,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 isCameraOn={!local.isCamOff}
                 isMicOn={!local.isMicOff}
                 isHandRaised={local.isHandRaised || false}
+                isFirstHand={local.id === firstHandRaisedId}
                 volumeLevel={local.volumeLevel}
                 isLocal={!!local.isLocal}
                 profileUrl={local.avatar}
@@ -622,6 +640,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               isCameraOn={!p.isCamOff}
               isMicOn={!p.isMicOff}
               isHandRaised={p.isHandRaised || false}
+              isFirstHand={p.id === firstHandRaisedId}
               volumeLevel={p.volumeLevel}
               isLocal={!!p.isLocal}
               profileUrl={p.avatar}
