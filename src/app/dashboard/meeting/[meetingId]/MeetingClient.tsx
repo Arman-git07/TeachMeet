@@ -330,7 +330,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       avatar: localUserDetails?.photoURL || user?.photoURL || `https://placehold.co/128x128.png?text=${(user?.displayName || 'Y').charAt(0)}`,
       isCamOff: !camOn,
       isMicOff: !micOn,
-      isHandRaised: localUserDetails?.isHandRaised,
+      isHandRaised: isHandRaised, // Use local state for local user
       isScreenSharing: localUserDetails?.isScreenSharing,
       isLocal: true,
       stream: localStream,
@@ -357,7 +357,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       });
 
     return [self, ...remotes];
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised]);
 
   const updateMyStatus = useCallback(async (status: Partial<{ isMicOn: boolean; isCameraOn: boolean; isHandRaised: boolean; isScreenSharing: boolean }>) => {
     if (user && meetingId) {
