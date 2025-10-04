@@ -71,18 +71,37 @@ const VideoTile: React.FC<Props> = ({
       {/* ✋ Hand Raised Icon - Top Left */}
       {isHandRaised && (
         <div
-          className="absolute top-2 left-2 z-[999999] p-2 rounded-full shadow-[0_0_15px_rgba(72,239,128,0.7)] 
-               bg-gradient-to-br from-[hsl(145,63%,48%)] to-[hsl(152,68%,55%)] 
-               border-2 border-white/20 backdrop-blur-md transform hover:scale-105 transition-transform duration-300"
-          style={{ isolation: "isolate" }}
+          className="absolute top-2 left-2 z-[999999] animate-pulse-slow"
+          style={{
+            filter: "drop-shadow(0 0 12px rgba(72,239,128,0.9)) drop-shadow(0 0 20px rgba(72,239,128,0.6))",
+            transform: "translateZ(0)",
+          }}
         >
           <Hand
-            className="h-6 w-6 text-white drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+            className="h-8 w-8 text-[hsl(145,63%,48%)]"
             style={{
-              filter: "drop-shadow(0 0 6px rgba(72, 239, 128, 0.9))",
-              transform: "translateZ(0)",
+              animation: "handGlow 2s infinite ease-in-out",
             }}
           />
+          <style jsx>{`
+            @keyframes handGlow {
+              0% {
+                filter: drop-shadow(0 0 6px rgba(72, 239, 128, 0.8))
+                        drop-shadow(0 0 12px rgba(72, 239, 128, 0.6));
+                transform: scale(1);
+              }
+              50% {
+                filter: drop-shadow(0 0 16px rgba(72, 239, 128, 1))
+                        drop-shadow(0 0 28px rgba(72, 239, 128, 0.8));
+                transform: scale(1.08);
+              }
+              100% {
+                filter: drop-shadow(0 0 6px rgba(72, 239, 128, 0.8))
+                        drop-shadow(0 0 12px rgba(72, 239, 128, 0.6));
+                transform: scale(1);
+              }
+            }
+          `}</style>
         </div>
       )}
 
