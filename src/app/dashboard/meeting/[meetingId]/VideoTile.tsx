@@ -50,6 +50,7 @@ const VideoTile: React.FC<Props> = ({
   onTogglePin,
   onDoubleClick,
   draggable = false,
+  volumeLevel = 0,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -70,28 +71,30 @@ const VideoTile: React.FC<Props> = ({
     <div
       onDoubleClick={onDoubleClick}
       className={cn(
-        "relative bg-black rounded-lg overflow-visible", // Use overflow-visible
+        "relative bg-black rounded-lg overflow-hidden",
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : ""
       )}
-      style={{ isolation: "isolate" }} // Create stacking context
       role="group"
     >
-       {/* Hand Raise Icon */}
-       {isHandRaised && (
+      {isHandRaised && (
         <div
-          className="w-8 h-8 cursor-pointer absolute top-2 left-2 z-50 transition-all duration-200"
+          className={cn(
+            "hand-raise-icon w-8 h-8 cursor-pointer absolute top-2 left-2 transition-all duration-200 z-30",
+            isHandRaised && "scale-110"
+          )}
           title={isFirstHand ? "First hand raised" : "Hand raised"}
         >
           <svg
             width="100%"
             height="100%"
             viewBox="0 0 24 24"
-            fill={isFilled ? green : "none"}
-            stroke={green}
+            fill={isFilled ? green : "none"} // fill only if multiple participants raised hand
+            stroke={green} // always green stroke
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            style={{ filter: `drop-shadow(0 0 8px ${green})` }}
           >
             {/* 3D hand shape */}
             <path d="M12 2 C12 2, 10 8, 10 14 L14 14 L14 8 L12 2 Z" />
