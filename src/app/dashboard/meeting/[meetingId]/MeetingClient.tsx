@@ -324,7 +324,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     });
   }, [remoteStreams]);
 
-  const { allParticipants, firstHandRaisedId } = useMemo(() => {
+  const { allParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
     const self: Participant = {
       id: userId,
@@ -365,8 +365,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const firstHandRaised = all
       .filter(p => p.isHandRaised && p.handRaisedAt)
       .sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
+    
+    const raisedCount = all.filter(p => p.isHandRaised).length;
 
-    return { allParticipants: all, firstHandRaisedId: firstHandRaised?.id || null };
+    return { allParticipants: all, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
   }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised]);
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -459,6 +461,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   isMicOn={!pinned.isMicOff}
                   isHandRaised={pinned.isHandRaised || false}
                   isFirstHand={pinned.id === firstHandRaisedId}
+                  raisedCount={raisedCount}
                   volumeLevel={pinned.volumeLevel}
                   isLocal={!!pinned.isLocal}
                   profileUrl={pinned.avatar}
@@ -484,6 +487,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     isMicOn={!p.isMicOff}
                     isHandRaised={p.isHandRaised || false}
                     isFirstHand={p.id === firstHandRaisedId}
+                    raisedCount={raisedCount}
                     volumeLevel={p.volumeLevel}
                     isLocal={!!p.isLocal}
                     profileUrl={p.avatar}
@@ -515,6 +519,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   isMicOn={!activeScreenSharer.isMicOff}
                   isHandRaised={activeScreenSharer.isHandRaised || false}
                   isFirstHand={activeScreenSharer.id === firstHandRaisedId}
+                  raisedCount={raisedCount}
                   volumeLevel={activeScreenSharer.volumeLevel}
                   isLocal={!!activeScreenSharer.isLocal}
                   profileUrl={activeScreenSharer.avatar}
@@ -536,6 +541,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                       isMicOn={!p.isMicOff}
                       isHandRaised={p.isHandRaised || false}
                       isFirstHand={p.id === firstHandRaisedId}
+                      raisedCount={raisedCount}
                       volumeLevel={p.volumeLevel}
                       isLocal={!!p.isLocal}
                       profileUrl={p.avatar}
@@ -563,6 +569,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             isMicOn={!p.isMicOff}
             isHandRaised={p.isHandRaised || false}
             isFirstHand={p.id === firstHandRaisedId}
+            raisedCount={raisedCount}
             volumeLevel={p.volumeLevel}
             isLocal={!!p.isLocal}
             profileUrl={p.avatar}
@@ -590,6 +597,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 isMicOn={!remote.isMicOff}
                 isHandRaised={remote.isHandRaised || false}
                 isFirstHand={remote.id === firstHandRaisedId}
+                raisedCount={raisedCount}
                 volumeLevel={remote.volumeLevel}
                 isLocal={!!remote.isLocal}
                 profileUrl={remote.avatar}
@@ -609,6 +617,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 isMicOn={!local.isMicOff}
                 isHandRaised={local.isHandRaised || false}
                 isFirstHand={local.id === firstHandRaisedId}
+                raisedCount={raisedCount}
                 volumeLevel={local.volumeLevel}
                 isLocal={!!local.isLocal}
                 profileUrl={local.avatar}
@@ -641,6 +650,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               isMicOn={!p.isMicOff}
               isHandRaised={p.isHandRaised || false}
               isFirstHand={p.id === firstHandRaisedId}
+              raisedCount={raisedCount}
               volumeLevel={p.volumeLevel}
               isLocal={!!p.isLocal}
               profileUrl={p.avatar}

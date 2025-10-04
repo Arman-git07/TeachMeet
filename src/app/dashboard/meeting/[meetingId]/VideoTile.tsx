@@ -14,54 +14,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// --- 3D Hand Component ---
-const Hand3D = ({ isFirst }: { isFirst: boolean }) => (
-  <div className="relative">
-    <Hand
-      className="h-10 w-10 text-green-500"
-      style={{
-        background: "linear-gradient(145deg, #22c55e, #16a34a)",
-        WebkitTextStroke: "1px #0f5132",
-        borderRadius: "6px",
-        padding: "4px",
-        boxShadow: "2px 2px 6px rgba(0,0,0,0.3), inset -2px -2px 4px rgba(255,255,255,0.15)",
-        transform: "perspective(800px) rotateX(10deg) rotateY(-5deg)",
-        animation: "popIn 0.3s ease-out",
-      }}
-    />
-    {isFirst && (
-      <span
-        className="absolute -top-1 -right-1 text-yellow-400 text-xs font-bold"
-        style={{
-          textShadow: "0 0 6px rgba(255,215,0,0.7)",
-        }}
-      >
-        ⭐
-      </span>
-    )}
-    <style jsx>{`
-      @keyframes popIn {
-        0% {
-          transform: scale(0.7) perspective(800px) rotateX(15deg) rotateY(-5deg);
-          opacity: 0;
-        }
-        100% {
-          transform: scale(1) perspective(800px) rotateX(10deg) rotateY(-5deg);
-          opacity: 1;
-        }
-      }
-    `}</style>
-  </div>
-);
-
-
 // --- Main VideoTile Component ---
 type Props = {
   stream: MediaStream | null;
   isCameraOn: boolean;
   isMicOn?: boolean;
   isHandRaised?: boolean;
-  isFirstHand?: boolean; // New prop
+  isFirstHand?: boolean;
+  raisedCount?: number;
   isLocal?: boolean;
   profileUrl?: string | null;
   className?: string;
@@ -79,7 +39,8 @@ const VideoTile: React.FC<Props> = ({
   isCameraOn,
   isMicOn = true,
   isHandRaised = false,
-  isFirstHand = false, // Default to false
+  isFirstHand = false,
+  raisedCount = 0,
   isLocal = false,
   profileUrl = null,
   className = "",
@@ -101,6 +62,9 @@ const VideoTile: React.FC<Props> = ({
     }
     if (!stream) videoEl.srcObject = null;
   }, [stream]);
+  
+  const green = "hsl(98, 60%, 50%)";
+  const isFilled = raisedCount > 1 && isHandRaised;
 
   return (
     <div
@@ -115,9 +79,25 @@ const VideoTile: React.FC<Props> = ({
     >
        {/* ✋ Hand Raised Icon - Top Left */}
        {isHandRaised && (
-         <div className="absolute top-2 left-2 z-[9999]">
-            <Hand3D isFirst={isFirstHand} />
-         </div>
+         <div 
+            className="w-8 h-8 cursor-pointer absolute top-2 left-2 z-50 transition-all duration-200"
+            title={isFirstHand ? "First hand raised" : "Hand raised"}
+          >
+            <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill={isFilled ? green : "none"} // fill only if multiple participants raised hand
+                stroke={green} // always green stroke
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
+                {/* 3D hand shape */}
+                <path d="M12 2 C12 2, 10 8, 10 14 L14 14 L14 8 L12 2 Z" />
+                <path d="M10 14 L10 20 L14 20 L14 14" />
+            </svg>
+        </div>
        )}
 
       {/* Video Layer */}
