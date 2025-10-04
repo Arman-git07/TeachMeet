@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -72,10 +71,18 @@ const VideoTile: React.FC<Props> = ({
       {/* ✋ Hand Raised Icon - Top Left */}
       {isHandRaised && (
         <div
-          className="absolute top-2 left-2 z-[99999] flex items-center justify-center p-2 bg-yellow-500 rounded-full shadow-xl pointer-events-none"
-          style={{ transform: "translateZ(0)" }}
+          className="absolute top-2 left-2 z-[999999] p-2 rounded-full shadow-[0_0_15px_rgba(72,239,128,0.7)] 
+               bg-gradient-to-br from-[hsl(145,63%,48%)] to-[hsl(152,68%,55%)] 
+               border-2 border-white/20 backdrop-blur-md transform hover:scale-105 transition-transform duration-300"
+          style={{ isolation: "isolate" }}
         >
-          <Hand className="h-5 w-5 text-white" />
+          <Hand
+            className="h-6 w-6 text-white drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+            style={{
+              filter: "drop-shadow(0 0 6px rgba(72, 239, 128, 0.9))",
+              transform: "translateZ(0)",
+            }}
+          />
         </div>
       )}
 
