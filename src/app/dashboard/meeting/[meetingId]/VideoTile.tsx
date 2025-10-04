@@ -77,28 +77,28 @@ const VideoTile: React.FC<Props> = ({
       style={{ isolation: "isolate" }} // Create stacking context
       role="group"
     >
-       {/* ✋ Hand Raised Icon - Top Left */}
+       {/* Hand Raise Icon */}
        {isHandRaised && (
-         <div 
-            className="w-8 h-8 cursor-pointer absolute top-2 left-2 z-50 transition-all duration-200"
-            title={isFirstHand ? "First hand raised" : "Hand raised"}
+        <div
+          className="w-8 h-8 cursor-pointer absolute top-2 left-2 z-50 transition-all duration-200"
+          title={isFirstHand ? "First hand raised" : "Hand raised"}
+        >
+          <svg
+            width="100%"
+            height="100%"
+            viewBox="0 0 24 24"
+            fill={isFilled ? green : "none"}
+            stroke={green}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg
-                width="100%"
-                height="100%"
-                viewBox="0 0 24 24"
-                fill={isFilled ? green : "none"} // fill only if multiple participants raised hand
-                stroke={green} // always green stroke
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            >
-                {/* 3D hand shape */}
-                <path d="M12 2 C12 2, 10 8, 10 14 L14 14 L14 8 L12 2 Z" />
-                <path d="M10 14 L10 20 L14 20 L14 14" />
-            </svg>
+            {/* 3D hand shape */}
+            <path d="M12 2 C12 2, 10 8, 10 14 L14 14 L14 8 L12 2 Z" />
+            <path d="M10 14 L10 20 L14 20 L14 14" />
+          </svg>
         </div>
-       )}
+      )}
 
       {/* Video Layer */}
       <div className="relative w-full h-full z-0">
