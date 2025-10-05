@@ -167,7 +167,7 @@ export default function WhiteboardPage() {
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic');
   const meetingId = params.meetingId as string;
-  const { setHeaderContent } = useDynamicHeader();
+  const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { toast } = useToast();
 
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1126,11 +1126,12 @@ export default function WhiteboardPage() {
     pagesHistoryStepRef.current = [0];
 
     setHeaderContent(
-      <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3">
           <Brush className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-semibold truncate">Whiteboard</h1>
         </div>
+    );
+    setHeaderAction(
         <div className="flex items-center gap-2">
             {meetingId && (
               <Button asChild variant="outline" size="sm" className="rounded-lg">
@@ -1164,10 +1165,13 @@ export default function WhiteboardPage() {
               </DropdownMenuContent>
             </DropdownMenu>
         </div>
-      </div>
     );
-    return () => setHeaderContent(null);
-  }, [setHeaderContent, meetingId, router, topic]);
+
+    return () => {
+        setHeaderContent(null);
+        setHeaderAction(null);
+    };
+  }, [setHeaderContent, setHeaderAction, meetingId, router, topic]);
 
 
   return (
@@ -1202,7 +1206,7 @@ export default function WhiteboardPage() {
         tabIndex={-1}
       />
       <div className="flex flex-col h-full bg-muted/30">
-        <div className="flex-none p-2 border-b bg-background shadow-md sticky top-16 z-20">
+        <div className="flex-none p-2 border-b bg-background shadow-md z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2 relative">
             <ToolButton icon={Brush} label="Draw" onClick={handleDrawButtonClick} isActive={activeTool === 'draw' || activeTool === 'shape'}/>
             {isDrawPanelVisible && (

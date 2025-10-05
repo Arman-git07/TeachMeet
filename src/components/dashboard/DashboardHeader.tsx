@@ -7,7 +7,7 @@ import { PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function DashboardHeader() {
-  const { headerContent } = useDynamicHeader();
+  const { headerContent, headerAction } = useDynamicHeader();
   
   return (
     <header className={cn(
@@ -24,6 +24,11 @@ export function DashboardHeader() {
           <SidebarTrigger className="hidden md:flex" />
            {headerContent}
         </div>
+        {headerAction && (
+            <div className="flex items-center gap-2">
+                {headerAction}
+            </div>
+        )}
       </div>
     </header>
   );
