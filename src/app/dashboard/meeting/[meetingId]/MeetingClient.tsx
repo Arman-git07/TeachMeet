@@ -479,7 +479,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
+            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
         </div>
