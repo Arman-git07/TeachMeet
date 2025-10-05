@@ -53,13 +53,12 @@ export default function DashboardLayout({
 
   return (
     <DynamicHeaderProvider>
-      <div className="flex flex-col flex-1">
-        {!isPrejoinPage && !isMeetingPage && <DashboardHeader />}
+      <div className="flex flex-col flex-1 h-screen overflow-hidden">
+        {!isPrejoinPage && <DashboardHeader />}
         <main className={cn(
-          "flex flex-col flex-1 bg-background",
-          !isMeetingPage && !isPrejoinPage && "p-4 md:p-8"
+          "flex flex-col flex-1 bg-background overflow-hidden",
+           isMeetingPage ? "" : "p-4 md:p-8"
         )}>
-           {isMeetingPage && <DashboardHeader />}
           {children}
         </main>
       </div>

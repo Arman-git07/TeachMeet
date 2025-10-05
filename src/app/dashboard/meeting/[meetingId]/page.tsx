@@ -1,23 +1,29 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import React, { useEffect, useState, useMemo } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth";
 import MeetingClient from "./MeetingClient";
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { MoreVertical, Brush, MessageSquare, Users, Settings } from 'lucide-react';
 
 
 // --------------------------- Meeting Page ---------------------------
 export default function MeetingPage() {
   const params = useSearchParams();
   const router = useRouter();
-  const { setHeaderContent } = useDynamicHeader();
+  const pathname = usePathname();
+  const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user } = useAuth();
   
   const [meetingId, setMeetingId] = useState('');
+  
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const pathParts = window.location.pathname.split('/');
@@ -28,10 +34,60 @@ export default function MeetingPage() {
 
   const topic = params.get('topic') || "TeachMeet Meeting";
   
+  const constructUrl = (page: string) => {
+    let url = `/dashboard/meeting/${meetingId}/${page}`;
+    if (topic) {
+        url += `?topic=${encodeURIComponent(topic)}`;
+    }
+    return url;
+  };
+  
   useEffect(() => {
     setHeaderContent(<span className="text-sm font-medium truncate">{topic}</span>);
-    return () => setHeaderContent(null);
-  }, [topic, setHeaderContent]);
+    
+    const MeetingActions = () => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <MoreVertical className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="rounded-xl w-56">
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href={constructUrl('whiteboard')}>
+              <Brush className="mr-2 h-4 w-4" />
+              <span>Whiteboard</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="cursor-pointer">
+             <Link href={constructUrl('chat')}>
+              <MessageSquare className="mr-2 h-4 w-4" />
+              <span>Chat</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="cursor-pointer">
+             <Link href={constructUrl('participants')}>
+              <Users className="mr-2 h-4 w-4" />
+              <span>Participants</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Meeting Settings</span>
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+
+    setHeaderAction(<MeetingActions />);
+
+    return () => {
+      setHeaderContent(null);
+      setHeaderAction(null);
+    };
+  }, [topic, meetingId, setHeaderContent, setHeaderAction]);
 
   const handleLeave = async () => {
     if (user && meetingId) await deleteDoc(doc(db, "meetings", meetingId, "participants", user.uid)).catch(console.error);
