@@ -66,7 +66,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
-  const screenStreamRef = useRef<MediaStream | null>(null);
   
   const [remoteScreenTiles, setRemoteScreenTiles] = useState<RemoteScreen[]>([]);
   const [screenShareRequest, setScreenShareRequest] = useState<{ participantId: string; name: string } | null>(null);
@@ -100,14 +99,14 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return new MeshRTC({
       roomId: meetingId,
       userId,
-      onRemoteStream: (socketId, stream) => {
+      onRemoteStream: (remoteSocketId, stream) => {
         if(stream.getVideoTracks().some(t => t.label.includes('screen'))) {
           // This is a screen share stream
-           setRemoteScreenTiles(prev => [...prev, { peerId: socketId, stream }]);
+           setRemoteScreenTiles(prev => [...prev, { peerId: remoteSocketId, stream }]);
         } else {
           setRemoteStreams(prev => {
             const next = new Map(prev);
-            next.set(socketId, stream);
+            next.set(remoteSocketId, stream);
             return next;
           });
         }
@@ -132,7 +131,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       meetingId,
       userId,
       isHost,
-      addRemoteScreenTile: (peerId, stream) => setRemoteScreenTiles(prev => [...prev, { peerId, stream }]),
+      addRemoteScreenTile: (peerId, stream) => setRemoteScreenTiles(prev => [...prev.filter(t => t.peerId !== peerId), { peerId, stream }]),
       removeRemoteScreenTile: (peerId) => setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== peerId)),
       showHostScreenShareRequestModal: (opts) => setScreenShareRequest(opts),
       setIsSharing: setIsScreenSharing
@@ -279,7 +278,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       name: localUserDetails?.name || user?.displayName || "You",
       avatar: localUserDetails?.photoURL || user?.photoURL || `https://placehold.co/128x128.png?text=${(user?.displayName || 'Y').charAt(0)}`,
       isCamOff: !camOn, isMicOff: !micOn, isHandRaised, handRaisedAt: localUserDetails?.handRaisedAt,
-      isScreenSharing, isLocal: true, stream: isScreenSharing ? screenStreamRef.current : localStream,
+      isScreenSharing, isLocal: true, stream: localStream,
       volumeLevel: volumeLevels.get(userId) ?? 0
     };
     const remotes: Participant[] = Array.from(liveParticipants.entries())
@@ -439,7 +438,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
+            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
         </div>

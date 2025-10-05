@@ -14,7 +14,13 @@ function getHostSocketId(roomId: string): string | undefined {
 }
 
 function getSocketIdForParticipant(roomId: string, participantId: string): string | undefined {
-  return rooms.get(roomId)?.participants.get(participantId);
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  // Find socket ID by user ID
+  for (const [uid, sid] of room.participants.entries()) {
+    if (uid === participantId) return sid;
+  }
+  return undefined;
 }
 
 function isSocketHostForMeeting(socket: any, roomId: string): boolean {
@@ -66,7 +72,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponseServerI
       socket.on("request-screen-share", ({ meetingId, participantId }) => {
         const hostSocketId = getHostSocketId(meetingId);
         if (hostSocketId) {
-          const name = rooms.get(meetingId)?.participants.has(participantId) ? participantId : "Unknown";
+          const name = socket.handshake.auth.name || participantId;
           io.to(hostSocketId).emit("screen-share-request", { meetingId, participantId, name });
         }
       });

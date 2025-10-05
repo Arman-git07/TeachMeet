@@ -68,10 +68,11 @@ export class ScreenShareHelper {
     });
 
     // Remote participant started/stopped sharing
-    this.socket.on("participant-started-sharing", ({ participantId, stream }: any) => {
-        // This is a backup; primary handling should be in ontrack
+    this.socket.on("participant-started-sharing", ({ participantId }: {participantId: string}) => {
+      // This is a backup; primary handling should be in ontrack
+      // You can add logic here if needed, but ontrack is more reliable for streams.
     });
-    this.socket.on("participant-stopped-sharing", ({ participantId }: any) => {
+    this.socket.on("participant-stopped-sharing", ({ participantId }: {participantId: string}) => {
       this.removeRemoteScreenTile(participantId);
     });
   }
@@ -111,6 +112,7 @@ export class ScreenShareHelper {
       this.screenStream = screenStream;
       this.screenTrack = screenTrack;
 
+      // Add screen track to all peer connections
       this.mesh?.addScreenTrackToAll(screenTrack, screenStream);
 
       screenTrack.onended = () => this.stopScreenShare();
@@ -118,6 +120,7 @@ export class ScreenShareHelper {
       this.isSharing = true;
       this.setIsSharingState(true);
 
+      // Notify others
       this.socket?.emit("notify-screen-share-started", { meetingId: this.meetingId, participantId: this.userId });
     } catch (err: any) {
       console.error("startScreenShare failed:", err);
@@ -155,7 +158,7 @@ export class ScreenShareHelper {
       console.error("stopScreenShare failed", err);
     }
   }
-
+  
   // Host responds to a request
   public hostRespondToShareRequest(participantId: string, allow: boolean) {
     this.socket?.emit("approve-screen-share", { meetingId: this.meetingId, participantId, approved: allow });
