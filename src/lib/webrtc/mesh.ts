@@ -28,7 +28,7 @@ export class MeshRTC {
   private localStream?: MediaStream;
   private originalVideoTrack?: MediaStreamTrack;
   private remotes = new Map<string, Remote>();
-  private roomId!: string;
+  public roomId!: string;
   private userId!: string;
   private initialized = false;
 
@@ -155,6 +155,10 @@ export class MeshRTC {
     return remote;
   }
   
+  public getLocalVideoTrack(): MediaStreamTrack | undefined {
+    return this.localStream?.getVideoTracks()[0];
+  }
+
   public replaceTrack(track: MediaStreamTrack) {
     this.remotes.forEach(({ pc }) => {
       const sender = pc.getSenders().find(s => s.track?.kind === track.kind);

@@ -66,7 +66,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [isHandRaised, setIsHandRaised] = useState(false);
   
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [showScreenShareConfirm, setShowScreenShareConfirm] = useState(false);
   
   const [remoteScreenTiles, setRemoteScreenTiles] = useState<RemoteScreen[]>([]);
   const [screenShareRequest, setScreenShareRequest] = useState<{ participantId: string; name: string } | null>(null);
@@ -125,18 +124,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [meetingId, userId, user?.displayName]);
 
   const screenShareHelper = useMemo(() => {
-    if (!rtc || !rtc.socket) return null;
-    return new ScreenShareHelper({
-      mesh: rtc,
-      socket: rtc.socket,
-      meetingId,
-      userId,
-      isHost,
-      addRemoteScreenTile: (participantId, stream) => setRemoteScreenTiles(prev => [...prev.filter(t => t.peerId !== participantId), { peerId: participantId, stream }]),
-      removeRemoteScreenTile: (participantId) => setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== participantId)),
-      showHostScreenShareRequestModal: (opts) => setScreenShareRequest(opts),
-    });
-  }, [rtc, meetingId, userId, isHost]);
+    if (!rtc || !user?.displayName) return null;
+    return new ScreenShareHelper(rtc, user.displayName);
+  }, [rtc, user?.displayName]);
 
   useEffect(() => {
     let mounted = true;
@@ -160,7 +150,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       audioContextRef.current?.close().catch(() => {});
       remoteAnalysersRef.current.forEach(entry => { if (entry.rafId) cancelAnimationFrame(entry.rafId); });
       remoteAnalysersRef.current.clear();
-      screenShareHelper?.cleanup();
+      screenShareHelper?.stopScreenShare();
     };
   }, [initialCamOn, initialMicOn, toast, screenShareHelper]);
 
@@ -273,14 +263,17 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   useEffect(() => {
     if (!rtc?.socket) return;
-    const handleStarted = ({userId: sharerId}: {userId: string}) => {
+    const handleStarted = ({ userId: sharerId }: { userId: string }) => {
       if (sharerId === userId) setIsScreenSharing(true);
     };
-    const handleStopped = ({userId: sharerId}: {userId: string}) => {
-       if (sharerId === userId) setIsScreenSharing(false);
+    const handleStopped = ({ userId: sharerId }: { userId: string }) => {
+      if (sharerId === userId) setIsScreenSharing(false);
     };
     rtc.socket.on("started-screen-share", handleStarted);
     rtc.socket.on("stopped-screen-share", handleStopped);
+    rtc.socket.on("screen-share-started", handleStarted);
+    rtc.socket.on("screen-share-stopped", handleStopped);
+
 
     const handleParticipantStarted = ({ participantId }: { participantId: string }) => {
         // The onRemoteStream in MeshRTC will handle adding the tile
@@ -296,6 +289,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => {
       rtc.socket.off("started-screen-share", handleStarted);
       rtc.socket.off("stopped-screen-share", handleStopped);
+      rtc.socket.off("screen-share-started", handleStarted);
+      rtc.socket.off("screen-share-stopped", handleStopped);
       rtc.socket.off('participant-started-sharing', handleParticipantStarted);
       rtc.socket.off('participant-stopped-sharing', handleParticipantStopped);
     };
@@ -354,6 +349,16 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const next = !isHandRaised; setIsHandRaised(next);
     updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null });
   }, [isHandRaised, updateMyStatus]);
+  
+  const handleToggleScreenShare = async () => {
+    if (screenShareHelper?.isScreenSharing()) {
+      await screenShareHelper.stopScreenShare();
+      setIsScreenSharing(false);
+    } else {
+      await screenShareHelper?.requestScreenSharePermission();
+      // The socket event listener will set isScreenSharing to true
+    }
+  };
   
   const togglePin = useCallback((id: string) => { setPinnedId(prev => prev === id ? null : prev); }, []);
 
@@ -467,18 +472,11 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           <div className="flex items-center justify-center gap-3">
             <Button onClick={toggleMic} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}</Button>
             <Button onClick={toggleCamera} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}</Button>
-            <AlertDialog open={showScreenShareConfirm} onOpenChange={setShowScreenShareConfirm}>
-               <AlertDialogTrigger asChild>
-                   <Button onClick={() => { isScreenSharing ? screenShareHelper?.stopScreenShare() : setShowScreenShareConfirm(true) }} variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isScreenSharing ? "bg-green-600 text-white hover:bg-green-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}>{isScreenSharing ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}</Button>
-               </AlertDialogTrigger>
-               <AlertDialogContent>
-                  <AlertDialogHeader><AlertDialogTitle>Share Your Screen?</AlertDialogTitle><AlertDialogDescription>This will allow everyone in the meeting to see your screen.</AlertDialogDescription></AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => screenShareHelper?.requestScreenSharePermission()}>Share Screen</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            
+            <Button onClick={handleToggleScreenShare} variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isScreenSharing ? "bg-green-600 text-white hover:bg-green-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
+                {isScreenSharing ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
+            </Button>
+            
             <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
