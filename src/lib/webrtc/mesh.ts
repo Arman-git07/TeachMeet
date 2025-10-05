@@ -12,6 +12,7 @@ type Remote = {
 type MeshOptions = {
   roomId: string;
   userId: string;
+  userName: string; // Add userName
   onRemoteStream: (remoteSocketId: string, stream: MediaStream) => void;
   onRemoteLeft: (remoteSocketId: string) => void;
   onUserJoined?: (remoteSocketId: string) => void;
@@ -40,7 +41,7 @@ export class MeshRTC {
     this.localStream = stream;
     this.originalVideoTrack = stream.getVideoTracks()[0];
 
-    this.socket = io({ path: "/api/socketio", auth: { name: this.opts.userId } });
+    this.socket = io({ path: "/api/socketio", auth: { name: this.opts.userName } });
 
     this.roomId = this.opts.roomId;
     this.userId = this.opts.userId;

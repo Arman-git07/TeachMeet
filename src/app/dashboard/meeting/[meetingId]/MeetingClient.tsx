@@ -95,10 +95,11 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const isHost = useCallback(() => userId === meetingCreatorId.current, [userId]);
   
   const rtc = useMemo(() => {
-    if (!userId || !meetingId) return null;
+    if (!userId || !meetingId || !user?.displayName) return null;
     return new MeshRTC({
       roomId: meetingId,
       userId,
+      userName: user.displayName, // Pass user name for auth
       onRemoteStream: (remoteSocketId, stream) => {
         if(stream.getVideoTracks().some(t => t.label.includes('screen'))) {
           // This is a screen share stream
@@ -121,7 +122,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setPinnedId(prev => prev === socketId ? null : prev);
       },
     });
-  }, [meetingId, userId]);
+  }, [meetingId, userId, user?.displayName]);
 
   const screenShareHelper = useMemo(() => {
     if (!rtc || !rtc.socket) return null;
@@ -460,7 +461,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", !isHandRaised ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
+            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
         </div>
