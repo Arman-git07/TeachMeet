@@ -83,6 +83,14 @@ export default function handler(req: NextApiRequest, res: NextApiResponseServerI
           io.to(participantSocketId).emit("screen-share-approval", { meetingId, approved });
         }
       });
+      
+      socket.on("started-screen-share", ({ meetingId, userId }) => {
+        socket.to(meetingId).emit("started-screen-share", { userId });
+      });
+
+      socket.on("stopped-screen-share", ({ meetingId, userId }) => {
+        socket.to(meetingId).emit("stopped-screen-share", { userId });
+      });
 
       socket.on("notify-screen-share-started", ({ meetingId, participantId }) => {
         socket.to(meetingId).emit("participant-started-sharing", { participantId });

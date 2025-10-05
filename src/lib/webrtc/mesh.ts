@@ -25,29 +25,20 @@ const ICE: RTCIceServer[] = [
 export class MeshRTC {
   public socket!: Socket;
   private localStream?: MediaStream;
+  private originalVideoTrack?: MediaStreamTrack;
   private remotes = new Map<string, Remote>();
   private roomId!: string;
   private userId!: string;
   private initialized = false;
-  // Keep a map of screen senders per peer connection (keyed by pc)
-  private screenSenders = new WeakMap<RTCPeerConnection, RTCRtpSender[]>();
-
 
   constructor(private opts: MeshOptions) {}
-
-  public getAllPeerConnections(): RTCPeerConnection[] {
-    return Array.from(this.remotes.values()).map(r => r.pc);
-  }
-
-  public getPeerConnectionById(peerId: string): RTCPeerConnection | undefined {
-    return this.remotes.get(peerId)?.pc;
-  }
 
   async init(stream: MediaStream) {
     if (this.initialized) return;
     this.initialized = true;
 
     this.localStream = stream;
+    this.originalVideoTrack = stream.getVideoTracks()[0];
 
     this.socket = io({ path: "/api/socketio", auth: { name: this.opts.userId } });
 
@@ -172,58 +163,12 @@ export class MeshRTC {
     });
   }
 
-  public addScreenTrackToAll(screenTrack: MediaStreamTrack, stream?: MediaStream) {
-    const added: { pc: RTCPeerConnection; sender: RTCRtpSender }[] = [];
-    this.getAllPeerConnections().forEach((pc) => {
-      try {
-        const sender = pc.addTrack(screenTrack, stream ?? new MediaStream([screenTrack]));
-        const arr = this.screenSenders.get(pc) ?? [];
-        arr.push(sender);
-        this.screenSenders.set(pc, arr);
-        added.push({ pc, sender });
-      } catch (e) {
-        console.warn("MeshRTC.addScreenTrackToAll: failed to add track for pc", e);
-      }
-    });
-    return added;
+  public restoreCameraTrack() {
+    if (this.originalVideoTrack) {
+        this.replaceTrack(this.originalVideoTrack);
+    }
   }
 
-  public removeScreenTrackFromAll(screenTrack?: MediaStreamTrack) {
-    this.getAllPeerConnections().forEach((pc) => {
-      const arr = this.screenSenders.get(pc);
-      if (!arr || arr.length === 0) return;
-      const remaining: RTCRtpSender[] = [];
-      arr.forEach((sender) => {
-        try {
-          const senderTrack = sender.track;
-          if (!screenTrack || senderTrack === screenTrack) {
-            pc.removeTrack(sender);
-          } else {
-            remaining.push(sender);
-          }
-        } catch (e) {
-          console.warn("MeshRTC.removeScreenTrackFromAll: removeTrack failed", e);
-        }
-      });
-      if (remaining.length === 0) this.screenSenders.delete(pc);
-      else this.screenSenders.set(pc, remaining);
-    });
-  }
-
-  public forceStopShareForPeer(peerId: string) {
-    const pc = this.getPeerConnectionById(peerId);
-    if (!pc) return;
-    const arr = this.screenSenders.get(pc);
-    if (!arr) return;
-    arr.forEach((sender) => {
-      try {
-        pc.removeTrack(sender);
-      } catch (e) {
-        console.warn("MeshRTC.forceStopShareForPeer removeTrack failed", e);
-      }
-    });
-    this.screenSenders.delete(pc);
-  }
 
   private cleanupRemote(socketId: string) {
     const remote = this.remotes.get(socketId);

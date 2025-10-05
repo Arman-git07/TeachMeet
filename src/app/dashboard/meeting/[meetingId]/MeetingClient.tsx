@@ -134,7 +134,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       addRemoteScreenTile: (peerId, stream) => setRemoteScreenTiles(prev => [...prev.filter(t => t.peerId !== peerId), { peerId, stream }]),
       removeRemoteScreenTile: (peerId) => setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== peerId)),
       showHostScreenShareRequestModal: (opts) => setScreenShareRequest(opts),
-      setIsSharing: setIsScreenSharing
     });
   }, [rtc, meetingId, userId, isHost]);
 
@@ -271,6 +270,23 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     });
   }, [remoteStreams]);
 
+  useEffect(() => {
+    if (!rtc?.socket) return;
+    const handleStarted = ({userId: sharerId}: {userId: string}) => {
+      if (sharerId === userId) setIsScreenSharing(true);
+    };
+    const handleStopped = ({userId: sharerId}: {userId: string}) => {
+       if (sharerId === userId) setIsScreenSharing(false);
+    };
+    rtc.socket.on("started-screen-share", handleStarted);
+    rtc.socket.on("stopped-screen-share", handleStopped);
+    return () => {
+      rtc.socket.off("started-screen-share", handleStarted);
+      rtc.socket.off("stopped-screen-share", handleStopped);
+    };
+  }, [rtc, userId]);
+
+
   const { allParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
     const self: Participant = {
@@ -402,7 +418,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   return (
     <div className="flex flex-col h-full">
-      {screenShareRequest && (
+      {isHost() && screenShareRequest && (
         <AlertDialog open={!!screenShareRequest} onOpenChange={() => setScreenShareRequest(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -421,6 +437,12 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         {loadingMedia ? <div className="w-full h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : renderLayout()}
       </div>
 
+      {isScreenSharing && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50">
+          🔴 You’re sharing your screen
+        </div>
+      )}
+
       <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
         <div className="flex items-center justify-center relative">
           <div className="flex items-center justify-center gap-3">
@@ -438,7 +460,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
+            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", !isHandRaised ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
         </div>
@@ -446,5 +468,3 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
-
-    
