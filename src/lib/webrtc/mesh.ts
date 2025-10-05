@@ -23,7 +23,7 @@ const ICE: RTCIceServer[] = [
 ];
 
 export class MeshRTC {
-  private socket!: Socket;
+  public socket!: Socket;
   private localStream?: MediaStream;
   private remotes = new Map<string, Remote>();
   private roomId!: string;

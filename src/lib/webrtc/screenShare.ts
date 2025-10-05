@@ -1,3 +1,4 @@
+
 // src/lib/webrtc/screenShare.ts
 "use client";
 
@@ -5,14 +6,14 @@ import { MeshRTC } from "./mesh";
 import { Socket } from "socket.io-client";
 
 export interface ScreenShareHelperProps {
-  mesh: MeshRTC | null;          // your MeshRTC instance
-  socket: Socket | null;         // your Socket.IO client instance
-  meetingId: string;      // meetingId prop
-  userId: string;         // current user's participantId
-  isHost: () => boolean;  // function returning true if current user is host
-  addRemoteScreenTile: (peerId: string, stream: MediaStream) => void; // render remote tile
-  removeRemoteScreenTile: (peerId: string) => void;                   // remove remote tile
-  showHostScreenShareRequestModal?: (opts: { participantId: string; name: string; }) => void; // optional host modal hook
+  mesh: MeshRTC | null;
+  socket: Socket | null;
+  meetingId: string;
+  userId: string;
+  isHost: () => boolean;
+  addRemoteScreenTile: (peerId: string, stream: MediaStream) => void;
+  removeRemoteScreenTile: (peerId: string) => void;
+  showHostScreenShareRequestModal?: (opts: { participantId: string; name: string; }) => void;
   setIsSharing: (isSharing: boolean) => void;
 }
 
