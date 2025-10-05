@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
 import { ScreenShareHelper } from "@/lib/webrtc/screenShare";
+import { ScreenShareHostModal } from "@/components/modals/ScreenShareHostModal";
 
 type Participant = {
   id: string;
@@ -102,7 +103,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       userName: user.displayName, // Pass user name for auth
       onRemoteStream: (remoteSocketId, stream) => {
         if(stream.getVideoTracks().some(t => t.label.includes('screen'))) {
-          // This is a screen share stream
            setRemoteScreenTiles(prev => [...prev, { peerId: remoteSocketId, stream }]);
         } else {
           setRemoteStreams(prev => {
@@ -420,18 +420,22 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   return (
     <div className="flex flex-col h-full">
       {isHost() && screenShareRequest && (
-        <AlertDialog open={!!screenShareRequest} onOpenChange={() => setScreenShareRequest(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{screenShareRequest.name} wants to share their screen</AlertDialogTitle>
-              <AlertDialogDescription>Do you want to allow them to share their screen?</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => { screenShareHelper?.hostRespondToShareRequest(screenShareRequest.participantId, false); setScreenShareRequest(null); }}>Deny</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { screenShareHelper?.hostRespondToShareRequest(screenShareRequest.participantId, true); setScreenShareRequest(null); }}>Allow</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+         <ScreenShareHostModal
+            isOpen={!!screenShareRequest}
+            participantName={screenShareRequest?.name || 'Someone'}
+            onApprove={() => {
+              if (rtc?.socket) {
+                rtc.socket.emit("approve-screen-share", { meetingId, participantId: screenShareRequest!.participantId, approved: true });
+              }
+              setScreenShareRequest(null);
+            }}
+            onDeny={() => {
+              if (rtc?.socket) {
+                rtc.socket.emit("approve-screen-share", { meetingId, participantId: screenShareRequest!.participantId, approved: false });
+              }
+              setScreenShareRequest(null);
+            }}
+          />
       )}
 
       <div className="relative flex-grow min-h-0">

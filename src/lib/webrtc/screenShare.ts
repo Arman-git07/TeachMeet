@@ -1,174 +1,171 @@
-
 // src/lib/webrtc/screenShare.ts
 "use client";
 
 import { MeshRTC } from "./mesh";
 import { Socket } from "socket.io-client";
 
-export interface ScreenShareHelperProps {
-  mesh: MeshRTC | null;
-  socket: Socket | null;
+interface ScreenShareHelperConfig {
+  mesh: MeshRTC;
+  socket: any;
   meetingId: string;
   userId: string;
   isHost: () => boolean;
-  addRemoteScreenTile: (peerId: string, stream: MediaStream) => void;
-  removeRemoteScreenTile: (peerId: string) => void;
-  showHostScreenShareRequestModal?: (opts: { participantId: string; name: string; }) => void;
-  setIsSharing: (isSharing: boolean) => void;
+  addRemoteScreenTile: (participantId: string, stream: MediaStream) => void;
+  removeRemoteScreenTile: (participantId: string) => void;
+  showHostScreenShareRequestModal: (data: { participantId: string; name: string }) => void;
 }
 
 export class ScreenShareHelper {
-  private mesh: MeshRTC | null;
-  private socket: Socket | null;
+  private mesh: MeshRTC;
+  private socket: any;
   private meetingId: string;
   private userId: string;
-  private isHostFn: () => boolean;
-  private addRemoteScreenTile: (peerId: string, stream: MediaStream) => void;
-  private removeRemoteScreenTile: (peerId: string) => void;
-  private showHostScreenShareRequestModal?: (opts: { participantId: string; name: string }) => void;
-  private setIsSharingState: (isSharing: boolean) => void;
+  private isHost: () => boolean;
+  private addRemoteScreenTile: (participantId: string, stream: MediaStream) => void;
+  private removeRemoteScreenTile: (participantId: string) => void;
+  private showHostScreenShareRequestModal: (data: { participantId: string; name: string }) => void;
+  private currentScreenTrack: MediaStreamTrack | null = null;
+  private approvedToShare = false;
 
-  private screenStream: MediaStream | null = null;
-  private screenTrack: MediaStreamTrack | null = null;
-  private isSharing: boolean = false;
-  private permissionGranted: boolean = false;
+  constructor(config: ScreenShareHelperConfig) {
+    this.mesh = config.mesh;
+    this.socket = config.socket;
+    this.meetingId = config.meetingId;
+    this.userId = config.userId;
+    this.isHost = config.isHost;
+    this.addRemoteScreenTile = config.addRemoteScreenTile;
+    this.removeRemoteScreenTile = config.removeRemoteScreenTile;
+    this.showHostScreenShareRequestModal = config.showHostScreenShareRequestModal;
 
-  constructor(props: ScreenShareHelperProps) {
-    this.mesh = props.mesh;
-    this.socket = props.socket;
-    this.meetingId = props.meetingId;
-    this.userId = props.userId;
-    this.isHostFn = props.isHost;
-    this.addRemoteScreenTile = props.addRemoteScreenTile;
-    this.removeRemoteScreenTile = props.removeRemoteScreenTile;
-    this.showHostScreenShareRequestModal = props.showHostScreenShareRequestModal;
-    this.setIsSharingState = props.setIsSharing;
-
-    this.initSocketListeners();
+    this.setupSocketEvents();
   }
 
-  private initSocketListeners() {
-    if (!this.socket) return;
-    // Participant receives approval/denial
-    this.socket.on("screen-share-approval", ({ approved }: { approved: boolean }) => {
-      this.permissionGranted = approved;
-      if (approved) this.startScreenShare();
-      else alert("Host denied screen sharing request.");
-    });
+  // --------------------------------------------------------------
+  // 🧠 PUBLIC METHOD 1: Called when user clicks "Share Screen"
+  // --------------------------------------------------------------
+  async requestScreenSharePermission() {
+    if (this.isHost()) {
+      // Host can share directly
+      await this.startScreenShare();
+    } else {
+      // Participant must request approval
+      this.socket.emit("screen-share-request", {
+        meetingId: this.meetingId,
+        participantId: this.userId,
+      });
+      alert("📩 Request sent to host for screen sharing permission.");
+    }
+  }
 
-    // Host receives request
-    this.socket.on("screen-share-request", ({ participantId, name }: { participantId: string; name: string }) => {
-      if (this.showHostScreenShareRequestModal) {
+  // --------------------------------------------------------------
+  // 🧠 PUBLIC METHOD 2: Called when user clicks "Stop Screen Share"
+  // --------------------------------------------------------------
+  stopScreenShare() {
+    if (this.currentScreenTrack) {
+      this.currentScreenTrack.stop();
+      this.mesh.restoreCameraTrack();
+      this.socket.emit("stopped-screen-share", {
+        meetingId: this.meetingId,
+        userId: this.userId,
+      });
+      this.currentScreenTrack = null;
+      this.approvedToShare = false;
+    }
+  }
+
+  // --------------------------------------------------------------
+  // 🔒 Internal: Start screen share after approval or if host
+  // --------------------------------------------------------------
+  private async startScreenShare() {
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+
+      const screenTrack = displayStream.getVideoTracks()[0];
+      this.currentScreenTrack = screenTrack;
+
+      // Replace outgoing track
+      this.mesh.replaceTrack(screenTrack);
+
+      // Handle user stopping share manually
+      screenTrack.onended = () => this.stopScreenShare();
+
+      // Emit event for UI indicator
+      this.socket.emit("started-screen-share", {
+        meetingId: this.meetingId,
+        userId: this.userId,
+      });
+
+      console.log("✅ Screen sharing started");
+    } catch (err) {
+      console.error("❌ Screen share failed:", err);
+      alert("Screen share failed. Please ensure you've granted permission and try again.");
+    }
+  }
+
+  // --------------------------------------------------------------
+  // 📡 Socket Listeners for approval & remote shares
+  // --------------------------------------------------------------
+  public setupSocketEvents() {
+    // Host receives screen share request
+    this.socket.on("screen-share-request", ({ participantId, name } : {participantId: string, name: string}) => {
+      if (this.isHost()) {
         this.showHostScreenShareRequestModal({ participantId, name });
       }
     });
 
-    // Participant forced stop by host
-    this.socket.on("force-stop-screen-share", () => {
-      if (this.isSharing) this.stopScreenShare(true);
+    // Participant receives approval from host
+    this.socket.on("screen-share-approval", async ({ participantId, approved }: {participantId: string, approved: boolean}) => {
+      if (participantId === this.userId && approved) {
+        this.approvedToShare = true;
+        await this.startScreenShare();
+      } else if (participantId === this.userId && !approved) {
+        alert("❌ Host denied your screen sharing request.");
+      }
     });
 
-    // Remote participant started/stopped sharing
-    this.socket.on("participant-started-sharing", ({ participantId }: {participantId: string}) => {
-      // This is a backup; primary handling should be in ontrack
-      // You can add logic here if needed, but ontrack is more reliable for streams.
+    // Host forces a participant to stop sharing
+    this.socket.on("force-stop-screen-share", ({ participantId } : {participantId: string}) => {
+      if (participantId === this.userId) {
+        this.stopScreenShare();
+        alert("⛔ Host stopped your screen sharing.");
+      }
     });
-    this.socket.on("participant-stopped-sharing", ({ participantId }: {participantId: string}) => {
+
+    // Remote participant started sharing
+    this.socket.on("participant-started-sharing", ({ participantId } : {participantId: string}) => {
+      if (participantId !== this.userId) {
+        // The actual stream is added via ontrack in MeshRTC. We just need to render it.
+        // The logic in MeetingClient will handle finding the stream and adding the tile.
+      }
+    });
+
+    // Remote participant stopped sharing
+    this.socket.on("participant-stopped-sharing", ({ participantId } : {participantId: string}) => {
       this.removeRemoteScreenTile(participantId);
     });
   }
 
+  // --------------------------------------------------------------
+  // 👑 Host stopping another participant’s screen
+  // --------------------------------------------------------------
+  hostStopParticipantShare(participantId: string) {
+    if (this.isHost()) {
+      this.socket.emit("host-force-stop-share", {
+        meetingId: this.meetingId,
+        targetParticipantId: participantId,
+      });
+    }
+  }
+
   public cleanup() {
       if (!this.socket) return;
-      this.socket.off("screen-share-approval");
       this.socket.off("screen-share-request");
+      this.socket.off("screen-share-approval");
       this.socket.off("force-stop-screen-share");
       this.socket.off("participant-started-sharing");
       this.socket.off("participant-stopped-sharing");
-  }
-
-  // Called when participant clicks confirmation dialog Share button
-  public requestScreenSharePermission() {
-    if (this.isHostFn()) {
-      this.startScreenShare();
-      return;
-    }
-    this.socket?.emit("request-screen-share", { meetingId: this.meetingId, participantId: this.userId });
-  }
-
-  // Starts actual screen share
-  public async startScreenShare() {
-    try {
-      if (this.isSharing) return;
-      if (!this.isHostFn() && !this.permissionGranted) {
-        console.warn("Screen share blocked: waiting for host approval");
-        this.requestScreenSharePermission();
-        return;
-      }
-
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: false });
-      const screenTrack = screenStream.getVideoTracks()[0];
-      if (!screenTrack) throw new Error("No screen track available");
-
-      this.screenStream = screenStream;
-      this.screenTrack = screenTrack;
-
-      // Add screen track to all peer connections
-      this.mesh?.addScreenTrackToAll(screenTrack, screenStream);
-
-      screenTrack.onended = () => this.stopScreenShare();
-
-      this.isSharing = true;
-      this.setIsSharingState(true);
-
-      // Notify others
-      this.socket?.emit("notify-screen-share-started", { meetingId: this.meetingId, participantId: this.userId });
-    } catch (err: any) {
-      console.error("startScreenShare failed:", err);
-      if (err.name === "NotAllowedError" || err.name === "SecurityError") {
-        alert("Screen sharing permission denied. Please allow screen sharing in your browser.");
-      } else if (err.name === "NotFoundError") {
-        alert("No screen or window found to share.");
-      } else {
-        alert("Screen share failed — please ensure you've granted permission and try again.");
-      }
-      this.isSharing = false;
-      this.setIsSharingState(false);
-      this.permissionGranted = false;
-    }
-  }
-
-  // Stop local screen share
-  public async stopScreenShare(forced: boolean = false) {
-    try {
-      if (!this.screenTrack && !this.screenStream) return;
-
-      if (this.screenTrack && this.screenTrack.readyState !== "ended") this.screenTrack.stop();
-      if (this.screenStream) this.screenStream.getTracks().forEach(t => t.stop());
-
-      this.mesh?.removeScreenTrackFromAll(this.screenTrack ?? undefined);
-
-      this.screenTrack = null;
-      this.screenStream = null;
-      this.isSharing = false;
-      this.setIsSharingState(false);
-      if (!forced) this.permissionGranted = false;
-
-      this.socket?.emit("notify-screen-share-stopped", { meetingId: this.meetingId, participantId: this.userId });
-    } catch (err) {
-      console.error("stopScreenShare failed", err);
-    }
-  }
-  
-  // Host responds to a request
-  public hostRespondToShareRequest(participantId: string, allow: boolean) {
-    this.socket?.emit("approve-screen-share", { meetingId: this.meetingId, participantId, approved: allow });
-  };
-
-  // Host forces stop participant's share
-  public hostStopParticipantShare(targetParticipantId: string) {
-    if (!this.isHostFn()) return;
-    this.socket?.emit("host-stop-participant-share", { meetingId: this.meetingId, targetParticipantId });
-    this.removeRemoteScreenTile(targetParticipantId);
   }
 }
