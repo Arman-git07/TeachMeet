@@ -159,18 +159,57 @@ export class MeshRTC {
     return this.localStream?.getVideoTracks()[0];
   }
 
-  public replaceTrack(track: MediaStreamTrack) {
-    this.remotes.forEach(({ pc }) => {
-      const sender = pc.getSenders().find(s => s.track?.kind === track.kind);
-      if (sender) {
-        sender.replaceTrack(track).catch(e => console.error("replaceTrack failed:", e));
+  public async replaceTrack(newTrack: MediaStreamTrack) {
+    if (!this.localStream) throw new Error("No local stream available.");
+  
+    // Find the video sender from the first available peer connection to use as a template
+    const firstRemote = this.remotes.values().next().value;
+    const videoSender = firstRemote?.pc
+      .getSenders()
+      .find((s: RTCRtpSender) => s.track?.kind === "video");
+  
+    if (!videoSender) {
+      console.warn("No video sender found, cannot replace track.");
+      return;
+    }
+    
+    await videoSender.replaceTrack(newTrack);
+  
+    // Update local stream for consistency
+    const oldTrack = this.localStream.getVideoTracks()[0];
+    if (oldTrack) {
+      this.localStream.removeTrack(oldTrack);
+    }
+    this.localStream.addTrack(newTrack);
+  
+    // Trigger renegotiation for all peers
+    for (const remote of this.remotes.values()) {
+      const pc = remote.pc;
+      if (pc.signalingState === "stable") {
+         try {
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            
+            const targetSocketId = [...this.remotes.entries()].find(([_, r]) => r === remote)?.[0];
+            if (targetSocketId) {
+                this.socket.emit("signal:offer", {
+                    roomId: this.roomId,
+                    to: targetSocketId,
+                    from: this.socket.id,
+                    sdp: pc.localDescription,
+                });
+            }
+
+        } catch (err) {
+          console.error("❌ Failed to renegotiate after replaceTrack:", err);
+        }
       }
-    });
+    }
   }
 
-  public restoreCameraTrack() {
+  public async restoreCameraTrack() {
     if (this.originalVideoTrack) {
-        this.replaceTrack(this.originalVideoTrack);
+        await this.replaceTrack(this.originalVideoTrack);
     }
   }
 
