@@ -68,35 +68,42 @@ export default function handler(req: NextApiRequest, res: NextApiResponseServerI
         io.to(to).emit("signal:ice", { from, candidate, socketId: socket.id });
       });
 
-      // Screen sharing events
+      // --- Screen Sharing Events ---
+      
+      // Participant requests to share screen
       socket.on("screen-share-request", ({ meetingId, participantId }) => {
         const hostSocketId = getHostSocketId(meetingId);
         if (hostSocketId) {
           const name = socket.handshake.auth.name || participantId;
-          io.to(hostSocketId).emit("screen-share-request", { meetingId, participantId, name });
+          io.to(hostSocketId).emit("screen-share-request", { participantId, name });
         }
       });
 
+      // Host approves or denies the request
       socket.on("approve-screen-share", ({ meetingId, participantId, approved }) => {
         const participantSocketId = getSocketIdForParticipant(meetingId, participantId);
         if (participantSocketId) {
-          io.to(participantSocketId).emit("approve-screen-share", { meetingId, participantId, approved });
+          io.to(participantSocketId).emit("screen-share-approval", { participantId, approved });
         }
       });
       
+      // Participant notifies room they started sharing
       socket.on("started-screen-share", ({ meetingId, userId }) => {
         socket.to(meetingId).emit("participant-started-sharing", { participantId: userId });
       });
 
+      // Participant notifies room they stopped sharing
       socket.on("stopped-screen-share", ({ meetingId, userId }) => {
         socket.to(meetingId).emit("participant-stopped-sharing", { participantId: userId });
       });
 
+      // Host forces a participant to stop sharing
       socket.on("host-force-stop-share", ({ meetingId, targetParticipantId }) => {
         if (!isSocketHostForMeeting(socket, meetingId)) return;
         const participantSocketId = getSocketIdForParticipant(meetingId, targetParticipantId);
         if (participantSocketId) {
           io.to(participantSocketId).emit("force-stop-screen-share", { participantId: targetParticipantId });
+          // Also notify others in the room immediately
           socket.to(meetingId).emit("participant-stopped-sharing", { participantId: targetParticipantId });
         }
       });
