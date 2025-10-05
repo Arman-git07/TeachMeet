@@ -63,22 +63,10 @@ export class ScreenShareHelper {
   // --------------------------------------------------------------
   public stopScreenShare() {
     if (this.currentScreenTrack) {
-      this.currentScreenTrack.stop(); // This will trigger the 'onended' event
+      this.currentScreenTrack.stop(); // This triggers the 'onended' event which handles cleanup
     }
-    // Fallback in case onended doesn't fire
+    // Fallback cleanup in case onended doesn't fire
     this.handleStopSharing();
-  }
-
-  private handleStopSharing = () => {
-    if (this.currentScreenTrack) {
-      this.mesh.restoreCameraTrack();
-      this.socket.emit("stopped-screen-share", {
-        meetingId: this.meetingId,
-        userId: this.userId,
-      });
-      this.currentScreenTrack = null;
-      this.approvedToShare = false;
-    }
   }
 
   // --------------------------------------------------------------
@@ -97,7 +85,7 @@ export class ScreenShareHelper {
       // Replace outgoing track
       this.mesh.replaceTrack(screenTrack);
 
-      // Handle user stopping share manually
+      // Handle user stopping share manually from browser UI
       screenTrack.onended = this.handleStopSharing;
 
       // Emit event for UI indicator
@@ -110,6 +98,18 @@ export class ScreenShareHelper {
     } catch (err) {
       console.error("❌ Screen share failed:", err);
       alert("Screen share failed. Please ensure you've granted permission and try again.");
+    }
+  }
+
+  private handleStopSharing = () => {
+    if (this.currentScreenTrack) {
+        this.mesh.restoreCameraTrack();
+        this.socket.emit("stopped-screen-share", {
+            meetingId: this.meetingId,
+            userId: this.userId,
+        });
+        this.currentScreenTrack = null;
+        this.approvedToShare = false;
     }
   }
 
@@ -136,7 +136,7 @@ export class ScreenShareHelper {
       }
     });
 
-    // Host forces a participant to stop sharing
+    // Participant is forced to stop sharing by the host
     this.socket.on("force-stop-screen-share", ({ participantId }: { participantId: string }) => {
       if (participantId === this.userId) {
         this.stopScreenShare();

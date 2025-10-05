@@ -132,8 +132,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       meetingId,
       userId,
       isHost,
-      addRemoteScreenTile: (peerId, stream) => setRemoteScreenTiles(prev => [...prev.filter(t => t.peerId !== peerId), { peerId, stream }]),
-      removeRemoteScreenTile: (peerId) => setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== peerId)),
+      addRemoteScreenTile: (participantId, stream) => setRemoteScreenTiles(prev => [...prev.filter(t => t.peerId !== participantId), { peerId: participantId, stream }]),
+      removeRemoteScreenTile: (participantId) => setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== participantId)),
       showHostScreenShareRequestModal: (opts) => setScreenShareRequest(opts),
     });
   }, [rtc, meetingId, userId, isHost]);
@@ -281,9 +281,23 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     };
     rtc.socket.on("started-screen-share", handleStarted);
     rtc.socket.on("stopped-screen-share", handleStopped);
+
+    const handleParticipantStarted = ({ participantId }: { participantId: string }) => {
+        // The onRemoteStream in MeshRTC will handle adding the tile
+    };
+    const handleParticipantStopped = ({ participantId }: { participantId: string }) => {
+        setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== participantId));
+    };
+
+    rtc.socket.on('participant-started-sharing', handleParticipantStarted);
+    rtc.socket.on('participant-stopped-sharing', handleParticipantStopped);
+
+
     return () => {
       rtc.socket.off("started-screen-share", handleStarted);
       rtc.socket.off("stopped-screen-share", handleStopped);
+      rtc.socket.off('participant-started-sharing', handleParticipantStarted);
+      rtc.socket.off('participant-stopped-sharing', handleParticipantStopped);
     };
   }, [rtc, userId]);
 
@@ -465,7 +479,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
+            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
         </div>
