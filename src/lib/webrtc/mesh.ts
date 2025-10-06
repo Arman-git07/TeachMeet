@@ -136,7 +136,7 @@ export class MeshRTC {
     pc.onnegotiationneeded = async () => {
         try {
             remote!.negotiating = true;
-            const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveVideo: true });
             if (pc.signalingState !== "stable") return;
             await pc.setLocalDescription(offer);
             this.socket.emit("signal:offer", {
@@ -162,18 +162,15 @@ export class MeshRTC {
   public async replaceTrack(newTrack: MediaStreamTrack) {
     if (!this.localStream) throw new Error("No local stream available.");
   
-    // Find the video sender from the first available peer connection to use as a template
-    const firstRemote = this.remotes.values().next().value;
-    const videoSender = firstRemote?.pc
-      .getSenders()
-      .find((s: RTCRtpSender) => s.track?.kind === "video");
-  
-    if (!videoSender) {
-      console.warn("No video sender found, cannot replace track.");
-      return;
+    for (const [socketId, remote] of this.remotes.entries()) {
+      const sender = remote.pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) {
+        await sender.replaceTrack(newTrack);
+        console.log(`✅ Track replaced for peer ${socketId}`);
+      } else {
+        console.warn(`⚠️ No video sender found for peer ${socketId}`);
+      }
     }
-    
-    await videoSender.replaceTrack(newTrack);
   
     // Update local stream for consistency
     const oldTrack = this.localStream.getVideoTracks()[0];
@@ -181,36 +178,14 @@ export class MeshRTC {
       this.localStream.removeTrack(oldTrack);
     }
     this.localStream.addTrack(newTrack);
-  
-    // Trigger renegotiation for all peers
-    for (const remote of this.remotes.values()) {
-      const pc = remote.pc;
-      if (pc.signalingState === "stable") {
-         try {
-            const offer = await pc.createOffer({ iceRestart: true });
-            await pc.setLocalDescription(offer);
-            
-            const targetSocketId = [...this.remotes.entries()].find(([_, r]) => r === remote)?.[0];
-            if (targetSocketId) {
-                this.socket.emit("signal:offer", {
-                    roomId: this.roomId,
-                    to: targetSocketId,
-                    from: this.socket.id,
-                    sdp: pc.localDescription,
-                });
-            }
-
-        } catch (err) {
-          console.error("❌ Failed to renegotiate after replaceTrack:", err);
-        }
-      }
-    }
   }
 
   public async restoreCameraTrack() {
-    if (this.originalVideoTrack) {
-        await this.replaceTrack(this.originalVideoTrack);
+    if (!this.originalVideoTrack) {
+        console.warn("⚠️ No original camera track to restore.");
+        return;
     }
+    await this.replaceTrack(this.originalVideoTrack);
   }
 
 
