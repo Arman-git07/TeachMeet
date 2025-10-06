@@ -138,11 +138,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [screenShareHelper]);
 
   const handleShareClick = () => {
-    if (isSharingScreen) {
-      screenShareHelper?.stopSharing();
-    } else {
-      setIsScreenShareModalOpen(true);
-    }
+    setIsScreenShareModalOpen(true);
   };
 
   const handleModalConfirm = async (mode: ShareMode) => {
@@ -155,7 +151,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       setIsSharingScreen(true);
     } catch (err) {
       console.error("Screen share cancelled or failed:", err);
-      toast({ variant: "destructive", title: "Screen Share Failed", description: "Could not start screen sharing. Please grant permissions and try again."});
+      toast({ variant: "destructive", title: "Screen Share Failed", description: "Could not start screen sharing. Please grant permission and try again."});
       setIsSharingScreen(false);
     }
   };
@@ -493,7 +489,20 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 {isSharingScreen ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
             </Button>
             
-            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
+            <button
+              className="h-14 w-14 rounded-full bg-blue-500 text-white"
+              onClick={async () => {
+                console.log("Clicked!");
+                try {
+                  const s = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                  console.log('✅ Success:', s);
+                } catch (e) {
+                  console.error('❌ Failed:', e);
+                }
+              }}
+            >Test</button>
+            
+            <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
         </div>
