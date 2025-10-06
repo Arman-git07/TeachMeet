@@ -13,8 +13,6 @@ const nextConfig = {
   //   ],
   // },
   experimental: {
-    serverActions: true,
-    instrumentationHook: true,
     optimizePackageImports: [
       'lucide-react',
       '@radix-ui/react-accordion',
@@ -49,5 +47,5 @@ const nextConfig = {
   },
 };
 
-// Incrementing this comment to force a cache clear: 11
+// Incrementing this comment to force a cache clear: 12
 module.exports = nextConfig;
