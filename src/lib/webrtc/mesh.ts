@@ -167,52 +167,71 @@ export class MeshRTC {
     const track = this.getLocalVideoTrack();
     return !!(track && track.enabled);
   }
-  
+
+/* --- Robust track replace/add/remove + signaling helpers --- */
+/* Paste inside your MeshRTC class. Assumes:
+   - this.socket is your signaling socket
+   - this.remotes is Map<socketId, { pc: RTCPeerConnection, ... }>
+   - this.localStream is MediaStream for local preview
+   - this.originalVideoTrack is where you saved the original camera track earlier (optional)
+*/
+
 private _setupSignalingBound = false;
 
 private setupSignalingHandlers() {
   if (this._setupSignalingBound) return;
   this._setupSignalingBound = true;
 
-  this.socket?.on?.("signal:offer", async (payload: any) => {
+  const handleIncomingOffer = async (payload: any, eventName: string) => {
     try {
-      const from = payload.from ?? payload.sender ?? payload.to;
-      const sdp: RTCSessionDescriptionInit = payload.sdp ?? payload.offer;
-      console.log("[mesh] ◀ Received OFFER from", from, "sdp-type:", sdp?.type);
-
-      if (!this.remotes.has(from)) {
-        console.warn("[mesh] No remote entry for", from, " — ensure you create it before signaling.");
-      }
-      const remote = this.remotes.get(from);
-      if (!remote || !remote.pc) {
-        console.error("[mesh] No RTCPeerConnection for", from);
+      // normalize 'from' and 'sdp'
+      const from = payload.from ?? payload.sender ?? payload.to ?? payload.socketId;
+      const sdp = payload.sdp ?? payload.offer ?? payload.sdpDescription;
+      console.log(`[mesh] ◀ Received OFFER (${eventName}) from`, from, "sdp-type:", sdp?.type);
+  
+      if (!from || !sdp) {
+        console.warn("[mesh] malformed offer payload:", payload);
         return;
       }
-      const pc: RTCPeerConnection = remote.pc;
-
+  
+      if (!this.remotes.has(from)) {
+        console.warn("[mesh] Offer from unknown peer, ensure peer exists:", from);
+        // optionally create the remote / pc here if your app supports it:
+        // await this.makePeerIfMissing(from, false);
+      }
+  
+      const remote = this.remotes.get(from);
+      if (!remote || !remote.pc) {
+        console.error("[mesh] cannot handle offer: no pc for", from);
+        return;
+      }
+      const pc = remote.pc;
+  
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       console.log("[mesh] setRemoteDescription OK for", from);
-
+  
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      console.log("[mesh] created + setLocalDescription (answer) for", from);
-
-      this.socket.emit?.("signal:answer", { to: from, from: this.socket.id ?? null, sdp: answer });
+      console.log("[mesh] created answer and setLocalDescription for", from);
+  
+      // send the answer back using dual-emit helper
+      this.emitAnswerToPeer(from, { sdp: answer });
       console.log("[mesh] → Sent ANSWER to", from);
     } catch (err) {
       console.error("[mesh] Error handling incoming offer:", err);
     }
-  });
-
-  this.socket?.on?.("signal:answer", async (payload: any) => {
+  };
+  
+  const handleIncomingAnswer = async (payload: any, eventName: string) => {
     try {
-      const from = payload.from ?? payload.sender ?? payload.to;
-      const sdp: RTCSessionDescriptionInit = payload.sdp ?? payload.answer;
-      console.log("[mesh] ◀ Received ANSWER from", from, "sdp-type:", sdp?.type);
-
+      const from = payload.from ?? payload.sender ?? payload.to ?? payload.socketId;
+      const sdp = payload.sdp ?? payload.answer ?? payload.sdpDescription;
+      console.log(`[mesh] ◀ Received ANSWER (${eventName}) from`, from, "sdp-type:", sdp?.type);
+      if (!from || !sdp) { console.warn("[mesh] malformed answer payload:", payload); return; }
+  
       const remote = this.remotes.get(from);
       if (!remote || !remote.pc) {
-        console.warn("[mesh] No remote pc to apply answer for", from);
+        console.warn("[mesh] No pc to apply answer for", from);
         return;
       }
       await remote.pc.setRemoteDescription(new RTCSessionDescription(sdp));
@@ -220,9 +239,26 @@ private setupSignalingHandlers() {
     } catch (err) {
       console.error("[mesh] Error handling incoming answer:", err);
     }
+  };
+
+  // Incoming offer -> setRemoteDescription -> createAnswer -> send answer
+  this.socket?.on?.("webrtc-offer", async (payload: any) => {
+    await handleIncomingOffer(payload, "webrtc-offer");
+  });
+  this.socket?.on?.("signal:offer", async (payload: any) => {
+    await handleIncomingOffer(payload, "signal:offer");
   });
 
-  this.socket?.on?.("signal:ice", async (payload: any) => {
+  // Incoming answer -> setRemoteDescription
+  this.socket?.on?.("webrtc-answer", async (payload: any) => {
+    await handleIncomingAnswer(payload, "webrtc-answer");
+  });
+  this.socket?.on?.("signal:answer", async (payload: any) => {
+    await handleIncomingAnswer(payload, "signal:answer");
+  });
+
+  // ICE candidate passing (if you use it)
+  this.socket?.on?.("webrtc-ice-candidate", async (payload: any) => {
     try {
       const from = payload.from;
       const candidate = payload.candidate;
@@ -240,7 +276,38 @@ private setupSignalingHandlers() {
   });
 }
 
+/** 
+ * Send an offer/answer using both the new and legacy event names so either server will relay it.
+ * payload should contain: { to, from, sdp, roomId? }
+ */
+private emitOfferToPeer(to: string, payload: any) {
+  // preferred (new) event name:
+  if (this.socket?.emit) {
+    try { this.socket.emit("webrtc-offer", { to, ...payload }); } catch (e) { console.warn("emit webrtc-offer failed:", e); }
+  }
+  // legacy event name used by your older server code:
+  if (this.socket?.emit) {
+    try { this.socket.emit("signal:offer", { to, from: this.socket?.id ?? null, sdp: payload.sdp, roomId: this.roomId }); } catch (e) { console.warn("emit signal:offer failed:", e); }
+  }
+}
+
+private emitAnswerToPeer(to: string, payload: any) {
+  if (this.socket?.emit) {
+    try { this.socket.emit("webrtc-answer", { to, ...payload }); } catch (e) { console.warn("emit webrtc-answer failed:", e); }
+  }
+  if (this.socket?.emit) {
+    try { this.socket.emit("signal:answer", { to, from: this.socket?.id ?? null, sdp: payload.sdp, roomId: this.roomId }); } catch (e) { console.warn("emit signal:answer failed:", e); }
+  }
+}
+
+/**
+ * replaceTrack(newTrack)
+ * - Replaces video track for every peer if sender exists
+ * - Adds a new track (pc.addTrack or addTransceiver) if no sender
+ * - Creates an offer and sends it to the peer so remote receives the new track
+ */
 public async replaceTrack(newTrack: MediaStreamTrack) {
+  // Ensure signaling handlers are bound
   this.setupSignalingHandlers();
 
   if (!this.localStream) throw new Error("No local stream available.");
@@ -257,6 +324,7 @@ public async replaceTrack(newTrack: MediaStreamTrack) {
         continue;
       }
 
+      // Find existing video sender
       let sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
 
       if (sender) {
@@ -265,20 +333,45 @@ public async replaceTrack(newTrack: MediaStreamTrack) {
           console.log(`[mesh] ✅ Replaced sender.track for peer ${socketId}`);
         } catch (err) {
           console.warn(`[mesh] sender.replaceTrack failed for ${socketId}:`, err);
+          // Fallback: try to remove/add
+          try {
+            pc.removeTrack(sender);
+            pc.addTrack(newTrack, new MediaStream([newTrack]));
+            console.log(`[mesh] fallback: removed old sender & added newTrack for ${socketId}`);
+          } catch (e) {
+            console.error(`[mesh] fallback addTrack failed for ${socketId}:`, e);
+          }
         }
       } else {
+        // No sender — create a transceiver or addTrack and renegotiate
         try {
-          pc.addTrack(newTrack, new MediaStream([newTrack]));
-          console.log(`[mesh] ✅ addTrack(newTrack) for ${socketId}`);
+          // Prefer transceiver for consistent behavior
+          const trans = pc.addTransceiver("video", { direction: "sendrecv" });
+          if (trans && trans.sender) {
+            await trans.sender.replaceTrack(newTrack);
+            console.log(`[mesh] ✅ Created transceiver and attached newTrack for ${socketId}`);
+          } else {
+            // Fallback
+            pc.addTrack(newTrack, new MediaStream([newTrack]));
+            console.log(`[mesh] ✅ addTrack(newTrack) for ${socketId}`);
+          }
         } catch (err) {
-          console.warn(`[mesh] addTrack failed for ${socketId}:`, err);
+          console.warn(`[mesh] addTransceiver/addTrack failed for ${socketId}:`, err);
+          try {
+            pc.addTrack(newTrack, new MediaStream([newTrack]));
+            console.log(`[mesh] fallback addTrack succeeded for ${socketId}`);
+          } catch (e) {
+            console.error(`[mesh] fallback addTrack totally failed for ${socketId}:`, e);
+          }
         }
       }
 
+      // Now renegotiate: createOffer/setLocalDescription/send offer
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        this.socket?.emit?.("signal:offer", { to: socketId, from: this.socket?.id ?? null, sdp: offer });
+        // send to peer
+        this.emitOfferToPeer(socketId, { sdp: offer });
         console.log(`[mesh] ↪ Sent OFFER to ${socketId}`);
       } catch (err) {
         console.error(`[mesh] ❌ Failed to create/send offer to ${socketId}:`, err);
@@ -288,6 +381,7 @@ public async replaceTrack(newTrack: MediaStreamTrack) {
     }
   }
 
+  // Update localStream preview: remove old video track and add new one if needed
   try {
     const oldTrack = this.localStream.getVideoTracks()[0];
     if (oldTrack && oldTrack.id !== newTrack.id) {
@@ -303,6 +397,9 @@ public async replaceTrack(newTrack: MediaStreamTrack) {
   }
 }
 
+/**
+ * restoreCameraTrack()
+ */
 public async restoreCameraTrack() {
   if (!this.originalVideoTrack) {
     console.warn("[mesh] ⚠️ No originalVideoTrack stored — cannot restore camera.");
@@ -314,9 +411,15 @@ public async restoreCameraTrack() {
     console.log("[mesh] ✅ restoreCameraTrack completed");
   } catch (err) {
     console.error("[mesh] restoreCameraTrack failed:", err);
+    // fallback: addTrack original
+    try { await this.addTrack(this.originalVideoTrack); } catch (e) { console.error("[mesh] fallback addTrack failed:", e); }
   }
 }
 
+/**
+ * addTrack(track)
+ * - Adds track to each pc and renegotiates
+ */
 public async addTrack(track: MediaStreamTrack) {
   this.setupSignalingHandlers();
   if (!this.localStream) throw new Error("No local stream available.");
@@ -329,18 +432,22 @@ public async addTrack(track: MediaStreamTrack) {
       console.log(`[mesh] addTrack called for ${socketId}`);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      this.socket?.emit?.("signal:offer", { to: socketId, from: this.socket?.id ?? null, sdp: offer });
+      this.emitOfferToPeer(socketId, { sdp: offer });
       console.log(`[mesh] ↪ Sent OFFER to ${socketId} after addTrack`);
     } catch (err) {
       console.error(`[mesh] addTrack/offer failed for ${socketId}:`, err);
     }
   }
+  // localStream
   try {
     const already = this.localStream.getTracks().some(t => t.id === track.id);
     if (!already) this.localStream.addTrack(track);
   } catch (e) { /* ignore */ }
 }
 
+/**
+ * removeTrack(track)
+ */
 public async removeTrack(track: MediaStreamTrack | null) {
   this.setupSignalingHandlers();
   const peers = Array.from(this.remotes.entries());
@@ -363,10 +470,11 @@ public async removeTrack(track: MediaStreamTrack | null) {
       } else {
         console.warn(`[mesh] No sender to remove for ${socketId}`);
       }
+      // renegotiate
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        this.socket?.emit?.("signal:offer", { to: socketId, from: this.socket?.id ?? null, sdp: offer });
+        this.emitOfferToPeer(socketId, { sdp: offer });
         console.log(`[mesh] ↪ Sent OFFER to ${socketId} after removeTrack`);
       } catch (e) {
         console.error(`[mesh] renegotiate after removeTrack failed for ${socketId}:`, e);
@@ -376,6 +484,7 @@ public async removeTrack(track: MediaStreamTrack | null) {
     }
   }
 
+  // remove from localStream
   if (this.localStream && track) {
     try {
       this.localStream.getTracks().forEach(t => {
