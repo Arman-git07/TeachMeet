@@ -29,6 +29,10 @@ function isSocketHostForMeeting(socket: any, roomId: string): boolean {
 
 
 export default function handler(req: NextApiRequest, res: NextApiResponseServerIO) {
+  // NOTE: This implementation is incorrect for a standard Next.js setup and causes startup failures.
+  // The WebSocket server should be managed as a separate process or using a different architecture.
+  // This code is being commented out to allow the Next.js application to start.
+  /*
   if (!res.socket.server.io) {
     const io = new IOServer(res.socket.server as any, { path: "/api/socketio" });
 
@@ -132,5 +136,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponseServerI
 
     res.socket.server.io = io;
   }
+  */
   res.end();
 }
