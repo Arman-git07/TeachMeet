@@ -136,7 +136,7 @@ export class MeshRTC {
     pc.onnegotiationneeded = async () => {
         try {
             remote!.negotiating = true;
-            const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveVideo: true });
+            const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
             if (pc.signalingState !== "stable") return;
             await pc.setLocalDescription(offer);
             this.socket.emit("signal:offer", {
@@ -159,35 +159,153 @@ export class MeshRTC {
     return this.localStream?.getVideoTracks()[0];
   }
 
+  public isCameraOn(): boolean {
+    const track = this.getLocalVideoTrack();
+    return !!(track && track.enabled);
+  }
+  
+  // --- Robust Track Management ---
+
   public async replaceTrack(newTrack: MediaStreamTrack) {
     if (!this.localStream) throw new Error("No local stream available.");
   
-    for (const [socketId, remote] of this.remotes.entries()) {
-      const sender = remote.pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) {
-        await sender.replaceTrack(newTrack);
-        console.log(`✅ Track replaced for peer ${socketId}`);
-      } else {
-        console.warn(`⚠️ No video sender found for peer ${socketId}`);
+    const oldTrack = this.localStream.getVideoTracks()[0];
+    const peers = Array.from(this.remotes.entries());
+  
+    for (const [socketId, remote] of peers) {
+      try {
+        const pc: RTCPeerConnection = remote.pc;
+        if (!pc) {
+          console.warn(`⚠️ No RTCPeerConnection for peer ${socketId}`);
+          continue;
+        }
+  
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
+  
+        if (sender) {
+          await sender.replaceTrack(newTrack);
+          console.log(`✅ Replaced track on sender for peer ${socketId}`);
+        } else {
+          try {
+            pc.addTrack(newTrack, new MediaStream([newTrack]));
+            console.log(`✅ Added new screen track to pc for peer ${socketId} (no existing sender)`);
+          } catch (err) {
+            console.warn(`⚠️ pc.addTrack failed for peer ${socketId}:`, err);
+          }
+        }
+      } catch (err) {
+        console.error(`❌ Error replacing/adding track for peer ${socketId}:`, err);
       }
     }
   
-    // Update local stream for consistency
-    const oldTrack = this.localStream.getVideoTracks()[0];
-    if (oldTrack) {
-      this.localStream.removeTrack(oldTrack);
+    try {
+      if (oldTrack && oldTrack !== newTrack) {
+        try { this.localStream.removeTrack(oldTrack); } catch (e) { /* ignore */ }
+      }
+      const already = this.localStream.getVideoTracks().some(t => t.id === newTrack.id);
+      if (!already) {
+        try { this.localStream.addTrack(newTrack); } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      console.warn("⚠️ Failed to update localStream tracks:", e);
     }
-    this.localStream.addTrack(newTrack);
+  
+    for (const [socketId, remote] of peers) {
+      const pc: RTCPeerConnection | undefined = remote.pc;
+      if (!pc) continue;
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+  
+        // The existing `onnegotiationneeded` handler is already configured to emit 'signal:offer'
+        // which our server (`socket.ts`) handles. No need to emit a custom 'webrtc-offer' event.
+        // The browser will fire the `negotiationneeded` event automatically.
+        // Forcing it can be complex, so we rely on the standard flow.
+        // If it doesn't fire, we may need a manual trigger.
+        console.log(`↪ Relying on 'onnegotiationneeded' to send offer to ${socketId}`);
+      } catch (err) {
+        console.error(`❌ Renegotiation failed for peer ${socketId}:`, err);
+      }
+    }
   }
 
   public async restoreCameraTrack() {
     if (!this.originalVideoTrack) {
-        console.warn("⚠️ No original camera track to restore.");
-        return;
+      console.warn("⚠️ No original camera track to restore.");
+      return;
     }
-    await this.replaceTrack(this.originalVideoTrack);
+  
+    try {
+      await this.replaceTrack(this.originalVideoTrack);
+      console.log("✅ Camera track restored via replaceTrack()");
+    } catch (err) {
+      console.error("❌ Failed to restore camera track, attempting fallback re-add:", err);
+      await this.addTrack(this.originalVideoTrack).catch(e => console.error("Fallback addTrack failed:", e));
+    }
   }
 
+  public async addTrack(track: MediaStreamTrack) {
+    if (!this.localStream) throw new Error("No local stream available.");
+  
+    const peers = Array.from(this.remotes.entries());
+    for (const [socketId, remote] of peers) {
+      try {
+        const pc = remote.pc;
+        if (!pc) continue;
+        pc.addTrack(track, new MediaStream([track]));
+        console.log(`✅ addTrack called for peer ${socketId}`);
+        // Let onnegotiationneeded handle the offer
+      } catch (err) {
+        console.error(`❌ addTrack failed for ${socketId}:`, err);
+      }
+    }
+  
+    try {
+      const already = this.localStream.getTracks().some(t => t.id === track.id);
+      if (!already) this.localStream.addTrack(track);
+    } catch (e) { /* ignore */ }
+  }
+
+  public async removeTrack(track: MediaStreamTrack | null) {
+    const peers = Array.from(this.remotes.entries());
+  
+    for (const [socketId, remote] of peers) {
+      try {
+        const pc = remote.pc;
+        if (!pc) continue;
+  
+        const sender = pc.getSenders().find(s => {
+          if (!s) return false;
+          if (track) return s.track && s.track.id === track.id;
+          return s.track && s.track.kind === "video";
+        });
+  
+        if (sender) {
+          try {
+            pc.removeTrack(sender);
+            console.log(`✅ removeTrack called for peer ${socketId}`);
+          } catch (e) {
+            console.warn(`⚠️ pc.removeTrack failed for ${socketId}`, e);
+          }
+        } else {
+          console.warn(`⚠️ No matching sender found to remove for ${socketId}`);
+        }
+        // Let onnegotiationneeded handle the offer
+      } catch (err) {
+        console.error(`❌ removeTrack failed for ${socketId}:`, err);
+      }
+    }
+  
+    if (this.localStream && track) {
+      try {
+        this.localStream.getTracks().forEach(t => {
+          if (t.id === track.id) {
+            try { this.localStream.removeTrack(t); } catch (e) {}
+          }
+        });
+      } catch (e) { /* ignore */ }
+    }
+  }
 
   private cleanupRemote(socketId: string) {
     const remote = this.remotes.get(socketId);
