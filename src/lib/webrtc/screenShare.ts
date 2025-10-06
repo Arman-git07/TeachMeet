@@ -1,97 +1,160 @@
+// src/lib/webrtc/screenShare.ts
+import type { MeshRTC } from "./mesh";
 
-import { MeshRTC } from "./mesh";
+export type ShareMode = "replace" | "alongside";
 
 export class ScreenShareHelper {
-  private mesh: MeshRTC;
-  private screenStream: MediaStream | null = null;
-  private originalTrack: MediaStreamTrack | null = null;
-  private screenTrack: MediaStreamTrack | null = null;
-  private isSharing = false;
-  private displayName: string;
+  private mesh: MeshRTC;
+  private screenStream: MediaStream | null = null;
+  private screenTrack: MediaStreamTrack | null = null;
+  private originalTrack: MediaStreamTrack | null = null;
+  private isSharingFlag = false;
+  private onStopCallbacks: Array<() => void> = [];
 
-  constructor(mesh: MeshRTC, displayName: string) {
-    this.mesh = mesh;
-    this.displayName = displayName;
-  }
+  constructor(mesh: MeshRTC) {
+    this.mesh = mesh;
+  }
 
-  async requestScreenSharePermission(mode: "replace" | "alongside" = "replace") {
-    try {
-      // ✅ Ask for screen share permission
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false,
-      });
+  isScreenSharing() {
+    return this.isSharingFlag;
+  }
 
-      if (!stream) throw new Error("No screen selected.");
+  // Register UI callbacks (e.g. to show/hide stop button on tile)
+  onStop(cb: () => void) {
+    this.onStopCallbacks.push(cb);
+    return () => {
+      this.onStopCallbacks = this.onStopCallbacks.filter(c => c !== cb);
+    };
+  }
 
-      this.screenStream = stream;
-      this.screenTrack = stream.getVideoTracks()[0];
+  private notifyStop() {
+    this.onStopCallbacks.forEach(cb => {
+      try { cb(); } catch (e) { console.error(e); }
+    });
+  }
 
-      if (!this.screenTrack) throw new Error("Failed to get screen track.");
+  // Start sharing given a MediaStream (call getDisplayMedia from UI - direct gesture)
+  async startSharingWithStream(mode: ShareMode, stream: MediaStream) {
+    if (!stream) throw new Error("No stream provided to startSharingWithStream");
 
-      // 📡 Listen for when user manually stops from browser UI
-      this.screenTrack.onended = () => {
-        this.stopScreenShare();
-      };
+    const track = stream.getVideoTracks()[0];
+    if (!track) throw new Error("No video track in provided stream");
 
-      // ✅ Store the original camera track before replacing
-      if (mode === "replace") {
-        this.originalTrack = this.mesh.getLocalVideoTrack?.() || null;
-        await this.mesh.replaceTrack(this.screenTrack);
-      } else {
-        // ✅ Add alongside camera (send both)
-        // @ts-ignore
-        await this.mesh.addTrack?.(this.screenTrack);
-      }
+    // attach onended so if user stops from browser UI, we clean up
+    track.onended = () => {
+      void this.stopSharing();
+    };
 
-      this.isSharing = true;
+    this.screenStream = stream;
+    this.screenTrack = track;
 
-      // 🔔 Emit socket event that screen started (optional)
-      this.mesh.socket?.emit("screen-share-started", {
-        meetingId: this.mesh.roomId,
-        displayName: this.displayName,
-      });
+    // If replace, store original camera track (if available)
+    if (mode === "replace") {
+      try {
+        this.originalTrack = this.mesh.getLocalVideoTrack?.() ?? null;
+      } catch (err) {
+        console.warn("Could not read original local track:", err);
+        this.originalTrack = null;
+      }
+    }
 
-      // 🟢 Visual indicator (optional toast)
-      console.log("✅ Screen sharing started.");
+    try {
+      if (mode === "replace") {
+        // Replace camera with screen
+        await this.mesh.replaceTrack(this.screenTrack);
+      } else {
+        // Send screen as an additional track on existing connection
+        await this.mesh.addTrack?.(this.screenTrack);
+      }
+      this.isSharingFlag = true;
 
-    } catch (err) {
-      console.error("❌ Screen share failed:", err);
-      alert("Please ensure you've granted permission and selected a screen.");
-    }
-  }
+       // Optional: emit socket/event if mesh exposes socket
+      this.mesh.socket?.emit?.("screen-share-started", {
+        roomId: this.mesh.roomId,
+        mode,
+      });
 
-  async stopScreenShare() {
-    if (!this.isSharing) return;
+       console.log("Screen sharing started (mode:", mode, ")");
+    } catch (err) {
+      console.error("Failed to start screen sharing:", err);
+      // clean up if failed
+      if (this.screenTrack) {
+        try { this.screenTrack.stop(); } catch {}
+      }
+      this.screenStream = null;
+      this.screenTrack = null;
+      throw err;
+    }
+  }
 
-    try {
-      if (this.screenTrack) {
-        this.screenTrack.stop();
-      }
-      if (this.screenStream) {
-        this.screenStream.getTracks().forEach(t => t.stop());
-      }
+   // Convenience: call getDisplayMedia and start sharing — keep for backward compatibility,
+   // but **prefer** calling getDisplayMedia directly from UI (see modal code).
+  async requestAndStart(mode: ShareMode = "replace", constraints = { video: true, audio: false }) {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+      await this.startSharingWithStream(mode, stream);
+    } catch (err) {
+      console.error("User denied or getDisplayMedia failed:", err);
+      throw err;
+    }
+  }
 
-      // 🔁 Restore original camera track if replaced
-      if (this.originalTrack) {
-        await this.mesh.restoreCameraTrack?.();
-      }
+  async stopSharing() {
+    if (!this.isSharingFlag) return;
 
-      this.isSharing = false;
+    try {
+      // Stop the screen track if still running
+      if (this.screenTrack) {
+        try { this.screenTrack.onended = null; } catch {}
+        try { this.screenTrack.stop(); } catch {}
+      }
+      if (this.screenStream) {
+        try {
+          this.screenStream.getTracks().forEach(t => {
+            try { t.stop(); } catch {}
+          });
+        } catch (e) { /* ignore */ }
+      }
 
-      // 🔔 Notify peers screen sharing stopped
-      this.mesh.socket?.emit("screen-share-stopped", {
-        meetingId: this.mesh.roomId,
-        displayName: this.displayName,
-      });
+       // If we replaced camera, restore the original camera track
+      if (this.originalTrack) {
+        try {
+          await this.mesh.restoreCameraTrack?.();
+        } catch (err) {
+          console.error("Failed to restore camera track:", err);
+          // fallback: try replaceTrack with originalTrack
+          try { await this.mesh.replaceTrack(this.originalTrack); } catch (e) { console.error(e); }
+        }
+      } else {
+        // If we were sending alongside, ask mesh to remove the screen track sender
+        try {
+          await this.mesh.removeTrack?.(this.screenTrack);
+        } catch (err) {
+          console.warn("mesh.removeTrack failed (maybe not implemented):", err);
+        }
+      }
 
-      console.log("🛑 Screen sharing stopped.");
-    } catch (err) {
-      console.error("❌ Failed to stop screen share:", err);
-    }
-  }
+       // Update local flags
+      this.screenStream = null;
+      this.screenTrack = null;
+      this.originalTrack = null;
+      this.isSharingFlag = false;
 
-  isScreenSharing() {
-    return this.isSharing;
-  }
+       // Notify UI callbacks
+      this.notifyStop();
+
+       // Optional event to peers
+      this.mesh.socket?.emit?.("screen-share-stopped", { roomId: this.mesh.roomId });
+
+       console.log("Screen sharing stopped.");
+    } catch (err) {
+      console.error("Error stopping screen share:", err);
+      // still attempt to reset flags
+      this.screenStream = null;
+      this.screenTrack = null;
+      this.originalTrack = null;
+      this.isSharingFlag = false;
+      this.notifyStop();
+    }
+  }
 }

@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
-import { ScreenShareHelper } from "@/lib/webrtc/screenShare";
-import { ScreenShareHostModal } from "@/components/modals/ScreenShareHostModal";
+import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
+import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
+
 
 type Participant = {
   id: string;
@@ -65,7 +66,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [liveParticipants, setLiveParticipants] = useState<Map<string, LiveParticipantInfo>>(new Map());
   const [isHandRaised, setIsHandRaised] = useState(false);
   
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  // Screen Share State
+  const [isScreenShareModalOpen, setIsScreenShareModalOpen] = useState(false);
+  const [isSharingScreen, setIsSharingScreen] = useState(false);
   
   const [remoteScreenTiles, setRemoteScreenTiles] = useState<RemoteScreen[]>([]);
   const [screenShareRequest, setScreenShareRequest] = useState<{ participantId: string; name: string } | null>(null);
@@ -124,9 +127,44 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [meetingId, userId, user?.displayName]);
 
   const screenShareHelper = useMemo(() => {
-    if (!rtc || !user?.displayName) return null;
-    return new ScreenShareHelper(rtc, user.displayName);
-  }, [rtc, user?.displayName]);
+    if (!rtc) return null;
+    return new ScreenShareHelper(rtc);
+  }, [rtc]);
+  
+  useEffect(() => {
+    if (!screenShareHelper) return;
+    const off = screenShareHelper.onStop(() => setIsSharingScreen(false));
+    return () => off();
+  }, [screenShareHelper]);
+
+  const handleShareClick = () => {
+    if (isSharingScreen) {
+      screenShareHelper?.stopSharing();
+    } else {
+      setIsScreenShareModalOpen(true);
+    }
+  };
+
+  const handleModalConfirm = async (mode: ShareMode) => {
+    setIsScreenShareModalOpen(false);
+    if (!screenShareHelper) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      await screenShareHelper.startSharingWithStream(mode, stream);
+      setIsSharingScreen(true);
+    } catch (err) {
+      console.error("Screen share cancelled or failed:", err);
+      toast({ variant: "destructive", title: "Screen Share Failed", description: "Could not start screen sharing. Please grant permissions and try again."});
+      setIsSharingScreen(false);
+    }
+  };
+  
+  const handleStopSharing = async () => {
+    await screenShareHelper?.stopSharing();
+    setIsSharingScreen(false);
+  };
+
 
   useEffect(() => {
     let mounted = true;
@@ -150,7 +188,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       audioContextRef.current?.close().catch(() => {});
       remoteAnalysersRef.current.forEach(entry => { if (entry.rafId) cancelAnimationFrame(entry.rafId); });
       remoteAnalysersRef.current.clear();
-      screenShareHelper?.stopScreenShare();
+      screenShareHelper?.stopSharing();
     };
   }, [initialCamOn, initialMicOn, toast, screenShareHelper]);
 
@@ -264,10 +302,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   useEffect(() => {
     if (!rtc?.socket) return;
     const handleStarted = ({ userId: sharerId }: { userId: string }) => {
-      if (sharerId === userId) setIsScreenSharing(true);
+      // Logic handled by onStop callback in helper
     };
     const handleStopped = ({ userId: sharerId }: { userId: string }) => {
-      if (sharerId === userId) setIsScreenSharing(false);
+      // Logic handled by onStop callback in helper
     };
     rtc.socket.on("started-screen-share", handleStarted);
     rtc.socket.on("stopped-screen-share", handleStopped);
@@ -304,7 +342,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       name: localUserDetails?.name || user?.displayName || "You",
       avatar: localUserDetails?.photoURL || user?.photoURL || `https://placehold.co/128x128.png?text=${(user?.displayName || 'Y').charAt(0)}`,
       isCamOff: !camOn, isMicOff: !micOn, isHandRaised, handRaisedAt: localUserDetails?.handRaisedAt,
-      isScreenSharing, isLocal: true, stream: localStream,
+      isScreenSharing: isSharingScreen, isLocal: true, stream: localStream,
       volumeLevel: volumeLevels.get(userId) ?? 0
     };
     const remotes: Participant[] = Array.from(liveParticipants.entries())
@@ -325,7 +363,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const firstHandRaised = all.filter(p => p.isHandRaised && p.handRaisedAt).sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
     const raisedCount = all.filter(p => p.isHandRaised).length;
     return { allParticipants: all, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isScreenSharing]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen]);
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (user && meetingId) {
@@ -365,7 +403,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           <div className="flex-1 min-h-0 relative">
             {pinned && (
               <div className="w-full h-full relative">
-                <VideoTile stream={pinned.stream} isCameraOn={!pinned.isCamOff} isMicOn={!pinned.isMicOff} isHandRaised={(pinned as Participant).isHandRaised || false} isFirstHand={pinned.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(pinned as Participant).volumeLevel} isLocal={!!(pinned as Participant).isLocal} profileUrl={(pinned as Participant).avatar} name={pinned.name} isScreenSharing={pinned.isScreenSharing} isPinned={true} onTogglePin={() => togglePin(pinned.id)} onDoubleClick={() => togglePin(pinned.id)} className="w-full h-full" />
+                <VideoTile stream={pinned.stream} isCameraOn={!pinned.isCamOff} isMicOn={!pinned.isMicOff} isHandRaised={(pinned as Participant).isHandRaised || false} isFirstHand={pinned.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(pinned as Participant).volumeLevel} isLocal={!!(pinned as Participant).isLocal} profileUrl={(pinned as Participant).avatar} name={pinned.name} isScreenSharing={pinned.isScreenSharing} isPinned={true} onTogglePin={() => togglePin(pinned.id)} onDoubleClick={() => togglePin(pinned.id)} className="w-full h-full" onStopShare={isSharingScreen && pinned.id === userId ? handleStopSharing : undefined} />
               </div>
             )}
           </div>
@@ -373,7 +411,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <div className="w-48 hidden md:flex md:flex-col gap-2 overflow-auto">
               {others.map(p => (
                 <div key={p.id} className="h-28 rounded-lg">
-                  <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={(p as Participant).avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" />
+                  <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={(p as Participant).avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
                 </div>
               ))}
             </div>
@@ -396,7 +434,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
               {otherTiles.map(p => (
                 <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
-                   <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} />
+                   <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
                 </div>
               ))}
             </div>
@@ -406,14 +444,14 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
 
     const count = allParticipants.length;
-    if (count === 1) return <div className="w-full h-full p-0"><VideoTile stream={allParticipants[0].stream} isCameraOn={!allParticipants[0].isCamOff} isMicOn={!allParticipants[0].isMicOff} isHandRaised={allParticipants[0].isHandRaised || false} isFirstHand={allParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={allParticipants[0].volumeLevel} isLocal={!!allParticipants[0].isLocal} profileUrl={allParticipants[0].avatar} name={allParticipants[0].name} isScreenSharing={allParticipants[0].isScreenSharing} onTogglePin={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} onDoubleClick={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} className="w-full h-full" /></div>;
+    if (count === 1) return <div className="w-full h-full p-0"><VideoTile stream={allParticipants[0].stream} isCameraOn={!allParticipants[0].isCamOff} isMicOn={!allParticipants[0].isMicOff} isHandRaised={allParticipants[0].isHandRaised || false} isFirstHand={allParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={allParticipants[0].volumeLevel} isLocal={!!allParticipants[0].isLocal} profileUrl={allParticipants[0].avatar} name={allParticipants[0].name} isScreenSharing={allParticipants[0].isScreenSharing} onTogglePin={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} onDoubleClick={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} className="w-full h-full" onStopShare={isSharingScreen && allParticipants[0].id === userId ? handleStopSharing : undefined} /></div>;
 
     if (count === 2) {
       const remote = allParticipants.find((u) => !u.isLocal); const local = allParticipants.find((u) => u.isLocal);
       return (
         <div className="w-full h-full relative p-0">
           {remote && <div className="w-full h-full relative"><VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} isLocal={!!remote.isLocal} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} onTogglePin={() => togglePin(remote.id)} onDoubleClick={() => togglePin(remote.id)} className="w-full h-full"/></div>}
-          {local && <div className="absolute bottom-6 right-6 w-48 h-32 z-50 shadow-lg"><VideoTile stream={local.stream} isCameraOn={!local.isCamOff} isMicOn={!local.isMicOff} isHandRaised={local.isHandRaised || false} isFirstHand={local.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={local.volumeLevel} isLocal={!!local.isLocal} profileUrl={local.avatar} name={local.name} isScreenSharing={local.isScreenSharing} onTogglePin={() => togglePin(local.id)} onDoubleClick={() => togglePin(local.id)} draggable={true}/></div>}
+          {local && <div className="absolute bottom-6 right-6 w-48 h-32 z-50 shadow-lg"><VideoTile stream={local.stream} isCameraOn={!local.isCamOff} isMicOn={!local.isMicOff} isHandRaised={local.isHandRaised || false} isFirstHand={local.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={local.volumeLevel} isLocal={!!local.isLocal} profileUrl={local.avatar} name={local.name} isScreenSharing={local.isScreenSharing} onTogglePin={() => togglePin(local.id)} onDoubleClick={() => togglePin(local.id)} draggable={true} onStopShare={isSharingScreen && local.id === userId ? handleStopSharing : undefined}/></div>}
         </div>
       );
     }
@@ -421,37 +459,25 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const cols = Math.ceil(Math.sqrt(count));
     return (
       <div className="w-full h-full grid gap-2 p-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
-        {allParticipants.map((p) => (<div key={p.id} className="w-full h-full rounded-lg relative aspect-video"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} /></div>))}
+        {allParticipants.map((p) => (<div key={p.id} className="w-full h-full rounded-lg relative aspect-video"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/></div>))}
       </div>
     );
   };
 
   return (
     <div className="flex flex-col h-full">
-      {isHost() && screenShareRequest && (
-         <ScreenShareHostModal
-            isOpen={!!screenShareRequest}
-            participantName={screenShareRequest?.name || 'Someone'}
-            onApprove={() => {
-              if (rtc?.socket) {
-                rtc.socket.emit("approve-screen-share", { meetingId, participantId: screenShareRequest!.participantId, approved: true });
-              }
-              setScreenShareRequest(null);
-            }}
-            onDeny={() => {
-              if (rtc?.socket) {
-                rtc.socket.emit("approve-screen-share", { meetingId, participantId: screenShareRequest!.participantId, approved: false });
-              }
-              setScreenShareRequest(null);
-            }}
-          />
-      )}
+      <ScreenShareModal
+        open={isScreenShareModalOpen}
+        onClose={() => setIsScreenShareModalOpen(false)}
+        onConfirm={handleModalConfirm}
+        cameraOn={camOn}
+      />
 
       <div className="relative flex-grow min-h-0">
         {loadingMedia ? <div className="w-full h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : renderLayout()}
       </div>
 
-      {isScreenSharing && (
+      {isSharingScreen && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50">
           🔴 You’re sharing your screen
         </div>
@@ -463,8 +489,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <Button onClick={toggleMic} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}</Button>
             <Button onClick={toggleCamera} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}</Button>
             
-            <Button variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
-                {isScreenSharing ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
+            <Button onClick={handleShareClick} variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>
+                {isSharingScreen ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
             </Button>
             
             <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
