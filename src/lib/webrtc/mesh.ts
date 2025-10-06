@@ -178,75 +178,39 @@ private setupSignalingHandlers() {
   if (this._setupSignalingBound) return;
   this._setupSignalingBound = true;
 
-  // Incoming offer -> setRemoteDescription -> createAnswer -> send answer
-  this.socket?.on?.("webrtc-offer", async (payload: any) => {
-    try {
-      const from = payload.from ?? payload.sender ?? payload.to; // try common keys
-      const sdp: RTCSessionDescriptionInit = payload.sdp ?? payload.offer;
-      console.log("[mesh] ◀ Received OFFER from", from, "sdp-type:", sdp?.type);
-
-      // Ensure a remote entry / pc exists for this peer
-      if (!this.remotes.has(from)) {
-        console.warn("[mesh] No remote entry for", from, " — ensure you create it before signaling.");
-        // Optionally create remote here if your app supports dynamic creation:
-        // this.createPeerFor(from);
-      }
-      const remote = this.remotes.get(from);
-      if (!remote || !remote.pc) {
-        console.error("[mesh] No RTCPeerConnection for", from);
-        return;
-      }
-      const pc: RTCPeerConnection = remote.pc;
-
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      console.log("[mesh] setRemoteDescription OK for", from);
-
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      console.log("[mesh] created + setLocalDescription (answer) for", from);
-
-      // Reply with answer
-      this.socket.emit?.("webrtc-answer", { to: from, from: this.socket.id ?? null, sdp: answer });
-      console.log("[mesh] → Sent ANSWER to", from);
-    } catch (err) {
-      console.error("[mesh] Error handling incoming offer:", err);
-    }
-  });
-
-  // Incoming answer -> setRemoteDescription
-  this.socket?.on?.("webrtc-answer", async (payload: any) => {
+  // This method now uses the same events as registerSocketEvents.
+  // It ensures that subsequent offers/answers from renegotiation are handled.
+  // The primary handlers are in registerSocketEvents. This is a safety measure.
+  
+  this.socket?.on?.("signal:offer", async (payload: any) => {
     try {
       const from = payload.from ?? payload.sender ?? payload.to;
-      const sdp: RTCSessionDescriptionInit = payload.sdp ?? payload.answer;
-      console.log("[mesh] ◀ Received ANSWER from", from, "sdp-type:", sdp?.type);
-
+      if (from === this.socket.id) return; // Don't process our own offers
       const remote = this.remotes.get(from);
-      if (!remote || !remote.pc) {
-        console.warn("[mesh] No remote pc to apply answer for", from);
+      if (!remote) {
+        console.warn("[mesh] Offer from unknown peer", from);
         return;
       }
-      await remote.pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      console.log("[mesh] setRemoteDescription(answer) OK for", from);
+      // The main logic is already in registerSocketEvents, we just log here.
+      console.log("[mesh-renegotiate] ◀ Received subsequent OFFER from", from);
     } catch (err) {
-      console.error("[mesh] Error handling incoming answer:", err);
+      console.error("[mesh] Error in re-handling offer:", err);
     }
   });
 
-  // ICE candidate passing (if you use it)
-  this.socket?.on?.("webrtc-ice-candidate", async (payload: any) => {
-    try {
-      const from = payload.from;
-      const candidate = payload.candidate;
-      if (!from || !candidate) return;
-      const remote = this.remotes.get(from);
-      if (!remote || !remote.pc) {
-        console.warn("[mesh] ICE candidate arrived for unknown peer", from);
+  this.socket?.on?.("signal:answer", async (payload: any) => {
+     try {
+      const from = payload.from ?? payload.sender ?? payload.to;
+      if (from === this.socket.id) return;
+       const remote = this.remotes.get(from);
+       if (!remote) {
+        console.warn("[mesh] Answer from unknown peer", from);
         return;
       }
-      await remote.pc.addIceCandidate(candidate).catch(e => console.warn("addIceCandidate failed:", e));
-      console.log("[mesh] addIceCandidate for", from);
+      // The main logic is already in registerSocketEvents, we just log here.
+      console.log("[mesh-renegotiate] ◀ Received subsequent ANSWER from", from);
     } catch (err) {
-      console.error("[mesh] error adding ice candidate:", err);
+      console.error("[mesh] Error in re-handling answer:", err);
     }
   });
 }
@@ -258,7 +222,6 @@ private setupSignalingHandlers() {
  * - Creates an offer and sends it to the peer so remote receives the new track
  */
 public async replaceTrack(newTrack: MediaStreamTrack) {
-  // Ensure signaling handlers are bound
   this.setupSignalingHandlers();
 
   if (!this.localStream) throw new Error("No local stream available.");
@@ -284,36 +247,13 @@ public async replaceTrack(newTrack: MediaStreamTrack) {
           console.log(`[mesh] ✅ Replaced sender.track for peer ${socketId}`);
         } catch (err) {
           console.warn(`[mesh] sender.replaceTrack failed for ${socketId}:`, err);
-          // Fallback: try to remove/add
-          try {
-            pc.removeTrack(sender);
-            pc.addTrack(newTrack, new MediaStream([newTrack]));
-            console.log(`[mesh] fallback: removed old sender & added newTrack for ${socketId}`);
-          } catch (e) {
-            console.error(`[mesh] fallback addTrack failed for ${socketId}:`, e);
-          }
         }
       } else {
-        // No sender — create a transceiver or addTrack and renegotiate
         try {
-          // Prefer transceiver for consistent behavior
-          const trans = pc.addTransceiver("video", { direction: "sendrecv" });
-          if (trans && trans.sender) {
-            await trans.sender.replaceTrack(newTrack);
-            console.log(`[mesh] ✅ Created transceiver and attached newTrack for ${socketId}`);
-          } else {
-            // Fallback
-            pc.addTrack(newTrack, new MediaStream([newTrack]));
-            console.log(`[mesh] ✅ addTrack(newTrack) for ${socketId}`);
-          }
+          pc.addTrack(newTrack, new MediaStream([newTrack]));
+          console.log(`[mesh] ✅ addTrack(newTrack) for ${socketId}`);
         } catch (err) {
-          console.warn(`[mesh] addTransceiver/addTrack failed for ${socketId}:`, err);
-          try {
-            pc.addTrack(newTrack, new MediaStream([newTrack]));
-            console.log(`[mesh] fallback addTrack succeeded for ${socketId}`);
-          } catch (e) {
-            console.error(`[mesh] fallback addTrack totally failed for ${socketId}:`, e);
-          }
+          console.warn(`[mesh] addTrack failed for ${socketId}:`, err);
         }
       }
 
@@ -322,7 +262,7 @@ public async replaceTrack(newTrack: MediaStreamTrack) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         // send to peer
-        this.socket?.emit?.("webrtc-offer", { to: socketId, from: this.socket?.id ?? null, sdp: offer });
+        this.socket?.emit?.("signal:offer", { roomId: this.roomId, to: socketId, from: this.socket?.id ?? null, sdp: offer });
         console.log(`[mesh] ↪ Sent OFFER to ${socketId}`);
       } catch (err) {
         console.error(`[mesh] ❌ Failed to create/send offer to ${socketId}:`, err);
@@ -362,8 +302,6 @@ public async restoreCameraTrack() {
     console.log("[mesh] ✅ restoreCameraTrack completed");
   } catch (err) {
     console.error("[mesh] restoreCameraTrack failed:", err);
-    // fallback: addTrack original
-    try { await this.addTrack(this.originalVideoTrack); } catch (e) { console.error("[mesh] fallback addTrack failed:", e); }
   }
 }
 
@@ -383,7 +321,7 @@ public async addTrack(track: MediaStreamTrack) {
       console.log(`[mesh] addTrack called for ${socketId}`);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      this.socket?.emit?.("webrtc-offer", { to: socketId, from: this.socket?.id ?? null, sdp: offer });
+      this.socket?.emit?.("signal:offer", { roomId: this.roomId, to: socketId, from: this.socket?.id ?? null, sdp: offer });
       console.log(`[mesh] ↪ Sent OFFER to ${socketId} after addTrack`);
     } catch (err) {
       console.error(`[mesh] addTrack/offer failed for ${socketId}:`, err);
@@ -425,7 +363,7 @@ public async removeTrack(track: MediaStreamTrack | null) {
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        this.socket?.emit?.("webrtc-offer", { to: socketId, from: this.socket?.id ?? null, sdp: offer });
+        this.socket?.emit?.("signal:offer", { roomId: this.roomId, to: socketId, from: this.socket?.id ?? null, sdp: offer });
         console.log(`[mesh] ↪ Sent OFFER to ${socketId} after removeTrack`);
       } catch (e) {
         console.error(`[mesh] renegotiate after removeTrack failed for ${socketId}:`, e);
