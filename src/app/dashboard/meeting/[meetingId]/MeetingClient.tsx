@@ -350,16 +350,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null });
   }, [isHandRaised, updateMyStatus]);
   
-  const handleToggleScreenShare = async () => {
-    if (screenShareHelper?.isScreenSharing()) {
-      await screenShareHelper.stopScreenShare();
-      setIsScreenSharing(false);
-    } else {
-      await screenShareHelper?.requestScreenSharePermission();
-      // The socket event listener will set isScreenSharing to true
-    }
-  };
-  
   const togglePin = useCallback((id: string) => { setPinnedId(prev => prev === id ? null : prev); }, []);
 
   const renderLayout = () => {
@@ -473,7 +463,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <Button onClick={toggleMic} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}</Button>
             <Button onClick={toggleCamera} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}</Button>
             
-            <Button onClick={handleToggleScreenShare} variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isScreenSharing ? "bg-green-600 text-white hover:bg-green-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
+            <Button variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
                 {isScreenSharing ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
             </Button>
             
