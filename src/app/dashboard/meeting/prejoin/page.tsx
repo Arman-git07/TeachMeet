@@ -277,8 +277,8 @@ export default function PreJoinPage() {
 
 
   return (
-    <div className="container mx-auto max-w-4xl flex-1 flex flex-col justify-center items-center p-2 sm:p-4 md:p-8">
-      <Card className="w-full shadow-2xl rounded-2xl border-border/50">
+    <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
+      <Card className="w-full max-w-4xl shadow-2xl rounded-2xl border-border/50">
         <CardHeader className="relative text-center">
             <div className="absolute top-4 left-4">
                 <SidebarTrigger>
@@ -298,7 +298,7 @@ export default function PreJoinPage() {
             Check your camera and mic before joining the meeting.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+        <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           <div className="relative w-full bg-muted rounded-lg flex items-center justify-center overflow-hidden aspect-video">
             <video
                 ref={videoRef}
