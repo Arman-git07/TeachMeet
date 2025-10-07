@@ -277,7 +277,7 @@ export default function PreJoinPage() {
 
 
   return (
-    <div className="container mx-auto max-w-xl py-4 sm:py-8">
+    <div className="container mx-auto max-w-4xl flex-1 flex flex-col justify-center items-center p-2 sm:p-4 md:p-8">
       <Card className="w-full shadow-2xl rounded-2xl border-border/50">
         <CardHeader className="relative text-center">
             <div className="absolute top-4 left-4">
@@ -298,8 +298,8 @@ export default function PreJoinPage() {
             Check your camera and mic before joining the meeting.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="relative w-full bg-muted rounded-lg flex items-center justify-center overflow-hidden aspect-[9/16] sm:aspect-video">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+          <div className="relative w-full bg-muted rounded-lg flex items-center justify-center overflow-hidden aspect-video">
             <video
                 ref={videoRef}
                 className={videoClassNames}
@@ -357,140 +357,59 @@ export default function PreJoinPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="mirror-video"
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <FlipHorizontal className="h-4 w-4" /> Mirror my video
-              </Label>
-              <Switch
-                id="mirror-video"
-                checked={mirrorVideo}
-                onCheckedChange={handleMirrorToggle}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="apply-filter"
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Sparkles className="h-4 w-4" /> Apply Filter
-              </Label>
-              <Switch
-                id="apply-filter"
-                checked={applyFilter}
-                onCheckedChange={setApplyFilter}
-              />
-            </div>
-            <Select
-              value={videoFilter}
-              onValueChange={setVideoFilter}
-              disabled={!applyFilter}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a filter..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="brightclear">Bright & Clear</SelectItem>
-                <SelectItem value="vintage">Vintage</SelectItem>
-                <SelectItem value="grayscale">Grayscale</SelectItem>
-                <SelectItem value="sepia">Sepia</SelectItem>
-                <SelectItem value="luminous">Luminous</SelectItem>
-                <SelectItem value="dramatic">Dramatic</SelectItem>
-                <SelectItem value="goldenhour">Golden Hour</SelectItem>
-                <SelectItem value="softfocus">Soft Focus</SelectItem>
-                <SelectItem value="naturalglow">Natural Glow</SelectItem>
-                <SelectItem value="radiantskin">Radiant Skin</SelectItem>
-                <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
-              </SelectContent>
-            </Select>
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="mirror-video" className="flex items-center gap-2 cursor-pointer"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
+                    <Switch id="mirror-video" checked={mirrorVideo} onCheckedChange={handleMirrorToggle}/>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="apply-filter" className="flex items-center gap-2 cursor-pointer"><Sparkles className="h-4 w-4" /> Apply Filter</Label>
+                    <Switch id="apply-filter" checked={applyFilter} onCheckedChange={setApplyFilter}/>
+                  </div>
+                  <Select value={videoFilter} onValueChange={setVideoFilter} disabled={!applyFilter}>
+                    <SelectTrigger><SelectValue placeholder="Select a filter..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="brightclear">Bright & Clear</SelectItem>
+                      <SelectItem value="vintage">Vintage</SelectItem>
+                      <SelectItem value="naturalglow">Natural Glow</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg text-sm">
+                      <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
+                          <Settings className="mr-2 h-4 w-4" /> More A/V Settings...
+                      </Link>
+                  </Button>
+              </div>
 
-            <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg">
-                <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}>
-                    <Settings className="mr-2 h-4 w-4" /> Advanced A/V Settings
-                </Link>
-            </Button>
-          </div>
-          <div className="space-y-2">
-            <Label>Invite Others</Label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                readOnly
-                value={meetingLink}
-                className="pl-9 pr-10 rounded-lg text-xs"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                onClick={() => handleCopyToClipboard(meetingLink, 'Link')}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+              <div className="space-y-2">
+                <Label>Invite Others</Label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input readOnly value={meetingLink} className="pl-9 pr-10 rounded-lg text-xs"/>
+                  <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingLink, 'Link')}><Copy className="h-4 w-4" /></Button>
+                </div>
+                <div className="relative">
+                  <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input readOnly value={meetingCode} className="pl-9 pr-10 rounded-lg" />
+                  <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8" onClick={() => handleCopyToClipboard(meetingCode, 'Code')}><Copy className="h-4 w-4" /></Button>
+                </div>
+                <Button variant="outline" className="w-full rounded-lg" onClick={() => setIsSharePanelOpen(true)}>
+                  <Share2 className="mr-2 h-4 w-4" /> Share Full Invite
+                </Button>
+              </div>
+
+              <div>
+                <Label htmlFor="meeting-topic">Meeting Topic</Label>
+                <Input id="meeting-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className="mt-1 rounded-lg"/>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox id="terms" checked={agreed} onCheckedChange={(checked) => setAgreed(!!checked)}/>
+                  <label htmlFor="terms" className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    I agree to the <Link href="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/community-guidelines" className="text-primary hover:underline">Community Guidelines</Link>.
+                  </label>
+              </div>
             </div>
-            <div className="relative">
-              <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                readOnly
-                value={meetingCode}
-                className="pl-9 pr-10 rounded-lg"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                onClick={() => handleCopyToClipboard(meetingCode, 'Code')}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setIsSharePanelOpen(true)}
-            >
-              <Share2 className="mr-2 h-4 w-4" />
-              Share Full Invite
-            </Button>
-          </div>
-          <div>
-            <Label htmlFor="meeting-topic">Meeting Topic</Label>
-            <Input
-              id="meeting-topic"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="terms"
-              checked={agreed}
-              onCheckedChange={(checked) => setAgreed(!!checked)}
-            />
-            <label
-              htmlFor="terms"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              I agree to the{' '}
-              <Link
-                href="/terms-of-service"
-                className="text-primary hover:underline"
-              >
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link
-                href="/community-guidelines"
-                className="text-primary hover:underline"
-              >
-                Community Guidelines
-              </Link>
-              .
-            </label>
-          </div>
         </CardContent>
         <CardFooter className="flex-col gap-4 border-t pt-4">
            <Button
