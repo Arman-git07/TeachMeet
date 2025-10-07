@@ -143,6 +143,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   const onModalConfirm = async (mode: ShareMode) => {
     setIsScreenShareModalOpen(false);
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      alert("Your browser does not support screen sharing or this is not a secure context (HTTPS).");
+      return;
+    }
     if (!screenShareHelper) return;
 
     try {
@@ -502,3 +506,5 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
+
+    
