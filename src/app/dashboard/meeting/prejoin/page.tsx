@@ -36,6 +36,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { v4 as uuidv4 } from 'uuid';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
@@ -59,6 +61,9 @@ export default function PreJoinPage() {
   const [startError, setStartError] = useState<string | null>(null);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
+  const [isLoadingRole, setIsLoadingRole] = useState(true);
+  const [isHost, setIsHost] = useState(false);
+
 
   // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -84,6 +89,38 @@ export default function PreJoinPage() {
       );
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!meetingId || authLoading) return;
+  
+    const determineRole = async () => {
+      setIsLoadingRole(true);
+      if (!user) {
+        // Not logged in, so they are a guest/participant.
+        setIsHost(false);
+        setIsLoadingRole(false);
+        return;
+      }
+      try {
+        const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
+        if (meetingDoc.exists()) {
+          // Meeting exists, check if current user is the creator
+          setIsHost(meetingDoc.data().creatorId === user.uid);
+        } else {
+          // Meeting doesn't exist, so the current user must be the host creating it.
+          setIsHost(true);
+        }
+      } catch (error) {
+        console.error("Error checking meeting host:", error);
+        // On error, default to non-host to be safe.
+        setIsHost(false);
+      } finally {
+        setIsLoadingRole(false);
+      }
+    };
+  
+    determineRole();
+  }, [meetingId, user, authLoading]);
 
   useEffect(() => {
     let mounted = true;
@@ -209,10 +246,24 @@ export default function PreJoinPage() {
         toast({ variant: 'destructive', title: 'Topic is required' });
         return;
     }
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Authentication Required', description: 'Please sign in to start a meeting.' });
+        return;
+    }
+
 
     setIsCreatingMeeting(true);
 
     try {
+        const meetingRef = doc(db, 'meetings', meetingId);
+        await setDoc(meetingRef, {
+            topic: topic.trim(),
+            creatorId: user.uid,
+            creatorName: user.displayName || 'Anonymous Host',
+            createdAt: serverTimestamp(),
+        });
+
+        // Add to recent meetings in local storage
         const rawMeetings = localStorage.getItem(STARTED_MEETINGS_KEY);
         let meetings = [];
         if (rawMeetings) {
@@ -228,10 +279,32 @@ export default function PreJoinPage() {
             localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings));
             window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
         }
-    } catch (e) {
-        console.error("Failed to update localStorage for ongoing meetings", e);
+
+        // Redirect to the meeting page
+        const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+        router.push(meetingPath);
+
+    } catch (error) {
+        console.error("Failed to create meeting:", error);
+        setStartError("Failed to create the meeting. Please check your network connection and try again.");
+        toast({ variant: "destructive", title: "Meeting Creation Failed", description: "Could not create the meeting record. Check Firestore rules." });
+        setIsCreatingMeeting(false);
     }
+  };
+
+  const handleAskToJoin = async () => {
+    if (!agreed) {
+        toast({ variant: 'destructive', title: 'Agreement Required' });
+        return;
+    }
+    if (!user) {
+        router.push(`/auth/signin?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        return;
+    }
+    setIsCreatingMeeting(true); // Reuse the loading state
     
+    // The actual join request is handled on the meeting page now.
+    // This button just needs to redirect the user there.
     const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
     router.push(meetingPath);
   };
@@ -404,19 +477,31 @@ export default function PreJoinPage() {
                         I agree to the <Link href="/terms-of-service" target="_blank" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/community-guidelines" target="_blank" className="text-primary hover:underline">Community Guidelines</Link>.
                     </label>
                 </div>
-                 <Button
-                    onClick={handleCreateAndJoinMeeting}
-                    disabled={!agreed || isCreatingMeeting}
-                    className={cn(
-                    "w-full py-3 text-lg font-semibold rounded-xl",
-                    agreed
-                        ? "btn-gel"
-                        : "bg-green-900/50 text-green-100/70 cursor-not-allowed"
-                    )}
-                >
-                    {isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                    Join Now as Host
-                </Button>
+                 
+                 {isLoadingRole ? (
+                     <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Checking...
+                    </Button>
+                 ) : isHost ? (
+                    <Button
+                        onClick={handleCreateAndJoinMeeting}
+                        disabled={!agreed || isCreatingMeeting}
+                        className={cn(
+                        "w-full py-3 text-lg font-semibold rounded-xl",
+                        agreed
+                            ? "btn-gel"
+                            : "bg-green-900/50 text-green-100/70 cursor-not-allowed"
+                        )}
+                    >
+                        {isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                        Join Now as Host
+                    </Button>
+                 ) : (
+                    <Button onClick={handleAskToJoin} disabled={!agreed || isCreatingMeeting} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">
+                        {isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                        Ask to Join
+                    </Button>
+                 )}
             </div>
         </main>
         <ShareOptionsPanel
@@ -429,5 +514,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    
