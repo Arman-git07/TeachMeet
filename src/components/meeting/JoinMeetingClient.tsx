@@ -85,15 +85,26 @@ export function JoinMeetingClient() {
       try {
         const url = new URL(meetingLinkInput.trim());
         const pathParts = url.pathname.split('/');
-        const meetingSegmentIndex = pathParts.indexOf('meeting');
-
-        if (meetingSegmentIndex !== -1 && meetingSegmentIndex + 1 < pathParts.length) {
-          const potentialId = pathParts[meetingSegmentIndex + 1];
-          if (potentialId && potentialId !== 'wait' && potentialId !== 'chat' && potentialId !== 'participants' && potentialId !== 'whiteboard') {
-            meetingId = potentialId;
-          }
+        
+        // Find meetingId from URL path like /join-meeting/{id} or /meeting/{id}
+        const joinMeetingIndex = pathParts.indexOf('join-meeting');
+        const meetingIndex = pathParts.indexOf('meeting');
+        
+        if (joinMeetingIndex !== -1 && joinMeetingIndex + 1 < pathParts.length) {
+            meetingId = pathParts[joinMeetingIndex + 1];
+        } else if (meetingIndex !== -1 && meetingIndex + 1 < pathParts.length) {
+             const potentialId = pathParts[meetingIndex + 1];
+            // Make sure it's an ID, not a sub-route like 'chat'
+            if (potentialId && !['wait', 'chat', 'participants', 'whiteboard', 'prejoin'].includes(potentialId)) {
+                meetingId = potentialId;
+            }
         }
         
+        // Also check for meetingId in search params
+        if (url.searchParams.has('meetingId')) {
+            meetingId = url.searchParams.get('meetingId');
+        }
+
         if (url.searchParams.has('topic')) {
           topic = url.searchParams.get('topic');
         }
@@ -135,14 +146,15 @@ export function JoinMeetingClient() {
 
     if (meetingId && meetingId.trim()) {
       const finalMeetingId = meetingId.trim();
-      let navigationPath = `/dashboard/meeting/${finalMeetingId}/wait`;
+      // Redirect to the pre-join page with the meetingId and topic
+      let navigationPath = `/dashboard/meeting/prejoin?meetingId=${finalMeetingId}`;
       if (topic) {
-        navigationPath += `?topic=${encodeURIComponent(topic)}`;
+        navigationPath += `&topic=${encodeURIComponent(topic)}`;
       }
       
       toast({
-        title: "Joining Meeting...",
-        description: `Attempting to join meeting ID: ${finalMeetingId}${topic ? ' with topic: ' + topic : ''}`,
+        title: "Preparing to Join...",
+        description: `Taking you to the setup screen for meeting: ${finalMeetingId}`,
       });
       router.push(navigationPath);
     } else {
