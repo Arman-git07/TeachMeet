@@ -1,3 +1,4 @@
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Your Next.js configuration options can go here.
@@ -14,7 +15,10 @@ const nextConfig = {
   // },
   experimental: {
     optimizePackageImports: [
-      'lucide-react',
+      '@genkit-ai/ai',
+      '@genkit-ai/flow',
+      '@genkit-ai/google-genai',
+      '@genkit-ai/googleai',
       '@radix-ui/react-accordion',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-avatar',
@@ -35,11 +39,13 @@ const nextConfig = {
       '@radix-ui/react-tabs',
       '@radix-ui/react-toast',
       '@radix-ui/react-tooltip',
+      'firebase/app',
       'firebase/auth',
       'firebase/firestore',
+      'firebase/messaging',
       'firebase/storage',
-      '@genkit-ai/flow',
-      '@genkit-ai/googleai',
+      'lucide-react',
+      'recharts',
     ],
     fontLoaders: [
       { loader: '@next/font/google', options: { subsets: ['latin'] } },
@@ -47,5 +53,5 @@ const nextConfig = {
   },
 };
 
-// Incrementing this comment to force a cache clear: 10
+// Incrementing this comment to force a cache clear: 12
 module.exports = nextConfig;
