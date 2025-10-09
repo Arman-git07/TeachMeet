@@ -1,43 +1,48 @@
-import { generate } from '@genkit-ai/ai';
-// Removed configureGenkit import
-import { defineFlow, runFlow } from '@genkit-ai/flow';
-import { googleAI } from '@genkit-ai/googleai';
-import * as z from 'zod';
+'use server';
+/**
+ * @fileOverview An AI Help Assistant flow.
+ *
+ * This file defines a Genkit flow that uses the Gemini model to answer
+ * user questions. It is designed to be called from the app's API routes.
+ */
 
-// Removed configureGenkit call
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
 
-export const aiHelpAssistantFlow = defineFlow(
+const AiHelpAssistantInputSchema = z.object({
+  question: z.string().describe('The user question for the AI assistant.'),
+});
+
+const AiHelpAssistantOutputSchema = z.object({
+  answer: z.string().describe('The AI-generated answer.'),
+});
+
+export async function aiHelpAssistantFlow(input: {
+  question: string;
+}): Promise<{ answer: string }> {
+  const llmResponse = await ai.generate({
+    prompt: input.question,
+    model: 'googleai/gemini-pro',
+    config: {
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      ],
+    },
+  });
+
+  return { answer: llmResponse.text };
+}
+
+const aiHelpAssistant = ai.defineFlow(
   {
     name: 'aiHelpAssistantFlow',
-    inputSchema: z.string(),
-    outputSchema: z.string(),
+    inputSchema: AiHelpAssistantInputSchema,
+    outputSchema: AiHelpAssistantOutputSchema,
   },
-  async (prompt) => {
-    const result = await generate(
-      googleAI.model('gemini-pro'), // Model as the first argument
-      {
-        prompt: prompt, // Prompt within the input object
-        safetySettings: [
-          {
-            category: 'HARM_CATEGORY_HATE_SPEECH',
-            threshold: 'BLOCK_NONE',
-          },
-          {
-            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-            threshold: 'BLOCK_NONE',
-          },
-          {
-            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-            threshold: 'BLOCK_NONE',
-          },
-          {
-            category: 'HARM_CATEGORY_HARASSMENT',
-            threshold: 'BLOCK_NONE',
-          },
-        ],
-      }
-    );
-
-    return result.text();
+  async (input) => {
+    return await aiHelpAssistantFlow(input);
   }
 );
