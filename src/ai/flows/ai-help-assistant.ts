@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI Help Assistant flow.
@@ -12,14 +13,18 @@ import { z } from 'zod';
 const AiHelpAssistantInputSchema = z.object({
   question: z.string().describe('The user question for the AI assistant.'),
 });
+export type AiHelpAssistantInput = z.infer<typeof AiHelpAssistantInputSchema>;
+
 
 const AiHelpAssistantOutputSchema = z.object({
   answer: z.string().describe('The AI-generated answer.'),
 });
+export type AiHelpAssistantOutput = z.infer<typeof AiHelpAssistantOutputSchema>;
 
-export async function aiHelpAssistantFlow(input: {
-  question: string;
-}): Promise<{ answer: string }> {
+
+export async function aiHelpAssistantFlow(
+  input: AiHelpAssistantInput
+): Promise<AiHelpAssistantOutput> {
   const llmResponse = await ai.generate({
     prompt: input.question,
     model: 'googleai/gemini-pro',
@@ -36,13 +41,11 @@ export async function aiHelpAssistantFlow(input: {
   return { answer: llmResponse.text };
 }
 
-const aiHelpAssistant = ai.defineFlow(
+ai.defineFlow(
   {
     name: 'aiHelpAssistantFlow',
     inputSchema: AiHelpAssistantInputSchema,
     outputSchema: AiHelpAssistantOutputSchema,
   },
-  async (input) => {
-    return await aiHelpAssistantFlow(input);
-  }
+  aiHelpAssistantFlow
 );

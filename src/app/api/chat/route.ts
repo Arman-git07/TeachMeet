@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { aiHelpAssistantFlow } from '@/ai/flows/ai-help-assistant';
 
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ answer: aiResponse.answer });
   } catch (error) {
     console.error('API Error:', error);
-    return NextResponse.json({ error: 'An error occurred while processing your request.' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ error: `An error occurred while processing your request: ${errorMessage}` }, { status: 500 });
   }
 }
