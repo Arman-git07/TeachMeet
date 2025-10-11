@@ -6,7 +6,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -109,7 +109,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   
     const requestsQuery = query(collection(db, `meetings/${meetingId}/joinRequests`));
     const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
-      const newRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest));
+      const newRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest));
       setPendingJoinRequests(newRequests);
     });
   
@@ -146,7 +146,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     // In a real scenario, the request doc might be deleted after a delay.
     // For now, we update the status, and the client waiting will see this change.
     // We will immediately remove it from our queue to show the next one.
-    setPendingJoinRequests(prev => prev.filter(r => r.id !== request.id));
+    setPendingJoinRequests(prev => prev.filter(r => r.userId !== request.userId));
     setCurrentJoinRequest(null);
 
     await batch.commit();
