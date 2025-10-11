@@ -6,7 +6,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import VideoTile from "./VideoTile";
 import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
+import { JoinRequestModal } from "@/components/modals/JoinRequestModal";
+import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 
 type Participant = {
@@ -73,6 +75,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [remoteScreenTiles, setRemoteScreenTiles] = useState<RemoteScreen[]>([]);
   const [screenShareRequest, setScreenShareRequest] = useState<{ participantId: string; name: string } | null>(null);
 
+  // Join Request State
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<JoinRequest[]>([]);
+  const [currentJoinRequest, setCurrentJoinRequest] = useState<JoinRequest | null>(null);
+  
   const [volumeLevels, setVolumeLevels] = useState<Map<string, number>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -97,6 +103,55 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   
   const isHost = useCallback(() => userId === meetingCreatorId.current, [userId]);
   
+  // Listen for join requests if user is host
+  useEffect(() => {
+    if (!isHost()) return;
+  
+    const requestsQuery = query(collection(db, `meetings/${meetingId}/joinRequests`));
+    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+      const newRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as JoinRequest));
+      setPendingJoinRequests(newRequests);
+    });
+  
+    return () => unsubscribe();
+  }, [meetingId, isHost]);
+
+  // Effect to show the next pending request in the modal
+  useEffect(() => {
+    if (pendingJoinRequests.length > 0 && !currentJoinRequest) {
+      setCurrentJoinRequest(pendingJoinRequests[0]);
+    } else if (pendingJoinRequests.length === 0) {
+      setCurrentJoinRequest(null);
+    }
+  }, [pendingJoinRequests, currentJoinRequest]);
+  
+  const handleJoinRequestDecision = async (request: JoinRequest, action: 'approve' | 'deny') => {
+    const batch = writeBatch(db);
+    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, request.userId);
+  
+    if (action === 'approve') {
+      const participantRef = doc(db, `meetings/${meetingId}/participants`, request.userId);
+      batch.set(participantRef, {
+        name: request.userName,
+        photoURL: request.userPhotoURL || '',
+        joinedAt: serverTimestamp()
+      });
+      batch.update(requestRef, { status: 'approved' });
+      toast({ title: "User Approved", description: `${request.userName} has been allowed to join.` });
+    } else { // Deny
+      batch.update(requestRef, { status: 'denied' });
+      toast({ title: "User Denied", description: `${request.userName}'s join request has been denied.` });
+    }
+    
+    // In a real scenario, the request doc might be deleted after a delay.
+    // For now, we update the status, and the client waiting will see this change.
+    // We will immediately remove it from our queue to show the next one.
+    setPendingJoinRequests(prev => prev.filter(r => r.id !== request.id));
+    setCurrentJoinRequest(null);
+
+    await batch.commit();
+  };
+
   const rtc = useMemo(() => {
     if (!userId || !meetingId || !user?.displayName) return null;
     return new MeshRTC({
@@ -471,6 +526,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   return (
     <div className="flex flex-col h-full">
+      <JoinRequestModal
+        isOpen={!!currentJoinRequest}
+        request={currentJoinRequest ? { userName: currentJoinRequest.userName, userPhotoURL: currentJoinRequest.userPhotoURL } : null}
+        onApprove={() => currentJoinRequest && handleJoinRequestDecision(currentJoinRequest, 'approve')}
+        onDeny={() => currentJoinRequest && handleJoinRequestDecision(currentJoinRequest, 'deny')}
+      />
+
       <ScreenShareModal
         open={isScreenShareModalOpen}
         onClose={() => setIsScreenShareModalOpen(false)}
@@ -506,7 +568,3 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
-
-    
-
-    

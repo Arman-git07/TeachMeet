@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Meeting": {
@@ -59,6 +60,27 @@
         }
       },
       "required": ["userId", "userName", "status", "requestedAt"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile data stored within a meeting's participants list.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The display name of the participant."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "The URL of the participant's avatar image."
+        },
+        "joinedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the user joined the meeting."
+        }
+      },
+      "required": ["name", "joinedAt"]
     }
   },
   "firestore": {
