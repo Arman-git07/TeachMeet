@@ -1,4 +1,4 @@
-typescriptreact
+'use client';
 import { useState } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
