@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -51,7 +50,11 @@ export function Announcements() {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'announcements'), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setAnnouncements(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
+            const now = new Date();
+            const fetchedAnnouncements = snapshot.docs
+                .map(d => ({ id: d.id, ...d.data() } as Announcement))
+                .filter(a => !a.vanishAt || a.vanishAt.toDate() > now);
+            setAnnouncements(fetchedAnnouncements);
         }, (error) => {
             console.error("Error fetching announcements:", error);
             toast({ variant: 'destructive', title: "Error", description: "Could not fetch announcements." });
@@ -79,7 +82,7 @@ export function Announcements() {
 
     return (
         <div className="space-y-4">
-            {canUserPost && <AnnouncementComposer classId={classroomId} canPost={canUserPost} />}
+            {canUserPost && classroomId && <AnnouncementComposer classId={classroomId} canPost={canUserPost} />}
             <div className="space-y-3">
                 {announcements.length > 0 ? announcements.map(a => (
                     <AnnouncementItem

@@ -138,8 +138,18 @@ export default function ClassroomPage() {
 
         fetchRoleAndClassroom();
 
+        const unsubscribe = onSnapshot(doc(db, "classrooms", classroomId), (doc) => {
+            if (doc.exists()) {
+                if (!cancelled) {
+                    setClassroom({ id: doc.id, ...doc.data() } as Classroom);
+                }
+            }
+        });
+
+
         return () => {
           cancelled = true;
+          unsubscribe();
         };
     }, [classroomId, user?.uid, authLoading, router, toast]);
 

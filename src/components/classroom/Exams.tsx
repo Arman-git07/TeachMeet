@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -56,7 +55,11 @@ export function Exams() {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'exams'), orderBy('date', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setExams(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Exam)));
+            const now = new Date();
+            const validExams = snapshot.docs
+                .map(d => ({ id: d.id, ...d.data() } as Exam))
+                .filter(exam => !exam.vanishAt || exam.vanishAt.toDate() > now);
+            setExams(validExams);
         }, (error) => {
             toast({ variant: 'destructive', title: "Error", description: "Could not fetch exams." });
         });
