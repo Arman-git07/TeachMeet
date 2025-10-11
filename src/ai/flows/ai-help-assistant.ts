@@ -40,12 +40,3 @@ export async function aiHelpAssistantFlow(
 
   return { answer: llmResponse.text };
 }
-
-ai.defineFlow(
-  {
-    name: 'aiHelpAssistantFlow',
-    inputSchema: AiHelpAssistantInputSchema,
-    outputSchema: AiHelpAssistantOutputSchema,
-  },
-  aiHelpAssistantFlow
-);

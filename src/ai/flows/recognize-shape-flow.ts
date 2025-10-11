@@ -26,10 +26,6 @@ const RecognizeShapeOutputSchema = z.object({
 });
 export type RecognizeShapeOutput = z.infer<typeof RecognizeShapeOutputSchema>;
 
-export async function recognizeShape(input: RecognizeShapeInput): Promise<RecognizeShapeOutput> {
-  return recognizeShapeFlow(input);
-}
-
 const recognizeShapeFlow = ai.defineFlow(
   {
     name: 'recognizeShapeFlow',
@@ -57,3 +53,7 @@ const recognizeShapeFlow = ai.defineFlow(
     };
   }
 );
+
+export async function recognizeShape(input: RecognizeShapeInput): Promise<RecognizeShapeOutput> {
+  return recognizeShapeFlow(input);
+}
