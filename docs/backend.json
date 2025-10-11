@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "Meeting": {
+      "title": "Meeting",
+      "description": "Represents a meeting session.",
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "description": "The topic or title of the meeting."
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "The UID of the user who created the meeting (the host)."
+        },
+        "creatorName": {
+          "type": "string",
+          "description": "The display name of the meeting creator."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the meeting was created."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "active", "ended"],
+          "description": "The current status of the meeting."
+        }
+      },
+      "required": ["topic", "creatorId", "createdAt"]
+    },
+    "JoinRequest": {
+      "title": "Join Request",
+      "description": "A request from a user to join a meeting.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user requesting to join."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The display name of the user requesting to join."
+        },
+        "userPhotoURL": {
+          "type": "string",
+          "description": "The photo URL of the user."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "denied"],
+          "description": "The status of the join request."
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the request was made."
+        }
+      },
+      "required": ["userId", "userName", "status", "requestedAt"]
+    }
+  },
+  "firestore": {
+    "/meetings/{meetingId}": {
+      "schema": { "$ref": "#/entities/Meeting" },
+      "description": "Collection of all meetings."
+    },
+    "/meetings/{meetingId}/joinRequests/{userId}": {
+      "schema": { "$ref": "#/entities/JoinRequest" },
+      "description": "Sub-collection for join requests for a specific meeting."
+    },
+    "/meetings/{meetingId}/participants/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Sub-collection for participants in a specific meeting."
+    }
+  },
+  "auth": {
+    "providers": ["anonymous", "email"]
+  }
+}
