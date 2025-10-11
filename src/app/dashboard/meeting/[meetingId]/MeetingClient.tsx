@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -448,7 +447,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null });
   }, [isHandRaised, updateMyStatus]);
   
-  const togglePin = useCallback((id: string) => { setPinnedId(prev => prev === id ? null : prev); }, []);
+  const togglePin = useCallback((id: string) => { setPinnedId(prev => prev === id ? null : id); }, []);
 
   const renderLayout = () => {
     const mainParticipants = allParticipants.filter(p => !remoteScreenTiles.some(s => s.peerId === p.id));

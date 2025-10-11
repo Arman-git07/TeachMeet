@@ -261,6 +261,15 @@ export default function PreJoinPage() {
             creatorId: user.uid,
             creatorName: user.displayName || 'Anonymous Host',
             createdAt: serverTimestamp(),
+            status: 'pending',
+        });
+        
+        const participantRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+        await setDoc(participantRef, {
+            name: user.displayName || 'Anonymous Host',
+            photoURL: user.photoURL || '',
+            isHost: true,
+            joinedAt: serverTimestamp(),
         });
 
         // Add to recent meetings in local storage
@@ -303,10 +312,25 @@ export default function PreJoinPage() {
     }
     setIsCreatingMeeting(true); // Reuse the loading state
     
-    // The actual join request is handled on the meeting page now.
-    // This button just needs to redirect the user there.
-    const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-    router.push(meetingPath);
+    try {
+      const requestRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+      await setDoc(requestRef, {
+        userId: user.uid,
+        userName: user.displayName || 'Anonymous User',
+        userPhotoURL: user.photoURL || '',
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      });
+      toast({ title: 'Request Sent', description: "Your request to join has been sent to the host." });
+
+      // Redirect to a waiting page (or the meeting page which will show a waiting UI)
+      const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+      router.push(meetingPath);
+    } catch(error) {
+       console.error("Failed to send join request:", error);
+       toast({ variant: "destructive", title: "Request Failed", description: "Could not send join request. The meeting may not exist or there's a network issue." });
+       setIsCreatingMeeting(false);
+    }
   };
 
 
