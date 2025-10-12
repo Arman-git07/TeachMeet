@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -143,7 +142,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
 
   const [realtimeParticipants, setRealtimeParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [meetingCreatorId, setMeetingCreatorId] = useState<string | null>(null);
+  const [meetingHostId, setMeetingHostId] = useState<string | null>(null);
   const [showMeetingId, setShowMeetingId] = useState(false);
   const currentUserId = auth.currentUser?.uid;
 
@@ -157,8 +156,8 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
         try {
             const docSnap = await getDoc(meetingDocRef);
             if (docSnap.exists()) {
-                const creator = docSnap.data().creatorId; // Correctly use creatorId
-                setMeetingCreatorId(creator);
+                const host = docSnap.data().hostId;
+                setMeetingHostId(host);
             } else {
                 toast({ variant: "destructive", title: "Meeting Not Found", description: "Could not load meeting details." });
             }
@@ -206,7 +205,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topicFromParams)}`
     : `/dashboard/meeting/${meetingId}`;
   
-  const isCurrentUserTheHost = currentUserId === meetingCreatorId;
+  const isCurrentUserTheHost = currentUserId === meetingHostId;
 
   return (
     <div className="flex flex-col h-full bg-muted/30">
@@ -258,7 +257,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                       key={participant.id} 
                       participant={participant} 
                       isCurrentUserHost={isCurrentUserTheHost}
-                      isThisParticipantTheHost={participant.id === meetingCreatorId}
+                      isThisParticipantTheHost={participant.id === meetingHostId}
                     />
                   ))}
                 </div>

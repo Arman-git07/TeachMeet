@@ -92,8 +92,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       setIsLoadingRole(true);
       const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
       if (meetingDoc.exists()) {
-        const creatorId = meetingDoc.data().creatorId;
-        setIsHost(userId === creatorId);
+        const hostId = meetingDoc.data().hostId; // Use hostId
+        setIsHost(userId === hostId);
       }
       setIsLoadingRole(false);
     };

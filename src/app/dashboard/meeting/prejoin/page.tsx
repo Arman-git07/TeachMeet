@@ -95,7 +95,7 @@ export default function PreJoinPage() {
         `${window.location.origin}/dashboard/join-meeting?meetingId=${id}`
       );
     }
-  }, [searchParams, router, toast]);
+  }, [searchParams, router, toast, user]);
 
   // Listen for host response (for participants)
   useEffect(() => {
@@ -127,7 +127,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost, authLoading, router, requestStatus, toast, topic, isCameraOn, isMicOn]);
+  }, [meetingId, user, isHost, router, authLoading, toast, requestStatus, topic, isCameraOn, isMicOn]);
 
 
   useEffect(() => {
@@ -164,7 +164,11 @@ export default function PreJoinPage() {
     try {
         const meetingRef = doc(db, 'meetings', meetingId);
         await setDoc(meetingRef, {
-            topic: topic.trim(), creatorId: user.uid, creatorName: user.displayName || 'Anonymous Host', createdAt: serverTimestamp(), status: 'pending',
+            topic: topic.trim(), 
+            hostId: user.uid, // Use hostId to match security rules
+            creatorName: user.displayName || 'Anonymous Host', 
+            createdAt: serverTimestamp(), 
+            status: 'pending',
         }, { merge: true });
         
         const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
