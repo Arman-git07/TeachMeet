@@ -185,9 +185,10 @@ export default function PreJoinPage() {
     const meetingRef = doc(db, 'meetings', meetingId);
     const meetingSnap = await getDoc(meetingRef);
     if (!meetingSnap.exists()) {
-        toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or has ended. The host may need to start it." });
+        setStartError("This meeting does not exist or has ended. The host may need to start it.");
         return;
     }
+    setStartError(null);
 
     setRequestStatus("pending");
     toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host.' });
@@ -253,7 +254,7 @@ export default function PreJoinPage() {
   return (
     <div className="flex flex-col h-full overflow-y-auto">
         <header className="flex-shrink-0 p-4 flex justify-between items-center"><div className="flex items-center gap-2"><SidebarTrigger><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger><h1 className="text-xl font-semibold text-foreground">Ready to Join?</h1></div><Button asChild variant="link" className="text-muted-foreground"><Link href="/">Cancel</Link></Button></header>
-        {startError && (<div className="px-4"><Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Failed to Start</AlertTitle><AlertDescription>{startError}</AlertDescription></Alert></div>)}
+        {startError && (<div className="px-4"><Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Meeting Not Found</AlertTitle><AlertDescription>{startError}</AlertDescription></Alert></div>)}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 p-4 md:p-8">
              <div className="relative w-full bg-muted rounded-2xl flex items-center justify-center overflow-hidden min-h-[250px] lg:min-h-0 shadow-inner">
                 <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
@@ -295,3 +296,5 @@ export default function PreJoinPage() {
     </div>
   );
 }
+
+    
