@@ -99,22 +99,27 @@ export default function PreJoinPage() {
 
   // Listen for host response (for participants)
   useEffect(() => {
-    if (!meetingId || !user || isHost) return;
+    if (!meetingId || !user || isHost || authLoading) return;
 
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
     const unsub = onSnapshot(reqRef, (snap) => {
-      const data = snap.data();
       if (!snap.exists()) {
-        setRequestStatus((currentStatus) => currentStatus === 'declined' ? 'idle' : currentStatus);
+        if (requestStatus === 'declined') {
+          setRequestStatus("idle");
+        }
         return;
-      }
-      if (data?.status === "approved") {
+      };
+
+      const data = snap.data();
+      if (data.status === "approved") {
         setRequestStatus("accepted");
         toast({ title: "Request Approved!", description: "The host has let you in. Joining the meeting now..." });
-        const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&cam=${isCameraOn}&mic=${isMicOn}`;
-        router.push(meetingPath);
-      } else if (data?.status === "denied") {
+        setTimeout(() => {
+            const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+            router.push(meetingPath);
+        }, 1000);
+      } else if (data.status === "denied") {
         setRequestStatus("declined");
         toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join."});
         setTimeout(() => deleteDoc(reqRef), 5000); // Clean up denied request
@@ -122,7 +127,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost, router, toast, topic, isCameraOn, isMicOn]);
+  }, [meetingId, user, isHost, router, authLoading, toast, requestStatus, topic, isCameraOn, isMicOn]);
 
 
   useEffect(() => {
@@ -155,25 +160,11 @@ export default function PreJoinPage() {
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user) return;
     setIsCreatingMeeting(true);
-
-    try {
-        const meetingRef = doc(db, 'meetings', meetingId);
-        await setDoc(meetingRef, {
-            topic: topic.trim(), 
-            hostId: user.uid, // Use hostId to match security rules
-            creatorName: user.displayName || 'Anonymous Host', 
-            createdAt: serverTimestamp(), 
-            status: 'pending',
-        }, { merge: true });
-        
-        const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-        router.push(meetingPath);
-
-    } catch (error) {
-        console.error("Failed to create/join meeting:", error);
-        toast({ variant: "destructive", title: "Meeting Start Failed", description: "Could not create or join the meeting. Check Firestore rules." });
-        setIsCreatingMeeting(false);
-    }
+    
+    // The meeting document will be created on the actual meeting page.
+    // This button just navigates the host.
+    const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+    router.push(meetingPath);
   };
 
   const handleAskToJoin = async () => {
