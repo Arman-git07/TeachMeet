@@ -96,11 +96,11 @@ export default function PreJoinPage() {
         `${window.location.origin}/dashboard/join-meeting?meetingId=${id}`
       );
     }
-  }, [searchParams, router, toast, user]);
+  }, [searchParams, router, toast]);
 
   // Listen for host response (for participants)
   useEffect(() => {
-    if (!meetingId || !user || isHost || authLoading) return;
+    if (!meetingId || !user || isHost) return;
 
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
@@ -117,7 +117,7 @@ export default function PreJoinPage() {
         setRequestStatus("accepted");
         toast({ title: "Request Approved!", description: "The host has let you in. Joining the meeting now..." });
         setTimeout(() => {
-            const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+            const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&cam=${isCameraOn}&mic=${isMicOn}`;
             router.push(meetingPath);
         }, 1000);
       } else if (data.status === "denied") {
@@ -128,7 +128,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost, router, authLoading, toast, requestStatus, topic, isCameraOn, isMicOn]);
+  }, [meetingId, user, isHost]);
 
 
   useEffect(() => {
