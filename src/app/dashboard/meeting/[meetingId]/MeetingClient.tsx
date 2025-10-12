@@ -6,7 +6,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -447,3 +447,5 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
+
+    
