@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -100,7 +99,7 @@ export default function PreJoinPage() {
 
   // Listen for host response (for participants)
   useEffect(() => {
-    if (!meetingId || !user || isHost) return;
+    if (!meetingId || !user || isHost || authLoading) return;
 
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
@@ -117,7 +116,7 @@ export default function PreJoinPage() {
         setRequestStatus("accepted");
         toast({ title: "Request Approved!", description: "The host has let you in. Joining the meeting now..." });
         setTimeout(() => {
-            const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&cam=${isCameraOn}&mic=${isMicOn}`;
+            const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
             router.push(meetingPath);
         }, 1000);
       } else if (data.status === "denied") {
@@ -128,7 +127,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost]);
+  }, [meetingId, user, isHost, authLoading, router, requestStatus, toast, topic, isCameraOn, isMicOn]);
 
 
   useEffect(() => {
