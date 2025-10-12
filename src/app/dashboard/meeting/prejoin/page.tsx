@@ -181,42 +181,61 @@ export default function PreJoinPage() {
   const handleAskToJoin = async () => {
     if (!user || !meetingId) return;
 
-    // Before sending a request, quickly check if the meeting exists
-    const meetingRef = doc(db, 'meetings', meetingId);
-    const meetingSnap = await getDoc(meetingRef);
-    if (!meetingSnap.exists()) {
-        setStartError("This meeting does not exist or has ended. The host may need to start it.");
-        return;
-    }
-    setStartError(null);
-
-    setRequestStatus("pending");
-    toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host.' });
-    
+    const meetingRef = doc(db, "meetings", meetingId);
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-    try {
-        await setDoc(reqRef, {
-            userId: user.uid,
-            userName: user.displayName || "Guest User",
-            userPhotoURL: user.photoURL || '',
-            status: "pending",
-            requestedAt: serverTimestamp(),
-        });
-        
-        // Auto-expire request after 2 minutes
-        setTimeout(async () => {
-            const snap = await getDoc(reqRef);
-            if (snap.exists() && snap.data().status === "pending") {
-              await deleteDoc(reqRef);
-              setRequestStatus("idle");
-              toast({ variant: 'destructive', title: 'Request Expired', description: 'Your join request timed out as the host did not respond.' });
-            }
-        }, 120000);
 
+    try {
+      // Try reading the meeting document to confirm existence
+      const meetingSnap = await getDoc(meetingRef);
+
+      if (!meetingSnap.exists()) {
+        // Allow join request even if host hasn't started meeting yet
+        await setDoc(meetingRef, {
+          placeholder: true,
+          createdAt: serverTimestamp(),
+        }, { merge: true });
+      }
+
+      // Proceed to send join request
+      setStartError(null);
+      setRequestStatus("pending");
+
+      await setDoc(reqRef, {
+        userId: user.uid,
+        userName: user.displayName || "Guest User",
+        userPhotoURL: user.photoURL || "",
+        status: "pending",
+        requestedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: "Request Sent",
+        description: "Your request to join has been sent to the host.",
+      });
+
+      // Auto-expire request after 2 minutes
+      setTimeout(async () => {
+        const snap = await getDoc(reqRef);
+        if (snap.exists() && snap.data().status === "pending") {
+          await deleteDoc(reqRef);
+          setRequestStatus("idle");
+          toast({
+            variant: "destructive",
+            title: "Request Expired",
+            description:
+              "Your join request timed out as the host did not respond.",
+          });
+        }
+      }, 120000);
     } catch (error) {
-        console.error("Failed to send join request:", error);
-        toast({ variant: "destructive", title: "Request Failed", description: "Could not send your join request." });
-        setRequestStatus("idle");
+      console.error("Failed to send join request:", error);
+      setStartError("Could not send join request. Please try again.");
+      toast({
+        variant: "destructive",
+        title: "Request Failed",
+        description: "An error occurred while sending your join request.",
+      });
+      setRequestStatus("idle");
     }
   };
 
@@ -296,6 +315,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    
-    
