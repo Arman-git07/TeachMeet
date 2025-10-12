@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -14,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import VideoTile from "./VideoTile";
 import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
-import { JoinRequestModal } from "@/components/modals/JoinRequestModal";
+import JoinRequestListener from "@/components/meeting/JoinRequestListener";
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 
@@ -72,12 +73,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   
   const [remoteScreenTiles, setRemoteScreenTiles] = useState<RemoteScreen[]>([]);
-  const [screenShareRequest, setScreenShareRequest] = useState<{ participantId: string; name: string } | null>(null);
-
-  // Join Request State
-  const [pendingJoinRequests, setPendingJoinRequests] = useState<JoinRequest[]>([]);
-  const [currentJoinRequest, setCurrentJoinRequest] = useState<JoinRequest | null>(null);
   
+  const [isHost, setIsHost] = useState(false);
+  const [isLoadingRole, setIsLoadingRole] = useState(true);
+
   const [volumeLevels, setVolumeLevels] = useState<Map<string, number>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -88,68 +87,19 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const lastRemoteUpdateRef = useRef<number>(0);
 
   const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const meetingCreatorId = useRef<string | null>(null);
-
+  
   useEffect(() => {
     const fetchMeetingCreator = async () => {
+      setIsLoadingRole(true);
       const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
       if (meetingDoc.exists()) {
-        meetingCreatorId.current = meetingDoc.data().creatorId;
+        const creatorId = meetingDoc.data().creatorId;
+        setIsHost(userId === creatorId);
       }
+      setIsLoadingRole(false);
     };
     fetchMeetingCreator();
-  }, [meetingId]);
-  
-  const isHost = useCallback(() => userId === meetingCreatorId.current, [userId]);
-  
-  // Listen for join requests if user is host
-  useEffect(() => {
-    if (!isHost()) return;
-  
-    const requestsQuery = query(collection(db, `meetings/${meetingId}/joinRequests`));
-    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
-      const newRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest));
-      setPendingJoinRequests(newRequests);
-    });
-  
-    return () => unsubscribe();
-  }, [meetingId, isHost]);
-
-  // Effect to show the next pending request in the modal
-  useEffect(() => {
-    if (pendingJoinRequests.length > 0 && !currentJoinRequest) {
-      setCurrentJoinRequest(pendingJoinRequests[0]);
-    } else if (pendingJoinRequests.length === 0) {
-      setCurrentJoinRequest(null);
-    }
-  }, [pendingJoinRequests, currentJoinRequest]);
-  
-  const handleJoinRequestDecision = async (request: JoinRequest, action: 'approve' | 'deny') => {
-    const batch = writeBatch(db);
-    const requestRef = doc(db, `meetings/${meetingId}/joinRequests`, request.userId);
-  
-    if (action === 'approve') {
-      const participantRef = doc(db, `meetings/${meetingId}/participants`, request.userId);
-      batch.set(participantRef, {
-        name: request.userName,
-        photoURL: request.userPhotoURL || '',
-        joinedAt: serverTimestamp()
-      });
-      batch.update(requestRef, { status: 'approved' });
-      toast({ title: "User Approved", description: `${request.userName} has been allowed to join.` });
-    } else { // Deny
-      batch.update(requestRef, { status: 'denied' });
-      toast({ title: "User Denied", description: `${request.userName}'s join request has been denied.` });
-    }
-    
-    // In a real scenario, the request doc might be deleted after a delay.
-    // For now, we update the status, and the client waiting will see this change.
-    // We will immediately remove it from our queue to show the next one.
-    setPendingJoinRequests(prev => prev.filter(r => r.userId !== request.userId));
-    setCurrentJoinRequest(null);
-
-    await batch.commit();
-  };
+  }, [meetingId, userId]);
 
   const rtc = useMemo(() => {
     if (!userId || !meetingId || !user?.displayName) return null;
@@ -191,9 +141,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => off();
   }, [screenShareHelper]);
 
-  const handleShareClick = () => {
-    setIsScreenShareModalOpen(true);
-  };
+  const handleShareClick = () => { setIsScreenShareModalOpen(true); };
 
   const onModalConfirm = async (mode: ShareMode) => {
     setIsScreenShareModalOpen(false);
@@ -204,13 +152,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     if (!screenShareHelper) return;
 
     try {
-      // direct user gesture: open browser screen picker
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      
-      // Start sharing using helper (this will call mesh.replaceTrack/addTrack)
       await screenShareHelper.startSharingWithStream(mode, stream);
-      
-      // update UI to show stop control on tile
       setIsSharingScreen(true);
     } catch (err) {
       console.error("Screen share cancelled or failed:", err);
@@ -219,11 +162,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
   };
   
-  const handleStopSharing = async () => {
-    await screenShareHelper?.stopSharing();
-    setIsSharingScreen(false);
-  };
-
+  const handleStopSharing = async () => { await screenShareHelper?.stopSharing(); setIsSharingScreen(false); };
 
   useEffect(() => {
     let mounted = true;
@@ -360,32 +299,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   useEffect(() => {
     if (!rtc?.socket) return;
-    const handleStarted = ({ userId: sharerId }: { userId: string }) => {
-      // Logic handled by onStop callback in helper
-    };
-    const handleStopped = ({ userId: sharerId }: { userId: string }) => {
-      // Logic handled by onStop callback in helper
-    };
-    rtc.socket.on("started-screen-share", handleStarted);
-    rtc.socket.on("stopped-screen-share", handleStopped);
+    const handleStarted = ({ userId: sharerId }: { userId: string }) => {};
+    const handleStopped = ({ userId: sharerId }: { userId: string }) => {};
     rtc.socket.on("screen-share-started", handleStarted);
     rtc.socket.on("screen-share-stopped", handleStopped);
-
-
-    const handleParticipantStarted = ({ participantId }: { participantId: string }) => {
-        // The onRemoteStream in MeshRTC will handle adding the tile
-    };
-    const handleParticipantStopped = ({ participantId }: { participantId: string }) => {
-        setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== participantId));
-    };
-
+    const handleParticipantStarted = ({ participantId }: { participantId: string }) => {};
+    const handleParticipantStopped = ({ participantId }: { participantId: string }) => { setRemoteScreenTiles(prev => prev.filter(t => t.peerId !== participantId)); };
     rtc.socket.on('participant-started-sharing', handleParticipantStarted);
     rtc.socket.on('participant-stopped-sharing', handleParticipantStopped);
-
-
     return () => {
-      rtc.socket.off("started-screen-share", handleStarted);
-      rtc.socket.off("stopped-screen-share", handleStopped);
       rtc.socket.off("screen-share-started", handleStarted);
       rtc.socket.off("screen-share-stopped", handleStopped);
       rtc.socket.off('participant-started-sharing', handleParticipantStarted);
@@ -393,6 +315,22 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     };
   }, [rtc, userId]);
 
+  useEffect(() => {
+    const addSelfToParticipants = async () => {
+        if (user && meetingId && !liveParticipants.has(user.uid)) {
+            const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+            await setDoc(participantRef, {
+                name: user.displayName || 'Anonymous',
+                photoURL: user.photoURL || '',
+                isHost: isHost,
+                joinedAt: serverTimestamp(),
+            });
+        }
+    };
+    if(!isLoadingRole) {
+        addSelfToParticipants();
+    }
+  }, [user, meetingId, liveParticipants, isHost, isLoadingRole]);
 
   const { allParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
@@ -431,73 +369,33 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
   }, [user, meetingId]);
 
-  const toggleMic = useCallback(() => {
-    if (!localStream) return; const nextState = !micOn; localStream.getAudioTracks().forEach(track => (track.enabled = nextState)); setMicOn(nextState);
-    updateMyStatus({ isMicOn: nextState });
-    setVolumeLevels(prev => { const next = new Map(prev); next.set(userId, nextState ? (next.get(userId) ?? 0) : 0); return next; });
-  }, [localStream, micOn, updateMyStatus, userId]);
-
-  const toggleCamera = useCallback(() => {
-    if (!localStream) return; const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) { const nextState = !videoTrack.enabled; videoTrack.enabled = nextState; setCamOn(nextState); updateMyStatus({ isCameraOn: nextState }); }
-  }, [localStream, updateMyStatus, camOn]);
-
-  const handleToggleHandRaise = useCallback(() => {
-    const next = !isHandRaised; setIsHandRaised(next);
-    updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null });
-  }, [isHandRaised, updateMyStatus]);
-  
+  const toggleMic = useCallback(() => { if (!localStream) return; const nextState = !micOn; localStream.getAudioTracks().forEach(track => (track.enabled = nextState)); setMicOn(nextState); updateMyStatus({ isMicOn: nextState }); setVolumeLevels(prev => { const next = new Map(prev); next.set(userId, nextState ? (next.get(userId) ?? 0) : 0); return next; }); }, [localStream, micOn, updateMyStatus, userId]);
+  const toggleCamera = useCallback(() => { if (!localStream) return; const videoTrack = localStream.getVideoTracks()[0]; if (videoTrack) { const nextState = !videoTrack.enabled; videoTrack.enabled = nextState; setCamOn(nextState); updateMyStatus({ isCameraOn: nextState }); } }, [localStream, updateMyStatus, camOn]);
+  const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   const togglePin = useCallback((id: string) => { setPinnedId(prev => prev === id ? null : id); }, []);
 
   const renderLayout = () => {
     const mainParticipants = allParticipants.filter(p => !remoteScreenTiles.some(s => s.peerId === p.id));
     const allTiles = [...mainParticipants, ...remoteScreenTiles.map(s => ({ id: s.peerId, stream: s.stream, name: liveParticipants.get(s.peerId)?.name || 'Screen', isScreenSharing: true, isCamOff: false, isMicOff: true }))];
 
-    // pinned view
     if (pinnedId) {
       const pinned = allTiles.find(p => p.id === pinnedId);
       const others = allTiles.filter(p => p.id !== pinnedId);
       return (
         <div className="w-full h-full flex gap-2 p-0">
-          <div className="flex-1 min-h-0 relative">
-            {pinned && (
-              <div className="w-full h-full relative">
-                <VideoTile stream={pinned.stream} isCameraOn={!pinned.isCamOff} isMicOn={!pinned.isMicOff} isHandRaised={(pinned as Participant).isHandRaised || false} isFirstHand={pinned.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(pinned as Participant).volumeLevel} isLocal={!!(pinned as Participant).isLocal} profileUrl={(pinned as Participant).avatar} name={pinned.name} isScreenSharing={pinned.isScreenSharing} isPinned={true} onTogglePin={() => togglePin(pinned.id)} onDoubleClick={() => togglePin(pinned.id)} className="w-full h-full" onStopShare={isSharingScreen && pinned.id === userId ? handleStopSharing : undefined} />
-              </div>
-            )}
-          </div>
-          {others.length > 0 && (
-            <div className="w-48 hidden md:flex md:flex-col gap-2 overflow-auto">
-              {others.map(p => (
-                <div key={p.id} className="h-28 rounded-lg">
-                  <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={(p as Participant).avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="flex-1 min-h-0 relative">{pinned && (<div className="w-full h-full relative"><VideoTile stream={pinned.stream} isCameraOn={!pinned.isCamOff} isMicOn={!pinned.isMicOff} isHandRaised={(pinned as Participant).isHandRaised || false} isFirstHand={pinned.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(pinned as Participant).volumeLevel} isLocal={!!(pinned as Participant).isLocal} profileUrl={(pinned as Participant).avatar} name={pinned.name} isScreenSharing={pinned.isScreenSharing} isPinned={true} onTogglePin={() => togglePin(pinned.id)} onDoubleClick={() => togglePin(pinned.id)} className="w-full h-full" onStopShare={isSharingScreen && pinned.id === userId ? handleStopSharing : undefined} /></div>)}</div>
+          {others.length > 0 && (<div className="w-48 hidden md:flex md:flex-col gap-2 overflow-auto">{others.map(p => (<div key={p.id} className="h-28 rounded-lg"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={(p as Participant).avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/></div>))}</div>)}
         </div>
       );
     }
     
     if (remoteScreenTiles.length > 0) {
-      const screenTile = remoteScreenTiles[0]; // Show first screen share large
+      const screenTile = remoteScreenTiles[0];
       const otherTiles = allTiles.filter(p => p.id !== screenTile.peerId);
       return (
         <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
-          <div className="flex-1 min-h-0">
-             <div className="w-full h-full relative">
-               <VideoTile stream={screenTile.stream} isCameraOn={true} name={liveParticipants.get(screenTile.peerId)?.name + "'s Screen" || 'Screen Share'} isScreenSharing={true} onTogglePin={() => togglePin(screenTile.peerId)} onDoubleClick={() => togglePin(screenTile.peerId)} className="w-full h-full" />
-             </div>
-          </div>
-          {otherTiles.length > 0 && (
-            <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
-              {otherTiles.map(p => (
-                <div key={p.id} className="md:h-32 aspect-video md:aspect-auto">
-                   <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="flex-1 min-h-0"><div className="w-full h-full relative"><VideoTile stream={screenTile.stream} isCameraOn={true} name={liveParticipants.get(screenTile.peerId)?.name + "'s Screen" || 'Screen Share'} isScreenSharing={true} onTogglePin={() => togglePin(screenTile.peerId)} onDoubleClick={() => togglePin(screenTile.peerId)} className="w-full h-full" /></div></div>
+          {otherTiles.length > 0 && (<div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">{otherTiles.map(p => (<div key={p.id} className="md:h-32 aspect-video md:aspect-auto"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={(p as Participant).isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={(p as Participant).volumeLevel} isLocal={!!(p as Participant).isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/></div>))}</div>)}
         </div>
       );
     }
@@ -525,40 +423,22 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   return (
     <div className="flex flex-col h-full">
-      <JoinRequestModal
-        isOpen={!!currentJoinRequest}
-        request={currentJoinRequest ? { userName: currentJoinRequest.userName, userPhotoURL: currentJoinRequest.userPhotoURL } : null}
-        onApprove={() => currentJoinRequest && handleJoinRequestDecision(currentJoinRequest, 'approve')}
-        onDeny={() => currentJoinRequest && handleJoinRequestDecision(currentJoinRequest, 'deny')}
-      />
+      {isHost && <JoinRequestListener meetingId={meetingId} userId={userId} />}
 
-      <ScreenShareModal
-        open={isScreenShareModalOpen}
-        onClose={() => setIsScreenShareModalOpen(false)}
-        onConfirm={onModalConfirm}
-        cameraOn={camOn}
-      />
+      <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
       <div className="relative flex-grow min-h-0">
         {loadingMedia ? <div className="w-full h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : renderLayout()}
       </div>
 
-      {isSharingScreen && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50">
-          🔴 You’re sharing your screen
-        </div>
-      )}
+      {isSharingScreen && (<div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50">🔴 You’re sharing your screen</div>)}
 
       <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
         <div className="flex items-center justify-center relative">
           <div className="flex items-center justify-center gap-3">
             <Button onClick={toggleMic} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}</Button>
             <Button onClick={toggleCamera} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}</Button>
-            
-            <Button onClick={handleShareClick} variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>
-                {isSharingScreen ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}
-            </Button>
-            
+            <Button onClick={handleShareClick} variant="ghost" className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff className="h-6 w-6" /> : <ScreenShare className="h-6 w-6" />}</Button>
             <Button onClick={handleToggleHandRaise} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-6 w-6" /></Button>
           </div>
           <div className="absolute right-0 top-1/2 -translate-y-1/2"><Button onClick={onLeave} className="h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-6" aria-label="Leave Meeting"><PhoneOff className="h-6 w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button></div>
