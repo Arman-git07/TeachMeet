@@ -39,9 +39,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
-const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
-
 export default function PreJoinPage() {
   const searchParams = useSearchParams();
   const router = useRouter();

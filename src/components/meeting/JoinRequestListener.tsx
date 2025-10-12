@@ -55,6 +55,7 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
     
     try {
       await updateDoc(reqRef, { status: "approved" });
+      // Add to participants sub-collection, which MeetingClient listens to
       await setDoc(partRef, {
         name: req.userName,
         photoURL: req.userPhotoURL,
