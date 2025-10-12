@@ -126,6 +126,8 @@ export function JoinMeetingClient() {
         return;
       }
     } else if (meetingCodeInput.trim()) {
+      // Assuming the code is the meeting ID itself.
+      // In a real scenario, this might need a lookup if codes are different from IDs.
       meetingId = meetingCodeInput.trim();
       if (!meetingId) {
         toast({
@@ -146,8 +148,8 @@ export function JoinMeetingClient() {
 
     if (meetingId && meetingId.trim()) {
       const finalMeetingId = meetingId.trim();
-      // Redirect to the pre-join page with the meetingId and topic
-      let navigationPath = `/dashboard/meeting/prejoin?meetingId=${finalMeetingId}`;
+      // Redirect to the pre-join page with the meetingId, topic, and role
+      let navigationPath = `/dashboard/meeting/prejoin?meetingId=${finalMeetingId}&role=participant`;
       if (topic) {
         navigationPath += `&topic=${encodeURIComponent(topic)}`;
       }

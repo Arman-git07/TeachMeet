@@ -71,6 +71,10 @@ export default function PreJoinPage() {
   const [isMicOn, setIsMicOn] = useState(true);
   
   useEffect(() => {
+    const role = searchParams.get('role');
+    setIsHost(role === 'host');
+    setIsLoadingRole(false);
+
     const existingMeetingId = searchParams.get('meetingId');
     if (!existingMeetingId) {
         toast({variant: "destructive", title: "Missing Meeting ID", description: "No meeting ID was provided in the URL."});
@@ -94,35 +98,7 @@ export default function PreJoinPage() {
     }
   }, [searchParams, router, toast]);
 
-  useEffect(() => {
-    if (!meetingId || authLoading || !user) {
-        setIsLoadingRole(authLoading);
-        return;
-    };
-  
-    const determineRole = async () => {
-      setIsLoadingRole(true);
-      try {
-        const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
-        if (meetingDoc.exists()) {
-          setIsHost(meetingDoc.data().creatorId === user.uid);
-        } else {
-          // If the meeting doesn't exist, this user could be the one creating it.
-          // We assume they intend to be the host.
-          setIsHost(true);
-        }
-      } catch (error) {
-        console.error("Error checking meeting host:", error);
-        setIsHost(false);
-      } finally {
-        setIsLoadingRole(false);
-      }
-    };
-  
-    determineRole();
-  }, [meetingId, user, authLoading]);
-
-  // Listen for host response
+  // Listen for host response (for participants)
   useEffect(() => {
     if (!meetingId || !user || isHost || authLoading) return;
 
@@ -247,6 +223,7 @@ export default function PreJoinPage() {
       return <Button onClick={handleCreateAndJoinMeeting} disabled={!agreed || isCreatingMeeting} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>{isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Join Now as Host</Button>
     }
 
+    // Participant buttons
     switch(requestStatus) {
       case 'idle':
         return <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>Ask to Join</Button>

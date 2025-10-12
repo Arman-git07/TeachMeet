@@ -63,7 +63,7 @@ export function StartMeetingDialogContent() {
   const handleSetupAndJoin = async () => {
     // This dialog now only redirects to the prejoin page.
     // The prejoin page will handle creating the meeting document.
-    const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}`;
+    const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}&role=host`;
     router.push(prejoinPath);
   };
 

@@ -28,7 +28,7 @@ export function SlideUpPanel() {
       return;
     }
     const meetingId = `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
-    router.push(`/dashboard/meeting/prejoin?meetingId=${meetingId}`);
+    router.push(`/dashboard/meeting/prejoin?meetingId=${meetingId}&role=host`);
   };
   
   return (
