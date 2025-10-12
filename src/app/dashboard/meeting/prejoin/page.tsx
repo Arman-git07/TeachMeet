@@ -73,6 +73,7 @@ export default function PreJoinPage() {
   useEffect(() => {
     const role = searchParams.get('role');
     setIsHost(role === 'host');
+    setIsLoadingRole(false);
     
     const existingMeetingId = searchParams.get('meetingId');
     if (!existingMeetingId) {
@@ -80,23 +81,6 @@ export default function PreJoinPage() {
         router.push('/dashboard');
         return;
     }
-
-    // New logic to validate meeting existence
-    const checkMeetingExists = async () => {
-      if (role !== 'host') { // Only check for participants, host will create it.
-          const meetingRef = doc(db, 'meetings', existingMeetingId);
-          const docSnap = await getDoc(meetingRef);
-          if (!docSnap.exists()) {
-              toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or has ended." });
-              router.push('/dashboard');
-              return;
-          }
-      }
-      // If meeting exists or user is host, proceed with setup.
-      setIsLoadingRole(false);
-    };
-    checkMeetingExists();
-
 
     const id = existingMeetingId;
     const code = id.replace('meeting-','');
@@ -196,6 +180,14 @@ export default function PreJoinPage() {
 
   const handleAskToJoin = async () => {
     if (!user || !meetingId) return;
+
+    // Before sending a request, quickly check if the meeting exists
+    const meetingRef = doc(db, 'meetings', meetingId);
+    const meetingSnap = await getDoc(meetingRef);
+    if (!meetingSnap.exists()) {
+        toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or has ended. The host may need to start it." });
+        return;
+    }
 
     setRequestStatus("pending");
     toast({ title: 'Request Sent', description: 'Your request to join has been sent to the host.' });
