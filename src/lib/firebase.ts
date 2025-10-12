@@ -4,6 +4,10 @@ import { initializeAuth, browserLocalPersistence, getAuth } from 'firebase/auth'
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
+import { errorEmitter } from '@/firebase/error-emitter'; // Emitter for centralized error handling
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors'; // Error types
+import { onSnapshot, doc, setDoc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,

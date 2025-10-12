@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -37,6 +38,8 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function PreJoinPage() {
   const searchParams = useSearchParams();
@@ -105,7 +108,7 @@ export default function PreJoinPage() {
 
     const unsub = onSnapshot(reqRef, (snap) => {
       if (!snap.exists()) {
-        if (requestStatus === 'declined') {
+        if (requestStatus === 'declined' || requestStatus === 'accepted') {
           setRequestStatus("idle");
         }
         return;
@@ -127,7 +130,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost, router, authLoading, toast, requestStatus, topic, isCameraOn, isMicOn]);
+  }, [meetingId, user, isHost, authLoading]);
 
 
   useEffect(() => {
@@ -157,75 +160,50 @@ export default function PreJoinPage() {
      };
   }, [toast]);
 
-  const handleCreateAndJoinMeeting = async () => {
+  const handleCreateAndJoinMeeting = () => {
     if (!agreed || !user) return;
     setIsCreatingMeeting(true);
     
-    // The meeting document will be created on the actual meeting page.
-    // This button just navigates the host.
     const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
     router.push(meetingPath);
   };
 
-  const handleAskToJoin = async () => {
+  const handleAskToJoin = () => {
     if (!user || !meetingId) return;
 
-    const meetingRef = doc(db, "meetings", meetingId);
+    const requestData = {
+      userId: user.uid,
+      userName: user.displayName || "Guest User",
+      userPhotoURL: user.photoURL || "",
+      status: "pending",
+      requestedAt: serverTimestamp(),
+    };
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    
+    setStartError(null);
+    setRequestStatus("pending");
+    toast({
+      title: "Request Sent",
+      description: "Your request to join has been sent to the host.",
+    });
 
-    try {
-      // Try reading the meeting document to confirm existence
-      const meetingSnap = await getDoc(meetingRef);
-
-      if (!meetingSnap.exists()) {
-        // Allow join request even if host hasn't started meeting yet
-        await setDoc(meetingRef, {
-          placeholder: true,
-          createdAt: serverTimestamp(),
-        }, { merge: true });
-      }
-
-      // Proceed to send join request
-      setStartError(null);
-      setRequestStatus("pending");
-
-      await setDoc(reqRef, {
-        userId: user.uid,
-        userName: user.displayName || "Guest User",
-        userPhotoURL: user.photoURL || "",
-        status: "pending",
-        requestedAt: serverTimestamp(),
+    setDoc(reqRef, requestData)
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: reqRef.path,
+          operation: "create",
+          requestResourceData: requestData,
+        });
+        errorEmitter.emit("permission-error", permissionError);
+        
+        // UI feedback for the user
+        setRequestStatus("idle");
+        toast({
+          variant: "destructive",
+          title: "Request Failed",
+          description: "Could not send join request due to a permission error.",
+        });
       });
-
-      toast({
-        title: "Request Sent",
-        description: "Your request to join has been sent to the host.",
-      });
-
-      // Auto-expire request after 2 minutes
-      setTimeout(async () => {
-        const snap = await getDoc(reqRef);
-        if (snap.exists() && snap.data().status === "pending") {
-          await deleteDoc(reqRef);
-          setRequestStatus("idle");
-          toast({
-            variant: "destructive",
-            title: "Request Expired",
-            description:
-              "Your join request timed out as the host did not respond.",
-          });
-        }
-      }, 120000);
-    } catch (error) {
-      console.error("Failed to send join request:", error);
-      setStartError("Could not send join request. Please try again.");
-      toast({
-        variant: "destructive",
-        title: "Request Failed",
-        description: "An error occurred while sending your join request.",
-      });
-      setRequestStatus("idle");
-    }
   };
 
   const userName = user?.displayName || 'User';
