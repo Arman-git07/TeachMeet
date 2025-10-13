@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -36,8 +35,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { v4 as uuidv4 } from 'uuid';
-import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
@@ -64,6 +63,7 @@ export default function PreJoinPage() {
   const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "accepted" | "declined">("idle");
   const [isHost, setIsHost] = useState(false);
   const [isLoadingRole, setIsLoadingRole] = useState(true);
+  const [requestSent, setRequestSent] = useState(false);
 
   // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -130,7 +130,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost, authLoading]);
+  }, [meetingId, user, isHost, authLoading, requestStatus, topic, isCameraOn, isMicOn, router, toast]);
 
 
   useEffect(() => {
@@ -158,7 +158,7 @@ export default function PreJoinPage() {
         mounted = false;
         localStream?.getTracks().forEach(track => track.stop());
      };
-  }, [toast]);
+  }, [toast, localStream]);
 
   const handleCreateAndJoinMeeting = () => {
     if (!agreed || !user) return;
@@ -168,43 +168,44 @@ export default function PreJoinPage() {
     router.push(meetingPath);
   };
 
-  const handleAskToJoin = () => {
-    if (!user || !meetingId) return;
+  const handleAskToJoin = async () => {
+    if (requestSent || !user || !meetingId) return; // prevent double-click and ensure user/id
+    setRequestSent(true);
 
-    const requestData = {
-      userId: user.uid,
-      userName: user.displayName || "Guest User",
-      userPhotoURL: user.photoURL || "",
-      status: "pending",
-      requestedAt: serverTimestamp(),
-    };
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-    
-    setStartError(null);
-    setRequestStatus("pending");
-    toast({
-      title: "Request Sent",
-      description: "Your request to join has been sent to the host.",
-    });
+    try {
+      // Check if meeting actually exists
+      const meetingRef = doc(db, "meetings", meetingId);
+      const meetingSnap = await getDoc(meetingRef);
 
-    setDoc(reqRef, requestData)
-      .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: reqRef.path,
-          operation: "create",
-          requestResourceData: requestData,
-        });
-        errorEmitter.emit("permission-error", permissionError);
-        
-        // UI feedback for the user
-        setRequestStatus("idle");
-        toast({
-          variant: "destructive",
-          title: "Request Failed",
-          description: "Could not send join request due to a permission error.",
-        });
+      if (!meetingSnap.exists()) {
+        alert("This meeting does not exist or has ended.");
+        setRequestSent(false); // Allow retry
+        return;
+      }
+
+      // Create join request if meeting exists
+      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), {
+        userId: auth.currentUser?.uid,
+        userName: auth.currentUser?.displayName || "Anonymous",
+        status: "pending",
+        timestamp: serverTimestamp(),
       });
+
+      console.log("Join request sent successfully");
+      setRequestStatus("pending");
+      toast({
+        title: "Request Sent",
+        description: "Your request to join has been sent to the host.",
+      });
+
+    } catch (error) {
+      console.error("Failed to send join request:", error);
+      alert("Failed to send join request. Please try again.");
+      setRequestSent(false); // Allow retry
+      setRequestStatus("idle");
+    }
   };
+
 
   const userName = user?.displayName || 'User';
   const userAvatar = user?.photoURL;
@@ -221,7 +222,7 @@ export default function PreJoinPage() {
     // Participant buttons
     switch(requestStatus) {
       case 'idle':
-        return <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>Ask to Join</Button>
+        return <Button onClick={handleAskToJoin} disabled={!agreed || requestSent} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>Ask to Join</Button>
       case 'pending':
         return <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-gray-500"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Request Sent, Waiting...</Button>
       case 'declined':
