@@ -81,6 +81,7 @@ import {
   Phone,
   Clock,
   Award,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -94,6 +95,7 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { auth } from '@/lib/firebase';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 
 export interface Classroom {
@@ -785,7 +787,12 @@ export default function ClassroomsPage() {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Classrooms</h1>
+        <div className="flex items-center gap-4">
+          <SidebarTrigger className="md:hidden">
+            <PanelLeftOpen className="h-6 w-6" />
+          </SidebarTrigger>
+          <h1 className="text-3xl font-bold">Classrooms</h1>
+        </div>
         { user && (
             <div>
                 <Button asChild variant="outline" className="mr-2">
@@ -827,5 +834,6 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
 
 
