@@ -8,7 +8,6 @@ import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DynamicHeaderProvider } from '@/contexts/DynamicHeaderContext';
 import { cn } from '@/lib/utils';
-import { DashboardHeader } from '@/components/dashboard/DashboardHeader'; // Import the new header component
 
 export default function DashboardLayout({
   children,
@@ -26,7 +25,6 @@ export default function DashboardLayout({
   }, [isAuthenticated, loading, router]);
 
   const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
-  const isPrejoinPage = pathname === '/dashboard/meeting/prejoin';
 
   if (loading) {
     return (
@@ -54,7 +52,6 @@ export default function DashboardLayout({
   return (
     <DynamicHeaderProvider>
       <div className="flex flex-col flex-1 h-screen overflow-hidden">
-        {!isPrejoinPage && !isMeetingPage && <DashboardHeader />}
         <main className={cn(
           "flex flex-col flex-1 bg-background overflow-hidden",
            isMeetingPage ? "" : "p-4 md:p-8"
