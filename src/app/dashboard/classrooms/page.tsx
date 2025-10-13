@@ -438,7 +438,11 @@ export default function ClassroomsPage() {
 
   // Fetch My Classes
   useEffect(() => {
-    if (!user) { setIsLoadingMy(false); setMyClasses([]); return; }
+    if (!user || !user.uid) { 
+      setIsLoadingMy(false);
+      setMyClasses([]); 
+      return; 
+    }
     setIsLoadingMy(true);
     const q = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -450,7 +454,11 @@ export default function ClassroomsPage() {
 
   // Fetch Enrolled Classes
   useEffect(() => {
-    if (!user) { setIsLoadingEnrolled(false); setEnrolledClasses([]); return; }
+    if (!user || !user.uid) { 
+      setIsLoadingEnrolled(false);
+      setEnrolledClasses([]); 
+      return; 
+    }
     setIsLoadingEnrolled(true);
     const q = query(collection(db, 'users', user.uid, 'enrolled'));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -477,7 +485,7 @@ export default function ClassroomsPage() {
   
   // Fetch pending requests for the current user
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.uid) {
       setPendingRequestIds(new Set());
       setIsLoadingRequests(false);
       return;
@@ -834,6 +842,7 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
 
 
 
