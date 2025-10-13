@@ -36,7 +36,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { v4 as uuidv4 } from 'uuid';
-import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc, collection, addDoc, writeBatch } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -99,7 +99,7 @@ export default function PreJoinPage() {
         `${window.location.origin}/dashboard/join-meeting?meetingId=${id}`
       );
     }
-  }, [searchParams, router, toast, user]);
+  }, [searchParams, router, toast]);
 
   // Listen for host response (for participants)
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost, router, toast, topic, isCameraOn, isMicOn]);
+  }, [meetingId, user, isHost]);
 
 
   useEffect(() => {
@@ -152,26 +152,24 @@ export default function PreJoinPage() {
         mounted = false;
         localStream?.getTracks().forEach(track => track.stop());
      };
-  }, [toast, localStream]);
+  }, []);
 
-  const handleCreateAndJoinMeeting = async () => {
+  const handleCreateAndJoinMeeting = () => {
     if (!agreed || !user) return;
-    setIsCreatingMeeting(true);
-    
-    const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-    router.push(meetingPath);
+    const prejoinPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+    router.push(prejoinPath);
   };
-
+  
   const handleAskToJoin = async () => {
     if (!user || !meetingId || requestSent) return;
 
     setRequestSent(true);
 
     const meetingRef = doc(db, "meetings", meetingId);
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
     
     try {
         const meetingSnap = await getDoc(meetingRef);
+
         if (!meetingSnap.exists()) {
             alert("This meeting does not exist or has ended.");
             setRequestSent(false); // Allow retry
@@ -185,8 +183,18 @@ export default function PreJoinPage() {
             status: "pending",
             requestedAt: serverTimestamp(),
         };
-
-        await setDoc(reqRef, requestData);
+        
+        const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+        await setDoc(reqRef, requestData)
+            .catch((serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: reqRef.path,
+                    operation: 'create',
+                    requestResourceData: requestData,
+                }, { cause: serverError });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError; // Re-throw to be caught by the outer catch block
+            });
 
         setRequestStatus("pending");
         toast({
@@ -195,17 +203,18 @@ export default function PreJoinPage() {
         });
 
     } catch (error) {
+        // This will catch both the permission error and any other errors
         console.error("Failed to send join request:", error);
+        if (!(error instanceof FirestorePermissionError)) {
+             toast({
+                variant: "destructive",
+                title: "Request Failed",
+                description: 'An unexpected error occurred. Please try again.',
+            });
+        }
+        // Reset state to allow user to try again
         setRequestStatus("idle");
         setRequestSent(false);
-        
-        const permissionError = new FirestorePermissionError({
-            path: reqRef.path,
-            operation: 'create',
-            requestResourceData: { userId: user.uid, status: 'pending' },
-        });
-
-        errorEmitter.emit('permission-error', permissionError);
     }
   };
 
@@ -286,5 +295,3 @@ export default function PreJoinPage() {
     </div>
   );
 }
-
-    
