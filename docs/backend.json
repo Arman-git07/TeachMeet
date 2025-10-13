@@ -10,9 +10,9 @@
           "type": "string",
           "description": "The topic or title of the meeting."
         },
-        "creatorId": {
+        "hostId": {
           "type": "string",
-          "description": "The UID of the user who created the meeting (the host)."
+          "description": "The UID of the user who is hosting the meeting."
         },
         "creatorName": {
           "type": "string",
@@ -29,7 +29,7 @@
           "description": "The current status of the meeting."
         }
       },
-      "required": ["topic", "creatorId", "createdAt"]
+      "required": ["topic", "hostId", "createdAt"]
     },
     "JoinRequest": {
       "title": "Join Request",
@@ -88,11 +88,19 @@
       "schema": { "$ref": "#/entities/Meeting" },
       "description": "Collection of all meetings."
     },
-    "/meetings/{meetingId}/joinRequests/{userId}": {
+    "/meetings/{meetingId}/joinRequests/{requestId}": {
       "schema": { "$ref": "#/entities/JoinRequest" },
       "description": "Sub-collection for join requests for a specific meeting."
     },
     "/meetings/{meetingId}/participants/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Sub-collection for participants in a specific meeting."
+    },
+    "/classrooms/{classroomId}/joinRequests/{userId}": {
+      "schema": { "$ref": "#/entities/JoinRequest" },
+      "description": "Sub-collection for join requests for a specific meeting."
+    },
+    "/classrooms/{classroomId}/participants/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Sub-collection for participants in a specific meeting."
     }

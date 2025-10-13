@@ -36,7 +36,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { v4 as uuidv4 } from 'uuid';
-import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc, collection, addDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc, collection, addDoc, writeBatch, runTransaction, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -170,87 +170,107 @@ export default function PreJoinPage() {
   }, [toast]);
 
   const handleCreateAndJoinMeeting = async () => {
-    if (!agreed || !user || !meetingId) return;
-
+    if (!agreed || !user) return;
     setIsCreatingMeeting(true);
-    toast({ title: "Creating Meeting...", description: "Please wait while we set up your room." });
-
+  
     try {
-        const meetingRef = doc(db, "meetings", meetingId);
-        await setDoc(meetingRef, {
+      const meetingRef = doc(db, 'meetings', meetingId);
+  
+      // Ensure meeting document exists and hostId is set. Use a transaction to be safe.
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(meetingRef);
+        if (!snap.exists()) {
+          tx.set(meetingRef, {
             topic: topic.trim(),
             hostId: user.uid,
-            creatorId: user.uid, // legacy field just in case
-            creatorName: user.displayName || "Host",
+            creatorName: user.displayName || 'Anonymous Host',
             createdAt: serverTimestamp(),
-            status: "pending",
-        });
-
-        const prejoinPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-        router.push(prejoinPath);
-
+            status: 'pending',
+          });
+        } else {
+          // If it exists, ensure hostId is present and correct (merge without overwriting)
+          tx.update(meetingRef, {
+            hostId: user.uid,
+            topic: topic.trim(),
+            creatorName: user.displayName || 'Anonymous Host',
+            // do NOT overwrite existing createdAt/status unless you intentionally want to.
+          });
+        }
+      });
+  
+      // Now it's safe to redirect — meeting document exists and hostId is set.
+      const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(
+        topic.trim()
+      )}&cam=${isCameraOn}&mic=${isMicOn}`;
+      router.push(meetingPath);
     } catch (error) {
-        console.error("Failed to create meeting document:", error);
-        toast({ variant: "destructive", title: "Meeting Creation Failed", description: "Could not create the meeting room. Please check your Firestore rules and try again." });
-        setIsCreatingMeeting(false);
+      console.error("Failed to create/join meeting:", error);
+      toast({
+        variant: "destructive",
+        title: "Meeting Start Failed",
+        description: "Could not create or join the meeting. Check Firestore rules and network.",
+      });
+      setIsCreatingMeeting(false);
     }
   };
   
   const handleAskToJoin = async () => {
-    if (!user || !meetingId || requestSent) return;
-
+    if (requestSent) return;
+    if (!auth.currentUser) {
+      toast({ variant: "destructive", title: "Please sign in to request to join." });
+      return;
+    }
     setRequestSent(true);
 
-    const meetingRef = doc(db, "meetings", meetingId);
-    
     try {
-        const meetingSnap = await getDoc(meetingRef);
-
-        if (!meetingSnap.exists()) {
-            toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or has ended."});
-            setRequestSent(false); // Allow retry
-            return;
-        }
-
-        const requestData = {
-            studentId: user.uid,
-            userName: user.displayName || "Guest User",
-            userPhotoURL: user.photoURL || "",
-            status: "pending",
-            requestedAt: serverTimestamp(),
-        };
-        
-        const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-        await setDoc(reqRef, requestData)
-            .catch((serverError) => {
-                const permissionError = new FirestorePermissionError({
-                    path: reqRef.path,
-                    operation: 'create',
-                    requestResourceData: requestData,
-                }, { cause: serverError });
-                errorEmitter.emit('permission-error', permissionError);
-                throw permissionError; // Re-throw to be caught by the outer catch block
-            });
-
-        setRequestStatus("pending");
+      // 1) Ensure meeting exists
+      const meetingRef = doc(db, "meetings", meetingId);
+      const meetingSnap = await getDoc(meetingRef);
+      if (!meetingSnap.exists()) {
         toast({
-            title: "Request Sent",
-            description: "Your request to join has been sent to the host.",
+          variant: "destructive",
+          title: "Meeting not found",
+          description: "This meeting doesn't exist or has ended.",
         });
+        setRequestSent(false); // Allow retry
+        return;
+      }
 
+      // 2) Prevent duplicate requests from same user
+      const existingReqQ = query(
+        collection(db, "meetings", meetingId, "joinRequests"),
+        where("userId", "==", auth.currentUser.uid)
+      );
+      const existingSnap = await getDocs(existingReqQ);
+      if (!existingSnap.empty) {
+        toast({
+          title: "Request already sent",
+          description: "Please wait for the host to respond.",
+        });
+        setRequestStatus("pending");
+        return;
+      }
+
+      // 3) Add join request
+      const requestData = {
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || "Anonymous",
+        status: "pending",
+        timestamp: serverTimestamp(),
+      };
+      
+      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), requestData);
+
+      setRequestStatus("pending");
+      toast({ title: "Request sent to host" });
     } catch (error) {
-        // This will catch both the permission error and any other errors
-        console.error("Failed to send join request:", error);
-        if (!(error instanceof FirestorePermissionError)) {
-             toast({
-                variant: "destructive",
-                title: "Request Failed",
-                description: 'An unexpected error occurred. Please try again.',
-            });
-        }
-        // Reset state to allow user to try again
-        setRequestStatus("idle");
-        setRequestSent(false);
+      console.error("Failed to send join request:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to send request",
+        description: "Check your connection or permissions.",
+      });
+      setRequestSent(false); // Allow retry
     }
   };
 
