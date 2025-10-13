@@ -102,27 +102,20 @@ export default function PreJoinPage() {
 
   // Listen for host response (for participants)
   useEffect(() => {
-    if (!meetingId || !user || isHost || authLoading) return;
+    if (!meetingId || !user || isHost) return;
 
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
     const unsub = onSnapshot(reqRef, (snap) => {
-      if (!snap.exists()) {
-        if (requestStatus === 'declined' || requestStatus === 'accepted') {
-          setRequestStatus("idle");
-        }
-        return;
-      };
-
       const data = snap.data();
-      if (data.status === "approved") {
+      if (snap.exists() && data?.status === "approved") {
         setRequestStatus("accepted");
         toast({ title: "Request Approved!", description: "The host has let you in. Joining the meeting now..." });
         setTimeout(() => {
-            const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+            const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&cam=${isCameraOn}&mic=${isMicOn}`;
             router.push(meetingPath);
         }, 1000);
-      } else if (data.status === "denied") {
+      } else if (snap.exists() && data?.status === "denied") {
         setRequestStatus("declined");
         toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join."});
         setTimeout(() => deleteDoc(reqRef), 5000); // Clean up denied request
@@ -130,7 +123,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost, authLoading, requestStatus, topic, isCameraOn, isMicOn, router, toast]);
+  }, [meetingId, user, isHost, router, toast, topic, isCameraOn, isMicOn]);
 
 
   useEffect(() => {
@@ -160,7 +153,7 @@ export default function PreJoinPage() {
      };
   }, [toast, localStream]);
 
-  const handleCreateAndJoinMeeting = () => {
+  const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user) return;
     setIsCreatingMeeting(true);
     
@@ -169,40 +162,49 @@ export default function PreJoinPage() {
   };
 
   const handleAskToJoin = async () => {
-    if (requestSent || !user || !meetingId) return; // prevent double-click and ensure user/id
+    if (!user || !meetingId || requestSent) return;
+
     setRequestSent(true);
 
+    const meetingRef = doc(db, "meetings", meetingId);
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    
     try {
-      // Check if meeting actually exists
-      const meetingRef = doc(db, "meetings", meetingId);
-      const meetingSnap = await getDoc(meetingRef);
+        const meetingSnap = await getDoc(meetingRef);
+        if (!meetingSnap.exists()) {
+            alert("This meeting does not exist or has ended.");
+            setRequestSent(false); // Allow retry
+            return;
+        }
 
-      if (!meetingSnap.exists()) {
-        alert("This meeting does not exist or has ended.");
-        setRequestSent(false); // Allow retry
-        return;
-      }
+        const requestData = {
+            userId: user.uid,
+            userName: user.displayName || "Guest User",
+            userPhotoURL: user.photoURL || "",
+            status: "pending",
+            requestedAt: serverTimestamp(),
+        };
 
-      // Create join request if meeting exists
-      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), {
-        userId: auth.currentUser?.uid,
-        userName: auth.currentUser?.displayName || "Anonymous",
-        status: "pending",
-        timestamp: serverTimestamp(),
-      });
+        await setDoc(reqRef, requestData);
 
-      console.log("Join request sent successfully");
-      setRequestStatus("pending");
-      toast({
-        title: "Request Sent",
-        description: "Your request to join has been sent to the host.",
-      });
+        setRequestStatus("pending");
+        toast({
+            title: "Request Sent",
+            description: "Your request to join has been sent to the host.",
+        });
 
     } catch (error) {
-      console.error("Failed to send join request:", error);
-      alert("Failed to send join request. Please try again.");
-      setRequestSent(false); // Allow retry
-      setRequestStatus("idle");
+        console.error("Failed to send join request:", error);
+        setRequestStatus("idle");
+        setRequestSent(false);
+        
+        const permissionError = new FirestorePermissionError({
+            path: reqRef.path,
+            operation: 'create',
+            requestResourceData: { userId: user.uid, status: 'pending' },
+        });
+
+        errorEmitter.emit('permission-error', permissionError);
     }
   };
 
