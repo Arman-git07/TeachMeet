@@ -124,7 +124,7 @@ export default function PreJoinPage() {
     });
 
     return () => unsub();
-  }, [meetingId, user, isHost]);
+  }, [meetingId, user, isHost, router, topic, isCameraOn, isMicOn, toast]);
 
 
   useEffect(() => {
@@ -152,12 +152,33 @@ export default function PreJoinPage() {
         mounted = false;
         localStream?.getTracks().forEach(track => track.stop());
      };
-  }, []);
+  }, [toast, localStream]);
 
-  const handleCreateAndJoinMeeting = () => {
-    if (!agreed || !user) return;
-    const prejoinPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-    router.push(prejoinPath);
+  const handleCreateAndJoinMeeting = async () => {
+    if (!agreed || !user || !meetingId) return;
+
+    setIsCreatingMeeting(true);
+    toast({ title: "Creating Meeting...", description: "Please wait while we set up your room." });
+
+    try {
+        const meetingRef = doc(db, "meetings", meetingId);
+        await setDoc(meetingRef, {
+            topic: topic.trim(),
+            hostId: user.uid,
+            creatorId: user.uid, // legacy field just in case
+            creatorName: user.displayName || "Host",
+            createdAt: serverTimestamp(),
+            status: "pending",
+        });
+
+        const prejoinPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+        router.push(prejoinPath);
+
+    } catch (error) {
+        console.error("Failed to create meeting document:", error);
+        toast({ variant: "destructive", title: "Meeting Creation Failed", description: "Could not create the meeting room. Please check your Firestore rules and try again." });
+        setIsCreatingMeeting(false);
+    }
   };
   
   const handleAskToJoin = async () => {
@@ -171,7 +192,7 @@ export default function PreJoinPage() {
         const meetingSnap = await getDoc(meetingRef);
 
         if (!meetingSnap.exists()) {
-            alert("This meeting does not exist or has ended.");
+            toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or has ended."});
             setRequestSent(false); // Allow retry
             return;
         }

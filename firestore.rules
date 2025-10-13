@@ -1,109 +1,98 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset defines access control for a meeting management application.
+ * @fileoverview Firestore Security Rules for the application.
  *
  * Core Philosophy:
- *  This ruleset employs a combination of ownership-based and shared-access control models.
- *  Meetings are the central entity, with join requests and participants managed within each meeting document.
- *  The rules strictly control who can create, read, update, and delete meetings and their associated data.
+ * This ruleset enforces a user-ownership model for meetings, with specific authorization
+ * for managing join requests.  It prioritizes secure access to meeting data and
+ * restricts unauthorized modifications.
  *
  * Data Structure:
- *  - /meetings/{meetingId}: Contains meeting metadata (topic, creator, status).
- *  - /meetings/{meetingId}/joinRequests/{userId}: Stores requests from users to join a meeting.
- *  - /meetings/{meetingId}/participants/{userId}: Lists users who are participating in a meeting.
+ * - /meetings/{meetingId}: Stores meeting metadata, including creatorId.
+ * - /meetings/{meetingId}/joinRequests/{userId}: Stores requests from users to join a meeting.
+ * - /meetings/{meetingId}/participants/{userId}: Stores profile information for meeting participants.
  *
  * Key Security Decisions:
- *  - Meeting creation is open to any authenticated user.
- *  - Meeting updates and deletion are restricted to the meeting creator (owner).
- *  - Join requests can be created by any authenticated user.
- *  - Join request status can only be updated by the meeting creator.
- *  - Listing of join requests is restricted to the meeting creator.
- *  - Participants can be added to a meeting only by the meeting creator.
- *  - Listing of participants is public.
+ * - Only the meeting creator can manage (approve/deny) join requests.
+ * - Users can only create join requests for themselves.
+ * - Listing meetings is allowed for all users.
  *
  * Denormalization for Authorization:
- *  - The `creatorId` field within each `/meetings/{meetingId}` document is used to quickly authorize meeting updates and deletes, avoiding costly `get()` operations.
- *  - The `userId` field in `joinRequests` is used to quickly authorize join request creation, avoiding costly `get()` operations.
+ * The `Meeting` document includes the `creatorId` field, enabling efficient
+ * ownership checks without requiring additional reads.
  */
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to the /meetings collection.
+     * @description Rules for the /meetings collection.
      * @path /meetings/{meetingId}
-     * @allow (create) User with auth can create a meeting.
-     * @deny (update) User without being creator attempts to update the meeting.
-     * @principle Allows any authenticated user to create a meeting, but restricts updates and deletes to the meeting creator.
+     * @allow get, list: Anyone can read the meeting details.
+     * @allow create: Any authenticated user can create a meeting.
+     * @allow update, delete: Only the meeting creator can update or delete a meeting.
+     * @principle Enforces document ownership for writes.
      */
     match /meetings/{meetingId} {
-      // Anyone can read a meeting.
       allow get, list: if true;
-
-      // Only authenticated users can create meetings, and the creatorId must match their UID.
       allow create: if isSignedIn() && request.resource.data.creatorId == request.auth.uid;
-
-      // Only the meeting creator can update or delete the meeting.
-      allow update, delete: if isExistingOwner(request.auth.uid, resource.data.creatorId);
+      allow update, delete: if isExistingOwner(resource.data.creatorId);
     }
 
     /**
-     * @description Controls access to the /meetings/{meetingId}/joinRequests collection.
+     * @description Rules for the /meetings/{meetingId}/joinRequests collection.
      * @path /meetings/{meetingId}/joinRequests/{userId}
-     * @allow (create) User with auth can create a join request for themself.
-     * @allow (update) Only the meeting creator can update the status of a join request.
-     * @deny (delete) No one can delete a join request.
-     * @principle Allows any authenticated user to create a join request, but restricts status updates to the meeting creator.
+     * @allow get, list: Only the meeting creator can read join requests.
+     * @allow create: Any authenticated user can create a join request for themselves.
+     * @allow update, delete: Only the meeting creator can update or delete join requests.
+     * @principle Enforces meeting creator control over join requests.
      */
     match /meetings/{meetingId}/joinRequests/{userId} {
-      // Only the meeting creator can get or list join requests.
-      allow get, list: if isOwner(request.auth.uid, get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
-
-      // Any authenticated user can create a join request with their own user ID.
+      allow get, list: if isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
       allow create: if isSignedIn() && request.auth.uid == userId && request.resource.data.userId == request.auth.uid;
-
-      // Only the meeting creator can update the status of a join request.
-      allow update: if isOwner(request.auth.uid, get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
-
-      // No one can delete a join request.
-      allow delete: if false;
+      allow update, delete: if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
     }
 
     /**
-     * @description Controls access to the /meetings/{meetingId}/participants collection.
+     * @description Rules for the /meetings/{meetingId}/participants collection.
      * @path /meetings/{meetingId}/participants/{userId}
-     * @allow (create) The meeting creator can add participants.
-     * @allow (get, list) Anyone can list participants.
-     * @deny (update, delete) No one can update or delete participants directly.
-     * @principle Allows the meeting creator to manage participants, while making the participant list publicly readable.
+     * @allow get, list: Only the meeting creator can read participants.
+     * @allow create: No one should be able to directly create participants. Participants are added by the application logic.
+     * @allow update, delete: No one should be able to directly update/delete participants. Participants are managed by the application logic.
+     * @principle Restricts access to meeting participants.
      */
     match /meetings/{meetingId}/participants/{userId} {
-      // Anyone can read the participants list.
-      allow get, list: if true;
-
-      // Only the meeting creator can add participants.
-      allow create: if isOwner(request.auth.uid, get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
-
-      // No one can update or delete participants.
-      allow update, delete: if false;
+      allow get, list: if isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.creatorId);
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     // --- Helper Functions ---
 
-    // Checks if the user is signed in.
+    /**
+     * @description Checks if the user is signed in.
+     * @return {bool} True if the user is signed in, false otherwise.
+     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Checks if the user is the owner of the document based on the creatorId field.
-    function isOwner(userId, creatorId) {
-        return isSignedIn() && userId == creatorId;
+    /**
+     * @description Checks if the user is the owner of the resource.
+     * @param {string} userId The UID of the user to check against.
+     * @return {bool} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks if the user is the owner of an *existing* document based on the creatorId field.
-    function isExistingOwner(userId, creatorId) {
-        return isOwner(userId, creatorId) && resource != null;
+    /**
+     * @description Checks if the user is the existing owner of the resource and the resource exists.
+     * @param {string} userId The UID of the user to check against.
+     * @return {bool} True if the user is the owner and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
     }
   }
 }
