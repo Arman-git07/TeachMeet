@@ -221,7 +221,12 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           {isAuthenticated ? (
             <>
-              <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem>
+              <div className="flex items-center gap-2">
+                <SidebarTrigger className="md:hidden">
+                    <PanelLeftOpen className="h-6 w-6" />
+                </SidebarTrigger>
+                <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem>
+              </div>
               {pathname === '/' && (
                 <>
                   <SidebarMenuItem>

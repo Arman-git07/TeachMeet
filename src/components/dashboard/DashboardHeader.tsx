@@ -2,8 +2,6 @@
 'use client';
 
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
-import { SidebarTrigger } from '@/components/ui/sidebar';
-import { PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function DashboardHeader() {
@@ -18,7 +16,6 @@ export function DashboardHeader() {
           "container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16"
       )}>
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* The SidebarTrigger is now managed within the AppSidebar for better layout control */}
            {headerContent}
         </div>
         {headerAction && (
