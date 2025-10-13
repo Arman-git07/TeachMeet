@@ -213,7 +213,7 @@ export default function PreJoinPage() {
         }
 
         const requestData = {
-            userId: user.uid,
+            studentId: user.uid,
             userName: user.displayName || "Guest User",
             userPhotoURL: user.photoURL || "",
             status: "pending",
