@@ -18,10 +18,7 @@ export function DashboardHeader() {
           "container mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16"
       )}>
         <div className="flex items-center gap-2 sm:gap-4">
-          <SidebarTrigger className="md:hidden">
-            <PanelLeftOpen className="h-6 w-6" />
-          </SidebarTrigger>
-          <SidebarTrigger className="hidden md:flex" />
+          {/* The SidebarTrigger is now managed within the AppSidebar for better layout control */}
            {headerContent}
         </div>
         {headerAction && (

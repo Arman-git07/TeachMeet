@@ -21,6 +21,7 @@ import {
   School,
   Library,
   History,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,7 @@ import {
   SidebarMenuButton,
   useSidebar,
   SidebarSeparator,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '../ui/skeleton';
@@ -198,10 +200,13 @@ export function AppSidebar() {
   return (
     <>
     <Sidebar side="left" variant="sidebar" collapsible="icon">
-      <SidebarHeader className="p-6 border-b border-sidebar-border">
+      <SidebarHeader className="p-6 border-b border-sidebar-border flex justify-between items-center">
         <Link href="/">
           <Logo size="small" />
         </Link>
+        <SidebarTrigger className="hidden md:flex">
+            <PanelLeftOpen className="h-6 w-6" />
+        </SidebarTrigger>
       </SidebarHeader>
       <SidebarContent className="flex-grow p-4">
         {loading ? (
