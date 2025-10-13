@@ -129,30 +129,45 @@ export default function PreJoinPage() {
 
   useEffect(() => {
     let mounted = true;
+    let stream: MediaStream | null = null;
     const getCameraPermission = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+        stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
         if (!mounted) { stream.getTracks().forEach(track => track.stop()); return; }
-        setHasCameraPermission(true); setLocalStream(stream);
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        
+        setHasCameraPermission(true); 
+        setLocalStream(stream);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
         
         const desiredMicState = localStorage.getItem('teachmeet-mic-default') !== 'off';
         const desiredCamState = localStorage.getItem('teachmeet-camera-default') !== 'off';
-        setIsMicOn(desiredMicState); setIsCameraOn(desiredCamState);
+        
+        setIsMicOn(desiredMicState); 
+        setIsCameraOn(desiredCamState);
+        
         stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
         stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
       } catch (error) {
         console.error('Error accessing media:', error);
-        setHasCameraPermission(false); setIsCameraOn(false);
-         toast({ variant: 'destructive', title: 'Media Access Denied', description: 'Please enable camera and microphone permissions.'});
+        setHasCameraPermission(false); 
+        setIsCameraOn(false);
+        toast({ variant: 'destructive', title: 'Media Access Denied', description: 'Please enable camera and microphone permissions.'});
       }
     };
+    
     getCameraPermission();
+
     return () => { 
         mounted = false;
-        localStream?.getTracks().forEach(track => track.stop());
+        // Clean up the stream when the component unmounts
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
      };
-  }, [toast, localStream]);
+  }, [toast]);
 
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user || !meetingId) return;
