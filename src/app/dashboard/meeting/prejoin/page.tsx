@@ -256,6 +256,7 @@ export default function PreJoinPage() {
         userId: auth.currentUser.uid,
         userName: auth.currentUser.displayName || "Anonymous",
         status: "pending",
+        userPhotoURL: auth.currentUser.photoURL || '',
         timestamp: serverTimestamp(),
       };
       

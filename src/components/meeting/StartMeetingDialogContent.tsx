@@ -65,7 +65,7 @@ export function StartMeetingDialogContent() {
     setLoading(true);
 
     try {
-      // **THE FIX**: Create the meeting document immediately before redirecting.
+      // Create the meeting document immediately before redirecting.
       const meetingRef = doc(db, 'meetings', meetingId);
       await setDoc(meetingRef, {
         topic: topic.trim(),
@@ -73,7 +73,7 @@ export function StartMeetingDialogContent() {
         creatorName: user.displayName || 'Anonymous Host',
         createdAt: serverTimestamp(),
         status: 'pending', // The meeting is pending until the host fully joins
-      });
+      }, { merge: true });
 
       // Now that the doc is created, redirect to the pre-join page.
       const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}&role=host`;
