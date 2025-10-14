@@ -200,11 +200,11 @@ export function AppSidebar() {
   return (
     <>
     <Sidebar side="left" variant="sidebar" collapsible="icon">
-      <SidebarHeader className="p-6 border-b border-sidebar-border flex justify-between items-center">
-        <Link href="/">
+      <SidebarHeader className="group p-6 border-b border-sidebar-border flex items-center group-data-[state=collapsed]:p-2 group-data-[state=collapsed]:justify-center">
+        <Link href="/" className="group-data-[state=collapsed]:hidden">
           <Logo size="small" />
         </Link>
-        <SidebarTrigger className="hidden md:flex">
+        <SidebarTrigger className="hidden md:flex ml-auto group-data-[state=collapsed]:ml-0">
             <PanelLeftOpen className="h-6 w-6" />
         </SidebarTrigger>
       </SidebarHeader>

@@ -37,6 +37,7 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
 
   return (
     <h1
+      data-testid="sidebar-logo"
       className={cn(
         'font-extrabold tracking-tight text-gel-gradient select-none',
         sizeClasses[size],
