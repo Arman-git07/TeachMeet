@@ -1,6 +1,6 @@
 
 import {genkit} from 'genkit';
-import {googleAI as genkitGoogleAI} from '@genkit-ai/google-genai';
+import {googleAI as genkitGoogleAI} from '@genkit-ai/googleai';
 
 let apiKeyFound = false;
 if (process.env.GOOGLE_API_KEY) {
