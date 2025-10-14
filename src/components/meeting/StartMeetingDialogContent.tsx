@@ -61,10 +61,33 @@ export function StartMeetingDialogContent() {
   };
 
   const handleSetupAndJoin = async () => {
-    // This dialog now only redirects to the prejoin page.
-    // The prejoin page will handle creating the meeting document.
-    const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}&role=host`;
-    router.push(prejoinPath);
+    if (loading || !topic.trim() || !user) return;
+    setLoading(true);
+
+    try {
+      // **THE FIX**: Create the meeting document immediately before redirecting.
+      const meetingRef = doc(db, 'meetings', meetingId);
+      await setDoc(meetingRef, {
+        topic: topic.trim(),
+        hostId: user.uid,
+        creatorName: user.displayName || 'Anonymous Host',
+        createdAt: serverTimestamp(),
+        status: 'pending', // The meeting is pending until the host fully joins
+      });
+
+      // Now that the doc is created, redirect to the pre-join page.
+      const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}&role=host`;
+      router.push(prejoinPath);
+
+    } catch (error) {
+      console.error("Failed to create meeting document:", error);
+      toast({
+        variant: "destructive",
+        title: "Meeting Creation Failed",
+        description: "Could not create the meeting document. Please check your Firestore rules and network connection.",
+      });
+      setLoading(false);
+    }
   };
 
   return (
