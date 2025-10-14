@@ -74,7 +74,7 @@ export default function JoinClassroomPage() {
             const batch = writeBatch(db);
             const requestRef = doc(db, `classrooms/${foundClassroom.id}/joinRequests`, user.uid);
             batch.set(requestRef, {
-                requesterId: user.uid, // Correct field for security rules
+                studentId: user.uid, // Use studentId to match security rules
                 studentName: user.displayName || 'Anonymous Student',
                 studentPhotoURL: user.photoURL || '',
                 role: 'student', // Assuming student role for this join page
