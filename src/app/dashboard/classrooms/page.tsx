@@ -170,7 +170,7 @@ const CreateClassroomDialogContent = ({
           teacherName: user.displayName || 'Anonymous Teacher',
           isPublic,
           students: [], 
-          teachers: [],
+          teachers: [{ uid: user.uid, name: user.displayName || 'Creator' }],
           createdAt: serverTimestamp(),
         };
         await addDoc(collection(db, 'classrooms'), classroomData);
@@ -240,7 +240,7 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
     const ref = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
 
     await setDoc(ref, {
-        studentId: user.uid, // keep field name consistent
+        requesterId: user.uid, // Correct field name for rules
         studentName: data.fullName,
         studentPhotoURL: user.photoURL || "",
         role: "teacher",
@@ -550,7 +550,7 @@ export default function ClassroomsPage() {
         // Add request to classroom's subcollection
         const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
         batch.set(requestRef, {
-            studentId: user.uid,
+            requesterId: user.uid, // Use requesterId for rules
             studentName: user.displayName || 'Anonymous User',
             studentPhotoURL: user.photoURL || '',
             status: 'pending',

@@ -1,8 +1,9 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
-import { collection, query, onSnapshot, orderBy, doc, writeBatch, deleteDoc, arrayUnion, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, doc, writeBatch, deleteDoc, arrayUnion, getDoc, setDoc, serverTimestamp, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useClassroom } from '@/contexts/ClassroomContext';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +18,7 @@ import Link from 'next/link';
 import type { JoinRequest, UserProfile } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 export function ParticipantsManagement() {
-    const { classroomId, user, userRole } = useClassroom();
+    const { classroomId, user, userRole, classroom } = useClassroom();
     const { toast } = useToast();
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
     const [participants, setParticipants] = useState<UserProfile[]>([]);
@@ -35,58 +36,71 @@ export function ParticipantsManagement() {
     }, [classroomId]);
 
     const handleRequest = useCallback(async (request: JoinRequest, action: 'approve' | 'deny') => {
-        if (action === 'deny') {
-            setIsProcessing(request.id);
-            try {
-                const batch = writeBatch(db);
-                batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.studentId));
-                batch.delete(doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId));
-                await batch.commit();
-                toast({ title: 'Request Denied' });
-            } catch (error: any) {
-                toast({ variant: 'destructive', title: 'Action Failed', description: error.message });
-            } finally {
-                setIsProcessing(null);
-            }
-            return;
-        }
-
-        // Approve
         setIsProcessing(request.id);
+        const batch = writeBatch(db);
+        const classroomRef = doc(db, 'classrooms', classroomId);
+
         try {
-            const batch = writeBatch(db);
-            const classroomRef = doc(db, 'classrooms', classroomId);
-            batch.set(doc(db, `classrooms/${classroomId}/participants`, request.studentId), {
-                uid: request.studentId, name: request.studentName, photoURL: request.studentPhotoURL || '', role: request.role, joinedAt: serverTimestamp(),
-            });
-            if (request.role === 'teacher') {
-                batch.set(doc(db, `classrooms/${classroomId}/teachers`, request.studentId), {
-                    uid: request.studentId, name: request.studentName, ...request.applicationData, addedAt: serverTimestamp(),
+            if (action === 'deny') {
+                batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
+                batch.delete(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId));
+                toast({ title: 'Request Denied' });
+            } else { // Approve
+                batch.set(doc(db, `classrooms/${classroomId}/participants`, request.requesterId), {
+                    uid: request.requesterId, name: request.studentName, photoURL: request.studentPhotoURL || '', role: request.role, joinedAt: serverTimestamp(),
                 });
-                batch.update(classroomRef, { teachers: arrayUnion({ uid: request.studentId, name: request.studentName, photoURL: request.studentPhotoURL || "" }) });
-            } else {
-                batch.update(classroomRef, { students: arrayUnion(request.studentId) });
+
+                if (request.role === 'teacher') {
+                     batch.update(classroomRef, { teachers: arrayUnion({ uid: request.requesterId, name: request.studentName, photoURL: request.studentPhotoURL || "" }) });
+                     batch.set(doc(db, `classrooms/${classroomId}/teachers`, request.requesterId), { uid: request.requesterId, name: request.studentName, ...request.applicationData, addedAt: serverTimestamp() });
+                } else {
+                    batch.update(classroomRef, { students: arrayUnion(request.requesterId) });
+                }
+
+                if (classroom) {
+                    batch.set(doc(db, `users/${request.requesterId}/enrolled`, classroomId), {
+                        classroomId, title: classroom.title, description: classroom.description, teacherName: classroom.teacherName, enrolledAt: serverTimestamp()
+                    });
+                }
+                
+                batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
+                batch.delete(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId));
+                toast({ title: 'Request Approved!', description: `${request.studentName} has been added.` });
             }
-            const classroomSnap = await getDoc(classroomRef);
-            if (classroomSnap.exists()) {
-                batch.set(doc(db, `users/${request.studentId}/enrolled`, classroomId), {
-                    classroomId, title: classroomSnap.data().title, description: classroomSnap.data().description, teacherName: classroomSnap.data().teacherName, enrolledAt: serverTimestamp()
-                });
-            }
-            batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.studentId));
-            batch.delete(doc(db, `users/${request.studentId}/pendingJoinRequests`, classroomId));
             await batch.commit();
-            toast({ title: 'Request Approved!', description: `${request.studentName} has been added.` });
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Approval Failed', description: error.message });
+            toast({ variant: 'destructive', title: 'Action Failed', description: error.message });
+            console.error("Error handling request:", error);
+        } finally {
+            setIsProcessing(null);
+        }
+    }, [classroomId, toast, classroom]);
+
+    const handleRemoveParticipant = useCallback(async (participant: UserProfile) => {
+        setIsProcessing(participant.uid);
+        const batch = writeBatch(db);
+        const classroomRef = doc(db, 'classrooms', classroomId);
+
+        try {
+            batch.delete(doc(db, `classrooms/${classroomId}/participants`, participant.uid));
+            batch.delete(doc(db, `users/${participant.uid}/enrolled`, classroomId));
+
+            if (participant.role === 'teacher') {
+                batch.update(classroomRef, { teachers: arrayRemove({ uid: participant.uid, name: participant.name, photoURL: participant.photoURL || "" }) });
+                batch.delete(doc(db, `classrooms/${classroomId}/teachers`, participant.uid));
+            } else {
+                batch.update(classroomRef, { students: arrayRemove(participant.uid) });
+            }
+
+            await batch.commit();
+            toast({ title: 'Participant Removed', description: `${participant.name} has been removed from the classroom.` });
+        } catch (error: any) {
+             toast({ variant: 'destructive', title: 'Removal Failed', description: error.message });
+             console.error("Error removing participant:", error);
         } finally {
             setIsProcessing(null);
         }
     }, [classroomId, toast]);
-
-    const handleRemoveParticipant = useCallback(async (participant: UserProfile) => {
-        // Implement remove logic here
-    }, []);
 
     return (
         <DialogContent className="sm:max-w-2xl">
@@ -120,7 +134,7 @@ export function ParticipantsManagement() {
                     )}
                     <div className="space-y-2">
                         <h4 className="font-medium text-sm text-muted-foreground px-1">Enrolled ({participants.length})</h4>
-                        {participants.map(p => (<div key={p.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg"><Avatar><AvatarImage src={p.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar><span className="text-sm flex-grow">{p.name}</span><Badge variant={p.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{p.role}</Badge>{userRole==='creator' && p.uid !== user?.uid && (<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70" onClick={() => handleRemoveParticipant(p)}><UserX className="h-4 w-4" /></Button>)}</div>))}
+                        {participants.map(p => (<div key={p.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg"><Avatar><AvatarImage src={p.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar><span className="text-sm flex-grow">{p.name}</span><Badge variant={p.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{p.role}</Badge>{userRole==='creator' && p.uid !== user?.uid && (<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70" onClick={() => handleRemoveParticipant(p)} disabled={isProcessing === p.uid}>{isProcessing === p.uid ? <Loader2 className="h-4 w-4 animate-spin"/> : <UserX className="h-4 w-4" />}</Button>)}</div>))}
                     </div>
                 </div>
             </ScrollArea>

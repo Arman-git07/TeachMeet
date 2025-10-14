@@ -15,14 +15,16 @@ function listHasUid(listLike: any, uid: string) {
 
 /** Resolve creator considering multiple legacy keys */
 function resolveCreatorId(cls: any): string | null {
+  // Prioritize teacherId as it's consistently used in creation logic.
   return (
+    cls?.teacherId ??
     cls?.createdBy ??
     cls?.creatorId ??
     cls?.ownerId ??
-    cls?.teacherId ?? // legacy field used as "creator" in old data
     null
   );
 }
+
 
 /** Check teacher membership from array field or subcollection */
 async function isSubjectTeacher(classId: string, cls: any, uid: string) {
