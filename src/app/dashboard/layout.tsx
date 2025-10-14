@@ -3,10 +3,10 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DynamicHeaderProvider } from '@/contexts/DynamicHeaderContext';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
@@ -16,15 +16,12 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.replace('/auth/signin');
     }
   }, [isAuthenticated, loading, router]);
-
-  const isMeetingPage = pathname.startsWith('/dashboard/meeting/');
 
   if (loading) {
     return (
@@ -52,10 +49,8 @@ export default function DashboardLayout({
   return (
     <DynamicHeaderProvider>
       <div className="flex flex-col flex-1 h-screen overflow-hidden">
-        <main className={cn(
-          "flex flex-col flex-1 bg-background overflow-hidden",
-           isMeetingPage ? "" : "p-4 md:p-8"
-        )}>
+        <DashboardHeader />
+        <main className="flex flex-col flex-1 bg-background overflow-hidden">
           {children}
         </main>
       </div>

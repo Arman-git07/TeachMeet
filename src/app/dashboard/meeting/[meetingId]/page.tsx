@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useSearchParams, useRouter, useParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth";
 import MeetingClient from "./MeetingClient";
@@ -16,23 +16,14 @@ import { MoreVertical, Brush, MessageSquare, Users, Settings } from 'lucide-reac
 
 // --------------------------- Meeting Page ---------------------------
 export default function MeetingPage() {
-  const params = useSearchParams();
+  const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const pathname = usePathname();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user } = useAuth();
   
-  const [meetingId, setMeetingId] = useState('');
-  
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const pathParts = window.location.pathname.split('/');
-      const id = pathParts[pathParts.indexOf('meeting') + 1];
-      setMeetingId(id);
-    }
-  }, []);
-
-  const topic = params.get('topic') || "TeachMeet Meeting";
+  const meetingId = params.meetingId as string;
+  const topic = searchParams.get('topic') || "TeachMeet Meeting";
   
   const constructUrl = (page: string) => {
     let url = `/dashboard/meeting/${meetingId}/${page}`;
@@ -100,8 +91,8 @@ export default function MeetingPage() {
         <MeetingClient
           meetingId={meetingId}
           userId={user.uid}
-          initialCamOn={params.get('cam') !== 'false'}
-          initialMicOn={params.get('mic') !== 'false'}
+          initialCamOn={searchParams.get('cam') !== 'false'}
+          initialMicOn={searchParams.get('mic') !== 'false'}
           onLeave={handleLeave}
         />
       )}
