@@ -235,7 +235,7 @@ export default function HomePage() {
             onClick={handleComplexLogoAnimation}
             animateChars={animateChars && logoText === 'TeachMeet'}
           />
-          <div className="mt-8 p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
+          <div className="mt-8 p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center border">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
               <History className="mr-3 h-6 w-6" />
               Latest Activity

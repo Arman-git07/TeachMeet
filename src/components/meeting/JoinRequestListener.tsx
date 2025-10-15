@@ -89,7 +89,7 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
   const currentRequest = requests[0];
 
   return (
-    <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-gray-900/80 backdrop-blur-sm rounded-xl shadow-2xl p-4 z-50 w-full max-w-md border border-gray-700">
+    <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm rounded-xl shadow-2xl p-4 z-50 w-full max-w-md border border-border">
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
                 <Avatar className="h-9 w-9">
@@ -97,8 +97,8 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
                     <AvatarFallback>{currentRequest.userName?.charAt(0) || 'G'}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <h4 className="font-semibold text-white">Join Request</h4>
-                    <p className="text-sm text-gray-300">{currentRequest.userName} wants to join the meeting.</p>
+                    <h4 className="font-semibold text-foreground">Join Request</h4>
+                    <p className="text-sm text-muted-foreground">{currentRequest.userName} wants to join the meeting.</p>
                 </div>
             </div>
             <div className="flex gap-2">

@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -432,7 +433,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       {isSharingScreen && (<div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50">🔴 You’re sharing your screen</div>)}
 
-      <div className="flex-none p-4 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700">
+      <div className="flex-none p-4 bg-background/80 backdrop-blur-sm border-t border-border">
         <div className="flex items-center justify-center relative">
           <div className="flex items-center justify-center gap-3">
             <Button onClick={toggleMic} className={cn("h-14 w-14 rounded-full flex items-center justify-center transition-colors", micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}</Button>
