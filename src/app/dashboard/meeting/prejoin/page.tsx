@@ -233,9 +233,9 @@ export default function PreJoinPage() {
       const requestData = {
         userId: auth.currentUser.uid,
         userName: auth.currentUser.displayName || "Anonymous",
-        status: "pending",
         userPhotoURL: auth.currentUser.photoURL || '',
         requestedAt: serverTimestamp(),
+        status: "pending", // This was the missing field!
       };
       
       await setDoc(requestRef, requestData);
