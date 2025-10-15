@@ -56,7 +56,7 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <SidebarTrigger className="md:hidden">
             <PanelLeftOpen className="h-6 w-6" />
           </SidebarTrigger>
@@ -69,7 +69,7 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
           )}
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-4 md:px-8">
+        <div className="flex flex-1 items-center justify-center px-2 sm:px-4 md:px-8">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <button
@@ -82,7 +82,7 @@ export function AppHeader({ showLogo = false }: AppHeaderProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <UserProfileDropdown />
           <ThemeToggle />
         </div>

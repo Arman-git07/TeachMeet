@@ -214,7 +214,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
-      <main className="flex-grow flex flex-col items-center justify-center overflow-hidden px-4 relative">
+      <main className="flex-grow flex flex-col items-center justify-center overflow-hidden p-4 relative">
         <div
           className="absolute inset-0 opacity-10"
           style={{
@@ -224,7 +224,7 @@ export default function HomePage() {
             maskImage: "radial-gradient(circle at center, white, transparent 70%)"
           }}
         />
-        <div className="relative z-10 flex flex-col items-center text-center">
+        <div className="relative z-10 flex flex-col items-center text-center w-full">
           <Logo
             text={logoText}
             size="medium"
@@ -235,7 +235,7 @@ export default function HomePage() {
             onClick={handleComplexLogoAnimation}
             animateChars={animateChars && logoText === 'TeachMeet'}
           />
-          <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
+          <div className="mt-8 p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
               <History className="mr-3 h-6 w-6" />
               Latest Activity
