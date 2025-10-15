@@ -40,11 +40,12 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       data-testid="sidebar-logo"
       className={cn(
         'font-extrabold tracking-tight text-gel-gradient select-none',
+        'dark:[--logo-outline-color:hsl(var(--background)/0.5)] [--logo-outline-color:hsl(var(--foreground)/0.3)]',
         sizeClasses[size],
         className
       )}
       style={{
-        WebkitTextStroke: `1px hsl(var(--background) / 0.5)`,
+        WebkitTextStroke: `1px var(--logo-outline-color)`,
         textShadow: `
           0px 2px 2px hsl(var(--background) / 0.3),
           0px 4px 5px hsl(var(--primary) / 0.2),
