@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -10,84 +11,92 @@ service cloud.firestore {
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
-
+    
     match /users/{userId}/{document=**} {
       allow read, write: if isOwner(userId);
     }
     
-    match /classrooms/{classroomId} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.auth.uid == request.resource.data.teacherId;
-      allow update, delete: if signedIn() && isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
+    match /documents/{documentId} {
+      allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
+      allow create: if isOwner(request.resource.data.uploaderId);
+      allow delete: if isOwner(resource.data.uploaderId);
+    }
 
+    match /recordings/{recordingId} {
+      allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
+      allow create: if isOwner(request.resource.data.uploaderId);
+      allow delete: if isOwner(resource.data.uploaderId);
+    }
+
+    match /classrooms/{classroomId} {
+      allow read: if true;
+      allow create: if signedIn() && request.auth.uid == request.resource.data.teacherId;
+      allow update, delete: if isOwner(resource.data.teacherId);
+      
       match /announcements/{announcementId} {
-        allow read: if signedIn();
-        allow create: if signedIn() && request.auth.uid == request.resource.data.authorId;
-        allow update, delete: if signedIn() && isOwner(resource.data.authorId);
+        allow read: if true;
+        allow create: if signedIn() && (isOwner(request.resource.data.authorId) || isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId));
+        allow delete: if isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
+      }
+
+      match /materials/{materialId} {
+        allow read: if true;
+        allow create: if signedIn() && (isOwner(request.resource.data.uploaderId) || isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId));
+        allow delete: if isOwner(resource.data.uploaderId) || isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
       }
       
-      match /materials/{materialId} {
+      match /joinRequests/{requestId} {
+        allow create: if signedIn() && (request.auth.uid == request.resource.data.requesterId);
         allow read: if signedIn();
-        allow create: if signedIn() && request.auth.uid == request.resource.data.uploaderId;
-        allow delete: if signedIn() && (isOwner(resource.data.uploaderId) || isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId));
+        allow delete: if request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId || request.auth.uid == requestId;
+        allow update: if isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
+      }
+      
+      match /participants/{participantId} {
+        allow read: if true;
+        allow create, update: if isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
+        allow delete: if isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId) || isOwner(participantId);
+      }
+      
+      match /teachers/{teacherId} {
+        allow read: if true;
+        allow create, update, delete: if isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
       }
       
       match /assignments/{assignmentId} {
-        allow read: if signedIn();
-        allow create: if signedIn() && request.auth.uid == request.resource.data.creatorId;
-        allow update, delete: if signedIn() && isOwner(resource.data.creatorId);
+        allow read: if true;
+        allow create: if isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
+        allow delete: if isOwner(resource.data.creatorId);
 
         match /submissions/{submissionId} {
-          allow read, create, update: if signedIn();
+            allow read: if true;
+            allow create, update: if isOwner(submissionId) || isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
+            allow delete: if isOwner(submissionId) || isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
         }
       }
 
       match /exams/{examId} {
-        allow read: if signedIn();
-        allow create: if signedIn() && request.auth.uid == request.resource.data.authorId;
-        allow update, delete: if signedIn() && isOwner(resource.data.authorId);
+        allow read: if true;
+        allow create: if isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
+        allow delete: if isOwner(resource.data.authorId);
       }
-
-      match /joinRequests/{requestId} {
-        allow read: if signedIn();
-        allow create: if signedIn() && request.auth.uid == request.resource.data.requesterId;
-        allow update: if signedIn() && isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
-        allow delete: if request.auth.uid == get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId || request.auth.uid == requestId;
-      }
-
-      match /participants/{participantId} {
-        allow read: if signedIn();
-        allow write: if signedIn() && isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
-        allow delete: if signedIn() && (isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId) || request.auth.uid == participantId);
-      }
-      
-       match /teachers/{teacherId} {
-        allow read: if signedIn();
-        allow write: if signedIn() && isOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId);
-      }
-    }
-    
-    match /documents/{documentId} {
-      allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
-      allow create: if signedIn() && request.auth.uid == request.resource.data.uploaderId;
-      allow delete: if signedIn() && isOwner(resource.data.uploaderId);
-    }
-    
-    match /recordings/{recordingId} {
-       allow read: if resource.data.isPrivate == false || isOwner(resource.data.uploaderId);
-       allow create: if signedIn() && request.auth.uid == request.resource.data.uploaderId;
-       allow delete: if signedIn() && isOwner(resource.data.uploaderId);
     }
     
     match /meetings/{meetingId} {
-      allow read, write; // Open for this prototype
-      match /participants/{participantId} {
-        allow read, write, delete; // Open for this prototype
-      }
-    }
+      allow read: if true;
+      allow create: if isOwner(request.resource.data.hostId);
+      allow update: if isOwner(resource.data.hostId);
 
-    match /fcmTokens/{userId} {
-      allow read, write: if isOwner(userId);
+      match /joinRequests/{requestId} {
+        allow create: if signedIn();
+        allow read, update, delete: if isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId) || isOwner(resource.data.userId);
+      }
+
+      match /participants/{participantId} {
+        allow read: if true;
+        allow create, delete: if isOwner(participantId) || isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+        allow update: if isOwner(participantId) || isOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+      }
     }
   }
 }
