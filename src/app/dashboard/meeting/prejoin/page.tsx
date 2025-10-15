@@ -221,57 +221,41 @@ export default function PreJoinPage() {
       return;
     }
     setRequestSent(true);
+    setRequestStatus("pending"); // Optimistic UI update
 
     try {
-      // 1) Ensure meeting exists
-      const meetingRef = doc(db, "meetings", meetingId);
-      const meetingSnap = await getDoc(meetingRef);
-      if (!meetingSnap.exists()) {
-        toast({
-          variant: "destructive",
-          title: "Meeting not found",
-          description: "This meeting doesn't exist or has ended.",
-        });
-        setRequestSent(false); // Allow retry
-        return;
-      }
+      // The client no longer checks if the meeting exists.
+      // This is now handled by Firestore security rules on the backend.
+      // This change prevents the INTERNAL ASSERTION FAILED error.
 
-      // 2) Prevent duplicate requests from same user
-      const existingReqQ = query(
-        collection(db, "meetings", meetingId, "joinRequests"),
-        where("userId", "==", auth.currentUser.uid)
-      );
-      const existingSnap = await getDocs(existingReqQ);
-      if (!existingSnap.empty) {
-        toast({
-          title: "Request already sent",
-          description: "Please wait for the host to respond.",
-        });
-        setRequestStatus("pending");
-        return;
-      }
-
-      // 3) Add join request
+      // We use setDoc with the user's UID as the document ID to prevent duplicates.
+      const requestRef = doc(db, "meetings", meetingId, "joinRequests", auth.currentUser.uid);
       const requestData = {
         userId: auth.currentUser.uid,
         userName: auth.currentUser.displayName || "Anonymous",
         status: "pending",
         userPhotoURL: auth.currentUser.photoURL || '',
-        timestamp: serverTimestamp(),
+        requestedAt: serverTimestamp(),
       };
       
-      await addDoc(collection(db, "meetings", meetingId, "joinRequests"), requestData);
+      await setDoc(requestRef, requestData);
 
-      setRequestStatus("pending");
       toast({ title: "Request sent to host" });
-    } catch (error) {
-      console.error("Failed to send join request:", error);
+    } catch (error: any) {
+      // Revert optimistic UI on failure
+      setRequestSent(false);
+      setRequestStatus("idle");
+      
+      console.error("Fail to send join request:", error);
+      let description = "Please check your connection or try again later.";
+      if (error.code === 'permission-denied') {
+        description = "Permission denied. The meeting may not exist or has ended. Please check the meeting link/code.";
+      }
       toast({
         variant: "destructive",
         title: "Failed to send request",
-        description: "Check your connection or permissions.",
+        description: description,
       });
-      setRequestSent(false); // Allow retry
     }
   };
 

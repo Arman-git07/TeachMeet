@@ -51,20 +51,26 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
 
   const handleAccept = async (req: any) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
-    const partRef = doc(db, "meetings", meetingId, "participants", req.id);
+    const partRef = doc(db, "meetings", meetingId, "participants", req.userId); // Use req.userId
     
     try {
-      await updateDoc(reqRef, { status: "approved" });
-      // Add to participants sub-collection, which MeetingClient listens to
+      // First, add the user to the participants subcollection
       await setDoc(partRef, {
         name: req.userName,
         photoURL: req.userPhotoURL,
         userId: req.userId,
+        isHost: false, // Explicitly set as not host
         joinedAt: serverTimestamp(),
       });
+
+      // Then, update the request status to 'approved' to notify the user
+      await updateDoc(reqRef, { status: "approved" });
+      
       toast({ title: "Request Approved", description: `${req.userName} has joined the meeting.` });
+      // Clean up the request document after a delay
       setTimeout(() => deleteDoc(reqRef), 10000);
     } catch (error) {
+      console.error("Error approving request:", error);
       toast({ variant: "destructive", title: "Action Failed", description: "Could not approve the request." });
     }
   };
