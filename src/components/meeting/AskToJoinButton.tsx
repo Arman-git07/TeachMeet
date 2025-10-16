@@ -9,8 +9,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getAuth } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export default function AskToJoinButton() {
+export default function AskToJoinButton({ disabled }: { disabled: boolean }) {
   const [requestStatus, setRequestStatus] = useState<"idle" | "sending" | "sent" | "approved" | "declined" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const router = useRouter();
@@ -103,14 +104,14 @@ export default function AskToJoinButton() {
         case "declined":
         case "error":
              return (
-                <Button onClick={handleAskToJoin} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">
+                <Button onClick={handleAskToJoin} disabled={disabled} className={cn("w-full py-3 text-lg font-semibold rounded-xl", disabled ? "bg-green-900/50 text-green-100/70 cursor-not-allowed" : "btn-gel")}>
                     Ask to Join Again
                 </Button>
             );
         case "idle":
         default:
              return (
-                <Button onClick={handleAskToJoin} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">
+                <Button onClick={handleAskToJoin} disabled={disabled} className={cn("w-full py-3 text-lg font-semibold rounded-xl", disabled ? "bg-green-900/50 text-green-100/70 cursor-not-allowed" : "btn-gel")}>
                     Ask to Join
                 </Button>
             );

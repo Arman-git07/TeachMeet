@@ -182,7 +182,7 @@ export default function PreJoinPage() {
       return <Button onClick={handleCreateAndJoinMeeting} disabled={!agreed || isCreatingMeeting} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>{isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Join Now as Host</Button>
     }
 
-    return <AskToJoinButton />;
+    return <AskToJoinButton disabled={!agreed} />;
   };
   
   const handleMirrorToggle = (checked: boolean) => { setMirrorVideo(checked); localStorage.setItem('teachmeet-camera-mirror', String(checked)); };
