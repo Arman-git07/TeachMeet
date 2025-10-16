@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Check, X } from "lucide-react";
 
-export default function JoinRequestListener({ meetingId, hostId }: { meetingId: string, hostId: string }) {
+export default function JoinRequestListener({ meetingId, userId: hostId }: { meetingId: string, userId: string }) {
   const [requests, setRequests] = useState<any[]>([]);
   const { toast } = useToast();
 
