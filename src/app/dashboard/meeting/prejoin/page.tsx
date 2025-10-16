@@ -212,31 +212,47 @@ export default function PreJoinPage() {
   };
   
   const handleAskToJoin = async () => {
-    if (!user) return alert("You must be signed in to join.");
+    if (!user) {
+      alert("You must be signed in to join a meeting.");
+      return;
+    }
   
     try {
       const meetingRef = doc(db, "meetings", meetingId);
       const meetingSnap = await getDoc(meetingRef);
   
+      // ✅ Step 1: Ensure meeting exists
       if (!meetingSnap.exists()) {
-        toast({ variant: "destructive", title: "Meeting Not Found", description: "Please check the link or wait for the host." });
+        alert("Meeting not found. Please check the code or link provided by the host.");
         return;
       }
   
+      const meetingData = meetingSnap.data();
+  
+      // ✅ Step 2: Prevent host from sending join request for their own meeting
+      if (meetingData.hostId === user.uid) {
+        alert("You are the host of this meeting. Please click 'Join Now as Host' instead.");
+        return;
+      }
+  
+      // ✅ Step 3: Create join request document
       const joinRequestRef = doc(db, "joinRequests", `${meetingId}_${user.uid}`);
       await setDoc(joinRequestRef, {
         meetingId,
-        userId: user.uid, 
+        userId: user.uid, // ✅ crucial field
         displayName: user.displayName || "Guest",
         photoURL: user.photoURL || "",
-        createdAt: serverTimestamp(),
+        hostId: meetingData.hostId, // important for host listener
         status: "pending",
+        createdAt: serverTimestamp(),
       });
   
       setRequestStatus("sent");
+      console.log("Join request sent successfully.");
       toast({ title: "Request Sent!", description: "Waiting for the host to let you in." });
     } catch (err: any) {
       console.error("Failed to send join request:", err);
+      alert("Failed to send join request: " + err.message);
       toast({ variant: "destructive", title: "Request Failed", description: err.message });
     }
   };

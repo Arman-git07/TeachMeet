@@ -18,38 +18,35 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Check, X } from "lucide-react";
 
-export default function JoinRequestListener({ meetingId, userId }: { meetingId: string, userId: string }) {
+export default function JoinRequestListener({ meetingId, hostId }: { meetingId: string, hostId: string }) {
   const [requests, setRequests] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!meetingId) return;
+    if (!hostId) return;
 
-    // Listen to the root `joinRequests` collection for requests matching this meeting.
-    const q = query(
-      collection(db, "joinRequests"),
-      where("meetingId", "==", meetingId),
-      where("status", "==", "pending")
-    );
+    // ✅ Host only receives requests where they are the meeting host
+    const q = query(collection(db, "joinRequests"), where("hostId", "==", hostId), where("status", "==", "pending"));
     const unsub = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setRequests(data);
     });
 
     return () => unsub();
-  }, [meetingId]);
+  }, [hostId]);
+
 
   const handleApprove = async (req: any) => {
     try {
-      // Add participant to the meeting's subcollection
-      await setDoc(doc(db, "meetings", meetingId, "participants", req.userId), {
+      // ✅ add participant
+      await setDoc(doc(db, "meetings", req.meetingId, "participants", req.userId), {
         userId: req.userId,
         name: req.displayName,
         photoURL: req.photoURL,
         joinedAt: serverTimestamp(),
       });
 
-      // Remove the request from the root collection after approval
+      // ✅ remove request after approval
       await deleteDoc(doc(db, "joinRequests", req.id));
 
       toast({
@@ -65,7 +62,7 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
       });
     }
   };
-
+  
   const handleDeny = async (req: any) => {
     try {
         await deleteDoc(doc(db, "joinRequests", req.id));
@@ -84,7 +81,6 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
     }
   }
 
-  // Display only the first request in the queue
   const currentRequest = requests.length > 0 ? requests[0] : null;
 
   if (!currentRequest) {
