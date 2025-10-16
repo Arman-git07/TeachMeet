@@ -51,10 +51,17 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
   }, [meetingId, userId]);
 
   const handleApprove = async (req: any) => {
+    // Note: The `userId` in the request document is the ID of the user requesting to join.
+    if (!req.userId) {
+      console.error("Cannot approve request: userId is missing from the request document.", req);
+      toast({ variant: "destructive", title: "Approval Failed", description: "Request data is corrupted." });
+      return;
+    }
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     const partRef = doc(db, "meetings", meetingId, "participants", req.userId);
     
     try {
+      // Create the participant document with the user's ID
       await setDoc(partRef, {
         name: req.userName,
         photoURL: req.userPhotoURL,
@@ -62,6 +69,7 @@ export default function JoinRequestListener({ meetingId, userId }: { meetingId: 
         isHost: false,
         joinedAt: serverTimestamp(),
       });
+      // Update the request status to approved so the participant's client can react
       await updateDoc(reqRef, { status: "approved" });
       toast({ title: "Request Approved", description: `${req.userName} has joined the meeting.` });
       // Clean up the request document after a delay

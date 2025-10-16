@@ -224,18 +224,13 @@ export default function PreJoinPage() {
     setRequestStatus("pending"); // Optimistic UI update
 
     try {
-      // The client no longer checks if the meeting exists.
-      // This is now handled by Firestore security rules on the backend.
-      // This change prevents the INTERNAL ASSERTION FAILED error.
-
-      // We use setDoc with the user's UID as the document ID to prevent duplicates.
       const requestRef = doc(db, "meetings", meetingId, "joinRequests", auth.currentUser.uid);
       const requestData = {
-        userId: auth.currentUser.uid,
+        userId: auth.currentUser.uid, // This is the crucial field for the host's logic
         userName: auth.currentUser.displayName || "Anonymous",
         userPhotoURL: auth.currentUser.photoURL || '',
         requestedAt: serverTimestamp(),
-        status: "pending", // This was the missing field!
+        status: "pending",
       };
       
       await setDoc(requestRef, requestData);
