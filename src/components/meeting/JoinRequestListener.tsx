@@ -17,10 +17,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Check, X } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
-export default function JoinRequestListener({ meetingId, userId: hostId }: { meetingId: string, userId: string }) {
+export default function JoinRequestListener({ meetingId }: { meetingId: string }) {
   const [requests, setRequests] = useState<any[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const hostId = user?.uid;
 
   useEffect(() => {
     if (!hostId) return;
@@ -34,7 +37,6 @@ export default function JoinRequestListener({ meetingId, userId: hostId }: { mee
 
     return () => unsub();
   }, [hostId]);
-
 
   const handleApprove = async (req: any) => {
     try {

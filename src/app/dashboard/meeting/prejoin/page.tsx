@@ -211,51 +211,51 @@ export default function PreJoinPage() {
     }
   };
   
-  const handleAskToJoin = async () => {
-    if (!user) {
-      alert("You must be signed in to join a meeting.");
+const handleAskToJoin = async () => {
+  if (!user) {
+    alert("Please sign in to join the meeting.");
+    return;
+  }
+
+  try {
+    const meetingRef = doc(db, "meetings", meetingId);
+    const meetingSnap = await getDoc(meetingRef);
+
+    // ✅ Step 1: Ensure meeting exists
+    if (!meetingSnap.exists()) {
+      alert("Meeting not found. Please check the meeting code or link.");
       return;
     }
-  
-    try {
-      const meetingRef = doc(db, "meetings", meetingId);
-      const meetingSnap = await getDoc(meetingRef);
-  
-      // ✅ Step 1: Ensure meeting exists
-      if (!meetingSnap.exists()) {
-        alert("Meeting not found. Please check the code or link provided by the host.");
-        return;
-      }
-  
-      const meetingData = meetingSnap.data();
-  
-      // ✅ Step 2: Prevent host from sending join request for their own meeting
-      if (meetingData.hostId === user.uid) {
-        alert("You are the host of this meeting. Please click 'Join Now as Host' instead.");
-        return;
-      }
-  
-      // ✅ Step 3: Create join request document
-      const joinRequestRef = doc(db, "joinRequests", `${meetingId}_${user.uid}`);
-      await setDoc(joinRequestRef, {
-        meetingId,
-        userId: user.uid, // ✅ crucial field
-        displayName: user.displayName || "Guest",
-        photoURL: user.photoURL || "",
-        hostId: meetingData.hostId, // important for host listener
-        status: "pending",
-        createdAt: serverTimestamp(),
-      });
-  
-      setRequestStatus("sent");
-      console.log("Join request sent successfully.");
-      toast({ title: "Request Sent!", description: "Waiting for the host to let you in." });
-    } catch (err: any) {
-      console.error("Failed to send join request:", err);
-      alert("Failed to send join request: " + err.message);
-      toast({ variant: "destructive", title: "Request Failed", description: err.message });
+
+    const meetingData = meetingSnap.data();
+
+    // ✅ Step 2: Prevent host from sending a join request to themselves
+    if (meetingData.hostId === user.uid) {
+      alert("You are the host of this meeting. Click 'Join Now as Host' instead.");
+      return;
     }
-  };
+
+    // ✅ Step 3: Create join request document for host
+    const joinRequestRef = doc(db, "joinRequests", `${meetingId}_${user.uid}`);
+    await setDoc(joinRequestRef, {
+      meetingId,
+      userId: user.uid, // ✅ crucial field
+      displayName: user.displayName || "Guest",
+      photoURL: user.photoURL || "",
+      hostId: meetingData.hostId, // link to host
+      status: "pending",
+      createdAt: serverTimestamp(),
+    });
+
+    // ✅ Update UI state
+    setRequestStatus("sent");
+    toast({ title: "Request Sent!", description: "Waiting for the host to let you in." });
+    console.log("Join request sent to host:", meetingData.hostId);
+  } catch (err: any) {
+    console.error("Failed to send join request:", err);
+    alert("Failed to send join request: " + err.message);
+  }
+};
 
 
   const userName = user?.displayName || 'User';
