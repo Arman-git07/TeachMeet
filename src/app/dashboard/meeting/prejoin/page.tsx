@@ -61,10 +61,9 @@ export default function PreJoinPage() {
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
-  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "accepted" | "declined">("idle");
+  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "sent" | "accepted" | "declined">("idle");
   const [isHost, setIsHost] = useState(false);
   const [isLoadingRole, setIsLoadingRole] = useState(true);
-  const [requestSent, setRequestSent] = useState(false);
 
   // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -105,21 +104,23 @@ export default function PreJoinPage() {
   useEffect(() => {
     if (!meetingId || !user || isHost) return;
 
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    // The host now approves by adding you to the `participants` subcollection.
+    // We listen there instead of the join request doc.
+    const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
 
-    const unsub = onSnapshot(reqRef, (snap) => {
-      const data = snap.data();
-      if (snap.exists() && data?.status === "approved") {
+    const unsub = onSnapshot(participantRef, (snap) => {
+      if (snap.exists()) {
         setRequestStatus("accepted");
         toast({ title: "Request Approved!", description: "The host has let you in. Joining the meeting now..." });
+        
+        // Cleanup the join request doc now that we are in.
+        const reqRef = doc(db, "joinRequests", `${meetingId}_${user.uid}`);
+        deleteDoc(reqRef).catch(() => {});
+
         setTimeout(() => {
             const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&cam=${isCameraOn}&mic=${isMicOn}`;
             router.push(meetingPath);
         }, 1000);
-      } else if (snap.exists() && data?.status === "denied") {
-        setRequestStatus("declined");
-        toast({ variant: 'destructive', title: "Request Denied", description: "The host has denied your request to join."});
-        setTimeout(() => deleteDoc(reqRef), 5000); // Clean up denied request
       }
     });
 
@@ -176,7 +177,6 @@ export default function PreJoinPage() {
     try {
       const meetingRef = doc(db, 'meetings', meetingId);
   
-      // Ensure meeting document exists and hostId is set. Use a transaction to be safe.
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(meetingRef);
         if (!snap.exists()) {
@@ -188,17 +188,14 @@ export default function PreJoinPage() {
             status: 'pending',
           });
         } else {
-          // If it exists, ensure hostId is present and correct (merge without overwriting)
           tx.update(meetingRef, {
             hostId: user.uid,
             topic: topic.trim(),
             creatorName: user.displayName || 'Anonymous Host',
-            // do NOT overwrite existing createdAt/status unless you intentionally want to.
           });
         }
       });
   
-      // Now it's safe to redirect — meeting document exists and hostId is set.
       const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(
         topic.trim()
       )}&cam=${isCameraOn}&mic=${isMicOn}`;
@@ -215,42 +212,32 @@ export default function PreJoinPage() {
   };
   
   const handleAskToJoin = async () => {
-    if (requestSent) return;
-    if (!auth.currentUser) {
-      toast({ variant: "destructive", title: "Please sign in to request to join." });
-      return;
-    }
-    setRequestSent(true);
-    setRequestStatus("pending"); // Optimistic UI update
-
+    if (!user) return alert("You must be signed in to join.");
+  
     try {
-      const requestRef = doc(db, "meetings", meetingId, "joinRequests", auth.currentUser.uid);
-      const requestData = {
-        userId: auth.currentUser.uid, // This is the crucial field for the host's logic
-        userName: auth.currentUser.displayName || "Anonymous",
-        userPhotoURL: auth.currentUser.photoURL || '',
-        requestedAt: serverTimestamp(),
-        status: "pending",
-      };
-      
-      await setDoc(requestRef, requestData);
-
-      toast({ title: "Request sent to host" });
-    } catch (error: any) {
-      // Revert optimistic UI on failure
-      setRequestSent(false);
-      setRequestStatus("idle");
-      
-      console.error("Fail to send join request:", error);
-      let description = "Please check your connection or try again later.";
-      if (error.code === 'permission-denied') {
-        description = "Permission denied. The meeting may not exist or has ended. Please check the meeting link/code.";
+      const meetingRef = doc(db, "meetings", meetingId);
+      const meetingSnap = await getDoc(meetingRef);
+  
+      if (!meetingSnap.exists()) {
+        toast({ variant: "destructive", title: "Meeting Not Found", description: "Please check the link or wait for the host." });
+        return;
       }
-      toast({
-        variant: "destructive",
-        title: "Failed to send request",
-        description: description,
+  
+      const joinRequestRef = doc(db, "joinRequests", `${meetingId}_${user.uid}`);
+      await setDoc(joinRequestRef, {
+        meetingId,
+        userId: user.uid, 
+        displayName: user.displayName || "Guest",
+        photoURL: user.photoURL || "",
+        createdAt: serverTimestamp(),
+        status: "pending",
       });
+  
+      setRequestStatus("sent");
+      toast({ title: "Request Sent!", description: "Waiting for the host to let you in." });
+    } catch (err: any) {
+      console.error("Failed to send join request:", err);
+      toast({ variant: "destructive", title: "Request Failed", description: err.message });
     }
   };
 
@@ -270,13 +257,15 @@ export default function PreJoinPage() {
     // Participant buttons
     switch(requestStatus) {
       case 'idle':
-        return <Button onClick={handleAskToJoin} disabled={!agreed || requestSent} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>Ask to Join</Button>
-      case 'pending':
+        return <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>Ask to Join</Button>
+      case 'sent':
         return <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-gray-500"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Request Sent, Waiting...</Button>
       case 'declined':
         return <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>Ask to Join Again</Button>
       case 'accepted':
         return <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Joining...</Button>
+      default:
+        return <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>Ask to Join</Button>
     }
   };
   

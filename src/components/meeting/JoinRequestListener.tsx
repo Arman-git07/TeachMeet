@@ -1,125 +1,136 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { db } from "@/lib/firebase";
+import { useEffect, useState } from "react";
 import {
   collection,
-  onSnapshot,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  setDoc,
   query,
   where,
+  onSnapshot,
+  doc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
 } from "firebase/firestore";
-import { Button } from "@/components/ui/button";
+import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Check, X } from "lucide-react";
 
-const playJoinRequestSound = () => {
-  const audio = new Audio("/sounds/request-tone.mp3");
-  audio.volume = 0.5;
-  audio.play().catch(() => {});
-};
-
-export default function JoinRequestListener({ meetingId, userId }: { meetingId: string; userId: string }) {
+export default function JoinRequestListener({ meetingId, userId }: { meetingId: string, userId: string }) {
   const [requests, setRequests] = useState<any[]>([]);
   const { toast } = useToast();
-  const playedRequestIds = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!meetingId || !userId) return;
-    
-    const q = query(collection(db, "meetings", meetingId, "joinRequests"), where("status", "==", "pending"));
+    if (!meetingId) return;
 
-    const unsub = onSnapshot(q, (snap) => {
-      const newRequests = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      
-      const hasNewUnplayed = newRequests.some(req => !playedRequestIds.current.has(req.id));
-      if (hasNewUnplayed) {
-        playJoinRequestSound();
-        newRequests.forEach(req => playedRequestIds.current.add(req.id));
-      }
-      
-      setRequests(newRequests);
+    // Listen to the root `joinRequests` collection for requests matching this meeting.
+    const q = query(
+      collection(db, "joinRequests"),
+      where("meetingId", "==", meetingId),
+      where("status", "==", "pending")
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setRequests(data);
     });
 
     return () => unsub();
-  }, [meetingId, userId]);
+  }, [meetingId]);
 
   const handleApprove = async (req: any) => {
-    // Note: The `userId` in the request document is the ID of the user requesting to join.
-    if (!req.userId) {
-      console.error("Cannot approve request: userId is missing from the request document.", req);
-      toast({ variant: "destructive", title: "Approval Failed", description: "Request data is corrupted." });
-      return;
-    }
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
-    const partRef = doc(db, "meetings", meetingId, "participants", req.userId);
-    
     try {
-      // Create the participant document with the user's ID
-      await setDoc(partRef, {
-        name: req.userName,
-        photoURL: req.userPhotoURL,
+      // Add participant to the meeting's subcollection
+      await setDoc(doc(db, "meetings", meetingId, "participants", req.userId), {
         userId: req.userId,
-        isHost: false,
+        name: req.displayName,
+        photoURL: req.photoURL,
         joinedAt: serverTimestamp(),
       });
-      // Update the request status to approved so the participant's client can react
-      await updateDoc(reqRef, { status: "approved" });
-      toast({ title: "Request Approved", description: `${req.userName} has joined the meeting.` });
-      // Clean up the request document after a delay
-      setTimeout(() => deleteDoc(reqRef).catch(()=>{}), 10000);
-    } catch (error) {
-      console.error("Error approving request:", error);
-      toast({ variant: "destructive", title: "Action Failed", description: "Could not approve the request." });
+
+      // Remove the request from the root collection after approval
+      await deleteDoc(doc(db, "joinRequests", req.id));
+
+      toast({
+        title: "Participant Approved",
+        description: `${req.displayName} has been allowed to join the meeting.`,
+      });
+    } catch (err: any) {
+      console.error("Failed to approve request:", err);
+      toast({
+        variant: "destructive",
+        title: "Approval Failed",
+        description: "Please try again.",
+      });
     }
   };
 
   const handleDeny = async (req: any) => {
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
-      await updateDoc(reqRef, { status: "denied" });
-      toast({ variant: "destructive", title: "Request Denied" });
-      setTimeout(() => deleteDoc(reqRef).catch(()=>{}), 5000);
-    } catch (error) {
-      toast({ variant: "destructive", title: "Action Failed", description: "Could not deny the request." });
+        await deleteDoc(doc(db, "joinRequests", req.id));
+        toast({
+            variant: "destructive",
+            title: "Request Denied",
+            description: `${req.displayName} has been denied entry.`
+        });
+    } catch (err) {
+        console.error("Failed to deny request:", err);
+        toast({
+            variant: "destructive",
+            title: "Action Failed",
+            description: "Could not deny the request."
+        });
     }
-  };
+  }
 
-  if (requests.length === 0) return null;
+  // Display only the first request in the queue
+  const currentRequest = requests.length > 0 ? requests[0] : null;
 
-  // Show one request at a time
-  const currentRequest = requests[0];
+  if (!currentRequest) {
+    return null;
+  }
 
   return (
-    <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm rounded-xl shadow-2xl p-4 z-50 w-full max-w-md border border-border">
-        <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9">
-                    <AvatarImage src={currentRequest.userPhotoURL} alt={currentRequest.userName} data-ai-hint="avatar user"/>
-                    <AvatarFallback>{currentRequest.userName?.charAt(0) || 'G'}</AvatarFallback>
-                </Avatar>
-                <div>
-                    <h4 className="font-semibold text-foreground">Join Request</h4>
-                    <p className="text-sm text-muted-foreground">{currentRequest.userName} wants to join the meeting.</p>
-                </div>
-            </div>
-            <div className="flex gap-2">
-                <Button size="sm" onClick={() => handleApprove(currentRequest)} className="px-4 h-9 bg-green-600 hover:bg-green-700 text-white rounded-lg">
-                    <Check className="mr-1.5 h-4 w-4" />
-                    Approve
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => handleDeny(currentRequest)} className="px-4 h-9 rounded-lg">
-                    <X className="mr-1.5 h-4 w-4" />
-                    Deny
-                </Button>
-            </div>
+    <div
+      key={currentRequest.id}
+      className="fixed top-20 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm rounded-xl shadow-2xl p-4 z-50 w-full max-w-md border border-border"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={currentRequest.photoURL} alt={currentRequest.displayName} data-ai-hint="avatar user"/>
+            <AvatarFallback>
+              {currentRequest.displayName?.charAt(0) || "G"}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h4 className="font-semibold text-foreground">Join Request</h4>
+            <p className="text-sm text-muted-foreground">
+              {currentRequest.displayName} wants to join the meeting.
+            </p>
+          </div>
         </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={() => handleApprove(currentRequest)}
+            className="px-4 h-9 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+          >
+            <Check className="mr-1.5 h-4 w-4" />
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => handleDeny(currentRequest)}
+            className="px-4 h-9 rounded-lg"
+          >
+            <X className="mr-1.5 h-4 w-4" />
+            Deny
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
