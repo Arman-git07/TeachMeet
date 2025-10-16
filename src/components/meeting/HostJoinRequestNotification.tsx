@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -23,11 +22,12 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   useEffect(() => {
     if (!meetingId) return;
 
-    const unsub = onSnapshot(collection(db, `meetings/${meetingId}/joinRequests`), (snap) => {
-      const pending = snap.docs
+    const requestsRef = collection(db, "meetings", meetingId, "joinRequests");
+    const unsub = onSnapshot(requestsRef, (snapshot) => {
+      const pending = snapshot.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((r: any) => r.status === "pending");
-        
+      
       setRequests(pending);
 
       pending.forEach(req => {
@@ -38,6 +38,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         }
       });
     });
+
     return () => unsub();
   }, [meetingId, playedSounds]);
 
@@ -52,6 +53,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
             photoURL: req.photoURL || '',
             isHost: false, // Explicitly not host
             joinedAt: serverTimestamp(),
+            userId: req.userId,
         });
         await updateDoc(reqRef, { status: "approved" });
       } else {
@@ -88,7 +90,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
       <div className="flex gap-2 sm:gap-3 items-center">
         <Button
-          onClick={() => handleResponse(currentRequest, "approve", currentRequest.userId)}
+          onClick={() => handleResponse(currentRequest, "approve")}
           className="flex items-center gap-1 bg-green-600 hover:bg-green-700 
                      text-white px-3 py-1.5 sm:px-4 sm:py-1.5 h-auto rounded-lg font-medium transition-all"
         >
@@ -96,7 +98,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         </Button>
 
         <Button
-          onClick={() => handleResponse(currentRequest, "deny", currentRequest.userId)}
+          onClick={() => handleResponse(currentRequest, "deny")}
           className="flex items-center gap-1 bg-red-600 hover:bg-red-700 
                      text-white px-3 py-1.5 sm:px-4 sm:py-1.5 h-auto rounded-lg font-medium transition-all"
         >
@@ -106,3 +108,4 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     </div>
   );
 }
+    

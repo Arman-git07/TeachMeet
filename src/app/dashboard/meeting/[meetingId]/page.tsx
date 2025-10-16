@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -6,7 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth";
 import MeetingClient from "./MeetingClient";
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -131,3 +130,5 @@ export default function MeetingPage() {
     </div>
   );
 }
+
+    
