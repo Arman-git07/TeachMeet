@@ -6,13 +6,13 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth";
 import MeetingClient from "./MeetingClient";
-import { doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings } from 'lucide-react';
-import HostJoinRequestsListener from "@/components/meeting/HostJoinRequestsListener";
+import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 
 
 // --------------------------- Meeting Page ---------------------------
@@ -101,19 +101,24 @@ export default function MeetingPage() {
 
   const handleLeave = async () => {
     if (user && meetingId) {
+        // Participant or host leaving, remove them from participants list
         const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
         await deleteDoc(participantRef).catch(console.error);
-        if (isHost) {
-            // Optionally, also delete the main meeting document if the host leaves
-            // await deleteDoc(doc(db, "meetings", meetingId));
-        }
+
+        // if (isHost) {
+            // Optional: If you want to end the meeting for everyone when the host leaves,
+            // you could update a `status` field on the meeting doc to 'ended'.
+            // For now, we'll just have the host leave.
+            // await updateDoc(doc(db, "meetings", meetingId), { status: 'ended' });
+        // }
     }
     router.push("/");
   };
 
+
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
-      {isHost && <HostJoinRequestsListener meetingId={meetingId} />}
+      {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       {meetingId && user?.uid && (
         <MeetingClient
           meetingId={meetingId}
