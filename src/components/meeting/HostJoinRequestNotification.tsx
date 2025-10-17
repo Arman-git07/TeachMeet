@@ -22,45 +22,46 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
   useEffect(() => {
     if (!meetingId) return;
-    const unsub = onSnapshot(collection(db, "meetings", meetingId, "joinRequests"), (snap) => {
-      const list: JoinRequest[] = [];
-      let newRequestDetected = false;
-      snap.forEach((doc) => {
-        const data = doc.data();
-        if (data.status === "pending") {
-          list.push({ id: doc.id, ...data } as JoinRequest);
-          if (!requests.some(r => r.id === doc.id)) {
-            newRequestDetected = true;
-          }
-        }
-      });
-      setRequests(list);
+    const q = collection(db, "meetings", meetingId, "joinRequests");
+    const unsub = onSnapshot(q, (snap) => {
+      const pendingRequests = snap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as JoinRequest))
+        .filter((req) => req.status === "pending");
 
-      if (newRequestDetected) {
-        const audio = new Audio("/sounds/join-request.mp3");
-        audio.play().catch(() => {});
+      if (pendingRequests.length > requests.length) {
+         const audio = new Audio("/sounds/join-request.mp3");
+         audio.play().catch(() => {});
       }
+      setRequests(pendingRequests);
     });
+
     return () => unsub();
-  }, [meetingId, requests]);
+  }, [meetingId]); // Corrected Dependency Array
 
   const handleDecision = async (req: JoinRequest, decision: "approved" | "denied") => {
     const ref = doc(db, "meetings", meetingId, "joinRequests", req.id);
+    
     if (decision === "approved") {
         await setDoc(doc(db, "meetings", meetingId, "participants", req.userId), {
             name: req.displayName,
-            userId: req.userId,
+            photoURL: req.photoURL || '',
             isHost: false,
             joinedAt: serverTimestamp(),
         });
     }
+
     await updateDoc(ref, { status: decision });
+    
     toast({
         title: `Request ${decision}`,
         description: `${req.displayName} has been ${decision}.`
     });
-    // Auto remove after a few seconds
-    setTimeout(() => deleteDoc(ref), 5000);
+
+    // Remove the notification from the UI immediately after decision
+    setRequests(currentRequests => currentRequests.filter(r => r.id !== req.id));
+
+    // Optional: Clean up the doc from Firestore after a delay
+    setTimeout(() => deleteDoc(ref).catch(console.error), 5000);
   };
 
   return (
