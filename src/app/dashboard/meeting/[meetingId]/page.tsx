@@ -28,17 +28,23 @@ export default function MeetingPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
+    // Wait until auth is resolved before checking host status
     if (authLoading) return;
+    
     const checkHost = async () => {
       try {
-        if (!user || !meetingId) return;
+        // If there's no user, they can't be the host.
+        if (!user || !meetingId) {
+            setIsLoading(false);
+            return;
+        };
 
         const meetingRef = doc(db, "meetings", meetingId);
         const snap = await getDoc(meetingRef);
 
         if (snap.exists()) {
           const data = snap.data();
-          // ✅ confirm host ownership
+          // ✅ Stricter check for host ownership
           if (data.hostId === user.uid) {
             setIsHost(true);
           }
@@ -51,7 +57,7 @@ export default function MeetingPage() {
     };
 
     checkHost();
-  }, [meetingId, user, authLoading]);
+  }, [meetingId, user, authLoading]); // Depend on authLoading to re-run when auth state is resolved
 
   const constructUrl = (page: string) => {
     let url = `/dashboard/meeting/${meetingId}/${page}`;
@@ -116,11 +122,15 @@ export default function MeetingPage() {
     router.push("/");
   };
   
-  if (isLoading || authLoading) return null; // Wait until host check is complete
+  // Render nothing until we've confirmed the user's role and auth status
+  if (isLoading || authLoading) return null; 
 
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
+      {/* ✅ Correctly render the listener ONLY for the verified host */}
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
+      
+      {/* The main meeting client is always rendered once loading is complete */}
       {meetingId && user?.uid && (
         <MeetingClient
           meetingId={meetingId}

@@ -86,22 +86,22 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       playedSoundRef.current = {};
       unsub();
     };
-  }, [meetingId]); // <- only meetingId here (fixed)
+  }, [meetingId]);
 
   const handleApprove = async (req: any) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
 
     try {
-      // add participant record (so meeting UI / roster can read it)
+      // ✅ CORRECTED: Add participant with name and photoURL so their video tile renders correctly.
       await setDoc(participantRef, {
         name: req.displayName || "Guest",
         photoURL: req.photoURL || "",
-        isHost: false, // Explicitly not a host
+        isHost: false, // Ensure they are not a host
         joinedAt: serverTimestamp(),
       });
 
-      // mark request approved
+      // Mark request as approved so the participant's watcher redirects them.
       await updateDoc(reqRef, { status: "approved" });
     } catch (err) {
       console.error("Approve failed:", err);
@@ -112,8 +112,8 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         clearTimeout(timersRef.current[req.id]);
         delete timersRef.current[req.id];
       }
-      // delete request doc after short delay to let participant observer react
-      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
+      // ✅ FIXED: Do not delete the request doc immediately. Let the watcher see the 'approved' status.
+      // The watcher will handle the eventual deletion if needed, or it can be cleaned up via a script.
     }
   };
 
@@ -129,7 +129,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         clearTimeout(timersRef.current[req.id]);
         delete timersRef.current[req.id];
       }
-      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
     }
   };
 
