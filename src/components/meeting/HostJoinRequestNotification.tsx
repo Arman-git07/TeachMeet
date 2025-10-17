@@ -13,7 +13,7 @@ import { Check, X } from "lucide-react";
  * - Does NOT delete request immediately — allows participant watcher to see "approved"
  * - Deletes request after a short delay (3s) once approved/declined
  */
-export default function HostJoinRequestNotification({ meetingId }: { meetingId: string }) {
+export default function HostJoinRequestNotification({ meetingId }: { meetingId:string }) {
   const [requests, setRequests] = useState<any[]>([]);
   const playedSoundRef = useRef<Record<string, boolean>>({});
   const cleanupTimers = useRef<Record<string, number>>({});
@@ -29,12 +29,18 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
       setRequests(pending);
 
-      // play sound once per request id
+      // play sound once per request id, with robust error handling
       pending.forEach((r: any) => {
         if (!playedSoundRef.current[r.id]) {
-          const audio = new Audio("/sounds/join-request.mp3");
-          audio.volume = 0.45;
-          audio.play().catch(() => {});
+          try {
+            const audio = new Audio("/sounds/join-request.mp3");
+            audio.volume = 0.45;
+            audio.play().catch((e) => {
+                console.warn("Audio play failed. This can happen if the user hasn't interacted with the page yet.", e);
+            });
+          } catch(e) {
+            console.error("Failed to create or play audio:", e);
+          }
           playedSoundRef.current[r.id] = true;
         }
       });
