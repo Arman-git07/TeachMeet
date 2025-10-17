@@ -1,14 +1,19 @@
+
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
+/**
+ * Drop-in: call handleAskToJoin() when the "Ask to Join" button is clicked.
+ * Writes a document at: /meetings/{meetingId}/joinRequests/{user.uid}
+ */
 export default function AskToJoinButton({ meetingId, disabled }: { meetingId: string; disabled: boolean }) {
   const [requestStatus, setRequestStatus] = useState<"idle" | "sending" | "sent">("idle");
   const { toast } = useToast();
@@ -22,24 +27,34 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
     }
 
     setRequestStatus("sending");
-    const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
     try {
-      await setDoc(requestRef, {
+      // Ensure meeting exists (prevents accidental creation by participants)
+      const meetingRef = doc(db, "meetings", meetingId);
+      const meetingSnap = await getDoc(meetingRef);
+      if (!meetingSnap.exists()) {
+        toast({ variant: "destructive", title: "Meeting Not Found", description: "Please check the meeting code/link."});
+        setRequestStatus("idle");
+        return;
+      }
+
+      // Write join request with the fields host listener expects
+      const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+      await setDoc(reqRef, {
         userId: user.uid,
-        displayName: user.displayName || "Guest User",
+        displayName: user.displayName || "Guest",
         photoURL: user.photoURL || "",
         status: "pending",
         createdAt: serverTimestamp(),
       });
-
+      
       setRequestStatus("sent");
       toast({ title: "Request Sent!", description: "The host has been notified. Please wait for approval." });
 
-    } catch (error: any) {
-      console.error("Failed to send join request:", error);
-      setRequestStatus("idle"); // Reset button on error
-      toast({ variant: "destructive", title: "Request Failed", description: "Could not send join request. Please check console for details." });
+    } catch (err) {
+      console.error("Ask to join failed:", err);
+      toast({ variant: "destructive", title: "Request Failed", description: "Failed to send join request. Please try again." });
+      setRequestStatus("idle");
     }
   };
 

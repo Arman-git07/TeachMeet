@@ -1,3 +1,4 @@
+
 // src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
@@ -28,6 +29,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const playedSoundRef = useRef<Record<string, boolean>>({});
   // track timers so we can clear them on unmount/handled
   const timersRef = useRef<Record<string, number>>({});
+  const cleanupTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!meetingId) return;
@@ -82,7 +84,9 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     return () => {
       // clear timers
       Object.values(timersRef.current).forEach((t) => clearTimeout(t));
+      Object.values(cleanupTimers.current).forEach((t) => clearTimeout(t));
       timersRef.current = {};
+      cleanupTimers.current = {};
       playedSoundRef.current = {};
       unsub();
     };
@@ -95,6 +99,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     try {
       // ✅ CORRECTED: Add participant with name and photoURL so their video tile renders correctly.
       await setDoc(participantRef, {
+        userId: req.userId,
         name: req.displayName || "Guest",
         photoURL: req.photoURL || "",
         isHost: false, // Ensure they are not a host
@@ -105,16 +110,23 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       await updateDoc(reqRef, { status: "approved" });
     } catch (err) {
       console.error("Approve failed:", err);
-    } finally {
-      // remove from host UI and cleanup timer
-      setRequests((prev) => prev.filter((r) => r.id !== req.id));
-      if (timersRef.current[req.id]) {
-        clearTimeout(timersRef.current[req.id]);
-        delete timersRef.current[req.id];
-      }
-      // ✅ FIXED: Do not delete the request doc immediately. Let the watcher see the 'approved' status.
-      // The watcher will handle the eventual deletion if needed, or it can be cleaned up via a script.
+      return;
     }
+
+    // remove from host UI immediately
+    setRequests((prev) => prev.filter((r) => r.id !== req.id));
+    if (timersRef.current[req.id]) {
+      clearTimeout(timersRef.current[req.id]);
+      delete timersRef.current[req.id];
+    }
+    
+    // keep the request doc for a short period so participant watcher can detect status,
+    // then delete it to keep collection clean
+    const timer = window.setTimeout(() => {
+      deleteDoc(reqRef).catch(() => {});
+      delete cleanupTimers.current[req.id];
+    }, 3000); // 3s gives participant time to react
+    cleanupTimers.current[req.id] = timer;
   };
 
   const handleDeny = async (req: any) => {
@@ -129,6 +141,11 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         clearTimeout(timersRef.current[req.id]);
         delete timersRef.current[req.id];
       }
+      const timer = window.setTimeout(() => {
+        deleteDoc(reqRef).catch(() => {});
+        delete cleanupTimers.current[req.id];
+      }, 3000);
+      cleanupTimers.current[req.id] = timer;
     }
   };
 

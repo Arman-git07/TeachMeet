@@ -1,136 +1,58 @@
-/**
- * @fileoverview Firestore Security Rules for the video meeting application.
- *
- * Core Philosophy:
- * This ruleset enforces a user-ownership model for meetings and restricts
- * access to meeting details, join requests, and participant lists to
- * authenticated users. It prioritizes ease of iteration by focusing on
- * authentication and authorization, deferring detailed schema validation.
- *
- * Data Structure:
- * - /meetings/{meetingId}: Stores meeting metadata, including the host.
- * - /meetings/{meetingId}/joinRequests/{userId}: Stores requests from users to join a meeting.
- * - /meetings/{meetingId}/participants/{userId}: Stores the profile data of meeting participants.
- *
- * Key Security Decisions:
- * - Only authenticated users can create, read, update, or delete meetings, join requests, and participant data.
- * - Detailed data validation (beyond authentication and authorization) is skipped to enable rapid prototyping.
- *
- * Denormalization for Authorization:
- * - The `meetings` collection documents MUST contain a `hostId` field to enable simple ownership checks.
- *
- * Structural Segregation:
- * - The application uses subcollections (`joinRequests`, `participants`) under each `meeting` document to manage related data,
- *   providing a clear separation of concerns and enabling granular access control.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Secure read and write access to meetings. Only authenticated users can create, read, update, or delete meetings.
-     * @path /meetings/{meetingId}
-     * @allow (create) Authenticated user can create a meeting.
-     * @deny (create) Unauthenticated user cannot create a meeting.
-     * @allow (get) Authenticated user can read a meeting.
-     * @deny (get) N/A
-     * @allow (list) Authenticated user can list meetings.
-     * @deny (list) N/A
-     * @allow (update) Authenticated user can update a meeting.
-     * @deny (update) Attempt to update a non-existent meeting.
-     * @allow (delete) Authenticated user can delete a meeting.
-     * @deny (delete) Attempt to delete a non-existent meeting.
-     * @principle Authenticated users only.
-     */
     match /meetings/{meetingId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.hostId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
     }
 
-    /**
-     * @description Secure read and write access to join requests within a meeting. Only authenticated users can create, read, update, or delete join requests.
-     * @path /meetings/{meetingId}/joinRequests/{reqId}
-     * @allow (create) Authenticated user can create a join request.
-     * @deny (create) Unauthenticated user cannot create a join request.
-     * @allow (get) Authenticated user can read a join request.
-     * @deny (get) N/A
-     * @allow (list) Authenticated user can list join requests.
-     * @deny (list) N/A
-     * @allow (update) Authenticated user can update a join request.
-     * @deny (update) Attempt to update a non-existent join request.
-     * @allow (delete) Authenticated user can delete a join request.
-     * @deny (delete) Attempt to delete a non-existent join request.
-     * @principle Authenticated users only.
-     */
     match /meetings/{meetingId}/joinRequests/{reqId} {
-      allow read, write, update, delete: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
-    /**
-     * @description Secure read and write access to the participants list of a meeting. Only authenticated users can create, read, update, or delete participant entries.
-     * @path /meetings/{meetingId}/participants/{userId}
-     * @allow (create) Authenticated user can create a participant entry.
-     * @deny (create) Unauthenticated user cannot create a participant entry.
-     * @allow (get) Authenticated user can read a participant entry.
-     * @deny (get) N/A
-     * @allow (list) Authenticated user can list participant entries.
-     * @deny (list) N/A
-     * @allow (update) Authenticated user can update a participant entry.
-     * @deny (update) Attempt to update a non-existent participant entry.
-     * @allow (delete) Authenticated user can delete a participant entry.
-     * @deny (delete) Attempt to delete a non-existent participant entry.
-     * @principle Authenticated users only.
-     */
     match /meetings/{meetingId}/participants/{userId} {
-      allow read, write, update, delete: if isSignedIn();
-    }
-    
-    /**
-     * @description Secure read and write access to join requests within a classroom. Only authenticated users can create, read, update, or delete join requests.
-     * @path /classrooms/{classroomId}/joinRequests/{userId}
-     * @allow (create) Authenticated user can create a join request.
-     * @deny (create) Unauthenticated user cannot create a join request.
-     * @allow (get) Authenticated user can read a join request.
-     * @deny (get) N/A
-     * @allow (list) Authenticated user can list join requests.
-     * @deny (list) N/A
-     * @allow (update) Authenticated user can update a join request.
-     * @deny (update) Attempt to update a non-existent join request.
-     * @allow (delete) Authenticated user can delete a join request.
-     * @deny (delete) Attempt to delete a non-existent join request.
-     * @principle Authenticated users only.
-     */
-     match /classrooms/{classroomId}/joinRequests/{userId} {
-      allow read, write, update, delete: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
-    /**
-     * @description Secure read and write access to the participants list of a classroom. Only authenticated users can create, read, update, or delete participant entries.
-     * @path /classrooms/{classroomId}/participants/{userId}
-     * @allow (create) Authenticated user can create a participant entry.
-     * @deny (create) Unauthenticated user cannot create a participant entry.
-     * @allow (get) Authenticated user can read a participant entry.
-     * @deny (get) N/A
-     * @allow (list) Authenticated user can list participant entries.
-     * @deny (list) N/A
-     * @allow (update) Authenticated user can update a participant entry.
-     * @deny (update) Attempt to update a non-existent participant entry.
-     * @allow (delete) Authenticated user can delete a participant entry.
-     * @deny (delete) Attempt to delete a non-existent participant entry.
-     * @principle Authenticated users only.
-     */
+    match /classrooms/{classroomId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /classrooms/{classroomId}/joinRequests/{userId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
     match /classrooms/{classroomId}/participants/{userId} {
-      allow read, write, update, delete: if isSignedIn();
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
-  }
-}
 
-/**
- * @description Checks if the user is signed in.
- * @return {boolean} True if the user is signed in, false otherwise.
- */
-function isSignedIn() {
-  return request.auth != null;
+  }
+
+  function isSignedIn() {
+    return request.auth != null;
+  }
 }

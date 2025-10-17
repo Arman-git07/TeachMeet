@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -25,17 +26,15 @@ export default function MeetingPage() {
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
   const [isHost, setIsHost] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Wait until auth is resolved before checking host status
-    if (authLoading) return;
+    if (authLoading) return; // Wait until auth state is resolved
     
     const checkHost = async () => {
       try {
-        // If there's no user, they can't be the host.
         if (!user || !meetingId) {
-            setIsLoading(false);
+            setLoading(false);
             return;
         };
 
@@ -52,7 +51,7 @@ export default function MeetingPage() {
       } catch (err) {
         console.error("Error verifying host:", err);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
@@ -122,15 +121,13 @@ export default function MeetingPage() {
     router.push("/");
   };
   
-  // Render nothing until we've confirmed the user's role and auth status
-  if (isLoading || authLoading) return null; 
+  if (loading || authLoading) return null; 
 
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
       {/* ✅ Correctly render the listener ONLY for the verified host */}
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       
-      {/* The main meeting client is always rendered once loading is complete */}
       {meetingId && user?.uid && (
         <MeetingClient
           meetingId={meetingId}

@@ -1,3 +1,4 @@
+
 // src/components/meeting/JoinMeetingWatcher.tsx
 "use client";
 
@@ -19,6 +20,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
 
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
     const unsub = onSnapshot(reqRef, (snap) => {
+      // if the document is deleted after processing, we don't want to do anything
       if (!snap.exists()) return;
       const data = snap.data();
       if (!data) return;
@@ -35,7 +37,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
           description: "The host has declined your request to join.",
         });
         // Optionally, redirect to dashboard or home after a delay
-        setTimeout(() => router.push('/dashboard'), 3000);
+        setTimeout(() => router.push('/dashboard/classrooms'), 3000);
       } else if (data.status === "expired") {
         toast({
           variant: "destructive",
