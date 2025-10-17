@@ -1,103 +1,69 @@
 
-// src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import {
-  collection,
-  onSnapshot,
-  doc,
-  updateDoc,
-  deleteDoc,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
 import { Check, X } from "lucide-react";
 
 /**
- * Host notification component — listen to meetings/{meetingId}/joinRequests
- * Shows a top banner for each pending request, plays a single sound once per request,
- * auto-dismisses after 2 minutes, and lets host Approve / Deny.
- *
- * Drop-in: <HostJoinRequestNotification meetingId={meetingId} />
- * (render only for the host)
+ * Host notification: listens at /meetings/{meetingId}/joinRequests
+ * - Plays sound once per request id (won't tear down the listener)
+ * - Approve writes participant doc with displayName/photoURL and sets request.status = "approved"
+ * - Does NOT delete request immediately — allows participant watcher to see "approved"
+ * - Deletes request after a short delay (3s) once approved/declined
  */
 export default function HostJoinRequestNotification({ meetingId }: { meetingId: string }) {
   const [requests, setRequests] = useState<any[]>([]);
-  // track which request ids we've played sound for
   const playedSoundRef = useRef<Record<string, boolean>>({});
-  // track timers so we can clear them on unmount/handled
-  const timersRef = useRef<Record<string, number>>({});
   const cleanupTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!meetingId) return;
 
-    const requestsRef = collection(db, "meetings", meetingId, "joinRequests");
-
-    const unsub = onSnapshot(requestsRef, (snapshot) => {
-      const pending = snapshot.docs
+    const reqCol = collection(db, "meetings", meetingId, "joinRequests");
+    const unsub = onSnapshot(reqCol, (snap) => {
+      const pending = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((r: any) => r.status === "pending");
 
       setRequests(pending);
 
-      // play sound once per-request id
-      pending.forEach((req: any) => {
-        if (!playedSoundRef.current[req.id]) {
+      // play sound once per request id
+      pending.forEach((r: any) => {
+        if (!playedSoundRef.current[r.id]) {
           const audio = new Audio("/sounds/join-request.mp3");
           audio.volume = 0.45;
           audio.play().catch(() => {});
-          playedSoundRef.current[req.id] = true;
-        }
-
-        // ensure a 2-minute auto-dismiss timer exists for this request
-        if (!timersRef.current[req.id]) {
-          const timeoutId = window.setTimeout(async () => {
-            try {
-              const reqRef = doc(db, `meetings/${meetingId}/joinRequests/${req.id}`);
-              // mark expired so participants can be notified
-              await updateDoc(reqRef, { status: "expired" });
-              // remove it from UI
-              setRequests((prev) => prev.filter((x) => x.id !== req.id));
-            } catch (e) {
-              // ignore
-            } finally {
-              delete timersRef.current[req.id];
-            }
-          }, 2 * 60 * 1000); // 2 minutes
-          timersRef.current[req.id] = timeoutId;
+          playedSoundRef.current[r.id] = true;
         }
       });
 
-      // cleanup timers for requests that disappeared
-      const pendingIds = new Set(pending.map((r: any) => r.id));
-      Object.keys(timersRef.current).forEach((id) => {
+      // cleanup for requests that disappeared or changed
+      const pendingIds = new Set(pending.map((p) => p.id));
+      Object.keys(cleanupTimers.current).forEach((id) => {
         if (!pendingIds.has(id)) {
-          clearTimeout(timersRef.current[id]);
-          delete timersRef.current[id];
+          clearTimeout(cleanupTimers.current[id]);
+          delete cleanupTimers.current[id];
         }
       });
     });
 
     return () => {
-      // clear timers
-      Object.values(timersRef.current).forEach((t) => clearTimeout(t));
+      unsub();
+      // clear any remaining timers
       Object.values(cleanupTimers.current).forEach((t) => clearTimeout(t));
-      timersRef.current = {};
       cleanupTimers.current = {};
       playedSoundRef.current = {};
-      unsub();
     };
-  }, [meetingId]);
+  }, [meetingId]); // <- only meetingId
 
   const handleApprove = async (req: any) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
 
     try {
-      // ✅ CORRECTED: Add participant with name and photoURL so their video tile renders correctly.
+      // write participant with required UI fields so MeetingClient can render tile
       await setDoc(participantRef, {
         userId: req.userId,
         name: req.displayName || "Guest",
@@ -106,20 +72,16 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         joinedAt: serverTimestamp(),
       });
 
-      // Mark request as approved so the participant's watcher redirects them.
+      // update join request so participant watcher sees approved
       await updateDoc(reqRef, { status: "approved" });
     } catch (err) {
       console.error("Approve failed:", err);
       return;
     }
 
-    // remove from host UI immediately
-    setRequests((prev) => prev.filter((r) => r.id !== req.id));
-    if (timersRef.current[req.id]) {
-      clearTimeout(timersRef.current[req.id]);
-      delete timersRef.current[req.id];
-    }
-    
+    // remove notification from host UI immediately
+    setRequests((prev) => prev.filter((p) => p.id !== req.id));
+
     // keep the request doc for a short period so participant watcher can detect status,
     // then delete it to keep collection clean
     const timer = window.setTimeout(() => {
@@ -129,18 +91,14 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     cleanupTimers.current[req.id] = timer;
   };
 
-  const handleDeny = async (req: any) => {
+  const handleDecline = async (req: any) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
       await updateDoc(reqRef, { status: "declined" });
     } catch (err) {
-      console.error("Deny failed:", err);
+      console.error("Decline failed:", err);
     } finally {
-      setRequests((prev) => prev.filter((r) => r.id !== req.id));
-      if (timersRef.current[req.id]) {
-        clearTimeout(timersRef.current[req.id]);
-        delete timersRef.current[req.id];
-      }
+      setRequests((prev) => prev.filter((p) => p.id !== req.id));
       const timer = window.setTimeout(() => {
         deleteDoc(reqRef).catch(() => {});
         delete cleanupTimers.current[req.id];
@@ -157,34 +115,28 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         <div
           key={req.id}
           className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999]
-                     bg-[#1b1e23] text-white rounded-2xl shadow-2xl border border-gray-700
+                     bg-[#111827] text-white rounded-2xl shadow-2xl border border-gray-700
                      px-6 py-4 flex items-center justify-between w-[90%] max-w-xl animate-slideDown"
         >
           <div className="flex flex-col">
-            <span className="text-lg font-semibold">Join Request</span>
+            <span className="text-lg font-semibold">Join request</span>
             <span className="text-sm text-gray-300">
               {req.displayName || "A participant"} wants to join the meeting.
-            </span>
-            <span className="text-xs text-gray-500 mt-1 italic">
-              Auto-dismisses in 2 minutes
             </span>
           </div>
 
           <div className="flex gap-3 items-center">
             <button
               onClick={() => handleApprove(req)}
-              className="flex items-center gap-1 bg-green-600 hover:bg-green-700
-                         text-white px-4 py-1.5 rounded-lg font-medium transition-all"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all"
             >
               <Check size={16} /> Approve
             </button>
-
             <button
-              onClick={() => handleDeny(req)}
-              className="flex items-center gap-1 bg-red-600 hover:bg-red-700
-                         text-white px-4 py-1.5 rounded-lg font-medium transition-all"
+              onClick={() => handleDecline(req)}
+              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all"
             >
-              <X size={16} /> Deny
+              <X size={16} /> Decline
             </button>
           </div>
         </div>

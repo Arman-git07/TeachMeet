@@ -1,23 +1,25 @@
 
-// src/components/meeting/JoinMeetingWatcher.tsx
 "use client";
 
 import { useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { getAuth } from "firebase/auth";
 
-export default function JoinMeetingWatcher({ meetingId, userId }: { meetingId: string; userId: string; }) {
+export default function JoinMeetingWatcher({ meetingId }: { meetingId: string; }) {
   const router = useRouter();
-  const { toast } = useToast();
   const searchParams = useSearchParams();
-
+  const { toast } = useToast();
+  
   useEffect(() => {
-    if (!userId || !meetingId) return;
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user || !meetingId) return;
 
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", userId);
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+
     const unsub = onSnapshot(reqRef, (snap) => {
       // if the document is deleted after processing, we don't want to do anything
       if (!snap.exists()) return;
@@ -47,7 +49,7 @@ export default function JoinMeetingWatcher({ meetingId, userId }: { meetingId: s
     });
 
     return () => unsub();
-  }, [meetingId, userId, router, toast, searchParams]);
+  }, [meetingId, router, toast, searchParams]);
 
   return null;
 }

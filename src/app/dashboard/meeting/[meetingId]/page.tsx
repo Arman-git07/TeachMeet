@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings } from 'lucide-react';
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
+import { getAuth } from "firebase/auth";
 
 
 // --------------------------- Meeting Page ---------------------------
@@ -33,6 +34,8 @@ export default function MeetingPage() {
     
     const checkHost = async () => {
       try {
+        const auth = getAuth();
+        const user = auth.currentUser;
         if (!user || !meetingId) {
             setLoading(false);
             return;
