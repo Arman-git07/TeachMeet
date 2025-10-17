@@ -1,8 +1,7 @@
-
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useSearchParams, useRouter, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth";
 import MeetingClient from "./MeetingClient";
@@ -21,7 +20,7 @@ export default function MeetingPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
@@ -29,20 +28,30 @@ export default function MeetingPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    if (!user || !meetingId) {
-        setIsLoading(false);
-        return;
-    };
+    if (authLoading) return;
     const checkHost = async () => {
-        const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
-        if (meetingDoc.exists() && meetingDoc.data().hostId === user.uid) {
-            setIsHost(true);
-        }
-        setIsLoading(false);
-    };
-    checkHost();
-  }, [user, meetingId]);
+      try {
+        if (!user || !meetingId) return;
 
+        const meetingRef = doc(db, "meetings", meetingId);
+        const snap = await getDoc(meetingRef);
+
+        if (snap.exists()) {
+          const data = snap.data();
+          // ✅ confirm host ownership
+          if (data.hostId === user.uid) {
+            setIsHost(true);
+          }
+        }
+      } catch (err) {
+        console.error("Error verifying host:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkHost();
+  }, [meetingId, user, authLoading]);
 
   const constructUrl = (page: string) => {
     let url = `/dashboard/meeting/${meetingId}/${page}`;
@@ -101,20 +110,13 @@ export default function MeetingPage() {
 
   const handleLeave = async () => {
     if (user && meetingId) {
-        // Participant or host leaving, remove them from participants list
         const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
         await deleteDoc(participantRef).catch(console.error);
-
-        // if (isHost) {
-            // Optional: If you want to end the meeting for everyone when the host leaves,
-            // you could update a `status` field on the meeting doc to 'ended'.
-            // For now, we'll just have the host leave.
-            // await updateDoc(doc(db, "meetings", meetingId), { status: 'ended' });
-        // }
     }
     router.push("/");
   };
-
+  
+  if (isLoading || authLoading) return null; // Wait until host check is complete
 
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
