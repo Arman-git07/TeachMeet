@@ -39,7 +39,7 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
             displayName: user.displayName || "Guest User",
             photoURL: user.photoURL || "",
             status: "pending",
-            requestedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
         });
 
         setRequestStatus("sent");

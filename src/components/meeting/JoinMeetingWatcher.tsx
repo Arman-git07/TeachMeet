@@ -2,52 +2,42 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/firebase";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
-export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
+export default function JoinMeetingWatcher({
+  meetingId,
+}: {
+  meetingId: string;
+}) {
   const router = useRouter();
-  const { toast } = useToast();
   const { user } = useAuth();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
-  const topic = searchParams.get('topic') || "TeachMeet Meeting";
-
 
   useEffect(() => {
-    if (!meetingId || !user) return;
+    if (!meetingId || !user?.uid) return;
 
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-    const unsub = onSnapshot(reqRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.status === "approved") {
-          toast({
-            title: "Approved!",
-            description: "Host accepted your request. Joining the meeting now...",
-          });
-          const meetingUrl = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
-          router.push(meetingUrl);
-        } else if (data.status === "declined") {
-          toast({
+    const ref = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    const unsub = onSnapshot(ref, (snap) => {
+      const data = snap.data();
+      if (data?.status === "approved") {
+        const topic = searchParams.get('topic') || 'TeachMeet Meeting';
+        router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`);
+      } else if (data?.status === "denied") {
+        toast({
             variant: "destructive",
-            title: "Request Declined",
-            description: "The host has declined your request to join.",
-          });
-        } else if (data.status === "expired") {
-            toast({
-              variant: "destructive",
-              title: "Request Expired",
-              description: "Your join request was not answered in time. Please try again if the meeting is still active.",
-            });
-        }
+            title: "Request Denied",
+            description: "The host has declined your request to join."
+        })
       }
     });
 
     return () => unsub();
-  }, [meetingId, user, router, toast, topic]);
+  }, [meetingId, user?.uid, router, toast, searchParams]);
 
   return null;
 }
