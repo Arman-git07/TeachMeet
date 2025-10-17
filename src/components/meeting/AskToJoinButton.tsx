@@ -10,12 +10,14 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-/**
- * A self-contained button that handles the logic for a participant asking to join a meeting.
- * It checks if the meeting exists before sending a request and manages its own state.
- */
-export default function AskToJoinButton({ meetingId, disabled }: { meetingId: string; disabled: boolean }) {
-  const [requestStatus, setRequestStatus] = useState<"idle" | "sending" | "sent">("idle");
+interface AskToJoinButtonProps {
+  meetingId: string;
+  disabled: boolean;
+  onSuccess: () => void; // Callback to notify parent component
+}
+
+export default function AskToJoinButton({ meetingId, disabled, onSuccess }: AskToJoinButtonProps) {
+  const [requestStatus, setRequestStatus] = useState<"idle" | "sending">("idle");
   const { toast } = useToast();
 
   const handleAskToJoin = async () => {
@@ -48,8 +50,8 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
         createdAt: serverTimestamp(),
       });
       
-      setRequestStatus("sent");
       toast({ title: "Request Sent!", description: "The host has been notified. Please wait for approval." });
+      onSuccess(); // Notify parent that the request was sent successfully
 
     } catch (err) {
       console.error("Ask to join failed:", err);
@@ -62,8 +64,6 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
     switch (requestStatus) {
       case "sending":
         return <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Request...</>;
-      case "sent":
-        return <>Request Sent, Waiting...</>;
       default:
         return "Ask to Join";
     }
@@ -72,11 +72,10 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
   return (
     <Button 
       onClick={handleAskToJoin} 
-      disabled={disabled || requestStatus !== 'idle'} 
+      disabled={disabled || requestStatus === 'sending'} 
       className={cn("w-full py-3 text-lg font-semibold rounded-xl", {
         "bg-green-900/50 text-green-100/70 cursor-not-allowed": disabled,
         "btn-gel": !disabled && requestStatus === 'idle',
-        "bg-yellow-600 hover:bg-yellow-700 cursor-wait": requestStatus === 'sent'
       })}
     >
       {renderButtonContent()}
