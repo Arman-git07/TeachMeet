@@ -86,7 +86,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       playedSoundRef.current = {};
       unsub();
     };
-  }, [meetingId]); // <- only meetingId here (fixed)
+  }, [meetingId]);
 
   const handleApprove = async (req: any) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
