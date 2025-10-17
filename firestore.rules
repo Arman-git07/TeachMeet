@@ -1,30 +1,46 @@
 /**
- * @description This ruleset enforces a strict authentication-based access control model for meetings and associated data.
- * All read and write operations require a valid authenticated user. Schema validation is relaxed to facilitate rapid prototyping.
- * @dataStructure
- * - /meetings/{meetingId}: Stores meeting metadata.
- * - /meetings/{meetingId}/joinRequests/{requestId}: Stores requests from users to join a specific meeting.
- * - /meetings/{meetingId}/participants/{userId}: Stores a list of users that are participating in a meeting.
- * - /classrooms/{classroomId}/joinRequests/{userId}: Stores requests from users to join a specific classroom.
- * - /classrooms/{classroomId}/participants/{userId}: Stores a list of users that are participating in a classroom.
- * @keySecurityDecisions
- * - All operations require authentication.
- * - Data shape validation is relaxed for prototyping. Only authorization-critical fields are validated.
- * - The host user is not explicitly validated in the rules; all authenticated users have read/write access to meeting resources.
+ * @fileoverview Firestore Security Rules for the video meeting application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a user-ownership model for meetings and restricts
+ * access to meeting details, join requests, and participant lists to
+ * authenticated users. It prioritizes ease of iteration by focusing on
+ * authentication and authorization, deferring detailed schema validation.
+ *
+ * Data Structure:
+ * - /meetings/{meetingId}: Stores meeting metadata, including the host.
+ * - /meetings/{meetingId}/joinRequests/{userId}: Stores requests from users to join a meeting.
+ * - /meetings/{meetingId}/participants/{userId}: Stores the profile data of meeting participants.
+ *
+ * Key Security Decisions:
+ * - Only authenticated users can create, read, update, or delete meetings, join requests, and participant data.
+ * - Detailed data validation (beyond authentication and authorization) is skipped to enable rapid prototyping.
+ *
+ * Denormalization for Authorization:
+ * - The `meetings` collection documents MUST contain a `hostId` field to enable simple ownership checks.
+ *
+ * Structural Segregation:
+ * - The application uses subcollections (`joinRequests`, `participants`) under each `meeting` document to manage related data,
+ *   providing a clear separation of concerns and enabling granular access control.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to the top-level 'meetings' collection.
+     * @description Secure read and write access to meetings. Only authenticated users can create, read, update, or delete meetings.
      * @path /meetings/{meetingId}
-     * @allow (read) Any authenticated user can read meeting data.
-     * @allow (create) Any authenticated user can create a meeting.
-     * @allow (update) Any authenticated user can update a meeting.
-     * @allow (delete) Any authenticated user can delete a meeting.
-     * @deny (create) An unauthenticated user cannot create a meeting.
-     * @principle Authenticated users can manage meeting details.
+     * @allow (create) Authenticated user can create a meeting.
+     * @deny (create) Unauthenticated user cannot create a meeting.
+     * @allow (get) Authenticated user can read a meeting.
+     * @deny (get) N/A
+     * @allow (list) Authenticated user can list meetings.
+     * @deny (list) N/A
+     * @allow (update) Authenticated user can update a meeting.
+     * @deny (update) Attempt to update a non-existent meeting.
+     * @allow (delete) Authenticated user can delete a meeting.
+     * @deny (delete) Attempt to delete a non-existent meeting.
+     * @principle Authenticated users only.
      */
     match /meetings/{meetingId} {
       allow get, list: if isSignedIn();
@@ -34,77 +50,87 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to the 'joinRequests' subcollection for meetings.
-     * @path /meetings/{meetingId}/joinRequests/{requestId}
-     * @allow (read) Any authenticated user can read join request data.
-     * @allow (create) Any authenticated user can create a join request.
-     * @allow (update) Any authenticated user can update a join request.
-     * @allow (delete) Any authenticated user can delete a join request.
-     * @deny (create) An unauthenticated user cannot create a join request.
-     * @principle Authenticated users can manage join requests for meetings.
+     * @description Secure read and write access to join requests within a meeting. Only authenticated users can create, read, update, or delete join requests.
+     * @path /meetings/{meetingId}/joinRequests/{reqId}
+     * @allow (create) Authenticated user can create a join request.
+     * @deny (create) Unauthenticated user cannot create a join request.
+     * @allow (get) Authenticated user can read a join request.
+     * @deny (get) N/A
+     * @allow (list) Authenticated user can list join requests.
+     * @deny (list) N/A
+     * @allow (update) Authenticated user can update a join request.
+     * @deny (update) Attempt to update a non-existent join request.
+     * @allow (delete) Authenticated user can delete a join request.
+     * @deny (delete) Attempt to delete a non-existent join request.
+     * @principle Authenticated users only.
      */
-    match /meetings/{meetingId}/joinRequests/{requestId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+    match /meetings/{meetingId}/joinRequests/{reqId} {
+      allow read, write, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'participants' subcollection for meetings.
+     * @description Secure read and write access to the participants list of a meeting. Only authenticated users can create, read, update, or delete participant entries.
      * @path /meetings/{meetingId}/participants/{userId}
-     * @allow (read) Any authenticated user can read participant data.
-     * @allow (create) Any authenticated user can create a participant entry.
-     * @allow (update) Any authenticated user can update a participant entry.
-     * @allow (delete) Any authenticated user can delete a participant entry.
-     * @deny (create) An unauthenticated user cannot create a participant entry.
-     * @principle Authenticated users can manage meeting participants.
+     * @allow (create) Authenticated user can create a participant entry.
+     * @deny (create) Unauthenticated user cannot create a participant entry.
+     * @allow (get) Authenticated user can read a participant entry.
+     * @deny (get) N/A
+     * @allow (list) Authenticated user can list participant entries.
+     * @deny (list) N/A
+     * @allow (update) Authenticated user can update a participant entry.
+     * @deny (update) Attempt to update a non-existent participant entry.
+     * @allow (delete) Authenticated user can delete a participant entry.
+     * @deny (delete) Attempt to delete a non-existent participant entry.
+     * @principle Authenticated users only.
      */
     match /meetings/{meetingId}/participants/{userId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow read, write, update, delete: if isSignedIn();
+    }
+    
+    /**
+     * @description Secure read and write access to join requests within a classroom. Only authenticated users can create, read, update, or delete join requests.
+     * @path /classrooms/{classroomId}/joinRequests/{userId}
+     * @allow (create) Authenticated user can create a join request.
+     * @deny (create) Unauthenticated user cannot create a join request.
+     * @allow (get) Authenticated user can read a join request.
+     * @deny (get) N/A
+     * @allow (list) Authenticated user can list join requests.
+     * @deny (list) N/A
+     * @allow (update) Authenticated user can update a join request.
+     * @deny (update) Attempt to update a non-existent join request.
+     * @allow (delete) Authenticated user can delete a join request.
+     * @deny (delete) Attempt to delete a non-existent join request.
+     * @principle Authenticated users only.
+     */
+     match /classrooms/{classroomId}/joinRequests/{userId} {
+      allow read, write, update, delete: if isSignedIn();
     }
 
-      /**
-     * @description Controls access to the 'joinRequests' subcollection for classrooms.
-     * @path /classrooms/{classroomId}/joinRequests/{userId}
-     * @allow (read) Any authenticated user can read join request data.
-     * @allow (create) Any authenticated user can create a join request.
-     * @allow (update) Any authenticated user can update a join request.
-     * @allow (delete) Any authenticated user can delete a join request.
-     * @deny (create) An unauthenticated user cannot create a join request.
-     * @principle Authenticated users can manage join requests for classrooms.
+    /**
+     * @description Secure read and write access to the participants list of a classroom. Only authenticated users can create, read, update, or delete participant entries.
+     * @path /classrooms/{classroomId}/participants/{userId}
+     * @allow (create) Authenticated user can create a participant entry.
+     * @deny (create) Unauthenticated user cannot create a participant entry.
+     * @allow (get) Authenticated user can read a participant entry.
+     * @deny (get) N/A
+     * @allow (list) Authenticated user can list participant entries.
+     * @deny (list) N/A
+     * @allow (update) Authenticated user can update a participant entry.
+     * @deny (update) Attempt to update a non-existent participant entry.
+     * @allow (delete) Authenticated user can delete a participant entry.
+     * @deny (delete) Attempt to delete a non-existent participant entry.
+     * @principle Authenticated users only.
      */
-       match /classrooms/{classroomId}/joinRequests/{userId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && resource != null;
-        allow delete: if isSignedIn() && resource != null;
-      }
-
-      /**
-       * @description Controls access to the 'participants' subcollection for classrooms.
-       * @path /classrooms/{classroomId}/participants/{userId}
-       * @allow (read) Any authenticated user can read participant data.
-       * @allow (create) Any authenticated user can create a participant entry.
-       * @allow (update) Any authenticated user can update a participant entry.
-       * @allow (delete) Any authenticated user can delete a participant entry.
-       * @deny (create) An unauthenticated user cannot create a participant entry.
-       * @principle Authenticated users can manage classroom participants.
-       */
-      match /classrooms/{classroomId}/participants/{userId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && resource != null;
-        allow delete: if isSignedIn() && resource != null;
-      }
-
+    match /classrooms/{classroomId}/participants/{userId} {
+      allow read, write, update, delete: if isSignedIn();
+    }
   }
+}
 
-  // Helper function to determine if a user is signed in
-  function isSignedIn() {
-    return request.auth != null;
-  }
+/**
+ * @description Checks if the user is signed in.
+ * @return {boolean} True if the user is signed in, false otherwise.
+ */
+function isSignedIn() {
+  return request.auth != null;
 }

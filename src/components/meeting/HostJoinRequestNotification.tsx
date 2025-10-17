@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -108,4 +109,3 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     </div>
   );
 }
-    
