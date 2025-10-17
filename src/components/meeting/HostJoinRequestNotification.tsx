@@ -1,98 +1,177 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useEffect, useState, useRef } from "react";
 import { db } from "@/lib/firebase";
-import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import {
+  collection,
+  onSnapshot,
+  doc,
+  updateDoc,
+  deleteDoc,
+  setDoc,
+} from "firebase/firestore";
 import { Check, X } from "lucide-react";
 
-type JoinRequest = {
-  id: string;
-  userId: string;
-  displayName: string;
-  status: "pending" | "approved" | "denied";
-};
-
+/**
+ * Host notification component — listen to meetings/{meetingId}/joinRequests
+ * Shows a top banner for each pending request, plays a single sound once per request,
+ * auto-dismisses after 2 minutes, and lets host Approve / Deny.
+ *
+ * Drop-in: <HostJoinRequestNotification meetingId={meetingId} />
+ * (render only for the host)
+ */
 export default function HostJoinRequestNotification({ meetingId }: { meetingId: string }) {
-  const [requests, setRequests] = useState<JoinRequest[]>([]);
-  const { toast } = useToast();
+  const [requests, setRequests] = useState<any[]>([]);
+  // track which request ids we've played sound for
+  const playedSoundRef = useRef<Record<string, boolean>>({});
+  // track timers so we can clear them on unmount/handled
+  const timersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!meetingId) return;
-    const q = collection(db, "meetings", meetingId, "joinRequests");
-    const unsub = onSnapshot(q, (snap) => {
-      const pendingRequests = snap.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as JoinRequest))
-        .filter((req) => req.status === "pending");
 
-      if (pendingRequests.length > requests.length) {
-         const audio = new Audio("/sounds/join-request.mp3");
-         audio.play().catch(() => {});
+    const requestsRef = collection(db, "meetings", meetingId, "joinRequests");
+
+    const unsub = onSnapshot(requestsRef, (snapshot) => {
+      const pending = snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((r: any) => r.status === "pending");
+
+      setRequests(pending);
+
+      // play sound once per-request id
+      pending.forEach((req: any) => {
+        if (!playedSoundRef.current[req.id]) {
+          const audio = new Audio("/sounds/join-request.mp3");
+          audio.volume = 0.45;
+          audio.play().catch(() => {});
+          playedSoundRef.current[req.id] = true;
+        }
+
+        // ensure a 2-minute auto-dismiss timer exists for this request
+        if (!timersRef.current[req.id]) {
+          const timeoutId = window.setTimeout(async () => {
+            try {
+              const reqRef = doc(db, `meetings/${meetingId}/joinRequests/${req.id}`);
+              // mark expired so participants can be notified
+              await updateDoc(reqRef, { status: "expired" });
+              // remove it from UI
+              setRequests((prev) => prev.filter((x) => x.id !== req.id));
+            } catch (e) {
+              // ignore
+            } finally {
+              delete timersRef.current[req.id];
+            }
+          }, 2 * 60 * 1000); // 2 minutes
+          timersRef.current[req.id] = timeoutId;
+        }
+      });
+
+      // cleanup timers for requests that disappeared
+      const pendingIds = new Set(pending.map((r: any) => r.id));
+      Object.keys(timersRef.current).forEach((id) => {
+        if (!pendingIds.has(id)) {
+          clearTimeout(timersRef.current[id]);
+          delete timersRef.current[id];
+        }
+      });
+    });
+
+    return () => {
+      // clear timers
+      Object.values(timersRef.current).forEach((t) => clearTimeout(t));
+      timersRef.current = {};
+      playedSoundRef.current = {};
+      unsub();
+    };
+  }, [meetingId]); // <- only meetingId here (fixed)
+
+  const handleApprove = async (req: any) => {
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
+    const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
+
+    try {
+      // add participant record (so meeting UI / roster can read it)
+      await setDoc(participantRef, {
+        userId: req.userId,
+        displayName: req.displayName || "",
+        photoURL: req.photoURL || "",
+        joinedAt: new Date().toISOString(),
+      });
+
+      // mark request approved
+      await updateDoc(reqRef, { status: "approved" });
+    } catch (err) {
+      console.error("Approve failed:", err);
+    } finally {
+      // remove from host UI and cleanup timer
+      setRequests((prev) => prev.filter((r) => r.id !== req.id));
+      if (timersRef.current[req.id]) {
+        clearTimeout(timersRef.current[req.id]);
+        delete timersRef.current[req.id];
       }
-      setRequests(pendingRequests);
-    });
-
-    return () => unsub();
-  }, [meetingId]); // Corrected Dependency Array
-
-  const handleDecision = async (req: JoinRequest, decision: "approved" | "denied") => {
-    const ref = doc(db, "meetings", meetingId, "joinRequests", req.id);
-    
-    if (decision === "approved") {
-        await setDoc(doc(db, "meetings", meetingId, "participants", req.userId), {
-            name: req.displayName,
-            photoURL: req.photoURL || '',
-            isHost: false,
-            joinedAt: serverTimestamp(),
-        });
+      // delete request doc after short delay to let participant observer react
+      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
     }
-
-    await updateDoc(ref, { status: decision });
-    
-    toast({
-        title: `Request ${decision}`,
-        description: `${req.displayName} has been ${decision}.`
-    });
-
-    // Remove the notification from the UI immediately after decision
-    setRequests(currentRequests => currentRequests.filter(r => r.id !== req.id));
-
-    // Optional: Clean up the doc from Firestore after a delay
-    setTimeout(() => deleteDoc(ref).catch(console.error), 5000);
   };
 
+  const handleDeny = async (req: any) => {
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
+    try {
+      await updateDoc(reqRef, { status: "declined" });
+    } catch (err) {
+      console.error("Deny failed:", err);
+    } finally {
+      setRequests((prev) => prev.filter((r) => r.id !== req.id));
+      if (timersRef.current[req.id]) {
+        clearTimeout(timersRef.current[req.id]);
+        delete timersRef.current[req.id];
+      }
+      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
+    }
+  };
+
+  if (!requests.length) return null;
+
   return (
-    <AnimatePresence>
+    <>
       {requests.map((req) => (
-        <motion.div
+        <div
           key={req.id}
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -100, opacity: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[90%] max-w-md bg-card dark:bg-neutral-900 shadow-2xl rounded-2xl border border-border dark:border-neutral-700 p-4"
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999]
+                     bg-[#1b1e23] text-white rounded-2xl shadow-2xl border border-gray-700
+                     px-6 py-4 flex items-center justify-between w-[90%] max-w-xl animate-slideDown"
         >
-          <div className="flex items-center justify-between gap-4">
-              <div className="flex-grow">
-                <p className="font-semibold text-foreground">Join Request</p>
-                <p className="text-sm text-muted-foreground">
-                  {req.displayName} wants to join the meeting.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="destructive" onClick={() => handleDecision(req, "denied")}>
-                  <X className="h-4 w-4 mr-1"/> Deny
-                </Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleDecision(req, "approved")}>
-                  <Check className="h-4 w-4 mr-1"/> Approve
-                </Button>
-              </div>
+          <div className="flex flex-col">
+            <span className="text-lg font-semibold">Join Request</span>
+            <span className="text-sm text-gray-300">
+              {req.displayName || "A participant"} wants to join the meeting.
+            </span>
+            <span className="text-xs text-gray-500 mt-1 italic">
+              Auto-dismisses in 2 minutes
+            </span>
           </div>
-        </motion.div>
+
+          <div className="flex gap-3 items-center">
+            <button
+              onClick={() => handleApprove(req)}
+              className="flex items-center gap-1 bg-green-600 hover:bg-green-700
+                         text-white px-4 py-1.5 rounded-lg font-medium transition-all"
+            >
+              <Check size={16} /> Approve
+            </button>
+
+            <button
+              onClick={() => handleDeny(req)}
+              className="flex items-center gap-1 bg-red-600 hover:bg-red-700
+                         text-white px-4 py-1.5 rounded-lg font-medium transition-all"
+            >
+              <X size={16} /> Deny
+            </button>
+          </div>
+        </div>
       ))}
-    </AnimatePresence>
+    </>
   );
 }
