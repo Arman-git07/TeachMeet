@@ -35,9 +35,8 @@ import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { v4 as uuidv4 } from 'uuid';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import AskToJoinButton from '@/components/meeting/AskToJoinButton';
 import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
 
@@ -85,7 +84,7 @@ export default function PreJoinPage() {
     }
 
     const id = existingMeetingId;
-    const code = id.replace('meeting-','');
+    const code = id.includes('meeting-') ? id.split('meeting-')[1] : id;
     const topicFromParams = searchParams.get('topic');
 
     if(topicFromParams) setTopic(topicFromParams);
@@ -194,7 +193,7 @@ export default function PreJoinPage() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-        {!isHost && user && meetingId && <JoinMeetingWatcher meetingId={meetingId} userId={user.uid} />}
+        {!isHost && user && meetingId && <JoinMeetingWatcher meetingId={meetingId} />}
         <header className="flex-shrink-0 p-4 flex justify-between items-center"><div className="flex items-center gap-2"><SidebarTrigger><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger><h1 className="text-xl font-semibold text-foreground">Ready to Join?</h1></div><Button asChild variant="link" className="text-muted-foreground"><Link href="/">Cancel</Link></Button></header>
         {startError && (<div className="px-4"><Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Meeting Not Found</AlertTitle><AlertDescription>{startError}</AlertDescription></Alert></div>)}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 p-4 md:p-8">

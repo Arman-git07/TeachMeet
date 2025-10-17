@@ -13,7 +13,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings } from 'lucide-react';
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
-import { getAuth } from "firebase/auth";
 
 
 // --------------------------- Meeting Page ---------------------------
@@ -30,17 +29,17 @@ export default function MeetingPage() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    if (authLoading) return; // Wait until auth state is resolved
+    if (authLoading || !user || !meetingId) {
+      if (!authLoading && !user) {
+        // Redirect to signin if not authenticated
+        const intendedUrl = `/dashboard/meeting/${meetingId}?${searchParams.toString()}`;
+        router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
+      }
+      return;
+    }
     
     const checkHost = async () => {
       try {
-        const auth = getAuth();
-        const user = auth.currentUser;
-        if (!user || !meetingId) {
-            setLoading(false);
-            return;
-        };
-
         const meetingRef = doc(db, "meetings", meetingId);
         const snap = await getDoc(meetingRef);
 
@@ -50,6 +49,9 @@ export default function MeetingPage() {
           if (data.hostId === user.uid) {
             setIsHost(true);
           }
+        } else {
+             // If meeting doc doesn't exist, this user can't be the host.
+            setIsHost(false);
         }
       } catch (err) {
         console.error("Error verifying host:", err);
@@ -59,7 +61,7 @@ export default function MeetingPage() {
     };
 
     checkHost();
-  }, [meetingId, user, authLoading]); // Depend on authLoading to re-run when auth state is resolved
+  }, [meetingId, user, authLoading, router, searchParams]);
 
   const constructUrl = (page: string) => {
     let url = `/dashboard/meeting/${meetingId}/${page}`;
@@ -119,7 +121,11 @@ export default function MeetingPage() {
   const handleLeave = async () => {
     if (user && meetingId) {
         const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        await deleteDoc(participantRef).catch(console.error);
+        try {
+          await deleteDoc(participantRef);
+        } catch (error) {
+           console.error("Error removing participant on leave:", error);
+        }
     }
     router.push("/");
   };

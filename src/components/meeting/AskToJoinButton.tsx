@@ -12,8 +12,7 @@ import { Button } from "@/components/ui/button";
 
 /**
  * A self-contained button that handles the logic for a participant asking to join a meeting.
- * It checks if the meeting exists before sending a request.
- * It also manages its own loading/disabled state.
+ * It checks if the meeting exists before sending a request and manages its own state.
  */
 export default function AskToJoinButton({ meetingId, disabled }: { meetingId: string; disabled: boolean }) {
   const [requestStatus, setRequestStatus] = useState<"idle" | "sending" | "sent">("idle");
@@ -23,14 +22,14 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user || !meetingId) {
-      toast({ variant: "destructive", title: "Error", description: "You must be signed in to join a meeting." });
+      toast({ variant: "destructive", title: "Error", description: "You must be signed in and have a valid meeting ID." });
       return;
     }
 
     setRequestStatus("sending");
 
     try {
-      // Ensure meeting exists (prevents accidental creation by participants)
+      // CRITICAL: Verify the meeting document exists before sending a request.
       const meetingRef = doc(db, "meetings", meetingId);
       const meetingSnap = await getDoc(meetingRef);
       if (!meetingSnap.exists()) {
@@ -39,7 +38,7 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
         return;
       }
 
-      // Write join request with the fields host listener expects
+      // Write the join request document to the correct path.
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
       await setDoc(reqRef, {
         userId: user.uid,
@@ -54,7 +53,7 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
 
     } catch (err) {
       console.error("Ask to join failed:", err);
-      toast({ variant: "destructive", title: "Request Failed", description: "Failed to send join request. Please try again." });
+      toast({ variant: "destructive", title: "Request Failed", description: "Failed to send join request. Please check permissions and try again." });
       setRequestStatus("idle");
     }
   };
@@ -62,9 +61,9 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
   const renderButtonContent = () => {
     switch (requestStatus) {
       case "sending":
-        return <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>;
+        return <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Request...</>;
       case "sent":
-        return <>Waiting for Host...</>;
+        return <>Request Sent, Waiting...</>;
       default:
         return "Ask to Join";
     }
