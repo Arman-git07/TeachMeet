@@ -26,8 +26,6 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
     const requestRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
     try {
-      // This is the critical write operation.
-      // It creates a document with status: "pending" at the correct path.
       await setDoc(requestRef, {
         userId: user.uid,
         displayName: user.displayName || "Guest User",

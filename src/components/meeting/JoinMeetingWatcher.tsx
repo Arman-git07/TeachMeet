@@ -6,9 +6,11 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { getAuth } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const auth = getAuth();
@@ -21,19 +23,29 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
       const data = snap.data();
       if (!data) return;
 
+      const topicParam = new URLSearchParams(window.location.search).get('topic');
+      const meetingPath = `/dashboard/meeting/${meetingId}${topicParam ? `?topic=${encodeURIComponent(topicParam)}` : ''}`;
+
       if (data.status === "approved") {
         // navigate to the meeting page
-        router.push(`/dashboard/meeting/${meetingId}`);
+        router.push(meetingPath);
       } else if (data.status === "declined") {
-        // show a friendly message (keep UI untouched elsewhere)
-        alert("Host declined your request to join.");
+        toast({
+            variant: "destructive",
+            title: "Request Denied",
+            description: "The host has declined your request to join."
+        });
       } else if (data.status === "expired") {
-        alert("Join request expired. Please try again.");
+        toast({
+            variant: "destructive",
+            title: "Request Expired",
+            description: "Your join request expired. Please try again."
+        });
       }
     });
 
     return () => unsub();
-  }, [meetingId, router]);
+  }, [meetingId, router, toast]);
 
   return null;
 }

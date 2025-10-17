@@ -1,4 +1,4 @@
-
+// src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -10,6 +10,7 @@ import {
   updateDoc,
   deleteDoc,
   setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { Check, X } from "lucide-react";
 
@@ -94,10 +95,9 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     try {
       // add participant record (so meeting UI / roster can read it)
       await setDoc(participantRef, {
-        userId: req.userId,
-        displayName: req.displayName || "",
+        name: req.displayName || "Guest",
         photoURL: req.photoURL || "",
-        joinedAt: new Date().toISOString(),
+        joinedAt: serverTimestamp(),
       });
 
       // mark request approved
