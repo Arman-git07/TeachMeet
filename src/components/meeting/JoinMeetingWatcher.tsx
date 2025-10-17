@@ -9,16 +9,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
-export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
+export default function JoinMeetingWatcher({ meetingId, userId }: { meetingId: string; userId: string; }) {
   const router = useRouter();
-  const { user } = useAuth();
   const { toast } = useToast();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (!user || !meetingId) return;
+    if (!userId || !meetingId) return;
 
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", userId);
     const unsub = onSnapshot(reqRef, (snap) => {
       // if the document is deleted after processing, we don't want to do anything
       if (!snap.exists()) return;
@@ -48,7 +47,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
     });
 
     return () => unsub();
-  }, [meetingId, user, router, toast, searchParams]);
+  }, [meetingId, userId, router, toast, searchParams]);
 
   return null;
 }
