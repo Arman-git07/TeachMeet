@@ -56,7 +56,7 @@ export default function MeetingPage() {
   const constructUrl = (page: string) => {
     let url = `/dashboard/meeting/${meetingId}/${page}`;
     if (topic) {
-        url += `?topic=${encodeURIComponent(topic)}`;
+        url += `?topic=${encodeURIComponent(topic || '')}`;
     }
     return url;
   };

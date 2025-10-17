@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -49,7 +48,7 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
       case "sending":
         return <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>;
       case "sent":
-        return <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Waiting for Host...</>;
+        return <>Waiting for Host...</>;
       default:
         return "Ask to Join";
     }
@@ -59,7 +58,11 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
     <Button 
       onClick={handleAskToJoin} 
       disabled={disabled || requestStatus !== 'idle'} 
-      className={cn("w-full py-3 text-lg font-semibold rounded-xl", disabled ? "bg-green-900/50 text-green-100/70 cursor-not-allowed" : "btn-gel")}
+      className={cn("w-full py-3 text-lg font-semibold rounded-xl", {
+        "bg-green-900/50 text-green-100/70 cursor-not-allowed": disabled,
+        "btn-gel": !disabled,
+        "bg-yellow-600 hover:bg-yellow-700 cursor-wait": requestStatus === 'sent'
+      })}
     >
       {renderButtonContent()}
     </Button>

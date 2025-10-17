@@ -34,6 +34,8 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
           title: "Request Denied",
           description: "The host has declined your request to join.",
         });
+        // Optionally, redirect to dashboard or home after a delay
+        setTimeout(() => router.push('/dashboard'), 3000);
       } else if (data.status === "expired") {
         toast({
           variant: "destructive",

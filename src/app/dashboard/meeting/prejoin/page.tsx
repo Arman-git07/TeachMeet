@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -202,7 +201,7 @@ export default function PreJoinPage() {
                 <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
                 {(!isCameraOn || hasCameraPermission === false) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                    <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">{userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar"/>}<AvatarFallback className="text-4xl">{userName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+                    <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">{userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar" /> }<AvatarFallback className="text-4xl">{userName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
                     <div className="flex flex-col items-center">{hasCameraPermission === false ? (<><VideoOff className="w-8 h-8 text-destructive" /><p className="text-sm mt-2 font-semibold">Camera access denied</p><p className="text-xs">Enable camera & mic in browser settings.</p></>) : (<><VideoOff className="w-8 h-8" /><p className="text-sm mt-2">Camera is off</p></>)}</div>
                 </div>
                 )}
