@@ -1,18 +1,17 @@
-
+// src/components/meeting/JoinMeetingWatcher.tsx
 "use client";
 
 import { useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getAuth } from "firebase/auth";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
   const router = useRouter();
-  const { toast } = useToast();
   const { user } = useAuth();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -23,7 +22,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
       if (!snap.exists()) return;
       const data = snap.data();
       if (!data) return;
-      
+
       const topic = searchParams.get('topic');
       const meetingUrl = `/dashboard/meeting/${meetingId}${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`;
 
