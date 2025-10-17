@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -11,8 +10,9 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 /**
- * Drop-in: call handleAskToJoin() when the "Ask to Join" button is clicked.
- * Writes a document at: /meetings/{meetingId}/joinRequests/{user.uid}
+ * A self-contained button that handles the logic for a participant asking to join a meeting.
+ * It checks if the meeting exists before sending a request.
+ * It also manages its own loading/disabled state.
  */
 export default function AskToJoinButton({ meetingId, disabled }: { meetingId: string; disabled: boolean }) {
   const [requestStatus, setRequestStatus] = useState<"idle" | "sending" | "sent">("idle");
@@ -75,7 +75,7 @@ export default function AskToJoinButton({ meetingId, disabled }: { meetingId: st
       disabled={disabled || requestStatus !== 'idle'} 
       className={cn("w-full py-3 text-lg font-semibold rounded-xl", {
         "bg-green-900/50 text-green-100/70 cursor-not-allowed": disabled,
-        "btn-gel": !disabled,
+        "btn-gel": !disabled && requestStatus === 'idle',
         "bg-yellow-600 hover:bg-yellow-700 cursor-wait": requestStatus === 'sent'
       })}
     >
