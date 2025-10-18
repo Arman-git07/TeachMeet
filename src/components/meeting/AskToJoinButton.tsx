@@ -6,6 +6,8 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface AskToJoinButtonProps {
   meetingId: string;
@@ -17,10 +19,12 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleAskToJoin = async () => {
     if (!user) {
       setError("You must be signed in to join a meeting.");
+      toast({ variant: "destructive", title: "Not Signed In", description: "Please sign in to request to join."});
       return;
     }
 
@@ -40,10 +44,10 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
       const joinReqRef = doc(db, `meetings/${meetingId.trim()}/joinRequests`, user.uid);
       await setDoc(joinReqRef, {
         userId: user.uid,
-        displayName: user.displayName || "Guest",
-        photoURL: user.photoURL || "",
+        userName: user.displayName || "Guest",
+        userPhotoURL: user.photoURL || "",
         status: "pending",
-        createdAt: new Date(),
+        requestedAt: serverTimestamp(),
       });
 
       setLoading(false);
@@ -56,11 +60,11 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
   };
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex w-full flex-col items-center gap-3">
       <Button
         onClick={handleAskToJoin}
         disabled={loading || disabled}
-        className="w-full py-3 text-lg font-semibold rounded-xl btn-gel"
+        className={cn("w-full py-3 text-lg font-semibold rounded-xl", !disabled && "btn-gel")}
       >
         {loading ? "Sending Request..." : "Ask to Join"}
       </Button>

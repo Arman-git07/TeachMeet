@@ -86,25 +86,25 @@ export function JoinMeetingClient() {
         const url = new URL(meetingLinkInput.trim());
         const pathParts = url.pathname.split('/');
         
-        // Find meetingId from URL path like /join-meeting/{id} or /meeting/{id}
         const joinMeetingIndex = pathParts.indexOf('join-meeting');
         const meetingIndex = pathParts.indexOf('meeting');
         
+        // Handle paths like /join-meeting/{id} or /meeting/{id}
+        let idFromPath: string | undefined;
         if (joinMeetingIndex !== -1 && joinMeetingIndex + 1 < pathParts.length) {
-            meetingId = pathParts[joinMeetingIndex + 1];
+            idFromPath = pathParts[joinMeetingIndex + 1];
         } else if (meetingIndex !== -1 && meetingIndex + 1 < pathParts.length) {
-             const potentialId = pathParts[meetingIndex + 1];
-            // Make sure it's an ID, not a sub-route like 'chat'
+            const potentialId = pathParts[meetingIndex + 1];
             if (potentialId && !['wait', 'chat', 'participants', 'whiteboard', 'prejoin'].includes(potentialId)) {
-                meetingId = potentialId;
+                idFromPath = potentialId;
             }
         }
         
-        // Also check for meetingId in search params
-        if (url.searchParams.has('meetingId')) {
-            meetingId = url.searchParams.get('meetingId');
-        }
-
+        // Handle search param ?meetingId=xyz, which takes precedence
+        const idFromParams = url.searchParams.get('meetingId');
+        
+        meetingId = idFromParams || idFromPath || null;
+        
         if (url.searchParams.has('topic')) {
           topic = url.searchParams.get('topic');
         }
@@ -127,7 +127,6 @@ export function JoinMeetingClient() {
       }
     } else if (meetingCodeInput.trim()) {
       // Assuming the code is the meeting ID itself.
-      // In a real scenario, this might need a lookup if codes are different from IDs.
       meetingId = meetingCodeInput.trim();
       if (!meetingId) {
         toast({

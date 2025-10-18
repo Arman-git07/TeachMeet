@@ -148,7 +148,6 @@ export default function PreJoinPage() {
     try {
       const meetingRef = doc(db, 'meetings', meetingId);
   
-      // Check if the meeting document already exists to prevent overwriting
       const meetingSnap = await getDoc(meetingRef);
       if (!meetingSnap.exists()) {
         await setDoc(meetingRef, {
