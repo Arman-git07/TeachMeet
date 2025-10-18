@@ -1,4 +1,4 @@
-// src/components/meeting/AskToJoinButton.tsx
+
 "use client";
 
 import { useState } from "react";
