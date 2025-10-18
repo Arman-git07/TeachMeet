@@ -37,6 +37,7 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
 
       if (!meetingSnap.exists()) {
         setError("Meeting does not exist. Check the code or link.");
+        toast({ variant: "destructive", title: "Meeting Not Found", description: "The meeting you are trying to join does not exist."});
         setLoading(false);
         return;
       }
@@ -55,6 +56,7 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
     } catch (err) {
       console.error("Error sending join request:", err);
       setError("Failed to send join request. Please try again.");
+      toast({ variant: "destructive", title: "Request Failed", description: "Could not send join request. Check permissions and network."});
       setLoading(false);
     }
   };
