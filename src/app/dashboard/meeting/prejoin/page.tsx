@@ -2,7 +2,7 @@
 // src/app/dashboard/meeting/prejoin/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,18 +39,24 @@ import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import AskToJoinButton from '@/components/meeting/AskToJoinButton';
 import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
+import { v4 as uuidv4 } from 'uuid';
 
 
-export default function PreJoinPage() {
+function PreJoinPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [topic, setTopic] = useState('Untitled Meeting');
+  const [isHost, setIsHost] = useState(false);
+  
+  // This state holds the single, authoritative meeting ID for the page
   const [meetingId, setMeetingId] = useState('');
+
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
+  
   const [requestSent, setRequestSent] = useState(false);
 
   // UI State
@@ -62,9 +68,7 @@ export default function PreJoinPage() {
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
-  const [isHost, setIsHost] = useState(false);
-  const [isLoadingRole, setIsLoadingRole] = useState(true);
-
+  
   // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -75,27 +79,29 @@ export default function PreJoinPage() {
   useEffect(() => {
     const role = searchParams.get('role');
     const idFromParams = searchParams.get('meetingId');
+    const topicFromParams = searchParams.get('topic');
 
+    // If no ID, it's an invalid state, redirect away.
     if (!idFromParams) {
         toast({variant: "destructive", title: "Missing Meeting ID", description: "No meeting ID was provided in the URL."});
         router.push('/dashboard');
         return;
     }
-
-    setIsHost(role === 'host');
-    setIsLoadingRole(false);
     
-    const code = idFromParams.includes('meeting-') ? idFromParams.split('meeting-')[1] : idFromParams;
-    const topicFromParams = searchParams.get('topic');
+    const isHostRole = role === 'host';
+    setIsHost(isHostRole);
 
-    if(topicFromParams) setTopic(topicFromParams);
-    
-    setMeetingId(idFromParams.trim());
-    setMeetingCode(code);
+    const finalMeetingId = idFromParams.trim();
+    const finalTopic = isHostRole && topicFromParams ? topicFromParams : 'Untitled Meeting';
+    const finalCode = finalMeetingId.includes('meeting-') ? finalMeetingId.split('meeting-')[1] : finalMeetingId;
+
+    setMeetingId(finalMeetingId);
+    setTopic(finalTopic);
+    setMeetingCode(finalCode);
     
     if (typeof window !== 'undefined') {
       setMeetingLink(
-        `${window.location.origin}/dashboard/join-meeting?meetingId=${idFromParams.trim()}`
+        `${window.location.origin}/dashboard/join-meeting?meetingId=${finalMeetingId}`
       );
     }
   }, [searchParams, router, toast]);
@@ -142,12 +148,13 @@ export default function PreJoinPage() {
   }, [toast]);
 
   const handleCreateAndJoinMeeting = async () => {
-    if (!agreed || !user) return;
+    if (!agreed || !user || !isHost) return;
     setIsCreatingMeeting(true);
   
     try {
       const meetingRef = doc(db, 'meetings', meetingId);
   
+      // Check if meeting doc exists, if not, create it
       const meetingSnap = await getDoc(meetingRef);
       if (!meetingSnap.exists()) {
         await setDoc(meetingRef, {
@@ -178,7 +185,7 @@ export default function PreJoinPage() {
   const userAvatar = user?.photoURL;
   
   const renderJoinButton = () => {
-    if (isLoadingRole || authLoading) {
+    if (authLoading) {
       return <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Authenticating...</Button>
     }
 
@@ -197,7 +204,7 @@ export default function PreJoinPage() {
       );
     }
 
-    return <AskToJoinButton meetingId={meetingId} disabled={!agreed} onSent={() => setRequestSent(true)} />;
+    return <AskToJoinButton meetingId={meetingId} onSent={() => setRequestSent(true)} disabled={!agreed} />;
   };
   
   const handleMirrorToggle = (checked: boolean) => { setMirrorVideo(checked); localStorage.setItem('teachmeet-camera-mirror', String(checked)); };
@@ -206,8 +213,8 @@ export default function PreJoinPage() {
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => { navigator.clipboard.writeText(textToCopy).then(() => toast({ title: `${type} Copied!` })).catch(() => toast({ variant: 'destructive', title: 'Copy Failed' })); };
   const videoClassNames = cn('h-full w-full object-cover transition-opacity duration-300 rounded-2xl', mirrorVideo && 'transform -scale-x-100', (hasCameraPermission && isCameraOn) ? 'opacity-100' : 'opacity-0', { 'video-filter-brightclear': applyFilter && videoFilter === 'brightclear' });
 
-  if (!meetingId && !isLoadingRole) {
-    return <div className="flex items-center justify-center h-screen"><p className="text-center text-destructive">Invalid meeting link or code. Please check the URL.</p></div>;
+  if (!meetingId) {
+    return <div className="flex items-center justify-center h-screen"><Loader2 className="h-8 w-8 animate-spin"/></div>;
   }
 
   return (
@@ -254,4 +261,12 @@ export default function PreJoinPage() {
         <ShareOptionsPanel isOpen={isSharePanelOpen} onClose={() => setIsSharePanelOpen(false)} meetingLink={meetingLink} meetingCode={meetingCode} meetingTitle={topic} />
     </div>
   );
+}
+
+export default function PreJoinPage() {
+    return (
+        <Suspense fallback={<div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin"/></div>}>
+            <PreJoinPageContent />
+        </Suspense>
+    )
 }

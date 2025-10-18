@@ -28,11 +28,17 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
       return;
     }
 
+    if (!meetingId) {
+      setError("Meeting ID is missing.");
+      toast({ variant: "destructive", title: "Error", description: "No meeting ID was provided."});
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
     try {
-      const meetingRef = doc(db, "meetings", meetingId.trim());
+      const meetingRef = doc(db, "meetings", meetingId);
       const meetingSnap = await getDoc(meetingRef);
 
       if (!meetingSnap.exists()) {
@@ -42,7 +48,7 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
         return;
       }
 
-      const joinReqRef = doc(db, `meetings/${meetingId.trim()}/joinRequests`, user.uid);
+      const joinReqRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
       await setDoc(joinReqRef, {
         userId: user.uid,
         userName: user.displayName || "Guest",
