@@ -1,4 +1,4 @@
-// src/app/dashboard/meeting/[meetingId]/page.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -49,10 +49,12 @@ export default function MeetingPage() {
             setIsHost(true);
           }
         } else {
+          // If meeting doesn't exist, they can't be the host.
           setIsHost(false);
         }
       } catch (err) {
         console.error("Error verifying host:", err);
+        setIsHost(false); // Default to false on error
       } finally {
         setLoading(false);
       }
@@ -120,6 +122,8 @@ export default function MeetingPage() {
     if (user && meetingId) {
         const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
         try {
+          // If the user is the host, we might want to end the meeting for everyone
+          // For now, we just remove the participant
           await deleteDoc(participantRef);
         } catch (error) {
            console.error("Error removing participant on leave:", error);
