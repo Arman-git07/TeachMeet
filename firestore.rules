@@ -1,17 +1,17 @@
 /**
  * @description This ruleset enforces a role-based access control model for meetings and join requests.
- *   Meetings can be created by any authenticated user. Only the host of a meeting can update or delete it.
- *   Users can create join requests for meetings, and hosts can manage these requests.
- *   Participants data is only writeable by the host
+ *   Only the host of a meeting can approve or reject join requests. Participants can be added to meetings
+ *   by the host.
  * @dataStructure
- *   /meetings/{meetingId} - Contains meeting details, with 'hostId' indicating the meeting host.
- *   /meetings/{meetingId}/joinRequests/{requestId} - Contains join requests, with 'userId' indicating the requesting user.
- *   /meetings/{meetingId}/participants/{userId} - Contains participants in a specific meeting.
+ *   /meetings/{meetingId} : Meeting documents, containing meeting metadata.
+ *   /meetings/{meetingId}/joinRequests/{requestId} : Join requests for a specific meeting.
+ *   /meetings/{meetingId}/participants/{userId} : Participants in a specific meeting.
+ *   /classrooms/{classroomId}/joinRequests/{userId} : Join requests for a specific classroom.
+ *   /classrooms/{classroomId}/participants/{userId} : Participants in a specific classroom.
  * @keySecurityDecisions
- *   - Only authenticated users can create meetings or join requests.
- *   - Only the host can update or delete meetings.
- *   - Listing of meetings is allowed for all users (public read).
- *   - Participants data is only writeable by the host.
+ *   - Only the host can manage join requests (approve/reject).
+ *   - Anyone can read meeting and participant data (public read).
+ *   - Denormalization: `hostId` on the `Meeting` document is used for authorization.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -21,75 +21,92 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(resourceOwnerId) {
-      return isSignedIn() && request.auth.uid == resourceOwnerId;
+    function isOwner(hostId) {
+      return isSignedIn() && request.auth.uid == hostId;
     }
 
-    function isExistingOwner(resourceOwnerId) {
-        return isOwner(resourceOwnerId) && resource != null;
+    function isExistingOwner(hostId) {
+      return isOwner(hostId) && resource != null;
     }
 
     /**
-     * @description Controls access to meeting documents.
+     * @description Allows reading meeting details. Write access is restricted to the host.
      * @path /meetings/{meetingId}
-     * @allow (create) Signed-in user creates a new meeting with themselves as the host.
-     * @deny (update) User attempts to update a meeting where they are not the host.
-     * @principle Enforces meeting ownership for updates and deletes. Allows public read access.
+     * @allow (get, list): if true
+     * @allow (create): if request.auth.uid == request.resource.data.hostId
+     * @allow (update, delete): if isExistingOwner(resource.data.hostId)
+     * @deny (create, update, delete): if the request.auth.uid does not match the meeting's hostId.
+     * @principle Public read with owner-only writes.  The host must be the owner to modify.
      */
     match /meetings/{meetingId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isExistingOwner(resource.data.hostId);
+      allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
+      allow update: if isExistingOwner(resource.data.hostId);
+      allow delete: if isExistingOwner(resource.data.hostId);
     }
 
     /**
-     * @description Controls access to join requests for a specific meeting.
+     * @description Allows the host to manage join requests for a specific meeting.
      * @path /meetings/{meetingId}/joinRequests/{requestId}
-     * @allow (create) User creates their own join request.
-     * @allow (read, update, delete) Host of the meeting manages join requests.
-     * @deny (create) User attempts to create a join request for another user.
-     * @principle Users can only create their own join requests, and hosts manage them.
+     * @allow (get, list): if true
+     * @allow (create): if false;
+     * @allow (update): if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+     * @allow (delete): if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+     * @deny: create if true; only the server should create these
+     * @principle Host-only management of join requests.
      */
     match /meetings/{meetingId}/joinRequests/{requestId} {
-      allow create: if isSignedIn() && request.auth.uid == requestId;
-      allow get, list, update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid);
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+      allow delete: if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
     }
 
     /**
-     * @description Controls access to participants in a specific meeting.
+     * @description Allows reading participant details. Write access is open to allow adding participants.
      * @path /meetings/{meetingId}/participants/{userId}
-     * @allow (create, update, delete) Host of the meeting manages participants.
-     * @deny (create) Non-host attempts to add participants
-     * @principle Only the host can add, update, or delete participants.
+     * @allow (get, list): if true
+     * @allow (create): if true;
+     * @allow (update): if true;
+     * @allow (delete): if true;
+     * @principle Public read and write for participants.
      */
     match /meetings/{meetingId}/participants/{userId} {
       allow get, list: if true;
-      allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
-
-        /**
-     * @description Controls access to join requests for a specific classroom.
-     * @path /classrooms/{classroomId}/joinRequests/{requestId}
-     * @allow (create) User creates their own join request.
-     * @allow (read, update, delete) Host of the classroom manages join requests.
-     * @deny (create) User attempts to create a join request for another user.
-     * @principle Users can only create their own join requests, and hosts manage them.
-     */
-    match /classrooms/{classroomId}/joinRequests/{requestId} {
-      allow create: if isSignedIn() && request.auth.uid == requestId;
-      allow get, list, update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId == request.auth.uid);
-    }
-
     /**
-     * @description Controls access to participants in a specific classroom.
+     * @description Allows the host to manage join requests for a specific classroom.
+     * @path /classrooms/{classroomId}/joinRequests/{requestId}
+     * @allow (get, list): if true
+     * @allow (create): if false;
+     * @allow (update): if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
+     * @allow (delete): if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
+     * @deny: create if true; only the server should create these
+     * @principle Host-only management of join requests.
+     */
+       match /classrooms/{classroomId}/joinRequests/{requestId} {
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
+      allow delete: if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
+    }
+    /**
+     * @description Allows reading participant details. Write access is open to allow adding participants.
      * @path /classrooms/{classroomId}/participants/{userId}
-     * @allow (create, update, delete) Host of the classroom manages participants.
-     * @deny (create) Non-host attempts to add participants
-     * @principle Only the host can add, update, or delete participants.
+     * @allow (get, list): if true
+     * @allow (create): if true;
+     * @allow (update): if true;
+     * @allow (delete): if true;
+     * @principle Public read and write for participants.
      */
     match /classrooms/{classroomId}/participants/{userId} {
       allow get, list: if true;
-      allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId == request.auth.uid;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
   }
 }

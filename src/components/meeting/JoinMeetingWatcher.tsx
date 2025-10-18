@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -25,6 +26,8 @@ export default function JoinMeetingWatcher({ meetingId }: Props) {
           router.push(`/dashboard/meeting/${meetingId}`);
         } else if (data.status === "rejected") {
           alert("Your join request was rejected by the host.");
+          // Optionally, redirect or reset the UI state
+          // e.g., router.push('/dashboard');
         }
       }
     });
