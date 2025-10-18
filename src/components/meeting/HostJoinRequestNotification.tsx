@@ -1,116 +1,121 @@
-
+// src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 
 /**
- * Host notification: listens at /meetings/{meetingId}/joinRequests
- * - Plays sound once per request id (won't tear down the listener)
- * - Approve writes participant doc with displayName/photoURL and sets request.status = "approved"
- * - Does NOT delete request immediately — allows participant watcher to see "approved"
- * - Deletes request after a short delay (3s) once approved/declined
+ * Renders a top banner for pending join-requests for a meeting.
+ * Use: <HostJoinRequestNotification meetingId={meetingId} />
+ * Render only for host.
  */
-export default function HostJoinRequestNotification({ meetingId }: { meetingId:string }) {
+export default function HostJoinRequestNotification({ meetingId }: { meetingId: string }) {
   const [requests, setRequests] = useState<any[]>([]);
   const playedSoundRef = useRef<Record<string, boolean>>({});
-  const cleanupTimers = useRef<Record<string, number>>({});
+  const timersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!meetingId) return;
 
-    const reqCol = collection(db, "meetings", meetingId, "joinRequests");
-    const unsub = onSnapshot(reqCol, (snap) => {
+    const colRef = collection(db, "meetings", meetingId, "joinRequests");
+    const unsub = onSnapshot(colRef, (snap) => {
       const pending = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((r: any) => r.status === "pending");
 
       setRequests(pending);
 
-      // play sound once per request id, with robust error handling
       pending.forEach((r: any) => {
         if (!playedSoundRef.current[r.id]) {
           try {
             const audio = new Audio("/sounds/join-request.mp3");
             audio.volume = 0.45;
-            audio.play().catch((e) => {
-                console.warn("Audio play failed. This can happen if the user hasn't interacted with the page yet.", e);
-            });
-          } catch(e) {
-            console.error("Failed to create or play audio:", e);
+            audio.play().catch(() => {});
+          } catch (e) {
+            console.warn("Sound playback failed:", e);
           }
           playedSoundRef.current[r.id] = true;
         }
+
+        // auto-expire timer per request
+        if (!timersRef.current[r.id]) {
+          const t = window.setTimeout(async () => {
+            try {
+              const reqRef = doc(db, "meetings", meetingId, "joinRequests", r.id);
+              await updateDoc(reqRef, { status: "expired" });
+              setRequests((prev) => prev.filter((x) => x.id !== r.id));
+            } catch (e) {
+              // ignore
+            } finally {
+              delete timersRef.current[r.id];
+            }
+          }, 2 * 60 * 1000);
+          timersRef.current[r.id] = t;
+        }
       });
 
-      // cleanup for requests that disappeared or changed
+      // clean timers for removed requests
       const pendingIds = new Set(pending.map((p) => p.id));
-      Object.keys(cleanupTimers.current).forEach((id) => {
+      Object.keys(timersRef.current).forEach((id) => {
         if (!pendingIds.has(id)) {
-          clearTimeout(cleanupTimers.current[id]);
-          delete cleanupTimers.current[id];
+          clearTimeout(timersRef.current[id]);
+          delete timersRef.current[id];
         }
       });
     });
 
     return () => {
       unsub();
-      // clear any remaining timers
-      Object.values(cleanupTimers.current).forEach((t) => clearTimeout(t));
-      cleanupTimers.current = {};
+      Object.values(timersRef.current).forEach((t) => clearTimeout(t));
+      timersRef.current = {};
       playedSoundRef.current = {};
     };
-  }, [meetingId]); // <- only meetingId
+  }, [meetingId]); // only meetingId
 
   const handleApprove = async (req: any) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
 
     try {
-      // write participant with required UI fields so MeetingClient can render tile
+      // write participant metadata so meeting UI shows a proper tile
       await setDoc(participantRef, {
         userId: req.userId,
         name: req.displayName || "Guest",
         photoURL: req.photoURL || "",
-        isHost: false, // Ensure they are not a host
-        joinedAt: serverTimestamp(),
+        joinedAt: new Date().toISOString(),
       });
 
-      // update join request so participant watcher sees approved
       await updateDoc(reqRef, { status: "approved" });
     } catch (err) {
-      console.error("Approve failed:", err);
+      console.error("approve failed", err);
       return;
     }
 
-    // remove notification from host UI immediately
     setRequests((prev) => prev.filter((p) => p.id !== req.id));
 
-    // keep the request doc for a short period so participant watcher can detect status,
-    // then delete it to keep collection clean
+    // keep request doc for a short time so watcher can pick up approved status
     const timer = window.setTimeout(() => {
       deleteDoc(reqRef).catch(() => {});
-      delete cleanupTimers.current[req.id];
-    }, 3000); // 3s gives participant time to react
-    cleanupTimers.current[req.id] = timer;
+      delete timersRef.current[req.id];
+    }, 3000);
+    timersRef.current[req.id] = timer;
   };
 
   const handleDecline = async (req: any) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
       await updateDoc(reqRef, { status: "declined" });
-    } catch (err) {
-      console.error("Decline failed:", err);
-    } finally {
-      setRequests((prev) => prev.filter((p) => p.id !== req.id));
-      const timer = window.setTimeout(() => {
-        deleteDoc(reqRef).catch(() => {});
-        delete cleanupTimers.current[req.id];
-      }, 3000);
-      cleanupTimers.current[req.id] = timer;
+    } catch (e) {
+      console.error("decline failed", e);
     }
+    setRequests((prev) => prev.filter((p) => p.id !== req.id));
+    const t = window.setTimeout(() => {
+      deleteDoc(reqRef).catch(() => {});
+      delete timersRef.current[req.id];
+    }, 3000);
+    timersRef.current[req.id] = t;
   };
 
   if (!requests.length) return null;
@@ -125,24 +130,17 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId:s
                      px-6 py-4 flex items-center justify-between w-[90%] max-w-xl animate-slideDown"
         >
           <div className="flex flex-col">
-            <span className="text-lg font-semibold">Join request</span>
-            <span className="text-sm text-gray-300">
-              {req.displayName || "A participant"} wants to join the meeting.
-            </span>
+            <span className="text-lg font-semibold">Join Request</span>
+            <span className="text-sm text-gray-300">{req.displayName || "A participant"} wants to join</span>
+            <span className="text-xs text-gray-500 mt-1">Auto-dismisses in 2 minutes</span>
           </div>
 
           <div className="flex gap-3 items-center">
-            <button
-              onClick={() => handleApprove(req)}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all"
-            >
-              <Check size={16} /> Approve
+            <button onClick={() => handleApprove(req)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all">
+                <Check size={16}/>Approve
             </button>
-            <button
-              onClick={() => handleDecline(req)}
-              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all"
-            >
-              <X size={16} /> Decline
+            <button onClick={() => handleDecline(req)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all">
+                <X size={16}/>Decline
             </button>
           </div>
         </div>

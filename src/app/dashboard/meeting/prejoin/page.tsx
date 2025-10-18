@@ -1,5 +1,5 @@
-
-'use client';
+// src/app/dashboard/meeting/prejoin/page.tsx
+"use client";
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -16,7 +16,6 @@ import {
   Settings,
   FlipHorizontal,
   Sparkles,
-  User,
   Hash,
   PanelLeftOpen,
   Loader2,
@@ -35,7 +34,7 @@ import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import AskToJoinButton from '@/components/meeting/AskToJoinButton';
 import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
@@ -51,7 +50,7 @@ export default function PreJoinPage() {
   const [meetingId, setMeetingId] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
-  const [requestStatus, setRequestStatus] = useState<'idle' | 'pending' | 'denied'>('idle');
+  const [requestSent, setRequestSent] = useState(false);
 
   // UI State
   const [agreed, setAgreed] = useState(false);
@@ -184,11 +183,17 @@ export default function PreJoinPage() {
     }
 
     // Participant view
-    if (requestStatus === 'pending') {
-      return <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-yellow-600 cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Request Sent, Waiting...</Button>
+    if (requestSent) {
+      return (
+        <div className="text-center space-y-2">
+            <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-yellow-600 cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Request Sent, Waiting...</Button>
+            <p className="text-xs text-muted-foreground">Waiting for the host to approve your request.</p>
+            <JoinMeetingWatcher meetingId={meetingId} />
+        </div>
+      );
     }
 
-    return <AskToJoinButton meetingId={meetingId} disabled={!agreed} onSuccess={() => setRequestStatus('pending')} />;
+    return <AskToJoinButton meetingId={meetingId} disabled={!agreed} onSent={() => setRequestSent(true)} />;
   };
   
   const handleMirrorToggle = (checked: boolean) => { setMirrorVideo(checked); localStorage.setItem('teachmeet-camera-mirror', String(checked)); };
@@ -199,7 +204,6 @@ export default function PreJoinPage() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-        {requestStatus === 'pending' && user && meetingId && <JoinMeetingWatcher meetingId={meetingId} />}
         <header className="flex-shrink-0 p-4 flex justify-between items-center"><div className="flex items-center gap-2"><SidebarTrigger><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger><h1 className="text-xl font-semibold text-foreground">Ready to Join?</h1></div><Button asChild variant="link" className="text-muted-foreground"><Link href="/">Cancel</Link></Button></header>
         {startError && (<div className="px-4"><Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Meeting Not Found</AlertTitle><AlertDescription>{startError}</AlertDescription></Alert></div>)}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 p-4 md:p-8">
@@ -207,7 +211,7 @@ export default function PreJoinPage() {
                 <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
                 {(!isCameraOn || hasCameraPermission === false) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-                    <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">{userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar" /> }<AvatarFallback className="text-4xl">{userName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+                    <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-lg">{userAvatar && <AvatarImage src={userAvatar} alt={userName} data-ai-hint="user avatar"/> }<AvatarFallback className="text-4xl">{userName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
                     <div className="flex flex-col items-center">{hasCameraPermission === false ? (<><VideoOff className="w-8 h-8 text-destructive" /><p className="text-sm mt-2 font-semibold">Camera access denied</p><p className="text-xs">Enable camera & mic in browser settings.</p></>) : (<><VideoOff className="w-8 h-8" /><p className="text-sm mt-2">Camera is off</p></>)}</div>
                 </div>
                 )}

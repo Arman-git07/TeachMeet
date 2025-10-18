@@ -1,46 +1,46 @@
-
+// src/components/meeting/AskToJoinButton.tsx
 "use client";
 
 import { useState } from "react";
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
-interface AskToJoinButtonProps {
+
+export default function AskToJoinButton({
+  meetingId,
+  onSent, // optional callback to notify parent that request created
+  disabled,
+}: {
   meetingId: string;
+  onSent?: () => void;
   disabled: boolean;
-  onSuccess: () => void; // Callback to notify parent component
-}
-
-export default function AskToJoinButton({ meetingId, disabled, onSuccess }: AskToJoinButtonProps) {
-  const [requestStatus, setRequestStatus] = useState<"idle" | "sending">("idle");
-  const { toast } = useToast();
+}) {
+  const [loading, setLoading] = useState(false);
 
   const handleAskToJoin = async () => {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user || !meetingId) {
-      toast({ variant: "destructive", title: "Error", description: "You must be signed in and have a valid meeting ID." });
+      alert("Please sign in and provide a valid meeting link.");
       return;
     }
 
-    setRequestStatus("sending");
-
+    setLoading(true);
     try {
-      // CRITICAL: Verify the meeting document exists before sending a request.
+      // Ensure meeting exists
       const meetingRef = doc(db, "meetings", meetingId);
       const meetingSnap = await getDoc(meetingRef);
       if (!meetingSnap.exists()) {
-        toast({ variant: "destructive", title: "Meeting Not Found", description: "Please check the meeting code/link."});
-        setRequestStatus("idle");
+        alert("Meeting not found. Please check the code or link.");
+        setLoading(false);
         return;
       }
 
-      // Write the join request document to the correct path.
+      // Write join request exactly where host listener expects
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
       await setDoc(reqRef, {
         userId: user.uid,
@@ -48,37 +48,27 @@ export default function AskToJoinButton({ meetingId, disabled, onSuccess }: AskT
         photoURL: user.photoURL || "",
         status: "pending",
         createdAt: serverTimestamp(),
-      });
-      
-      toast({ title: "Request Sent!", description: "The host has been notified. Please wait for approval." });
-      onSuccess(); // Notify parent that the request was sent successfully
+      }, { merge: true });
 
+      if (onSent) onSent();
     } catch (err) {
-      console.error("Ask to join failed:", err);
-      toast({ variant: "destructive", title: "Request Failed", description: "Failed to send join request. Please check permissions and try again." });
-      setRequestStatus("idle");
-    }
-  };
-
-  const renderButtonContent = () => {
-    switch (requestStatus) {
-      case "sending":
-        return <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Request...</>;
-      default:
-        return "Ask to Join";
+      console.error("Ask to join failed", err);
+      alert("Failed to send join request. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Button 
-      onClick={handleAskToJoin} 
-      disabled={disabled || requestStatus === 'sending'} 
+    <Button
+      onClick={handleAskToJoin}
+      disabled={disabled || loading}
       className={cn("w-full py-3 text-lg font-semibold rounded-xl", {
         "bg-green-900/50 text-green-100/70 cursor-not-allowed": disabled,
-        "btn-gel": !disabled && requestStatus === 'idle',
+        "btn-gel": !disabled,
       })}
     >
-      {renderButtonContent()}
+      {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : "Ask to Join"}
     </Button>
   );
 }

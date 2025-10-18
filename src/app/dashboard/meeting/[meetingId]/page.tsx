@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -45,7 +44,7 @@ export default function MeetingPage() {
 
         if (snap.exists()) {
           const data = snap.data();
-          // ✅ Stricter check for host ownership
+          // ✅ confirm host ownership
           if (data.hostId === user.uid) {
             setIsHost(true);
           }
@@ -134,7 +133,7 @@ export default function MeetingPage() {
 
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
-      {/* ✅ Correctly render the listener ONLY for the verified host */}
+      {/* ✅ Host gets notification listener */}
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       
       {meetingId && user?.uid && (
