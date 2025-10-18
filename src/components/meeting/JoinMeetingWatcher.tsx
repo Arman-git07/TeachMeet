@@ -4,8 +4,8 @@
 import { useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getAuth } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getAuth } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 
 export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
@@ -38,7 +38,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
 
         toast({ title: "Request Approved!", description: "You are now joining the meeting." });
         router.push(meetingPath);
-      } else if (data.status === "denied") {
+      } else if (data.status === "declined") {
         toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
         // Optional: Redirect back or reset the UI state after a delay
         setTimeout(() => router.push('/dashboard'), 3000);

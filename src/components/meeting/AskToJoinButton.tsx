@@ -8,60 +8,72 @@ import { getAuth } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-
 
 export default function AskToJoinButton({
   meetingId,
-  onSent, // required callback to notify parent that request created
+  onSent,
   disabled,
 }: {
   meetingId: string;
-  onSent: () => void;
+  onSent?: () => void;
   disabled: boolean;
 }) {
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
 
   const handleAskToJoin = async () => {
-    const auth = getAuth();
-    const user = auth.currentUser;
-    if (!user || !meetingId) {
-      toast({ variant: "destructive", title: "Error", description: "You must be signed in and provide a valid meeting ID." });
-      return;
-    }
-
     setLoading(true);
     try {
-      // Ensure meeting exists before sending a request
-      const meetingRef = doc(db, "meetings", meetingId);
-      const meetingSnap = await getDoc(meetingRef);
-      if (!meetingSnap.exists()) {
-        toast({ variant: "destructive", title: "Meeting Not Found", description: "Please check the meeting code or link and try again."});
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Please sign in to request to join.");
+        setLoading(false);
+        return;
+      }
+      if (!meetingId) {
+        alert("Missing meeting ID.");
         setLoading(false);
         return;
       }
 
-      // Write join request to the path the host is listening on
-      const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-      await setDoc(reqRef, {
-        userId: user.uid,
-        displayName: user.displayName || "Guest",
-        photoURL: user.photoURL || "",
-        status: "pending",
-        createdAt: serverTimestamp(),
-      }, { merge: true });
+      const id = meetingId.trim();
+      if (!id) {
+        alert("Invalid meeting ID.");
+        setLoading(false);
+        return;
+      }
 
-      // Notify parent component to update UI (e.g., show "Waiting...")
-      if (onSent) onSent();
+      // confirm meeting exists
+      const meetingRef = doc(db, "meetings", id);
+      const meetingSnap = await getDoc(meetingRef);
+      if (!meetingSnap.exists()) {
+        alert("Meeting not found. Please check the code or link.");
+        setLoading(false);
+        return;
+      }
 
-    } catch (err: any) {
-      console.error("Ask to join failed", err);
-      toast({ variant: "destructive", title: "Request Failed", description: err.message || "Failed to send join request. Please try again." });
+      // write the join request at exact path host listens to
+      const reqRef = doc(db, "meetings", id, "joinRequests", user.uid);
+      await setDoc(
+        reqRef,
+        {
+          userId: user.uid,
+          displayName: user.displayName || "Guest",
+          photoURL: user.photoURL || "",
+          status: "pending",
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // notify parent (prejoin page) to mount the watcher UI
+      onSent?.();
+    } catch (err) {
+      console.error("Ask to join failed:", err);
+      alert("Failed to send join request. Check console for details.");
+    } finally {
       setLoading(false);
     }
-    // Note: setLoading(false) is not called on success, because the parent will
-    // unmount this component and show the "Waiting..." state.
   };
 
   return (
@@ -73,7 +85,7 @@ export default function AskToJoinButton({
         "btn-gel": !disabled,
       })}
     >
-      {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Request...</> : "Ask to Join"}
+      {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : "Ask to Join"}
     </Button>
   );
 }

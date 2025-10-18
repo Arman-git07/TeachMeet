@@ -95,7 +95,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
     setRequests((prev) => prev.filter((p) => p.id !== req.id));
 
-    // keep request doc for a short time so watcher can pick up approved status
+    // keep request doc for a short time so participant watcher can pick up approved status
     const timer = window.setTimeout(() => {
       deleteDoc(reqRef).catch(() => {});
       delete timersRef.current[req.id];
@@ -107,15 +107,16 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
       await updateDoc(reqRef, { status: "declined" });
-    } catch (e) {
-      console.error("decline failed", e);
+    } catch (err) {
+      console.error("decline failed", err);
+    } finally {
+      setRequests((prev) => prev.filter((p) => p.id !== req.id));
+      const t = window.setTimeout(() => {
+        deleteDoc(reqRef).catch(() => {});
+        delete timersRef.current[req.id];
+      }, 3000);
+      timersRef.current[req.id] = t;
     }
-    setRequests((prev) => prev.filter((p) => p.id !== req.id));
-    const t = window.setTimeout(() => {
-      deleteDoc(reqRef).catch(() => {});
-      delete timersRef.current[req.id];
-    }, 3000);
-    timersRef.current[req.id] = t;
   };
 
   if (!requests.length) return null;

@@ -1,3 +1,4 @@
+// src/app/dashboard/meeting/[meetingId]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -28,29 +29,27 @@ export default function MeetingPage() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    if (authLoading || !user || !meetingId) {
-      if (!authLoading && !user) {
-        // Redirect to signin if not authenticated
-        const intendedUrl = `/dashboard/meeting/${meetingId}?${searchParams.toString()}`;
-        router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
-      }
+    if (authLoading || !meetingId) return;
+
+    if (!user) {
+      const intendedUrl = `/dashboard/meeting/${meetingId}?${searchParams.toString()}`;
+      router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
       return;
     }
     
     const checkHost = async () => {
+      setLoading(true);
       try {
         const meetingRef = doc(db, "meetings", meetingId);
         const snap = await getDoc(meetingRef);
 
         if (snap.exists()) {
           const data = snap.data();
-          // ✅ confirm host ownership
           if (data.hostId === user.uid) {
             setIsHost(true);
           }
         } else {
-             // If meeting doc doesn't exist, this user can't be the host.
-            setIsHost(false);
+          setIsHost(false);
         }
       } catch (err) {
         console.error("Error verifying host:", err);
@@ -133,7 +132,6 @@ export default function MeetingPage() {
 
   return (
     <div className="w-full h-full bg-gray-900 text-white flex flex-col">
-      {/* ✅ Host gets notification listener */}
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       
       {meetingId && user?.uid && (
