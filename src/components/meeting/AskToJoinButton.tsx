@@ -59,7 +59,7 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
       <Button
         onClick={handleAskToJoin}
         disabled={loading || disabled}
-        className="bg-green-600 hover:bg-green-700 text-white"
+        className="w-full py-3 text-lg font-semibold rounded-xl btn-gel"
       >
         {loading ? "Sending Request..." : "Ask to Join"}
       </Button>
