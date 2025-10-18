@@ -1,8 +1,7 @@
-
 // src/app/dashboard/meeting/prejoin/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +34,7 @@ import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import AskToJoinButton from '@/components/meeting/AskToJoinButton';
 import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
@@ -90,12 +89,12 @@ export default function PreJoinPage() {
 
     if(topicFromParams) setTopic(topicFromParams);
     
-    setMeetingId(idFromParams);
+    setMeetingId(idFromParams.trim());
     setMeetingCode(code);
     
     if (typeof window !== 'undefined') {
       setMeetingLink(
-        `${window.location.origin}/dashboard/join-meeting?meetingId=${idFromParams}`
+        `${window.location.origin}/dashboard/join-meeting?meetingId=${idFromParams.trim()}`
       );
     }
   }, [searchParams, router, toast]);
@@ -148,13 +147,17 @@ export default function PreJoinPage() {
     try {
       const meetingRef = doc(db, 'meetings', meetingId);
   
-      await setDoc(meetingRef, {
-        topic: topic.trim(),
-        hostId: user.uid,
-        creatorName: user.displayName || 'Anonymous Host',
-        createdAt: serverTimestamp(),
-        status: 'pending',
-      }, { merge: true });
+      // Check if the meeting document already exists to prevent overwriting
+      const meetingSnap = await getDoc(meetingRef);
+      if (!meetingSnap.exists()) {
+        await setDoc(meetingRef, {
+          topic: topic.trim(),
+          hostId: user.uid,
+          creatorName: user.displayName || 'Anonymous Host',
+          createdAt: serverTimestamp(),
+          status: 'pending',
+        });
+      }
   
       const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(
         topic.trim()
@@ -202,6 +205,10 @@ export default function PreJoinPage() {
   const toggleMic = () => { if (!localStream) return; const nextState = !isMicOn; setIsMicOn(nextState); localStream.getAudioTracks().forEach((track) => track.enabled = nextState); localStorage.setItem('teachmeet-mic-default', nextState ? 'on' : 'off'); };
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => { navigator.clipboard.writeText(textToCopy).then(() => toast({ title: `${type} Copied!` })).catch(() => toast({ variant: 'destructive', title: 'Copy Failed' })); };
   const videoClassNames = cn('h-full w-full object-cover transition-opacity duration-300 rounded-2xl', mirrorVideo && 'transform -scale-x-100', (hasCameraPermission && isCameraOn) ? 'opacity-100' : 'opacity-0', { 'video-filter-brightclear': applyFilter && videoFilter === 'brightclear' });
+
+  if (!meetingId && !isLoadingRole) {
+    return <div className="flex items-center justify-center h-screen"><p className="text-center text-destructive">Invalid meeting link or code. Please check the URL.</p></div>;
+  }
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
