@@ -73,28 +73,28 @@ export default function PreJoinPage() {
   
   useEffect(() => {
     const role = searchParams.get('role');
-    setIsHost(role === 'host');
-    setIsLoadingRole(false);
-    
-    const existingMeetingId = searchParams.get('meetingId');
-    if (!existingMeetingId) {
+    const idFromParams = searchParams.get('meetingId');
+
+    if (!idFromParams) {
         toast({variant: "destructive", title: "Missing Meeting ID", description: "No meeting ID was provided in the URL."});
         router.push('/dashboard');
         return;
     }
 
-    const id = existingMeetingId;
-    const code = id.includes('meeting-') ? id.split('meeting-')[1] : id;
+    setIsHost(role === 'host');
+    setIsLoadingRole(false);
+    
+    const code = idFromParams.includes('meeting-') ? idFromParams.split('meeting-')[1] : idFromParams;
     const topicFromParams = searchParams.get('topic');
 
     if(topicFromParams) setTopic(topicFromParams);
     
-    setMeetingId(id);
+    setMeetingId(idFromParams);
     setMeetingCode(code);
     
     if (typeof window !== 'undefined') {
       setMeetingLink(
-        `${window.location.origin}/dashboard/join-meeting?meetingId=${id}`
+        `${window.location.origin}/dashboard/join-meeting?meetingId=${idFromParams}`
       );
     }
   }, [searchParams, router, toast]);
