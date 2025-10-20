@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -421,12 +422,12 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   };
 
   return (
-    <div className="flex flex-col flex-1 bg-gray-900 min-h-0">
+    <div className="flex flex-col h-full bg-gray-900 overflow-hidden">
       {isHost && <JoinRequestListener meetingId={meetingId} userId={userId} />}
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="relative flex-1 min-h-0">
+      <main className="relative flex-grow min-h-0">
         {loadingMedia ? <div className="w-full h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : renderLayout()}
       </main>
 
@@ -444,5 +445,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
+
+    
 
     
