@@ -1,69 +1,67 @@
-
 'use client';
 
-import { Button } from "@/components/ui/button";
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2, Link as LinkIcon } from "lucide-react";
-import Link from "next/link";
-import React, { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/hooks/useAuth'; 
-import { useSearchParams, useRouter, useParams } from "next/navigation";
-import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+import { Loader2 } from "lucide-react";
+import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
-
-type JoinRequestStatus = 'idle' | 'pending' | 'denied' | 'approved';
-
-// DEPRECATED: This page is no longer the primary entry point for hosts or guests.
-// It remains as a simple redirector to the main meeting page to handle old links.
-// The new /dashboard/meeting/prejoin page handles the host's setup flow.
-// The /dashboard/meeting/[meetingId] page handles guest join requests and waiting rooms.
-export default function WaitingAreaPage() {
-  const { meetingId } = useParams() as { meetingId: string };
+function WaitPageContent() {
   const searchParams = useSearchParams();
+  const meetingId = searchParams.get("meetingId");
   const topic = searchParams.get("topic") || "TeachMeet Meeting";
-  const router = useRouter();
 
-  const { user, loading: authLoading } = useAuth(); 
-  const { toast } = useToast();
-  
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-        const intendedUrl = `/dashboard/meeting/${meetingId}?${searchParams.toString()}`;
-        router.push(`/auth/signin?redirect=${encodeURIComponent(intendedUrl)}`);
-        return;
-    }
-    
-    // Redirect all users (hosts and guests) to the main meeting page.
-    // The meeting page now contains all the logic for waiting rooms, join requests, etc.
-    const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
-    router.replace(meetingPath);
+  if (!meetingId) {
+    return (
+       <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl rounded-xl border-border/50">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl text-destructive">
+              Invalid Meeting Link
+            </CardTitle>
+            <CardDescription>No meeting ID was provided. Please go back and use a valid link.</CardDescription>
+          </CardHeader>
+          <CardFooter className="flex justify-center">
+              <Button asChild variant="outline">
+                <Link href="/dashboard/join-meeting">Go to Join Page</Link>
+              </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
-  }, [meetingId, user, authLoading, router, searchParams, topic]);
-
-
-  // Fallback UI while redirecting
   return (
     <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            Redirecting to Meeting...
+            Request Sent
           </CardTitle>
-          <CardDescription>{topic}</CardDescription>
+          <CardDescription>You've asked to join: <strong>{topic}</strong></CardDescription>
         </CardHeader>
-        <CardContent className="py-8 flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+        <CardContent className="py-8 flex flex-col items-center justify-center text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4"/>
+            <p className="text-sm text-muted-foreground">Waiting for the host to let you in...</p>
+            {/* This component listens for the host's approval and redirects */}
+            <JoinMeetingWatcher meetingId={meetingId} />
         </CardContent>
-         <CardFooter className="flex justify-center">
-            <Button variant="link" asChild className="text-muted-foreground">
-                <Link href="/dashboard">Go to Dashboard</Link>
-            </Button>
+         <CardFooter className="flex justify-center text-xs text-muted-foreground">
+            You will be admitted automatically.
         </CardFooter>
       </Card>
     </div>
   );
+}
+
+// This is the main component for the page, wrapping the logic in Suspense
+// to handle the reading of search parameters.
+export default function WaitingAreaPage() {
+    return (
+      <Suspense fallback={<div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin"/></div>}>
+        <WaitPageContent />
+      </Suspense>
+    );
 }
