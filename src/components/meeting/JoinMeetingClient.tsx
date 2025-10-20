@@ -26,6 +26,7 @@ export function JoinMeetingClient() {
 
     let meetingId: string | null = null;
     let topic: string | null = null;
+    let isRawCode = false;
 
     try {
       if (codeOrLink.startsWith('http')) {
@@ -33,15 +34,24 @@ export function JoinMeetingClient() {
         const pathSegments = url.pathname.split('/');
         meetingId = url.searchParams.get('meetingId') || pathSegments.find(seg => seg.startsWith('meeting-')) || null;
         topic = url.searchParams.get('topic');
+      } else {
+        isRawCode = true;
       }
     } catch (error) {
       // Not a valid URL, treat it as a code
+      isRawCode = true;
     }
 
-    if (!meetingId) {
-      meetingId = codeOrLink.split('/').pop() || codeOrLink;
+    if (isRawCode) {
+        // If it's a raw code, it might be the full ID or the short code.
+        if (codeOrLink.startsWith('meeting-')) {
+            meetingId = codeOrLink;
+        } else {
+            // This is the fix: prepend "meeting-" if it's just the code.
+            meetingId = `meeting-${codeOrLink}`;
+        }
     }
-    
+
     if (meetingId) {
       let navigationPath = `/dashboard/meeting/prejoin?meetingId=${encodeURIComponent(meetingId)}&role=participant`;
       if (topic) {
