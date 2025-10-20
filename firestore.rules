@@ -1,112 +1,172 @@
-/**
- * @description This ruleset enforces a role-based access control model for meetings and join requests.
- *   Only the host of a meeting can approve or reject join requests. Participants can be added to meetings
- *   by the host.
- * @dataStructure
- *   /meetings/{meetingId} : Meeting documents, containing meeting metadata.
- *   /meetings/{meetingId}/joinRequests/{requestId} : Join requests for a specific meeting.
- *   /meetings/{meetingId}/participants/{userId} : Participants in a specific meeting.
- *   /classrooms/{classroomId}/joinRequests/{userId} : Join requests for a specific classroom.
- *   /classrooms/{classroomId}/participants/{userId} : Participants in a specific classroom.
- * @keySecurityDecisions
- *   - Only the host can manage join requests (approve/reject).
- *   - Anyone can read meeting and participant data (public read).
- *   - Denormalization: `hostId` on the `Meeting` document is used for authorization.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(hostId) {
-      return isSignedIn() && request.auth.uid == hostId;
-    }
-
-    function isExistingOwner(hostId) {
-      return isOwner(hostId) && resource != null;
-    }
-
     /**
-     * @description Allows reading meeting details. Write access is restricted to the host.
+     * @description Rules for the /meetings/{meetingId} collection.
      * @path /meetings/{meetingId}
-     * @allow (get, list): if true
-     * @allow (create): if request.auth.uid == request.resource.data.hostId
-     * @allow (update, delete): if isExistingOwner(resource.data.hostId)
-     * @deny (create, update, delete): if the request.auth.uid does not match the meeting's hostId.
-     * @principle Public read with owner-only writes.  The host must be the owner to modify.
+     * @allow (read, write) User with UID matching the meeting's `hostId` can read and write.
+     *        Example: User with UID "host123" can read/write a meeting document where `resource.data.hostId == 'host123'`.
+     * @allow (get, list) Any signed-in user can read meeting data.
+     *        Example: A signed-in user with UID "participant456" can `get()` a meeting document.
+     * @deny (create, update, delete) Non-hosts cannot create, update, or delete meetings.
+     *       Example: User "participant456" cannot `update()` a meeting document where `resource.data.hostId != 'participant456'`.
+     * @principle Enforces meeting ownership and allows any signed-in user to read the meeting document.
      */
     match /meetings/{meetingId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.hostId);
-      allow delete: if isExistingOwner(resource.data.hostId);
+      // isSignedIn helper function
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // isOwner helper function
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      // isExistingOwner helper function
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+      // ✅ allow the host to read/write their own meeting
+      allow read, write: if isSignedIn() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid;
+
+      // ✅ allow any signed-in user to read a meeting doc so they can send join requests
+      allow get, list: if isSignedIn();
+
+      allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid;
     }
 
     /**
-     * @description Allows the host to manage join requests for a specific meeting.
+     * @description Rules for the /meetings/{meetingId}/joinRequests/{requestId} subcollection.
      * @path /meetings/{meetingId}/joinRequests/{requestId}
-     * @allow (get, list): if true
-     * @allow (create): if false;
-     * @allow (update): if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
-     * @allow (delete): if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
-     * @deny: create if true; only the server should create these
-     * @principle Host-only management of join requests.
+     * @allow (create) Signed-in user can create a join request with their UID as the `userId`.
+     *        Example: User "participant456" can `create()` a join request document where `request.resource.data.userId == 'participant456'`.
+     * @allow (read, update, delete) The meeting host can read, update, and delete join requests.
+     *        Example: User "host123" (the host) can `read()` a join request under their meeting.
+     * @deny (read, update, delete) Non-hosts cannot read, update, or delete join requests.
+     *       Example: User "participant456" cannot `read()` a join request under a meeting they don't host.
+     * @principle  Allows participants to request joining and the host to manage those requests.
      */
     match /meetings/{meetingId}/joinRequests/{requestId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
-      allow delete: if isExistingOwner(get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId);
+      // isSignedIn helper function
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // isOwner helper function
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      // isExistingOwner helper function
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+      // ✅ participant can create their own request
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // ✅ host can read/update (approve/deny)
+      allow read, update, delete: if isSignedIn() &&
+          get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid;
     }
 
     /**
-     * @description Allows reading participant details. Write access is open to allow adding participants.
+     * @description Rules for the /meetings/{meetingId}/participants/{userId} subcollection.
      * @path /meetings/{meetingId}/participants/{userId}
-     * @allow (get, list): if true
-     * @allow (create): if true;
-     * @allow (update): if true;
-     * @allow (delete): if true;
-     * @principle Public read and write for participants.
+     * @allow (read, write) The host and the participant can read/write the participant data.
+     *        Example: The host "host123" can `read()` participant data.
+     *        Example: The participant "participant456" can `read()` their own participant data.
+     * @deny (read, write) Other users cannot read/write participant data.
+     *       Example: User "other789" cannot `read()` participant data of "participant456" without being the host.
+     * @principle  Allows the host and the participant themself to manage participant data.
      */
-    match /meetings/{meetingId}/participants/{userId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+    match /meetings/{meetingId}/participants/{participantId} {
+      // isSignedIn helper function
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // isOwner helper function
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      // isExistingOwner helper function
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+      allow read, write: if isSignedIn() &&
+          (
+            // host
+            get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid ||
+            // participant editing their own record
+            request.auth.uid == participantId
+          );
     }
     /**
-     * @description Allows the host to manage join requests for a specific classroom.
-     * @path /classrooms/{classroomId}/joinRequests/{requestId}
-     * @allow (get, list): if true
-     * @allow (create): if false;
-     * @allow (update): if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
-     * @allow (delete): if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
-     * @deny: create if true; only the server should create these
-     * @principle Host-only management of join requests.
+     * @description Rules for the /classrooms/{classroomId}/joinRequests/{userId} subcollection.
+     * @path /classrooms/{classroomId}/joinRequests/{userId}
+     * @allow (create) Signed-in user can create a join request with their UID as the `userId`.
+     *        Example: User "participant456" can `create()` a join request document where `request.resource.data.userId == 'participant456'`.
+     * @allow (read, update, delete) The meeting host can read, update, and delete join requests.
+     *        Example: User "host123" (the host) can `read()` a join request under their meeting.
+     * @deny (read, update, delete) Non-hosts cannot read, update, or delete join requests.
+     *       Example: User "participant456" cannot `read()` a join request under a meeting they don't host.
+     * @principle  Allows participants to request joining and the host to manage those requests.
      */
-       match /classrooms/{classroomId}/joinRequests/{requestId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
-      allow delete: if isExistingOwner(get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId);
+    match /classrooms/{classroomId}/joinRequests/{userId} {
+      // isSignedIn helper function
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // isOwner helper function
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      // isExistingOwner helper function
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+      // ✅ participant can create their own request
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // ✅ host can read/update (approve/deny)
+      allow read, update, delete: if isSignedIn() &&
+          get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId == request.auth.uid;
     }
     /**
-     * @description Allows reading participant details. Write access is open to allow adding participants.
+     * @description Rules for the /classrooms/{classroomId}/participants/{userId} subcollection.
      * @path /classrooms/{classroomId}/participants/{userId}
-     * @allow (get, list): if true
-     * @allow (create): if true;
-     * @allow (update): if true;
-     * @allow (delete): if true;
-     * @principle Public read and write for participants.
+     * @allow (read, write) The host and the participant can read/write the participant data.
+     *        Example: The host "host123" can `read()` participant data.
+     *        Example: The participant "participant456" can `read()` their own participant data.
+     * @deny (read, write) Other users cannot read/write participant data.
+     *       Example: User "other789" cannot `read()` participant data of "participant456" without being the host.
+     * @principle  Allows the host and the participant themself to manage participant data.
      */
-    match /classrooms/{classroomId}/participants/{userId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+    match /classrooms/{classroomId}/participants/{participantId} {
+      // isSignedIn helper function
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // isOwner helper function
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      // isExistingOwner helper function
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+      allow read, write: if isSignedIn() &&
+          (
+            // host
+            get(/databases/$(database)/documents/classrooms/$(classroomId)).data.hostId == request.auth.uid ||
+            // participant editing their own record
+            request.auth.uid == participantId
+          );
     }
   }
 }
