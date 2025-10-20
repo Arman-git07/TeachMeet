@@ -141,38 +141,38 @@ function PreJoinPageContent() {
   }, [toast]);
   
     useEffect(() => {
-        if (!meetingId || !user || isHost || authLoading) return;
+    if (!meetingId || !user || isHost || authLoading) return;
 
-        const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
-        const unsub = onSnapshot(reqRef, (snap) => {
-            if (!snap.exists()) {
-                if (requestStatus === 'pending') setRequestStatus('idle');
-                return;
-            }
-            const data = snap.data();
-            if (!data) return;
+    const unsub = onSnapshot(reqRef, (snap) => {
+      if (!snap.exists()) {
+        if (requestStatus === 'pending') setRequestStatus('idle');
+        return;
+      }
+      const data = snap.data();
+      if (!data) return;
 
-            const status = data.status;
-            if (status === "approved" || status === "accepted") {
-                setRequestStatus("accepted");
-                toast({ title: "Request Approved", description: "Joining the meeting..." });
-                setTimeout(() => {
-                    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
-                }, 800);
-            } else if (status === "denied" || status === "declined") {
-                setRequestStatus("declined");
-                toast({ variant: "destructive", title: "Request Denied", description: "Host denied your request." });
-                setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
-            } else {
-                setRequestStatus("pending");
-            }
-        }, (err) => {
-            console.error("JoinRequest onSnapshot error:", err);
-        });
+      const status = data.status;
+      if (status === "approved" || status === "accepted") {
+        setRequestStatus("accepted");
+        toast({ title: "Request Approved", description: "Joining the meeting..." });
+        setTimeout(() => {
+          router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
+        }, 800);
+      } else if (status === "denied" || status === "declined") {
+        setRequestStatus("declined");
+        toast({ variant: "destructive", title: "Request Denied", description: "Host denied your request." });
+        setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
+      } else {
+        setRequestStatus("pending");
+      }
+    }, (err) => {
+      console.error("JoinRequest onSnapshot error:", err);
+    });
 
-        return () => unsub();
-    }, [meetingId, user, isHost, authLoading, topic, isCameraOn, isMicOn, router, toast, requestStatus]);
+    return () => unsub();
+  }, [meetingId, user, isHost, authLoading, topic, isCameraOn, isMicOn, router, toast, requestStatus]);
 
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user || !isHost) return;
