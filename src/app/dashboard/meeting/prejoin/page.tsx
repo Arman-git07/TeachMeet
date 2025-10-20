@@ -50,7 +50,6 @@ function PreJoinPageContent() {
   const [topic, setTopic] = useState('Untitled Meeting');
   const [isHost, setIsHost] = useState(false);
   
-  // This state holds the single, authoritative meeting ID for the page
   const [meetingId, setMeetingId] = useState('');
 
   const [meetingLink, setMeetingLink] = useState('');
@@ -58,7 +57,6 @@ function PreJoinPageContent() {
   
   const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "accepted" | "declined">("idle");
 
-  // UI State
   const [agreed, setAgreed] = useState(false);
   const [mirrorVideo, setMirrorVideo] = useState(true);
   const [applyFilter, setApplyFilter] = useState(true);
@@ -68,7 +66,6 @@ function PreJoinPageContent() {
   
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
   
-  // A/V State
   const videoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -80,7 +77,6 @@ function PreJoinPageContent() {
     const idFromParams = searchParams.get('meetingId');
     const topicFromParams = searchParams.get('topic');
 
-    // If no ID, it's an invalid state, redirect away.
     if (!idFromParams) {
         toast({variant: "destructive", title: "Missing Meeting ID", description: "No meeting ID was provided in the URL."});
         router.push('/dashboard');
@@ -153,7 +149,6 @@ function PreJoinPageContent() {
   
     const unsub = onSnapshot(reqRef, (snap) => {
       if (!snap.exists()) {
-        // request was removed or never created
         if (requestStatus === 'pending') setRequestStatus('idle');
         return;
       }
@@ -170,10 +165,8 @@ function PreJoinPageContent() {
       } else if (status === "denied" || status === "declined") {
         setRequestStatus("declined");
         toast({ variant: "destructive", title: "Request Denied", description: "Host denied your request." });
-        // Optional: remove the doc after a short delay so UI resets and host can re-request.
         setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
       } else {
-        // keep pending state
         setRequestStatus("pending");
       }
     }, (err) => {
@@ -194,8 +187,8 @@ function PreJoinPageContent() {
       if (!meetingSnap.exists()) {
         await setDoc(meetingRef, {
           topic: topic.trim(),
+          creatorId: user.uid,
           hostId: user.uid,
-          creatorId: user.uid, // Also set creatorId for compatibility
           creatorName: user.displayName || 'Anonymous Host',
           createdAt: serverTimestamp(),
           status: 'pending',
@@ -218,14 +211,11 @@ function PreJoinPageContent() {
   };
 
   const handleAskToJoin = async () => {
-    // Guard
     if (!user || !meetingId) {
-      console.warn("AskToJoin: missing user or meetingId", { user, meetingId });
       setStartError("Missing meeting or not signed in.");
       return;
     }
     if (!agreed) {
-      // UI already disables button, but extra guard
       toast({ variant: "destructive", title: "Please agree to Terms", description: "You must agree to the Terms of Service before joining."});
       return;
     }
@@ -234,35 +224,27 @@ function PreJoinPageContent() {
     const reqRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
   
     try {
-      // read meeting doc to find the host -> ensures we send request to a real meeting created by host.
       const meetingSnap = await getDoc(meetingRef);
   
       if (!meetingSnap.exists()) {
-        // meeting doc not found — stop and inform user (host must have created/started meeting)
-        console.warn("AskToJoin: meeting doc not found", { meetingId });
         setStartError("This meeting does not exist or the host hasn't started it yet.");
         toast({ variant: "destructive", title: "Meeting not available", description: "The host may not have started the meeting yet." });
         return;
       }
   
       const meetingData = meetingSnap.data() || {};
-      // ensure meeting has creatorId (host)
       const hostId = meetingData.creatorId || meetingData.hostId || null;
       if (!hostId) {
-        console.warn("AskToJoin: meeting exists but missing creatorId", { meetingId, meetingData });
         setStartError("This meeting is not correctly configured. Contact the host.");
         toast({ variant: "destructive", title: "Meeting invalid", description: "Host information missing." });
         return;
       }
   
-      // If the current user is actually the host, they must join as host — don't create a join request.
       if (user.uid === hostId) {
-        // let host flow handle it (should be unchanged)
         toast({ title: "You are the host", description: "Use 'Join Now as Host' to start the meeting." });
         return;
       }
   
-      // write the join request (participant creates their own request doc)
       setRequestStatus("pending");
       await setDoc(reqRef, {
         userId: user.uid,
@@ -274,14 +256,15 @@ function PreJoinPageContent() {
   
       toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
   
-      // Auto-expire safety: schedule a background check to remove stale pending request after 2 minutes.
       setTimeout(async () => {
         try {
           const s = await getDoc(reqRef);
           if (s.exists() && s.data()?.status === "pending") {
             await deleteDoc(reqRef);
-            setRequestStatus("idle");
-            toast({ variant: "destructive", title: "Request expired", description: "Host did not respond." });
+            if (requestStatus === 'pending') {
+              setRequestStatus("idle");
+              toast({ variant: "destructive", title: "Request expired", description: "Host did not respond." });
+            }
           }
         } catch (e) {
           console.warn("AskToJoin: expiry check failed", e);
@@ -290,7 +273,6 @@ function PreJoinPageContent() {
   
     } catch (err: any) {
       console.error("AskToJoin: unexpected error:", err);
-      // common causes: Firestore permission denied, network, or invalid path.
       if (err?.code === 'permission-denied') {
         toast({ variant: 'destructive', title: 'Request Failed', description: 'Permission denied. Check Firestore rules.' });
         setStartError("Permission denied. Contact admin.");
@@ -314,7 +296,6 @@ function PreJoinPageContent() {
       return <Button onClick={handleCreateAndJoinMeeting} disabled={!agreed || isCreatingMeeting} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>{isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Join Now as Host</Button>
     }
 
-    // Participant view
     switch (requestStatus) {
       case 'pending':
       case 'accepted':
@@ -402,7 +383,3 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
-
-    
-
-    

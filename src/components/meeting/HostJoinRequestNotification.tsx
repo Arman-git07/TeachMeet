@@ -3,17 +3,21 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-/**
- * Renders a top banner for pending join-requests for a meeting.
- * Use: <HostJoinRequestNotification meetingId={meetingId} />
- * Render only for host.
- */
+interface JoinRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhotoURL?: string;
+}
+
 export default function HostJoinRequestNotification({ meetingId }: { meetingId: string }) {
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<JoinRequest[]>([]);
+  const { toast } = useToast();
   const playedSoundRef = useRef<Record<string, boolean>>({});
   const timersRef = useRef<Record<string, number>>({});
 
@@ -21,15 +25,15 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     if (!meetingId) return;
 
     const colRef = collection(db, "meetings", meetingId, "joinRequests");
-    const unsub = onSnapshot(colRef, (snap) => {
-      const pending = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((r: any) => r.status === "pending");
+    const q = query(colRef, where("status", "==", "pending"));
 
-      setRequests(pending);
+    const unsub = onSnapshot(q, (snap) => {
+      const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as JoinRequest));
 
-      pending.forEach((r: any) => {
-        if (!playedSoundRef.current[r.id]) {
+      setRequests(pendingReqs);
+
+      pendingReqs.forEach((req) => {
+        if (!playedSoundRef.current[req.id]) {
           try {
             const audio = new Audio("/sounds/join-request.mp3");
             audio.volume = 0.45;
@@ -37,86 +41,44 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
           } catch (e) {
             console.warn("Sound playback failed:", e);
           }
-          playedSoundRef.current[r.id] = true;
-        }
-
-        // auto-expire timer per request
-        if (!timersRef.current[r.id]) {
-          const t = window.setTimeout(async () => {
-            try {
-              const reqRef = doc(db, "meetings", meetingId, "joinRequests", r.id);
-              await updateDoc(reqRef, { status: "expired" });
-              setRequests((prev) => prev.filter((x) => x.id !== r.id));
-            } catch (e) {
-              // ignore
-            } finally {
-              delete timersRef.current[r.id];
-            }
-          }, 2 * 60 * 1000);
-          timersRef.current[r.id] = t;
-        }
-      });
-
-      // clean timers for removed requests
-      const pendingIds = new Set(pending.map((p) => p.id));
-      Object.keys(timersRef.current).forEach((id) => {
-        if (!pendingIds.has(id)) {
-          clearTimeout(timersRef.current[id]);
-          delete timersRef.current[id];
+          playedSoundRef.current[req.id] = true;
         }
       });
     });
 
-    return () => {
-      unsub();
-      Object.values(timersRef.current).forEach((t) => clearTimeout(t));
-      timersRef.current = {};
-      playedSoundRef.current = {};
-    };
-  }, [meetingId]); // only meetingId
+    return () => unsub();
+  }, [meetingId]);
 
-  const handleApprove = async (req: any) => {
+  const handleApprove = async (req: JoinRequest) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
 
     try {
-      // write participant metadata so meeting UI shows a proper tile
       await setDoc(participantRef, {
-        userId: req.userId,
-        name: req.displayName || "Guest",
-        photoURL: req.photoURL || "",
-        joinedAt: new Date().toISOString(),
+        name: req.userName,
+        photoURL: req.userPhotoURL || "",
+        joinedAt: serverTimestamp(),
       });
 
       await updateDoc(reqRef, { status: "approved" });
+      toast({ title: "Participant Approved", description: `${req.userName} has joined.`});
+
+      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
     } catch (err) {
       console.error("approve failed", err);
-      return;
+      toast({ variant: "destructive", title: "Approval Failed"});
     }
-
-    setRequests((prev) => prev.filter((p) => p.id !== req.id));
-
-    // keep request doc for a short time so participant watcher can pick up approved status
-    const timer = window.setTimeout(() => {
-      deleteDoc(reqRef).catch(() => {});
-      delete timersRef.current[req.id];
-    }, 3000);
-    timersRef.current[req.id] = timer;
   };
 
-  const handleDecline = async (req: any) => {
+  const handleDecline = async (req: JoinRequest) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
-      await updateDoc(reqRef, { status: "declined" });
+      await updateDoc(reqRef, { status: "denied" });
+      toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied entry.`});
+      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
     } catch (err) {
       console.error("decline failed", err);
-    } finally {
-      setRequests((prev) => prev.filter((p) => p.id !== req.id));
-      const t = window.setTimeout(() => {
-        deleteDoc(reqRef).catch(() => {});
-        delete timersRef.current[req.id];
-      }, 3000);
-      timersRef.current[req.id] = t;
+      toast({ variant: "destructive", title: "Action Failed"});
     }
   };
 
@@ -133,8 +95,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         >
           <div className="flex flex-col">
             <span className="text-lg font-semibold">Join Request</span>
-            <span className="text-sm text-gray-300">{req.displayName || "A participant"} wants to join</span>
-            <span className="text-xs text-gray-500 mt-1">Auto-dismisses in 2 minutes</span>
+            <span className="text-sm text-gray-300">{req.userName || "A participant"} wants to join</span>
           </div>
 
           <div className="flex gap-3 items-center">

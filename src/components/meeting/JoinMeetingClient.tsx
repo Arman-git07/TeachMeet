@@ -31,7 +31,9 @@ export function JoinMeetingClient() {
       // Attempt to parse as a URL first
       if (codeOrLink.startsWith('http')) {
         const url = new URL(codeOrLink);
-        meetingId = url.searchParams.get('meetingId');
+        // Look for meetingId in path or query params
+        const pathSegments = url.pathname.split('/');
+        meetingId = url.searchParams.get('meetingId') || pathSegments.find(seg => seg.startsWith('meeting-')) || null;
         topic = url.searchParams.get('topic');
       }
     } catch (error) {
@@ -42,6 +44,9 @@ export function JoinMeetingClient() {
     if (!meetingId) {
       meetingId = codeOrLink;
     }
+    
+    // Final cleanup of the ID
+    meetingId = meetingId.split('/').pop() || meetingId;
 
     if (meetingId) {
       let navigationPath = `/dashboard/meeting/prejoin?meetingId=${encodeURIComponent(meetingId)}&role=participant`;
@@ -51,7 +56,7 @@ export function JoinMeetingClient() {
       
       toast({
         title: "Preparing to Join...",
-        description: `Taking you to the setup screen for meeting...`,
+        description: `Taking you to the setup screen for the meeting.`,
       });
       router.push(navigationPath);
     } else {
@@ -77,6 +82,7 @@ export function JoinMeetingClient() {
             className="pl-10 rounded-lg text-base"
             value={meetingInput}
             onChange={(e) => setMeetingInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleJoinMeeting()}
           />
         </div>
       </div>

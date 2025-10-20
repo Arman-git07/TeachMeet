@@ -29,7 +29,6 @@ export function StartMeetingDialogContent() {
   const [topic, setTopic] = useState("My TeachMeet Meeting");
   const [loading, setLoading] = useState(false);
   
-  // These are now derived from a single stable meetingId
   const [meetingId, setMeetingId] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
@@ -37,7 +36,6 @@ export function StartMeetingDialogContent() {
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
 
   useEffect(() => {
-    // Generate a stable ID once when the dialog mounts
     const id = `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
     const code = id.replace('meeting-','');
     
@@ -65,17 +63,17 @@ export function StartMeetingDialogContent() {
     setLoading(true);
 
     try {
-      // Create the meeting document immediately before redirecting.
       const meetingRef = doc(db, 'meetings', meetingId);
+      // Corrected: Use creatorId to be consistent with security rules
       await setDoc(meetingRef, {
         topic: topic.trim(),
-        hostId: user.uid,
+        creatorId: user.uid, // Use creatorId
+        hostId: user.uid, // Keep hostId for compatibility if needed elsewhere
         creatorName: user.displayName || 'Anonymous Host',
         createdAt: serverTimestamp(),
-        status: 'pending', // The meeting is pending until the host fully joins
+        status: 'pending', 
       }, { merge: true });
 
-      // Now that the doc is created, redirect to the pre-join page.
       const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}&role=host`;
       router.push(prejoinPath);
 
