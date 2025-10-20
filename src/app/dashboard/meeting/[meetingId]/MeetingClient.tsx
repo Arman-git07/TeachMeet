@@ -427,8 +427,16 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="relative flex-grow min-h-0">
-        {loadingMedia ? <div className="w-full h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : renderLayout()}
+      <main className="flex-1 relative min-h-0">
+          {loadingMedia ? (
+              <div className="w-full h-full flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+          ) : (
+              <div className="w-full h-full relative">
+                  {renderLayout()}
+              </div>
+          )}
       </main>
 
       {isSharingScreen && (<div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50">🔴 You’re sharing your screen</div>)}
@@ -445,7 +453,3 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     </div>
   );
 }
-
-    
-
-    
