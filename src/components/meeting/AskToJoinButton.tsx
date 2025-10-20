@@ -48,6 +48,7 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
         return;
       }
 
+      // CORRECTED PATH: Use the sub-collection under the specific meeting document.
       const joinReqRef = doc(db, `meetings/${meetingId}/joinRequests`, user.uid);
       await setDoc(joinReqRef, {
         userId: user.uid,
