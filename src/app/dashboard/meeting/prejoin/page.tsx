@@ -35,9 +35,8 @@ import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import AskToJoinButton from '@/components/meeting/AskToJoinButton';
 import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -57,7 +56,7 @@ function PreJoinPageContent() {
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
   
-  const [requestSent, setRequestSent] = useState(false);
+  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "accepted" | "declined">("idle");
 
   // UI State
   const [agreed, setAgreed] = useState(false);
@@ -92,7 +91,7 @@ function PreJoinPageContent() {
     setIsHost(isHostRole);
 
     const finalMeetingId = idFromParams.trim();
-    const finalTopic = isHostRole && topicFromParams ? topicFromParams : 'Untitled Meeting';
+    const finalTopic = topicFromParams || (isHostRole ? 'Untitled Meeting' : 'Joining a Meeting');
     const finalCode = finalMeetingId.includes('meeting-') ? finalMeetingId.split('meeting-')[1] : finalMeetingId;
 
     setMeetingId(finalMeetingId);
@@ -146,6 +145,43 @@ function PreJoinPageContent() {
         }
      };
   }, [toast]);
+  
+  useEffect(() => {
+    if (!meetingId || !user || isHost || authLoading) return;
+  
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+  
+    const unsub = onSnapshot(reqRef, (snap) => {
+      if (!snap.exists()) {
+        // request was removed or never created
+        if (requestStatus === 'pending') setRequestStatus('idle');
+        return;
+      }
+      const data = snap.data();
+      if (!data) return;
+  
+      const status = data.status;
+      if (status === "approved" || status === "accepted") {
+        setRequestStatus("accepted");
+        toast({ title: "Request Approved", description: "Joining the meeting..." });
+        setTimeout(() => {
+          router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
+        }, 800);
+      } else if (status === "denied" || status === "declined") {
+        setRequestStatus("declined");
+        toast({ variant: "destructive", title: "Request Denied", description: "Host denied your request." });
+        // Optional: remove the doc after a short delay so UI resets and host can re-request.
+        setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
+      } else {
+        // keep pending state
+        setRequestStatus("pending");
+      }
+    }, (err) => {
+      console.error("JoinRequest onSnapshot error:", err);
+    });
+  
+    return () => unsub();
+  }, [meetingId, user, isHost, authLoading, topic, isCameraOn, isMicOn, router, toast, requestStatus]);
 
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user || !isHost) return;
@@ -154,12 +190,12 @@ function PreJoinPageContent() {
     try {
       const meetingRef = doc(db, 'meetings', meetingId);
   
-      // Check if meeting doc exists, if not, create it
       const meetingSnap = await getDoc(meetingRef);
       if (!meetingSnap.exists()) {
         await setDoc(meetingRef, {
           topic: topic.trim(),
           hostId: user.uid,
+          creatorId: user.uid, // Also set creatorId for compatibility
           creatorName: user.displayName || 'Anonymous Host',
           createdAt: serverTimestamp(),
           status: 'pending',
@@ -181,6 +217,91 @@ function PreJoinPageContent() {
     }
   };
 
+  const handleAskToJoin = async () => {
+    // Guard
+    if (!user || !meetingId) {
+      console.warn("AskToJoin: missing user or meetingId", { user, meetingId });
+      setStartError("Missing meeting or not signed in.");
+      return;
+    }
+    if (!agreed) {
+      // UI already disables button, but extra guard
+      toast({ variant: "destructive", title: "Please agree to Terms", description: "You must agree to the Terms of Service before joining."});
+      return;
+    }
+  
+    const meetingRef = doc(db, 'meetings', meetingId);
+    const reqRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+  
+    try {
+      // read meeting doc to find the host -> ensures we send request to a real meeting created by host.
+      const meetingSnap = await getDoc(meetingRef);
+  
+      if (!meetingSnap.exists()) {
+        // meeting doc not found — stop and inform user (host must have created/started meeting)
+        console.warn("AskToJoin: meeting doc not found", { meetingId });
+        setStartError("This meeting does not exist or the host hasn't started it yet.");
+        toast({ variant: "destructive", title: "Meeting not available", description: "The host may not have started the meeting yet." });
+        return;
+      }
+  
+      const meetingData = meetingSnap.data() || {};
+      // ensure meeting has creatorId (host)
+      const hostId = meetingData.creatorId || meetingData.hostId || null;
+      if (!hostId) {
+        console.warn("AskToJoin: meeting exists but missing creatorId", { meetingId, meetingData });
+        setStartError("This meeting is not correctly configured. Contact the host.");
+        toast({ variant: "destructive", title: "Meeting invalid", description: "Host information missing." });
+        return;
+      }
+  
+      // If the current user is actually the host, they must join as host — don't create a join request.
+      if (user.uid === hostId) {
+        // let host flow handle it (should be unchanged)
+        toast({ title: "You are the host", description: "Use 'Join Now as Host' to start the meeting." });
+        return;
+      }
+  
+      // write the join request (participant creates their own request doc)
+      setRequestStatus("pending");
+      await setDoc(reqRef, {
+        userId: user.uid,
+        userName: user.displayName || "Guest User",
+        userPhotoURL: user.photoURL || "",
+        status: "pending",
+        requestedAt: serverTimestamp()
+      });
+  
+      toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
+  
+      // Auto-expire safety: schedule a background check to remove stale pending request after 2 minutes.
+      setTimeout(async () => {
+        try {
+          const s = await getDoc(reqRef);
+          if (s.exists() && s.data()?.status === "pending") {
+            await deleteDoc(reqRef);
+            setRequestStatus("idle");
+            toast({ variant: "destructive", title: "Request expired", description: "Host did not respond." });
+          }
+        } catch (e) {
+          console.warn("AskToJoin: expiry check failed", e);
+        }
+      }, 120000);
+  
+    } catch (err: any) {
+      console.error("AskToJoin: unexpected error:", err);
+      // common causes: Firestore permission denied, network, or invalid path.
+      if (err?.code === 'permission-denied') {
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Permission denied. Check Firestore rules.' });
+        setStartError("Permission denied. Contact admin.");
+      } else {
+        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Try again.' });
+        setStartError("Could not send join request. Try again.");
+      }
+      setRequestStatus("idle");
+    }
+  };
+
   const userName = user?.displayName || 'User';
   const userAvatar = user?.photoURL;
   
@@ -194,17 +315,28 @@ function PreJoinPageContent() {
     }
 
     // Participant view
-    if (requestSent) {
-      return (
-        <div className="text-center space-y-2">
-            <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-yellow-600 cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Request Sent, Waiting...</Button>
-            <p className="text-xs text-muted-foreground">Waiting for the host to approve your request.</p>
-            <JoinMeetingWatcher meetingId={meetingId} />
-        </div>
-      );
+    switch (requestStatus) {
+      case 'pending':
+      case 'accepted':
+        return (
+          <div className="text-center space-y-2">
+              <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-yellow-600 cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Waiting for host...</Button>
+              <p className="text-xs text-muted-foreground">{requestStatus === 'accepted' ? 'Approved! Joining now...' : 'Waiting for the host to approve your request.'}</p>
+          </div>
+        );
+      case 'declined':
+         return (
+          <div className="text-center space-y-2">
+            <Button onClick={handleAskToJoin} disabled={!agreed} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">
+              Ask to Join Again
+            </Button>
+            <p className="text-xs text-destructive">Your previous request was declined.</p>
+          </div>
+         );
+      case 'idle':
+      default:
+        return <Button onClick={handleAskToJoin} disabled={!agreed} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">Ask to Join</Button>;
     }
-
-    return <AskToJoinButton meetingId={meetingId} onSent={() => setRequestSent(true)} disabled={!agreed || true} />;
   };
   
   const handleMirrorToggle = (checked: boolean) => { setMirrorVideo(checked); localStorage.setItem('teachmeet-camera-mirror', String(checked)); };
@@ -270,3 +402,5 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
+
+    
