@@ -1,17 +1,20 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
-import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
+import { Loader2, ShieldCheck } from "lucide-react";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import AskToJoinButton from '@/components/meeting/AskToJoinButton';
+import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
 
 function WaitPageContent() {
   const searchParams = useSearchParams();
   const meetingId = searchParams.get("meetingId");
   const topic = searchParams.get("topic") || "TeachMeet Meeting";
+  const [requestSent, setRequestSent] = useState(false);
 
   if (!meetingId) {
     return (
@@ -38,18 +41,25 @@ function WaitPageContent() {
       <Card className="w-full max-w-md shadow-xl rounded-xl border-border/50">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            Request Sent
+            {requestSent ? 'Request Sent' : `Ready to join "${topic}"?`}
           </CardTitle>
-          <CardDescription>You've asked to join: <strong>{topic}</strong></CardDescription>
+          <CardDescription>
+            {requestSent ? 'Waiting for the host to let you in...' : 'Your camera and mic will be off by default.'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="py-8 flex flex-col items-center justify-center text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4"/>
-            <p className="text-sm text-muted-foreground">Waiting for the host to let you in...</p>
-            {/* This component listens for the host's approval and redirects */}
-            <JoinMeetingWatcher meetingId={meetingId} />
+            {!requestSent ? (
+              <AskToJoinButton meetingId={meetingId} onSent={() => setRequestSent(true)} />
+            ) : (
+              <>
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4"/>
+                <p className="text-sm text-muted-foreground">You will be admitted automatically.</p>
+                <JoinMeetingWatcher meetingId={meetingId} />
+              </>
+            )}
         </CardContent>
          <CardFooter className="flex justify-center text-xs text-muted-foreground">
-            You will be admitted automatically.
+            Meeting ID: {meetingId}
         </CardFooter>
       </Card>
     </div>
