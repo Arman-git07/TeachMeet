@@ -204,7 +204,7 @@ function PreJoinPageContent() {
       );
     }
 
-    return <AskToJoinButton meetingId={meetingId} onSent={() => setRequestSent(true)} disabled={!agreed} />;
+    return <AskToJoinButton meetingId={meetingId} onSent={() => setRequestSent(true)} disabled={!agreed || true} />;
   };
   
   const handleMirrorToggle = (checked: boolean) => { setMirrorVideo(checked); localStorage.setItem('teachmeet-camera-mirror', String(checked)); };
