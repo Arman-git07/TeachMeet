@@ -19,7 +19,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const { toast } = useToast();
   const playedSoundRef = useRef<Record<string, boolean>>({});
-  const timersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!meetingId) return;
@@ -29,8 +28,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
     const unsub = onSnapshot(q, (snap) => {
       const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as JoinRequest));
-
-      setRequests(pendingReqs);
 
       pendingReqs.forEach((req) => {
         if (!playedSoundRef.current[req.id]) {
@@ -44,6 +41,8 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
           playedSoundRef.current[req.id] = true;
         }
       });
+      
+      setRequests(pendingReqs);
     });
 
     return () => unsub();

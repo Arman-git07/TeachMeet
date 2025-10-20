@@ -30,7 +30,6 @@ export default function JoinMeetingWatcher({ meetingId }: Props) {
           router.push(`/dashboard/meeting/${meetingId}`);
         } else if (data.status === "denied") {
           toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join."});
-          // Optional: redirect to dashboard after a delay
           setTimeout(() => router.push('/dashboard'), 3000);
         }
       }

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Hash, LinkIcon } from "lucide-react";
+import { LinkIcon } from "lucide-react";
 
 export function JoinMeetingClient() {
   const [meetingInput, setMeetingInput] = useState('');
@@ -28,10 +28,8 @@ export function JoinMeetingClient() {
     let topic: string | null = null;
 
     try {
-      // Attempt to parse as a URL first
       if (codeOrLink.startsWith('http')) {
         const url = new URL(codeOrLink);
-        // Look for meetingId in path or query params
         const pathSegments = url.pathname.split('/');
         meetingId = url.searchParams.get('meetingId') || pathSegments.find(seg => seg.startsWith('meeting-')) || null;
         topic = url.searchParams.get('topic');
@@ -40,14 +38,10 @@ export function JoinMeetingClient() {
       // Not a valid URL, treat it as a code
     }
 
-    // If parsing as URL didn't yield an ID, treat the whole input as the ID
     if (!meetingId) {
-      meetingId = codeOrLink;
+      meetingId = codeOrLink.split('/').pop() || codeOrLink;
     }
     
-    // Final cleanup of the ID
-    meetingId = meetingId.split('/').pop() || meetingId;
-
     if (meetingId) {
       let navigationPath = `/dashboard/meeting/prejoin?meetingId=${encodeURIComponent(meetingId)}&role=participant`;
       if (topic) {

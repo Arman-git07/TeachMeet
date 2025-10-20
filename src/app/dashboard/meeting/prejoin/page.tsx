@@ -1,6 +1,5 @@
 
-// src/app/dashboard/meeting/prejoin/page.tsx
-"use client";
+'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -37,7 +36,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -142,39 +140,39 @@ function PreJoinPageContent() {
      };
   }, [toast]);
   
-  useEffect(() => {
-    if (!meetingId || !user || isHost || authLoading) return;
-  
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-  
-    const unsub = onSnapshot(reqRef, (snap) => {
-      if (!snap.exists()) {
-        if (requestStatus === 'pending') setRequestStatus('idle');
-        return;
-      }
-      const data = snap.data();
-      if (!data) return;
-  
-      const status = data.status;
-      if (status === "approved" || status === "accepted") {
-        setRequestStatus("accepted");
-        toast({ title: "Request Approved", description: "Joining the meeting..." });
-        setTimeout(() => {
-          router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
-        }, 800);
-      } else if (status === "denied" || status === "declined") {
-        setRequestStatus("declined");
-        toast({ variant: "destructive", title: "Request Denied", description: "Host denied your request." });
-        setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
-      } else {
-        setRequestStatus("pending");
-      }
-    }, (err) => {
-      console.error("JoinRequest onSnapshot error:", err);
-    });
-  
-    return () => unsub();
-  }, [meetingId, user, isHost, authLoading, topic, isCameraOn, isMicOn, router, toast, requestStatus]);
+    useEffect(() => {
+        if (!meetingId || !user || isHost || authLoading) return;
+
+        const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+
+        const unsub = onSnapshot(reqRef, (snap) => {
+            if (!snap.exists()) {
+                if (requestStatus === 'pending') setRequestStatus('idle');
+                return;
+            }
+            const data = snap.data();
+            if (!data) return;
+
+            const status = data.status;
+            if (status === "approved" || status === "accepted") {
+                setRequestStatus("accepted");
+                toast({ title: "Request Approved", description: "Joining the meeting..." });
+                setTimeout(() => {
+                    router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
+                }, 800);
+            } else if (status === "denied" || status === "declined") {
+                setRequestStatus("declined");
+                toast({ variant: "destructive", title: "Request Denied", description: "Host denied your request." });
+                setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
+            } else {
+                setRequestStatus("pending");
+            }
+        }, (err) => {
+            console.error("JoinRequest onSnapshot error:", err);
+        });
+
+        return () => unsub();
+    }, [meetingId, user, isHost, authLoading, topic, isCameraOn, isMicOn, router, toast, requestStatus]);
 
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user || !isHost) return;
@@ -183,17 +181,14 @@ function PreJoinPageContent() {
     try {
       const meetingRef = doc(db, 'meetings', meetingId);
   
-      const meetingSnap = await getDoc(meetingRef);
-      if (!meetingSnap.exists()) {
-        await setDoc(meetingRef, {
-          topic: topic.trim(),
-          creatorId: user.uid,
-          hostId: user.uid,
-          creatorName: user.displayName || 'Anonymous Host',
-          createdAt: serverTimestamp(),
-          status: 'pending',
-        });
-      }
+      await setDoc(meetingRef, {
+        topic: topic.trim(),
+        creatorId: user.uid,
+        hostId: user.uid,
+        creatorName: user.displayName || 'Anonymous Host',
+        createdAt: serverTimestamp(),
+        status: 'pending',
+      });
   
       const meetingPath = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(
         topic.trim()
@@ -212,75 +207,77 @@ function PreJoinPageContent() {
 
   const handleAskToJoin = async () => {
     if (!user || !meetingId) {
-      setStartError("Missing meeting or not signed in.");
-      return;
+        setStartError("Missing meeting or not signed in.");
+        return;
     }
     if (!agreed) {
-      toast({ variant: "destructive", title: "Please agree to Terms", description: "You must agree to the Terms of Service before joining."});
-      return;
+        toast({ variant: "destructive", title: "Please agree to Terms", description: "You must agree to the Terms of Service before joining."});
+        return;
     }
-  
+
     const meetingRef = doc(db, 'meetings', meetingId);
     const reqRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
-  
+
     try {
-      const meetingSnap = await getDoc(meetingRef);
-  
-      if (!meetingSnap.exists()) {
-        setStartError("This meeting does not exist or the host hasn't started it yet.");
-        toast({ variant: "destructive", title: "Meeting not available", description: "The host may not have started the meeting yet." });
-        return;
-      }
-  
-      const meetingData = meetingSnap.data() || {};
-      const hostId = meetingData.creatorId || meetingData.hostId || null;
-      if (!hostId) {
-        setStartError("This meeting is not correctly configured. Contact the host.");
-        toast({ variant: "destructive", title: "Meeting invalid", description: "Host information missing." });
-        return;
-      }
-  
-      if (user.uid === hostId) {
-        toast({ title: "You are the host", description: "Use 'Join Now as Host' to start the meeting." });
-        return;
-      }
-  
-      setRequestStatus("pending");
-      await setDoc(reqRef, {
-        userId: user.uid,
-        userName: user.displayName || "Guest User",
-        userPhotoURL: user.photoURL || "",
-        status: "pending",
-        requestedAt: serverTimestamp()
-      });
-  
-      toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
-  
-      setTimeout(async () => {
-        try {
-          const s = await getDoc(reqRef);
-          if (s.exists() && s.data()?.status === "pending") {
-            await deleteDoc(reqRef);
-            if (requestStatus === 'pending') {
-              setRequestStatus("idle");
-              toast({ variant: "destructive", title: "Request expired", description: "Host did not respond." });
-            }
-          }
-        } catch (e) {
-          console.warn("AskToJoin: expiry check failed", e);
+        const meetingSnap = await getDoc(meetingRef);
+
+        if (!meetingSnap.exists()) {
+            console.warn("AskToJoin: meeting doc not found", { meetingId });
+            setStartError("This meeting does not exist or the host hasn't started it yet.");
+            toast({ variant: "destructive", title: "Meeting not available", description: "The host may not have started the meeting yet." });
+            return;
         }
-      }, 120000);
-  
+
+        const meetingData = meetingSnap.data() || {};
+        const hostId = meetingData.creatorId || meetingData.hostId || null;
+        if (!hostId) {
+            console.warn("AskToJoin: meeting exists but missing creatorId", { meetingId, meetingData });
+            setStartError("This meeting is not correctly configured. Contact the host.");
+            toast({ variant: "destructive", title: "Meeting invalid", description: "Host information missing." });
+            return;
+        }
+
+        if (user.uid === hostId) {
+            toast({ title: "You are the host", description: "Use 'Join Now as Host' to start the meeting." });
+            return;
+        }
+
+        setRequestStatus("pending");
+        await setDoc(reqRef, {
+            userId: user.uid,
+            userName: user.displayName || "Guest User",
+            userPhotoURL: user.photoURL || "",
+            status: "pending",
+            requestedAt: serverTimestamp()
+        });
+
+        toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
+
+        setTimeout(async () => {
+            try {
+                const s = await getDoc(reqRef);
+                if (s.exists() && s.data()?.status === "pending") {
+                    await deleteDoc(reqRef);
+                    if (requestStatus === 'pending') {
+                       setRequestStatus("idle");
+                       toast({ variant: "destructive", title: "Request expired", description: "Host did not respond." });
+                    }
+                }
+            } catch (e) {
+                console.warn("AskToJoin: expiry check failed", e);
+            }
+        }, 120000);
+
     } catch (err: any) {
-      console.error("AskToJoin: unexpected error:", err);
-      if (err?.code === 'permission-denied') {
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Permission denied. Check Firestore rules.' });
-        setStartError("Permission denied. Contact admin.");
-      } else {
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Try again.' });
-        setStartError("Could not send join request. Try again.");
-      }
-      setRequestStatus("idle");
+        console.error("AskToJoin: unexpected error:", err);
+        if (err?.code === 'permission-denied') {
+            toast({ variant: 'destructive', title: 'Request Failed', description: 'Permission denied. Check Firestore rules.' });
+            setStartError("Permission denied. Contact admin.");
+        } else {
+            toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Try again.' });
+            setStartError("Could not send join request. Try again.");
+        }
+        setRequestStatus("idle");
     }
   };
 

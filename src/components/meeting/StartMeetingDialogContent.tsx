@@ -64,11 +64,10 @@ export function StartMeetingDialogContent() {
 
     try {
       const meetingRef = doc(db, 'meetings', meetingId);
-      // Corrected: Use creatorId to be consistent with security rules
       await setDoc(meetingRef, {
         topic: topic.trim(),
-        creatorId: user.uid, // Use creatorId
-        hostId: user.uid, // Keep hostId for compatibility if needed elsewhere
+        creatorId: user.uid,
+        hostId: user.uid, 
         creatorName: user.displayName || 'Anonymous Host',
         createdAt: serverTimestamp(),
         status: 'pending', 
