@@ -162,7 +162,7 @@ function PreJoinPageContent() {
         }, 800);
       } else if (status === "denied" || status === "declined") {
         setRequestStatus("declined");
-        toast({ variant: "destructive", title: "Request Denied", description: "Host denied your request." });
+        toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
         setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
       } else {
         setRequestStatus("pending");
