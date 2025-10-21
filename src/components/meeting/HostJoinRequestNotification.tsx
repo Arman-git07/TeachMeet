@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, where } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -49,34 +49,44 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   }, [meetingId]);
 
   const handleApprove = async (req: JoinRequest) => {
+    const batch = writeBatch(db);
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
 
     try {
-      await setDoc(participantRef, {
+      // Create the participant document
+      batch.set(participantRef, {
         name: req.userName,
         photoURL: req.userPhotoURL || "",
+        isHost: false, // Explicitly not the host
         joinedAt: serverTimestamp(),
       });
 
-      await updateDoc(reqRef, { status: "approved" });
+      // Update the request status to signal the client
+      batch.update(reqRef, { status: "approved" });
+      
+      await batch.commit();
+
       toast({ title: "Participant Approved", description: `${req.userName} has joined.`});
 
-      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
+      // Clean up the request after a short delay
+      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
     } catch (err) {
-      console.error("approve failed", err);
+      console.error("Approve failed:", err);
       toast({ variant: "destructive", title: "Approval Failed"});
     }
   };
 
-  const handleDecline = async (req: JoinRequest) => {
+  const handleDeny = async (req: JoinRequest) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
+      // Update status to 'denied' to notify the user
       await updateDoc(reqRef, { status: "denied" });
       toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied entry.`});
-      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 3000);
+      // Clean up the request after a short delay
+      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
     } catch (err) {
-      console.error("decline failed", err);
+      console.error("Decline failed:", err);
       toast({ variant: "destructive", title: "Action Failed"});
     }
   };
@@ -101,7 +111,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
             <button onClick={() => handleApprove(req)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all">
                 <Check size={16}/>Approve
             </button>
-            <button onClick={() => handleDecline(req)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all">
+            <button onClick={() => handleDeny(req)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all">
                 <X size={16}/>Decline
             </button>
           </div>

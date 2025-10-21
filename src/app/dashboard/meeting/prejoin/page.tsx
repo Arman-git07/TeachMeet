@@ -154,13 +154,15 @@ function PreJoinPageContent() {
       if (!data) return;
 
       const status = data.status;
-      if (status === "approved" || status === "accepted") {
+      if (status === "approved") {
+        if (requestStatus === 'accepted') return; // Prevent multiple navigations
         setRequestStatus("accepted");
         toast({ title: "Request Approved", description: "Joining the meeting..." });
         setTimeout(() => {
           router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
         }, 800);
-      } else if (status === "denied" || status === "declined") {
+      } else if (status === "denied") {
+        if (requestStatus === 'declined') return; // Prevent multiple toasts
         setRequestStatus("declined");
         toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
         setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
@@ -252,21 +254,6 @@ function PreJoinPageContent() {
         });
 
         toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
-
-        setTimeout(async () => {
-            try {
-                const s = await getDoc(reqRef);
-                if (s.exists() && s.data()?.status === "pending") {
-                    await deleteDoc(reqRef);
-                    if (requestStatus === 'pending') {
-                       setRequestStatus("idle");
-                       toast({ variant: "destructive", title: "Request expired", description: "Host did not respond." });
-                    }
-                }
-            } catch (e) {
-                console.warn("AskToJoin: expiry check failed", e);
-            }
-        }, 120000);
 
     } catch (err: any) {
         console.error("AskToJoin: unexpected error:", err);

@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import VideoTile from "./VideoTile";
 import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
-import JoinRequestListener from "@/components/meeting/JoinRequestListener";
+import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 
@@ -317,20 +317,22 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   useEffect(() => {
     const addSelfToParticipants = async () => {
-        if (user && meetingId && !liveParticipants.has(user.uid)) {
+        if (user && meetingId && !isLoadingRole) {
             const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-            await setDoc(participantRef, {
-                name: user.displayName || 'Anonymous',
-                photoURL: user.photoURL || '',
-                isHost: isHost,
-                joinedAt: serverTimestamp(),
-            });
+            // Check if doc exists to avoid overwriting on re-renders
+            const docSnap = await getDoc(participantRef);
+            if (!docSnap.exists()) {
+                await setDoc(participantRef, {
+                    name: user.displayName || 'Anonymous',
+                    photoURL: user.photoURL || '',
+                    isHost: isHost,
+                    joinedAt: serverTimestamp(),
+                });
+            }
         }
     };
-    if(!isLoadingRole) {
-        addSelfToParticipants();
-    }
-  }, [user, meetingId, liveParticipants, isHost, isLoadingRole]);
+    addSelfToParticipants();
+  }, [user, meetingId, isHost, isLoadingRole]);
 
   const { allParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
@@ -423,7 +425,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   return (
     <div className="flex flex-col h-full bg-gray-900 overflow-hidden">
-      {isHost && <JoinRequestListener meetingId={meetingId} userId={userId} />}
+      {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
