@@ -6,14 +6,19 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LinkIcon } from "lucide-react";
+import { LinkIcon, Loader2 } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
 
 export function JoinMeetingClient() {
   const [meetingInput, setMeetingInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const handleJoinMeeting = () => {
+  const handleJoinMeeting = async () => {
     const codeOrLink = meetingInput.trim();
     if (!codeOrLink) {
       toast({
@@ -24,9 +29,10 @@ export function JoinMeetingClient() {
       return;
     }
 
+    setIsLoading(true);
+
     let meetingId: string | null = null;
     let topic: string | null = null;
-    let isRawCode = false;
 
     try {
       if (codeOrLink.startsWith('http')) {
@@ -35,40 +41,71 @@ export function JoinMeetingClient() {
         meetingId = url.searchParams.get('meetingId') || pathSegments.find(seg => seg.startsWith('meeting-')) || null;
         topic = url.searchParams.get('topic');
       } else {
-        isRawCode = true;
-      }
-    } catch (error) {
-      // Not a valid URL, treat it as a code
-      isRawCode = true;
-    }
-
-    if (isRawCode) {
-        // If it's a raw code, it might be the full ID or the short code.
         if (codeOrLink.startsWith('meeting-')) {
             meetingId = codeOrLink;
         } else {
-            // This is the fix: prepend "meeting-" if it's just the code.
             meetingId = `meeting-${codeOrLink}`;
         }
+      }
+    } catch (error) {
+      // Not a valid URL, treat as a code
+      if (codeOrLink.startsWith('meeting-')) {
+          meetingId = codeOrLink;
+      } else {
+          meetingId = `meeting-${codeOrLink}`;
+      }
     }
 
-    if (meetingId) {
-      let navigationPath = `/dashboard/meeting/prejoin?meetingId=${encodeURIComponent(meetingId)}&role=participant`;
-      if (topic) {
-        navigationPath += `&topic=${encodeURIComponent(topic)}`;
-      }
-      
-      toast({
-        title: "Preparing to Join...",
-        description: `Taking you to the setup screen for the meeting.`,
-      });
-      router.push(navigationPath);
-    } else {
+    if (!meetingId) {
       toast({
         variant: "destructive",
         title: "Invalid Input",
         description: "Could not determine a valid meeting ID from your input.",
       });
+      setIsLoading(false);
+      return;
+    }
+    
+    // --- Validation Logic ---
+    try {
+        const meetingRef = doc(db, 'meetings', meetingId);
+        const docSnap = await getDoc(meetingRef);
+
+        if (!docSnap.exists()) {
+            toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or may have ended." });
+            setIsLoading(false);
+            return;
+        }
+
+        const meetingData = docSnap.data();
+
+        if (meetingData.status === 'ended') {
+            toast({ variant: "destructive", title: "Meeting Has Ended", description: "This meeting is no longer active." });
+            setIsLoading(false);
+            return;
+        }
+        
+        if (user && meetingData.hostId === user.uid) {
+            toast({ title: "You are the host!", description: "To start your meeting, go to the pre-join link from your dashboard.", duration: 5000 });
+            router.push(`/dashboard/meeting/prejoin?meetingId=${meetingId}&role=host&topic=${encodeURIComponent(meetingData.topic || '')}`);
+            return;
+        }
+        
+        let navigationPath = `/dashboard/meeting/prejoin?meetingId=${encodeURIComponent(meetingId)}&role=participant`;
+        const finalTopic = topic || meetingData.topic;
+        if (finalTopic) {
+            navigationPath += `&topic=${encodeURIComponent(finalTopic)}`;
+        }
+        
+        toast({
+            title: "Preparing to Join...",
+            description: `Taking you to the setup screen for the meeting.`,
+        });
+        router.push(navigationPath);
+
+    } catch (error) {
+        toast({ variant: "destructive", title: "Validation Failed", description: "An error occurred while trying to join the meeting."});
+        setIsLoading(false);
     }
   };
 
@@ -87,11 +124,13 @@ export function JoinMeetingClient() {
             value={meetingInput}
             onChange={(e) => setMeetingInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleJoinMeeting()}
+            disabled={isLoading}
           />
         </div>
       </div>
       
-      <Button onClick={handleJoinMeeting} className="w-full btn-gel text-lg py-3 rounded-lg">
+      <Button onClick={handleJoinMeeting} className="w-full btn-gel text-lg py-3 rounded-lg" disabled={isLoading}>
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Join Meeting
       </Button>
     </div>
