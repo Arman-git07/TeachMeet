@@ -147,7 +147,11 @@ function PreJoinPageContent() {
 
     const unsub = onSnapshot(reqRef, (snap) => {
       if (!snap.exists()) {
-        if (requestStatus === 'pending') setRequestStatus('idle');
+        if (requestStatus === 'pending') {
+            setRequestStatus('idle');
+        } else if (requestStatus === 'denied') {
+            setRequestStatus('idle'); // Allow re-requesting after denial is processed
+        }
         return;
       }
       const data = snap.data();
@@ -162,8 +166,8 @@ function PreJoinPageContent() {
           router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
         }, 800);
       } else if (status === "denied") {
-        if (requestStatus === 'declined') return; // Prevent multiple toasts
-        setRequestStatus("declined");
+        if (requestStatus === 'denied') return; // Prevent multiple toasts
+        setRequestStatus("denied");
         toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
         setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
       } else {
@@ -285,11 +289,11 @@ function PreJoinPageContent() {
       case 'accepted':
         return (
           <div className="text-center space-y-2">
-              <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-secondary cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Waiting for host...</Button>
+              <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-primary/20 text-primary-foreground/80 border border-primary/30 cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Waiting for host...</Button>
               <p className="text-xs text-muted-foreground">{requestStatus === 'accepted' ? 'Approved! Joining now...' : 'Waiting for the host to approve your request.'}</p>
           </div>
         );
-      case 'declined':
+      case 'denied':
          return (
           <div className="text-center space-y-2">
             <Button onClick={handleAskToJoin} disabled={!agreed} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">
