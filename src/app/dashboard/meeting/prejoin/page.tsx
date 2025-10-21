@@ -53,7 +53,7 @@ function PreJoinPageContent() {
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
   
-  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "accepted" | "declined">("idle");
+  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "accepted" | "denied">("idle");
 
   const [agreed, setAgreed] = useState(false);
   const [mirrorVideo, setMirrorVideo] = useState(true);
@@ -285,7 +285,7 @@ function PreJoinPageContent() {
       case 'accepted':
         return (
           <div className="text-center space-y-2">
-              <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-yellow-600 cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Waiting for host...</Button>
+              <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-secondary cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Waiting for host...</Button>
               <p className="text-xs text-muted-foreground">{requestStatus === 'accepted' ? 'Approved! Joining now...' : 'Waiting for the host to approve your request.'}</p>
           </div>
         );
