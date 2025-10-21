@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
  *
  * NOTE: This only performs the redirect behavior — it does not modify any UI or buttons.
  */
-export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
+export default function JoinMeetingWatcher({ meetingId }: { meetingId:string }) {
   const router = useRouter();
   const unsubRefs = useRef<{ req?: () => void; part?: () => void } | null>(null);
   const didRedirect = useRef(false);
@@ -32,6 +32,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
     const redirectToMeeting = () => {
       if (didRedirect.current) return;
       didRedirect.current = true;
+      console.log("REDIRECTING NOW to /dashboard/meeting/" + meetingId);
       // Replace so back button doesn't go back to waiting screen
       router.replace(`/dashboard/meeting/${meetingId}`);
     };
@@ -65,8 +66,10 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
 
       // 1) One-time fast check (maybe approval already happened)
       try {
+        console.log("JoinMeetingWatcher: Performing initial one-time check.");
         const [partSnap, reqSnap] = await Promise.all([getDoc(partRef), getDoc(reqRef)]);
         if (partSnap.exists()) {
+          console.log("JoinMeetingWatcher (fast check): Participant doc exists. Redirecting.");
           redirectToMeeting();
           // we can stop now
           cleanup();
@@ -74,6 +77,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
           return;
         }
         if (reqSnap.exists() && (reqSnap.data() as any).status === "approved") {
+          console.log("JoinMeetingWatcher (fast check): Join request status is 'approved'. Redirecting.");
           redirectToMeeting();
           cleanup();
           stopAuthListener();
@@ -81,20 +85,22 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
         }
       } catch (e) {
         // harmless; we'll still set listeners
-        // console.warn("JoinMeetingWatcher quick-check failed:", e);
+        console.warn("JoinMeetingWatcher quick-check failed", e);
       }
 
       // 2) Real-time listener on joinRequests/{userId}
       try {
         const unsubReq = onSnapshot(reqRef, (snap) => {
+          // DEBUGGING LINE
+          console.log("req-snap", snap.id, snap.exists() ? snap.data() : 'DOES NOT EXIST');
           if (!snap.exists()) return;
           const data = snap.data() as any;
           // If host set approved status
           if (data?.status === "approved") {
             redirectToMeeting();
           } else if (data?.status === "denied" || data?.status === "rejected") {
-            // Optional: you may show feedback (alert/toast) elsewhere; do not auto-redirect.
-            // alert("Host denied your request to join.");
+            // optional: notify the user — do not redirect
+            try { alert("Host denied your request to join."); } catch (e) {}
           }
         });
         unsubRefs.current = { ...unsubRefs.current, req: unsubReq };
@@ -105,6 +111,8 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
       // 3) Real-time listener on participants/{userId} (host might create participant doc first)
       try {
         const unsubPart = onSnapshot(partRef, (snap) => {
+          // DEBUGGING LINE
+          console.log("part-snap exists", snap.exists());
           if (snap.exists()) {
             redirectToMeeting();
           }
@@ -129,6 +137,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
         try {
           const partSnap = await getDoc(partRef);
           if (partSnap.exists()) {
+            console.log("JoinMeetingWatcher (polling): Found participant doc. Redirecting.");
             redirectToMeeting();
             cleanup();
             return;
@@ -136,6 +145,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
           // also check request doc status just in case
           const reqSnap = await getDoc(reqRef);
           if (reqSnap.exists() && (reqSnap.data() as any).status === "approved") {
+            console.log("JoinMeetingWatcher (polling): Found approved request. Redirecting.");
             redirectToMeeting();
             cleanup();
             return;
