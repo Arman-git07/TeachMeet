@@ -163,7 +163,7 @@ function PreJoinPageContent() {
         setRequestStatus("accepted");
         toast({ title: "Request Approved", description: "Joining the meeting..." });
         setTimeout(() => {
-          router.push(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
+          router.replace(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
         }, 800);
       } else if (status === "denied") {
         if (requestStatus === 'denied') return; // Prevent multiple toasts
@@ -304,7 +304,7 @@ function PreJoinPageContent() {
          );
       case 'idle':
       default:
-        return <Button onClick={handleAskToJoin} disabled={!agreed} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">Ask to Join</Button>;
+        return <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-primary/50 text-primary-foreground/70 cursor-not-allowed")}>Ask to Join</Button>;
     }
   };
   
