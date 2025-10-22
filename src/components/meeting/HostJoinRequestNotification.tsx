@@ -2,11 +2,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, where, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
 
 interface JoinRequest {
   id: string;
@@ -19,6 +20,8 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const { toast } = useToast();
   const playedSoundRef = useRef<Record<string, boolean>>({});
+  const { user } = useAuth();
+  const hostId = user?.uid;
 
   useEffect(() => {
     if (!meetingId) return;
@@ -49,7 +52,52 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   }, [meetingId]);
 
   const handleApprove = async (req: JoinRequest) => {
-    // Feature removed as per request
+    if (!meetingId) {
+      console.error("handleApprove: missing meetingId");
+      return;
+    }
+    const participantId = req.userId;
+    const participantDocRef = doc(db, "meetings", meetingId, "participants", participantId);
+    const joinReqRef = doc(db, "meetings", meetingId, "joinRequests", participantId);
+  
+    try {
+      // Use batch to ensure both writes happen together
+      const batch = writeBatch(db);
+  
+      // Create participant doc (host-provided metadata)
+      batch.set(participantDocRef, {
+        userId: participantId,
+        name: req.userName || "Guest",
+        photoURL: req.userPhotoURL || "",
+        joinedAt: serverTimestamp(),
+      }, { merge: true });
+  
+      // Mark the join request approved so the participant watcher sees it
+      batch.update(joinReqRef, {
+        status: "approved",
+        approvedAt: serverTimestamp(),
+        approvedBy: hostId || null,
+      });
+  
+      // Commit both operations in one atomic write
+      await batch.commit();
+
+      toast({ title: "Request Approved", description: `${req.userName} will now join the meeting.` });
+  
+      // Optional: keep request document for a short delay so participant watcher sees 'approved', then delete
+      // (Do not delete immediately — give participant time to observe the change)
+      setTimeout(async () => {
+        try {
+          await deleteDoc(joinReqRef);
+        } catch (e) {
+          // ignore if already deleted
+        }
+      }, 3000);
+  
+    } catch (err) {
+      console.error("Failed to approve join request:", err);
+      toast({ variant: "destructive", title: "Action Failed", description: "Could not approve the request."});
+    }
   };
 
   const handleDeny = async (req: JoinRequest) => {
