@@ -1,4 +1,3 @@
-
 // src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
@@ -52,49 +51,65 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     return () => unsub();
   }, [meetingId]);
 
-  const handleApprove = async (req: JoinRequest) => {
-    if (!meetingId) {
-      console.error("handleApprove: missing meetingId");
-      return;
-    }
-    const participantId = req.userId;
-    const participantDocRef = doc(db, "meetings", meetingId, "participants", participantId);
-    const joinReqRef = doc(db, "meetings", meetingId, "joinRequests", participantId);
-  
+  const handleApprove = async (request: {
+    userId: string;
+    userName?: string;
+    userPhotoURL?: string;
+  }) => {
     try {
+      if (!meetingId) {
+        console.error("Missing meetingId");
+        return;
+      }
+  
+      const participantUid = request.userId;
+      const participantRef = doc(db, "meetings", meetingId, "participants", participantUid);
+      const joinRequestRef = doc(db, "meetings", meetingId, "joinRequests", participantUid);
+  
       const batch = writeBatch(db);
   
-      batch.set(participantDocRef, {
-        userId: participantId,
-        name: req.userName || "Guest",
-        photoURL: req.userPhotoURL || "",
+      // 1️⃣ Create participant document — this is what the participant watcher listens for
+      batch.set(participantRef, {
+        userId: participantUid,
+        name: request.userName || "Guest",
+        photoURL: request.userPhotoURL || "",
         joinedAt: serverTimestamp(),
+        isHost: false, // Explicitly set as not host
       }, { merge: true });
   
-      batch.update(joinReqRef, {
-        status: "approved",
-        approvedAt: serverTimestamp(),
-        approvedBy: hostId || null,
-      });
+      // 2️⃣ Update join request status to “approved”
+      batch.set(
+        joinRequestRef,
+        {
+          status: "approved",
+          approvedAt: serverTimestamp(),
+          approvedBy: hostId || null,
+        },
+        { merge: true }
+      );
   
+      // Commit both writes atomically
       await batch.commit();
-
-      toast({ title: "Request Approved", description: `${req.userName} will now join the meeting.` });
   
+      console.log("✅ Approved join request and added participant.");
+      toast({ title: "Request Approved", description: `${request.userName} will now join the meeting.` });
+  
+      // Optional: keep request document for a short delay so participant watcher sees 'approved', then delete
+      // (Do not delete immediately — give participant time to observe the change)
       setTimeout(async () => {
         try {
-          await deleteDoc(joinReqRef);
+          await deleteDoc(joinRequestRef);
         } catch (e) {
           // ignore if already deleted
         }
       }, 3000);
   
-    } catch (err) {
-      console.error("Failed to approve join request:", err);
+    } catch (error) {
+      console.error("❌ handleApprove failed:", error);
       toast({ variant: "destructive", title: "Action Failed", description: "Could not approve the request."});
     }
   };
-
+  
   const handleDeny = async (req: JoinRequest) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
