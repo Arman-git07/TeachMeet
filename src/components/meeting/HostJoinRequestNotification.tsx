@@ -69,7 +69,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
       toast({ title: "Participant Approved", description: `${req.userName} has joined.`});
 
-      // Clean up the request after a short delay
+      // Clean up the request after a short delay to ensure listener fires
       setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
     } catch (err) {
       console.error("Approve failed:", err);
