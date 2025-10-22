@@ -68,16 +68,16 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   
       const batch = writeBatch(db);
   
-      // 1️⃣ Create participant document — this is what the participant watcher listens for
+      // 1. Create participant document
       batch.set(participantRef, {
         userId: participantUid,
         name: request.userName || "Guest",
         photoURL: request.userPhotoURL || "",
         joinedAt: serverTimestamp(),
-        isHost: false, // Explicitly set as not host
+        isHost: false,
       }, { merge: true });
   
-      // 2️⃣ Update join request status to “approved”
+      // 2. Update join request status to “approved”
       batch.set(
         joinRequestRef,
         {
@@ -88,14 +88,12 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         { merge: true }
       );
   
-      // Commit both writes atomically
       await batch.commit();
   
       console.log("✅ Approved join request and added participant.");
       toast({ title: "Request Approved", description: `${request.userName} will now join the meeting.` });
   
       // Optional: keep request document for a short delay so participant watcher sees 'approved', then delete
-      // (Do not delete immediately — give participant time to observe the change)
       setTimeout(async () => {
         try {
           await deleteDoc(joinRequestRef);
