@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -32,9 +33,10 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, getDoc, DocumentData } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch } from 'firebase/firestore';
 
 interface Participant {
   id: string; // This will be the userId
@@ -42,16 +44,19 @@ interface Participant {
   photoURL?: string;
   isMicMuted?: boolean;
   isCameraOff?: boolean;
+  role: 'host' | 'participant'; // Assuming role is available
 }
 
 const ParticipantItem = React.memo(({
   participant, 
   isCurrentUserHost, 
-  isThisParticipantTheHost 
+  isThisParticipantTheHost,
+  onRemoveClick
 }: { 
   participant: Participant, 
   isCurrentUserHost: boolean,
-  isThisParticipantTheHost: boolean
+  isThisParticipantTheHost: boolean,
+  onRemoveClick: (participant: Participant) => void;
 }) => {
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
@@ -111,7 +116,7 @@ const ParticipantItem = React.memo(({
               <DropdownMenuSeparator />
               {isCurrentUserHost && !isThisParticipantTheHost && ( 
                 <DropdownMenuItem 
-                  onSelect={() => handleActionClick('Remove', participant.name)} 
+                  onSelect={(e) => { e.preventDefault(); onRemoveClick(participant); }}
                   className="text-destructive focus:text-destructive cursor-pointer"
                 >
                   <UserX className="mr-2 h-4 w-4" />
@@ -145,6 +150,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const [meetingHostId, setMeetingHostId] = useState<string | null>(null);
   const [showMeetingId, setShowMeetingId] = useState(false);
   const currentUserId = auth.currentUser?.uid;
+  const [participantToRemove, setParticipantToRemove] = useState<Participant | null>(null);
 
   useEffect(() => {
     if (!meetingId || !db) return;
@@ -181,6 +187,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
           photoURL: data.photoURL,
           isMicMuted: data.isMicMuted,
           isCameraOff: data.isCameraOff,
+          role: data.isHost ? 'host' : 'participant',
         });
       });
       setRealtimeParticipants(fetchedParticipants);
@@ -201,6 +208,25 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     };
   }, [meetingId, db, toast]);
 
+  const handleRemoveConfirm = async () => {
+    if (!participantToRemove) return;
+    
+    const batch = writeBatch(db);
+    const participantRef = doc(db, "meetings", meetingId, "participants", participantToRemove.id);
+    batch.delete(participantRef);
+
+    try {
+        await batch.commit();
+        toast({ title: "Participant Removed", description: `${participantToRemove.name} has been removed from the meeting.` });
+    } catch (error) {
+        console.error("Error removing participant:", error);
+        toast({ variant: "destructive", title: "Removal Failed", description: "Could not remove the participant." });
+    } finally {
+        setParticipantToRemove(null);
+    }
+  };
+
+
   const backToMeetingLink = topicFromParams 
     ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topicFromParams)}`
     : `/dashboard/meeting/${meetingId}`;
@@ -208,6 +234,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const isCurrentUserTheHost = currentUserId === meetingHostId;
 
   return (
+    <>
     <div className="flex flex-col h-full bg-muted/30">
       <header className="flex-none p-3 border-b bg-background shadow-sm">
         <div className="container mx-auto flex items-center justify-between">
@@ -258,6 +285,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                       participant={participant} 
                       isCurrentUserHost={isCurrentUserTheHost}
                       isThisParticipantTheHost={participant.id === meetingHostId}
+                      onRemoveClick={() => setParticipantToRemove(participant)}
                     />
                   ))}
                 </div>
@@ -270,5 +298,21 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
         TeachMeet Participants List - Real-time updates from Firestore.
       </footer>
     </div>
+    <AlertDialog open={!!participantToRemove} onOpenChange={(open) => !open && setParticipantToRemove(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will remove <span className="font-bold">{participantToRemove?.name}</span> from the meeting. They will need to request to join again.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setParticipantToRemove(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleRemoveConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Remove</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
+
