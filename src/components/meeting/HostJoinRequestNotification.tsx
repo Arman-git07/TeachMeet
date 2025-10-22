@@ -1,3 +1,4 @@
+
 // src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
@@ -61,10 +62,8 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     const joinReqRef = doc(db, "meetings", meetingId, "joinRequests", participantId);
   
     try {
-      // Use batch to ensure both writes happen together
       const batch = writeBatch(db);
   
-      // Create participant doc (host-provided metadata)
       batch.set(participantDocRef, {
         userId: participantId,
         name: req.userName || "Guest",
@@ -72,20 +71,16 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         joinedAt: serverTimestamp(),
       }, { merge: true });
   
-      // Mark the join request approved so the participant watcher sees it
       batch.update(joinReqRef, {
         status: "approved",
         approvedAt: serverTimestamp(),
         approvedBy: hostId || null,
       });
   
-      // Commit both operations in one atomic write
       await batch.commit();
 
       toast({ title: "Request Approved", description: `${req.userName} will now join the meeting.` });
   
-      // Optional: keep request document for a short delay so participant watcher sees 'approved', then delete
-      // (Do not delete immediately — give participant time to observe the change)
       setTimeout(async () => {
         try {
           await deleteDoc(joinReqRef);
@@ -103,10 +98,8 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const handleDeny = async (req: JoinRequest) => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
-      // Update status to 'denied' to notify the user
       await updateDoc(reqRef, { status: "denied" });
       toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied entry.`});
-      // Clean up the request after a short delay
       setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
     } catch (err) {
       console.error("Decline failed:", err);
