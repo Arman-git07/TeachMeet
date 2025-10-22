@@ -1,8 +1,7 @@
-// src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, where, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +13,7 @@ interface JoinRequest {
   userId: string;
   userName: string;
   userPhotoURL?: string;
+  meetingId?: string; // Add this to the interface
 }
 
 export default function HostJoinRequestNotification({ meetingId }: { meetingId: string }) {
@@ -23,15 +23,17 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const { user } = useAuth();
   const hostId = user?.uid;
 
+  // 🔹 Listen for pending join requests
   useEffect(() => {
     if (!meetingId) return;
-
-    const colRef = collection(db, "meetings", meetingId, "joinRequests");
-    const q = query(colRef, where("status", "==", "pending"));
+    // This query path was incorrect. It should query the subcollection within the meeting document.
+    const q = query(collection(db, "meetings", meetingId, "joinRequests"), where("status", "==", "pending"));
 
     const unsub = onSnapshot(q, (snap) => {
-      const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as JoinRequest));
+      const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest)); // Ensure userId is populated from doc id
+      setRequests(pendingReqs);
 
+      // Play sound only once per request
       pendingReqs.forEach((req) => {
         if (!playedSoundRef.current[req.id]) {
           try {
@@ -44,81 +46,76 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
           playedSoundRef.current[req.id] = true;
         }
       });
-      
-      setRequests(pendingReqs);
     });
 
     return () => unsub();
   }, [meetingId]);
 
-  const handleApprove = async (request: {
-    userId: string;
-    userName?: string;
-    userPhotoURL?: string;
-  }) => {
+  // 🔹 Approve request
+  const handleApprove = async (req: JoinRequest) => {
     try {
-      if (!meetingId) {
-        console.error("Missing meetingId");
-        return;
-      }
-  
-      const participantUid = request.userId;
-      const participantRef = doc(db, "meetings", meetingId, "participants", participantUid);
-      const joinRequestRef = doc(db, "meetings", meetingId, "joinRequests", participantUid);
-  
+      const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
+      const joinRequestRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
+
       const batch = writeBatch(db);
-  
-      // 1. Create participant document
+
+      // Create participant
       batch.set(participantRef, {
-        userId: participantUid,
-        name: request.userName || "Guest",
-        photoURL: request.userPhotoURL || "",
+        userId: req.userId,
+        name: req.userName || "Guest",
+        photoURL: req.userPhotoURL || "",
         joinedAt: serverTimestamp(),
         isHost: false,
         approvedBy: hostId || null,
-      }, { merge: true });
-  
-      // 2. Update join request status to “approved” so the participant watcher sees it
-      batch.set(
-        joinRequestRef,
-        {
-          status: "approved",
-          approvedAt: serverTimestamp(),
-          approvedBy: hostId || null,
-        },
-        { merge: true }
-      );
-  
+      });
+
+      // Update join request status
+      batch.update(joinRequestRef, {
+        status: "approved",
+        approvedAt: serverTimestamp(),
+        approvedBy: hostId || null,
+      });
+
       await batch.commit();
-  
-      console.log("✅ Approved join request and added participant.");
-      toast({ title: "Request Approved", description: `${request.userName} will now join the meeting.` });
-  
-      // Optional: keep request document for a short delay so participant watcher sees 'approved', then delete
+
+      toast({
+        title: "Request Approved",
+        description: `${req.userName} can now join the meeting.`,
+      });
+
+      // Wait 5 seconds, then delete joinRequest for cleanup
       setTimeout(async () => {
         try {
           await deleteDoc(joinRequestRef);
-        } catch (e) {
-          // ignore if already deleted
+        } catch {
+          /* ignore */
         }
-      }, 5000); // Increased to 5s for more safety margin
-  
+      }, 5000);
     } catch (error) {
       console.error("❌ handleApprove failed:", error);
-      toast({ variant: "destructive", title: "Action Failed", description: "Could not approve the request."});
+      toast({
+        variant: "destructive",
+        title: "Action Failed",
+        description: "Could not approve the request.",
+      });
     }
   };
-  
+
+  // 🔹 Deny request
   const handleDeny = async (req: JoinRequest) => {
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
     try {
+      const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
       await updateDoc(reqRef, { status: "denied" });
-      toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied entry.`});
-      // Allow denied status to be seen by user, then remove
+      
+      toast({
+        variant: "destructive",
+        title: "Request Denied",
+        description: `${req.userName} was denied access.`,
+      });
       setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
     } catch (err) {
-      console.error("Decline failed:", err);
-      toast({ variant: "destructive", title: "Action Failed"});
+      console.error("Decline failed: ", err);
+      toast({ variant: "destructive", title: "Action Failed" });
     }
   };
 
@@ -129,27 +126,30 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       {requests.map((req) => (
         <div
           key={req.id}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999]
-                     bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-border
-                     px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown"
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-primary/30 px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown"
         >
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12 border-2 border-primary/50">
-              <AvatarImage src={req.userPhotoURL} alt={req.userName} data-ai-hint="avatar user"/>
-              <AvatarFallback>{req.userName.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarImage src={req.userPhotoURL} alt={req.userName} />
+              <AvatarFallback>{req.userName?.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
               <span className="text-lg font-semibold">Join Request</span>
-              <span className="text-sm text-muted-foreground">{req.userName || "A participant"} wants to join</span>
+              <span className="text-sm text-muted-foreground">{req.userName || "A participant"} wants to join.</span>
             </div>
           </div>
-
           <div className="flex gap-3 items-center">
-            <button onClick={() => handleApprove(req)} className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl flex items-center gap-2 font-medium transition-all shadow-lg hover:shadow-primary/40">
-                <Check size={18}/>Approve
+            <button
+              onClick={() => handleApprove(req)}
+              className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
+            >
+              <Check size={18} /> Approve
             </button>
-            <button onClick={() => handleDeny(req)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-xl flex items-center gap-2 font-medium transition-all shadow-lg hover:shadow-destructive/40">
-                <X size={18}/>Decline
+            <button
+              onClick={() => handleDeny(req)}
+              className="bg-destructive hover:bg-destructive/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
+            >
+              <X size={18} /> Decline
             </button>
           </div>
         </div>
