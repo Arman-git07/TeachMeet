@@ -75,9 +75,10 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         photoURL: request.userPhotoURL || "",
         joinedAt: serverTimestamp(),
         isHost: false,
+        approvedBy: hostId || null,
       }, { merge: true });
   
-      // 2. Update join request status to “approved”
+      // 2. Update join request status to “approved” so the participant watcher sees it
       batch.set(
         joinRequestRef,
         {
@@ -100,7 +101,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         } catch (e) {
           // ignore if already deleted
         }
-      }, 3000);
+      }, 5000); // Increased to 5s for more safety margin
   
     } catch (error) {
       console.error("❌ handleApprove failed:", error);
@@ -113,6 +114,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     try {
       await updateDoc(reqRef, { status: "denied" });
       toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied entry.`});
+      // Allow denied status to be seen by user, then remove
       setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
     } catch (err) {
       console.error("Decline failed:", err);
