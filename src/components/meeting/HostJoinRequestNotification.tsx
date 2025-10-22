@@ -1,4 +1,3 @@
-
 // src/components/meeting/HostJoinRequestNotification.tsx
 "use client";
 
@@ -7,6 +6,7 @@ import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimest
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface JoinRequest {
   id: string;
@@ -99,20 +99,26 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         <div
           key={req.id}
           className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999]
-                     bg-[#111827] text-white rounded-2xl shadow-2xl border border-gray-700
-                     px-6 py-4 flex items-center justify-between w-[90%] max-w-xl animate-slideDown"
+                     bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-border
+                     px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown"
         >
-          <div className="flex flex-col">
-            <span className="text-lg font-semibold">Join Request</span>
-            <span className="text-sm text-gray-300">{req.userName || "A participant"} wants to join</span>
+          <div className="flex items-center gap-4">
+            <Avatar className="h-12 w-12 border-2 border-primary/50">
+              <AvatarImage src={req.userPhotoURL} alt={req.userName} data-ai-hint="avatar user"/>
+              <AvatarFallback>{req.userName.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="text-lg font-semibold">Join Request</span>
+              <span className="text-sm text-muted-foreground">{req.userName || "A participant"} wants to join</span>
+            </div>
           </div>
 
           <div className="flex gap-3 items-center">
-            <button onClick={() => handleApprove(req)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all">
-                <Check size={16}/>Approve
+            <button onClick={() => handleApprove(req)} className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl flex items-center gap-2 font-medium transition-all shadow-lg hover:shadow-primary/40">
+                <Check size={18}/>Approve
             </button>
-            <button onClick={() => handleDeny(req)} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-1 font-medium transition-all">
-                <X size={16}/>Decline
+            <button onClick={() => handleDeny(req)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-xl flex items-center gap-2 font-medium transition-all shadow-lg hover:shadow-destructive/40">
+                <X size={18}/>Decline
             </button>
           </div>
         </div>
