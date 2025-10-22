@@ -3,141 +3,161 @@
 import { useEffect, useRef } from "react";
 import { doc, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 /**
- * Robust JoinMeetingWatcher:
- * - Mount this after participant sends the join request.
- * - Listens to both:
- *     - meetings/{meetingId}/joinRequests/{userUid}  (status -> "approved")
- *     - meetings/{meetingId}/participants/{userUid}  (host may create this first)
- * - Does a fast one-time check and a short polling fallback to avoid race conditions.
- * - Redirects to /dashboard/meeting/{meetingId} via router.replace
+ * Robust JoinMeetingWatcher
+ * - Mount on the participant pre-join page (after request is sent).
+ * - Redirects the participant to the meeting page immediately after host approval.
+ *
+ * Usage (already used by you): <JoinMeetingWatcher meetingId={meetingId} />
+ *
+ * NOTE: This only performs the redirect behavior — it does not modify any UI or buttons.
  */
 export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
   const router = useRouter();
-  const unsubRef = useRef<{ req?: () => void; part?: () => void } | null>(null);
-  const redirected = useRef(false);
-  const pollRef = useRef<number | null>(null);
+  const unsubRefs = useRef<{ req?: () => void; part?: () => void } | null>(null);
+  const didRedirect = useRef(false);
+  const fallbackInterval = useRef<number | null>(null);
 
   useEffect(() => {
     if (!meetingId) return;
 
     let mounted = true;
-
     const auth = getAuth();
 
-    const stop = onAuthStateChanged(auth, async (user) => {
+    // Helper redirect once
+    const redirectToMeeting = () => {
+      if (didRedirect.current) return;
+      didRedirect.current = true;
+      // Replace so back button doesn't go back to waiting screen
+      router.replace(`/dashboard/meeting/${meetingId}`);
+    };
+
+    // Cleanup helper
+    const cleanup = () => {
+      if (unsubRefs.current?.req) {
+        try { unsubRefs.current.req(); } catch {}
+      }
+      if (unsubRefs.current?.part) {
+        try { unsubRefs.current.part(); } catch {}
+      }
+      if (fallbackInterval.current) {
+        clearInterval(fallbackInterval.current);
+        fallbackInterval.current = null;
+      }
+    };
+
+    // Wait for auth to be ready (handles the currentUser null race)
+    const stopAuthListener = onAuthStateChanged(auth, async (user) => {
       if (!mounted) return;
+
       if (!user) {
-        // Not authenticated — watcher can't work.
+        // Not signed in — nothing to watch. The app's auth flow should handle sign-in.
         return;
       }
-      const userId = user.uid;
+
+      const userId = (user as User).uid;
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", userId);
-      const participantRef = doc(db, "meetings", meetingId, "participants", userId);
+      const partRef = doc(db, "meetings", meetingId, "participants", userId);
 
-      const doRedirect = () => {
-        if (redirected.current) return;
-        redirected.current = true;
-        // Use replace so Back button doesn't return to prejoin
-        router.replace(`/dashboard/meeting/${meetingId}`);
-      };
-
-      // Fast one-time check in case approval has already happened
+      // 1) One-time fast check (maybe approval already happened)
       try {
-        const [partSnap, reqSnap] = await Promise.all([getDoc(participantRef), getDoc(reqRef)]);
+        const [partSnap, reqSnap] = await Promise.all([getDoc(partRef), getDoc(reqRef)]);
         if (partSnap.exists()) {
-          doRedirect();
+          redirectToMeeting();
+          // we can stop now
+          cleanup();
+          stopAuthListener();
           return;
         }
         if (reqSnap.exists() && (reqSnap.data() as any).status === "approved") {
-          doRedirect();
+          redirectToMeeting();
+          cleanup();
+          stopAuthListener();
           return;
         }
       } catch (e) {
-        // ignore and continue to attach listeners
+        // harmless; we'll still set listeners
+        // console.warn("JoinMeetingWatcher quick-check failed", e);
       }
 
-      // Real-time listener on join request doc
+      // 2) Real-time listener on joinRequests/{userId}
       try {
         const unsubReq = onSnapshot(reqRef, (snap) => {
           if (!snap.exists()) return;
           const data = snap.data() as any;
-          if (!data) return;
-          const status = data.status;
-          if (status === "approved") {
-            doRedirect();
-          } else if (status === "denied" || status === "rejected") {
-            // Optionally notify participant here (do not redirect)
-            try { alert("Host denied your join request."); } catch {}
+          // If host set approved status
+          if (data?.status === "approved") {
+            redirectToMeeting();
+          } else if (data?.status === "denied" || data?.status === "rejected") {
+            // Optional: you may show feedback (alert/toast) elsewhere; do not auto-redirect.
+            // alert("Host denied your request to join.");
           }
         });
-        unsubRef.current = { ...(unsubRef.current || {}), req: unsubReq };
+        unsubRefs.current = { ...unsubRefs.current, req: unsubReq };
       } catch (e) {
-        console.error("Failed to attach joinRequest listener", e);
+        console.error("JoinMeetingWatcher: failed to attach req listener", e);
       }
 
-      // Real-time listener on participant doc (host sometimes writes this first)
+      // 3) Real-time listener on participants/{userId} (host might create participant doc first)
       try {
-        const unsubPart = onSnapshot(participantRef, (snap) => {
+        const unsubPart = onSnapshot(partRef, (snap) => {
           if (snap.exists()) {
-            doRedirect();
+            redirectToMeeting();
           }
         });
-        unsubRef.current = { ...(unsubRef.current || {}), part: unsubPart };
+        unsubRefs.current = { ...unsubRefs.current, part: unsubPart };
       } catch (e) {
-        console.error("Failed to attach participant listener", e);
+        console.error("JoinMeetingWatcher: failed to attach participant listener", e);
       }
 
-      // Short polling fallback (every 1s up to ~8s) — catches the race when host deletes request immediately
-      let tries = 0;
-      pollRef.current = window.setInterval(async () => {
-        if (redirected.current) {
-          if (pollRef.current) clearInterval(pollRef.current);
-          pollRef.current = null;
+      // 4) Fallback polling: in case host deletes the request immediately after approval
+      //    we poll participants doc every 1s for up to 10s (only if not redirected).
+      let polls = 0;
+      fallbackInterval.current = window.setInterval(async () => {
+        if (didRedirect.current) {
+          if (fallbackInterval.current) {
+            clearInterval(fallbackInterval.current);
+            fallbackInterval.current = null;
+          }
           return;
         }
-        tries++;
+        polls++;
         try {
-          const p = await getDoc(participantRef);
-          if (p.exists()) {
-            doRedirect();
+          const partSnap = await getDoc(partRef);
+          if (partSnap.exists()) {
+            redirectToMeeting();
+            cleanup();
             return;
           }
-          const r = await getDoc(reqRef);
-          if (r.exists() && (r.data() as any).status === "approved") {
-            doRedirect();
+          // also check request doc status just in case
+          const reqSnap = await getDoc(reqRef);
+          if (reqSnap.exists() && (reqSnap.data() as any).status === "approved") {
+            redirectToMeeting();
+            cleanup();
             return;
           }
-        } catch (err) {
-          // ignore transient read errors
+        } catch (e) {
+          // ignore transient errors
         }
-        if (tries >= 8) {
-          // stop after ~8s
-          if (pollRef.current) clearInterval(pollRef.current);
-          pollRef.current = null;
+        if (polls >= 10) {
+          // stop fallback after 10 attempts (~10s)
+          if (fallbackInterval.current) {
+            clearInterval(fallbackInterval.current);
+            fallbackInterval.current = null;
+          }
         }
       }, 1000);
 
-      // Stop listening to auth state after we set up watchers
-      stop();
+      // We no longer need the onAuthStateChanged listener once set up
+      stopAuthListener();
     });
 
     return () => {
       mounted = false;
-      // cleanup listeners
-      if (unsubRef.current?.req) {
-        try { unsubRef.current.req(); } catch {}
-      }
-      if (unsubRef.current?.part) {
-        try { unsubRef.current.part(); } catch {}
-      }
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
+      cleanup();
     };
   }, [meetingId, router]);
 
