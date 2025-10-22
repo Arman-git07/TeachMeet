@@ -49,32 +49,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   }, [meetingId]);
 
   const handleApprove = async (req: JoinRequest) => {
-    const batch = writeBatch(db);
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.id);
-    const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
-
-    try {
-      // Create the participant document
-      batch.set(participantRef, {
-        name: req.userName,
-        photoURL: req.userPhotoURL || "",
-        isHost: false, // Explicitly not the host
-        joinedAt: serverTimestamp(),
-      });
-
-      // Update the request status to signal the client
-      batch.update(reqRef, { status: "approved" });
-      
-      await batch.commit();
-
-      toast({ title: "Participant Approved", description: `${req.userName} has joined.`});
-
-      // Clean up the request after a short delay to ensure listener fires
-      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
-    } catch (err) {
-      console.error("Approve failed:", err);
-      toast({ variant: "destructive", title: "Approval Failed"});
-    }
+    // Feature removed as per request
   };
 
   const handleDeny = async (req: JoinRequest) => {
