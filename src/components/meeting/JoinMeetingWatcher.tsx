@@ -8,9 +8,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 export default function JoinMeetingWatcher({ meetingId }: { meetingId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const unsubRefs = useRef<{ req?: () => void; part?: () => void }>({});
   const didRedirect = useRef(false);
-  const fallbackInterval = useRef<number | null>(null);
+  const unsubRefs = useRef<{ req?: () => void; part?: () => void }>({});
+  const fallbackInterval = useRef<NodeJS.Timeout | null>(null);
 
   const topic = searchParams.get("topic") || "";
   const cam = searchParams.get("cam") || "true";
@@ -19,72 +19,77 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
   useEffect(() => {
     if (!meetingId) return;
     let mounted = true;
-    const auth = getAuth();
 
     const redirectToMeeting = () => {
       if (didRedirect.current) return;
       didRedirect.current = true;
-      const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}&cam=${cam}&mic=${mic}`;
-      router.replace(destination);
-    };
 
-    const cleanup = () => {
+      // clean up listeners immediately on redirect
       try {
         unsubRefs.current.req?.();
         unsubRefs.current.part?.();
+        if (fallbackInterval.current) clearInterval(fallbackInterval.current);
       } catch {}
-      if (fallbackInterval.current) clearInterval(fallbackInterval.current);
+
+      const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(
+        topic
+      )}&cam=${cam}&mic=${mic}`;
+      router.replace(destination);
     };
 
-    const stopAuthListener = onAuthStateChanged(auth, async (user) => {
-      if (!mounted || !user) return;
+    const auth = getAuth();
+    const stopAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user || !mounted) return;
       const userId = user.uid;
 
-      // Corrected the path to query the subcollection
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", userId);
       const partRef = doc(db, "meetings", meetingId, "participants", userId);
 
-      // 🔹 Fast-check in case approval already exists
+      // 🔹 Initial fast check: maybe host already approved before watcher started
       try {
-        const [partSnap, reqSnap] = await Promise.all([getDoc(partRef), getDoc(reqRef)]);
+        const [reqSnap, partSnap] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
         if (partSnap.exists() || (reqSnap.exists() && reqSnap.data().status === "approved")) {
           redirectToMeeting();
-          cleanup();
-          stopAuthListener();
           return;
         }
       } catch (e) {
-        console.warn("Watcher fast-check failed", e);
+        console.error("Initial join check failed", e);
       }
 
-      // 🔹 Real-time listeners
+      // 🔹 Real-time listeners (stay active)
       unsubRefs.current.req = onSnapshot(reqRef, (snap) => {
-        if (snap.exists() && snap.data().status === "approved") {
+        if (!mounted || didRedirect.current) return;
+        const data = snap.data();
+        if (snap.exists() && data?.status === "approved") {
           redirectToMeeting();
         }
       });
 
       unsubRefs.current.part = onSnapshot(partRef, (snap) => {
-        if (snap.exists()) redirectToMeeting();
+        if (!mounted || didRedirect.current) return;
+        if (snap.exists()) {
+          redirectToMeeting();
+        }
       });
 
-      // 🔹 Fallback polling (max 10s)
-      let polls = 0;
-      fallbackInterval.current = window.setInterval(async () => {
-        if (didRedirect.current || polls >= 10) {
-          if (fallbackInterval.current) clearInterval(fallbackInterval.current);
-          return;
-        }
-        polls++;
-        const partSnap = await getDoc(partRef);
-        if (partSnap.exists()) redirectToMeeting();
-      }, 1000);
+      // 🔹 Fallback poller (in case snapshots fail)
+      fallbackInterval.current = setInterval(async () => {
+        if (!mounted || didRedirect.current) return;
+        try {
+          const [r, p] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
+          if (p.exists() || (r.exists() && r.data()?.status === "approved")) {
+            redirectToMeeting();
+          }
+        } catch {}
+      }, 4000);
     });
 
     return () => {
       mounted = false;
-      cleanup();
-      stopAuthListener();
+      stopAuth();
+      unsubRefs.current.req?.();
+      unsubRefs.current.part?.();
+      if (fallbackInterval.current) clearInterval(fallbackInterval.current);
     };
   }, [meetingId, router, topic, cam, mic]);
 
