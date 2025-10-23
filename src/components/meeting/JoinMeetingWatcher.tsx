@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useRef } from "react";
 import { doc, onSnapshot, getDoc } from "firebase/firestore";
@@ -74,7 +75,10 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
 
       // 🔹 Fallback poller (in case snapshots fail)
       fallbackInterval.current = setInterval(async () => {
-        if (!mounted || didRedirect.current) return;
+        if (!mounted || didRedirect.current) {
+          if(fallbackInterval.current) clearInterval(fallbackInterval.current);
+          return;
+        };
         try {
           const [r, p] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
           if (p.exists() || (r.exists() && r.data()?.status === "approved")) {
