@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -83,14 +84,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         description: `${req.userName} can now join the meeting.`,
       });
 
-      // Wait 5 seconds, then delete joinRequest for cleanup
-      setTimeout(async () => {
-        try {
-          await deleteDoc(joinRequestRef);
-        } catch {
-          /* ignore */
-        }
-      }, 5000);
     } catch (error) {
       console.error("❌ handleApprove failed:", error);
       toast({
@@ -112,7 +105,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         title: "Request Denied",
         description: `${req.userName} was denied access.`,
       });
-      setTimeout(() => deleteDoc(reqRef).catch(() => {}), 5000);
+      // The participant's side will now handle seeing the "denied" status
     } catch (err) {
       console.error("Decline failed: ", err);
       toast({ variant: "destructive", title: "Action Failed" });
@@ -157,3 +150,5 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     </>
   );
 }
+
+    

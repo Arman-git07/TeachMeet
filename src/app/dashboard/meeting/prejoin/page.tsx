@@ -140,36 +140,38 @@ function PreJoinPageContent() {
      };
   }, [toast]);
   
-    useEffect(() => {
+  useEffect(() => {
     if (!meetingId || !user || isHost || authLoading) return;
 
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
 
     const unsub = onSnapshot(reqRef, (snap) => {
+      // If we are already accepted, don't allow state to change backwards.
+      if (requestStatus === 'accepted') return;
+        
       if (!snap.exists()) {
+        // If the doc is deleted, reset to idle unless we were already denied.
         if (requestStatus === 'pending') {
             setRequestStatus('idle');
-        } else if (requestStatus === 'denied') {
-            setRequestStatus('idle'); // Allow re-requesting after denial is processed
         }
         return;
       }
+      
       const data = snap.data();
       if (!data) return;
 
       const status = data.status;
       if (status === "approved") {
-        if (requestStatus === 'accepted') return; // Prevent multiple navigations
         setRequestStatus("accepted");
         toast({ title: "Request Approved", description: "Joining the meeting..." });
         setTimeout(() => {
           router.replace(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
         }, 800);
       } else if (status === "denied") {
-        if (requestStatus === 'denied') return; // Prevent multiple toasts
-        setRequestStatus("denied");
-        toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
-        setTimeout(() => deleteDoc(reqRef).catch(() => {}), 4000);
+        if (requestStatus !== 'denied') { // Prevent multiple toasts for same denial
+           setRequestStatus("denied");
+           toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
+        }
       } else {
         setRequestStatus("pending");
       }
@@ -246,6 +248,10 @@ function PreJoinPageContent() {
         if (user.uid === hostId) {
             toast({ title: "You are the host", description: "Use 'Join Now as Host' to start the meeting." });
             return;
+        }
+        
+        if (requestStatus === 'denied') {
+             await deleteDoc(reqRef).catch(() => {});
         }
 
         setRequestStatus("pending");
@@ -371,3 +377,5 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
+
+    
