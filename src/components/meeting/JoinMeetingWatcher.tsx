@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useEffect, useRef } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getAuth, onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,7 +11,7 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
   const router = useRouter();
   const searchParams = useSearchParams();
   const didRedirect = useRef(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const cleanupRef = useRef<() => void>(() => {});
 
   const topic = searchParams.get("topic") || "";
   const cam = searchParams.get("cam") || "true";
@@ -20,17 +21,10 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
     if (!meetingId) return;
     let mounted = true;
 
-    const cleanup = () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-
     const redirectToMeeting = () => {
       if (!mounted || didRedirect.current) return;
       didRedirect.current = true;
-      cleanup();
+      cleanupRef.current(); // Stop all listeners and timers
       const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(
         topic
       )}&cam=${cam}&mic=${mic}`;
@@ -39,13 +33,15 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
 
     const startWatcher = async (user: User) => {
       if (!mounted) return;
+      const userId = user.uid;
 
-      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+      const participantRef = doc(db, "meetings", meetingId, "participants", userId);
+      const requestRef = doc(db, "meetings", meetingId, "joinRequests", userId);
 
-      // 1. Initial immediate check
+      // 1. Initial Fast Check
       try {
-        const initialSnap = await getDoc(participantRef);
-        if (initialSnap.exists()) {
+        const participantSnap = await getDoc(participantRef);
+        if (participantSnap.exists()) {
           redirectToMeeting();
           return;
         }
@@ -53,40 +49,54 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
         console.error("JoinMeetingWatcher: Initial check failed", e);
       }
 
-      // 2. Aggressive polling as a robust fallback
-      cleanup(); // Ensure no previous interval is running
-      intervalRef.current = setInterval(async () => {
+      // 2. Real-time Listeners
+      const unsubParticipant = onSnapshot(participantRef, (snap) => {
+        if (snap.exists()) {
+          redirectToMeeting();
+        }
+      });
+
+      const unsubRequest = onSnapshot(requestRef, (snap) => {
+        if (snap.exists() && snap.data()?.status === "approved") {
+          redirectToMeeting();
+        }
+      });
+      
+      // 3. Fallback Polling
+      const fallbackInterval = setInterval(async () => {
         if (!mounted || didRedirect.current) {
-          cleanup();
+          clearInterval(fallbackInterval);
           return;
         }
         try {
-          const pollSnap = await getDoc(participantRef);
-          if (pollSnap.exists()) {
+          const pSnap = await getDoc(participantRef);
+          if (pSnap.exists()) {
             redirectToMeeting();
           }
-        } catch (e) {
-          // Don't log errors here as it's a fallback and can be noisy.
-          // The main failure would be the redirect not happening.
-        }
-      }, 2000); // Check every 2 seconds
+        } catch {}
+      }, 3000); // Check every 3 seconds
+
+      // Aggregate cleanup function
+      cleanupRef.current = () => {
+        unsubParticipant();
+        unsubRequest();
+        clearInterval(fallbackInterval);
+      };
     };
 
+    // Main entry point: wait for auth state
     const auth = getAuth();
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         startWatcher(user);
-      } else {
-        // If user logs out while waiting, stop everything.
-        cleanup();
       }
     });
 
-    // Cleanup on component unmount
+    // Final cleanup on component unmount
     return () => {
       mounted = false;
       authUnsubscribe();
-      cleanup();
+      cleanupRef.current();
     };
   }, [meetingId, router, topic, cam, mic]);
 
