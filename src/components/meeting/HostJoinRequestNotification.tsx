@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, deleteDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -27,11 +27,10 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   // 🔹 Listen for pending join requests
   useEffect(() => {
     if (!meetingId) return;
-    // This query path was incorrect. It should query the subcollection within the meeting document.
     const q = query(collection(db, "meetings", meetingId, "joinRequests"), where("status", "==", "pending"));
 
     const unsub = onSnapshot(q, (snap) => {
-      const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest)); // Ensure userId is populated from doc id
+      const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest));
       setRequests(pendingReqs);
 
       // Play sound only once per request
@@ -83,6 +82,8 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         title: "Request Approved",
         description: `${req.userName} can now join the meeting.`,
       });
+      // ⛔ REMOVED: Do not auto-delete the request document.
+      // Let the participant's redirect logic handle it.
 
     } catch (error) {
       console.error("❌ handleApprove failed:", error);
@@ -105,7 +106,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         title: "Request Denied",
         description: `${req.userName} was denied access.`,
       });
-      // The participant's side will now handle seeing the "denied" status
     } catch (err) {
       console.error("Decline failed: ", err);
       toast({ variant: "destructive", title: "Action Failed" });
@@ -150,5 +150,3 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     </>
   );
 }
-
-    

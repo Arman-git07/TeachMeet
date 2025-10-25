@@ -143,40 +143,41 @@ function PreJoinPageContent() {
   useEffect(() => {
     if (!meetingId || !user || isHost || authLoading) return;
 
+    // Use a ref to track if we've already started the redirect process
+    const isRedirecting = { current: false };
+
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-
+    
     const unsub = onSnapshot(reqRef, (snap) => {
-      // If we are already accepted, don't allow state to change backwards.
-      if (requestStatus === 'accepted') return;
-        
-      if (!snap.exists()) {
-        // If the doc is deleted, reset to idle unless we were already denied.
-        if (requestStatus === 'pending') {
-            setRequestStatus('idle');
+        // Once approved, lock the state so subsequent events (like deletion) won't cancel the redirect.
+        if (isRedirecting.current || requestStatus === 'accepted') {
+            return;
         }
-        return;
-      }
-      
-      const data = snap.data();
-      if (!data) return;
 
-      const status = data.status;
-      if (status === "approved") {
-        setRequestStatus("accepted");
-        toast({ title: "Request Approved", description: "Joining the meeting..." });
-        setTimeout(() => {
-          router.replace(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
-        }, 800);
-      } else if (status === "denied") {
-        if (requestStatus !== 'denied') { // Prevent multiple toasts for same denial
-           setRequestStatus("denied");
-           toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
+        if (snap.exists()) {
+            const data = snap.data();
+            if (data.status === "approved") {
+                isRedirecting.current = true; // Lock the state
+                setRequestStatus("accepted");
+                toast({ title: "Request Approved", description: "Joining the meeting..." });
+                // Guarantee redirect even if doc is deleted later
+                setTimeout(() => {
+                  router.replace(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
+                }, 800);
+            } else if (data.status === "denied") {
+                if (requestStatus !== 'denied') {
+                    setRequestStatus("denied");
+                    toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
+                }
+            } else {
+                 setRequestStatus("pending");
+            }
+        } else {
+             // Ignore deletion if we were already accepted and are in the process of redirecting.
+            if (!isRedirecting.current) {
+                setRequestStatus("idle");
+            }
         }
-      } else {
-        setRequestStatus("pending");
-      }
-    }, (err) => {
-      console.error("JoinRequest onSnapshot error:", err);
     });
 
     return () => unsub();
@@ -377,5 +378,3 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
-
-    
