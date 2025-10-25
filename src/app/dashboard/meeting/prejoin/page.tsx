@@ -142,40 +142,45 @@ function PreJoinPageContent() {
   
   useEffect(() => {
     if (!meetingId || !user || isHost || authLoading) return;
-
-    // Use a ref to track if we've already started the redirect process
-    const isRedirecting = { current: false };
-
+  
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
     
+    // This is a mutable reference to the status, so we can check it inside the listener
+    const currentStatusRef = { current: requestStatus };
+    currentStatusRef.current = requestStatus;
+
     const unsub = onSnapshot(reqRef, (snap) => {
-        // Once approved, lock the state so subsequent events (like deletion) won't cancel the redirect.
-        if (isRedirecting.current || requestStatus === 'accepted') {
+        // Once approved, lock the state so deletion won’t cancel redirect.
+        if (currentStatusRef.current === "accepted") {
             return;
         }
 
         if (snap.exists()) {
             const data = snap.data();
             if (data.status === "approved") {
-                isRedirecting.current = true; // Lock the state
                 setRequestStatus("accepted");
+                currentStatusRef.current = "accepted"; // Update ref immediately
                 toast({ title: "Request Approved", description: "Joining the meeting..." });
                 // Guarantee redirect even if doc is deleted later
                 setTimeout(() => {
-                  router.replace(`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`);
+                  const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+                  router.replace(destination);
                 }, 800);
             } else if (data.status === "denied") {
-                if (requestStatus !== 'denied') {
+                if (currentStatusRef.current !== 'denied') {
                     setRequestStatus("denied");
+                    currentStatusRef.current = "denied";
                     toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
                 }
             } else {
                  setRequestStatus("pending");
+                 currentStatusRef.current = "pending";
             }
         } else {
-             // Ignore deletion if we were already accepted and are in the process of redirecting.
-            if (!isRedirecting.current) {
+             // Ignore deletion if we were already accepted.
+            if (currentStatusRef.current !== "accepted") {
                 setRequestStatus("idle");
+                currentStatusRef.current = "idle";
             }
         }
     });
@@ -378,3 +383,5 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
+
+    
