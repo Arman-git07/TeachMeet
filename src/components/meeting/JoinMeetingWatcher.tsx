@@ -22,15 +22,20 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
     let mounted = true;
 
     const redirectToMeeting = () => {
-      if (didRedirect.current) return;
+      if (!mounted || didRedirect.current) return;
       didRedirect.current = true;
 
-      // clean up listeners immediately on redirect
+      // Clean up all listeners and intervals immediately upon redirect
       try {
         unsubRefs.current.req?.();
         unsubRefs.current.part?.();
-        if (fallbackInterval.current) clearInterval(fallbackInterval.current);
-      } catch {}
+        if (fallbackInterval.current) {
+          clearInterval(fallbackInterval.current);
+          fallbackInterval.current = null;
+        }
+      } catch (e) {
+        console.warn("Error during watcher cleanup:", e);
+      }
 
       const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(
         topic
@@ -39,63 +44,81 @@ export default function JoinMeetingWatcher({ meetingId }: { meetingId: string })
     };
 
     const auth = getAuth();
-    const stopAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user || !mounted) return;
+
+    // The main auth listener. This is the entry point.
+    const stopAuthListener = onAuthStateChanged(auth, async (user) => {
+      // Only proceed if we are mounted and have a valid user
+      if (!mounted || !user) return;
+      
       const userId = user.uid;
 
+      // Correctly reference the subcollections within the specific meeting document
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", userId);
       const partRef = doc(db, "meetings", meetingId, "participants", userId);
 
-      // 🔹 Initial fast check: maybe host already approved before watcher started
+      // 🔹 Initial Fast Check: Check for approval right away.
+      // This catches cases where approval happened before this listener was ready.
       try {
         const [reqSnap, partSnap] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
-        if (partSnap.exists() || (reqSnap.exists() && reqSnap.data().status === "approved")) {
+        if (partSnap.exists() || (reqSnap.exists() && reqSnap.data()?.status === "approved")) {
           redirectToMeeting();
-          return;
+          return; // Stop further processing if we already have approval
         }
       } catch (e) {
         console.error("Initial join check failed", e);
       }
 
-      // 🔹 Real-time listeners (stay active)
-      unsubRefs.current.req = onSnapshot(reqRef, (snap) => {
-        if (!mounted || didRedirect.current) return;
-        const data = snap.data();
-        if (snap.exists() && data?.status === "approved") {
-          redirectToMeeting();
-        }
-      });
-
+      // 🔹 Real-time Listener for the participant document itself.
+      // This is the most reliable and fastest way to detect approval.
       unsubRefs.current.part = onSnapshot(partRef, (snap) => {
-        if (!mounted || didRedirect.current) return;
-        if (snap.exists()) {
+        if (snap.exists() && mounted) {
           redirectToMeeting();
         }
+      }, (error) => {
+        console.error("Participant listener error:", error);
       });
 
-      // 🔹 Fallback poller (in case snapshots fail)
+      // 🔹 Real-time Listener for the join request document status.
+      // This is a good secondary check.
+      unsubRefs.current.req = onSnapshot(reqRef, (snap) => {
+        const data = snap.data();
+        if (snap.exists() && data?.status === "approved" && mounted) {
+          redirectToMeeting();
+        }
+      }, (error) => {
+          console.error("Join request listener error:", error);
+      });
+
+      // 🔹 Fallback Poller: A safety net in case snapshot events are missed.
+      if (fallbackInterval.current) clearInterval(fallbackInterval.current); // Clear any old interval
       fallbackInterval.current = setInterval(async () => {
         if (!mounted || didRedirect.current) {
-          if(fallbackInterval.current) clearInterval(fallbackInterval.current);
+          if (fallbackInterval.current) clearInterval(fallbackInterval.current);
           return;
-        };
+        }
         try {
-          const [r, p] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
-          if (p.exists() || (r.exists() && r.data()?.status === "approved")) {
+          const partSnap = await getDoc(partRef);
+          if (partSnap.exists()) {
             redirectToMeeting();
           }
-        } catch {}
-      }, 4000);
+        } catch (e) {
+            // This is just a fallback, so we don't need to show errors.
+        }
+      }, 3000); // Check every 3 seconds
+
     });
 
+    // Cleanup function for when the component unmounts
     return () => {
       mounted = false;
-      stopAuth();
+      stopAuthListener(); // Detach the auth state listener
       unsubRefs.current.req?.();
       unsubRefs.current.part?.();
-      if (fallbackInterval.current) clearInterval(fallbackInterval.current);
+      if (fallbackInterval.current) {
+        clearInterval(fallbackInterval.current);
+      }
     };
   }, [meetingId, router, topic, cam, mic]);
 
-  return null;
+  return null; // This component renders nothing
 }
