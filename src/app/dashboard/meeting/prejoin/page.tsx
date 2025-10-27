@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
@@ -37,6 +36,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 
 function PreJoinPageContent() {
@@ -140,53 +140,111 @@ function PreJoinPageContent() {
      };
   }, [toast]);
   
-  useEffect(() => {
-    if (!meetingId || !user || isHost || authLoading) return;
-  
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-    
-    // This is a mutable reference to the status, so we can check it inside the listener
-    const currentStatusRef = { current: requestStatus };
-    currentStatusRef.current = requestStatus;
+  // ---------- REPLACE the existing listener useEffect with this ----------
+useEffect(() => {
+  if (!meetingId || isHost) return;
 
-    const unsub = onSnapshot(reqRef, (snap) => {
-        // Once approved, lock the state so deletion won’t cancel redirect.
-        if (currentStatusRef.current === "accepted") {
-            return;
+  let mounted = true;
+  const auth = getAuth(); // import from firebase/auth at top if not already
+  const didRedirectRef = { current: false };
+  const unsubRefs: { req?: () => void; part?: () => void } = {};
+  let pollHandle: number | null = null;
+
+  const cleanupAll = () => {
+    try { unsubRefs.req?.(); } catch {}
+    try { unsubRefs.part?.(); } catch {}
+    if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+  };
+
+  const redirectToMeeting = () => {
+    if (didRedirectRef.current) return;
+    didRedirectRef.current = true;
+    cleanupAll();
+    const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+    // use replace to avoid back navigation to waiting page
+    router.replace(destination);
+  };
+
+  // Wait for auth to be ready - avoids race where user isn't known yet
+  const stopAuth = onAuthStateChanged(auth, async (user) => {
+    if (!mounted || !user) return;
+    const uid = user.uid;
+
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", uid);
+    const partRef = doc(db, "meetings", meetingId, "participants", uid);
+
+    // Fast one-time check: maybe host approved before this listener mounted
+    try {
+      const [reqSnap, partSnap] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
+      if (partSnap.exists() || (reqSnap.exists() && (reqSnap.data() as any).status === "approved")) {
+        redirectToMeeting();
+        stopAuth(); // stop further auth events - we are done
+        return;
+      }
+    } catch (e) {
+      // non-fatal, continue to attach real-time listeners
+      console.warn("Prejoin fast-check failed:", e);
+    }
+
+    // Real-time listeners (stay active)
+    try {
+      unsubRefs.req = onSnapshot(reqRef, (snap) => {
+        if (!mounted || didRedirectRef.current) return;
+        if (!snap.exists()) return; // ignore deletions unless we haven't accepted yet
+        const data = snap.data() as any;
+        if (data?.status === "approved") {
+          // lock immediately and redirect
+          redirectToMeeting();
+        } else if (data?.status === "denied") {
+          // you already show toasts elsewhere; optionally show one here
+          // do not auto-navigate on denied
         }
+      });
+    } catch (e) {
+      console.warn("Failed to attach joinRequest listener", e);
+    }
 
+    try {
+      unsubRefs.part = onSnapshot(partRef, (snap) => {
+        if (!mounted || didRedirectRef.current) return;
         if (snap.exists()) {
-            const data = snap.data();
-            if (data.status === "approved") {
-                setRequestStatus("accepted");
-                currentStatusRef.current = "accepted"; // Update ref immediately
-                toast({ title: "Request Approved", description: "Joining the meeting..." });
-                // Guarantee redirect even if doc is deleted later
-                setTimeout(() => {
-                  const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-                  router.replace(destination);
-                }, 800);
-            } else if (data.status === "denied") {
-                if (currentStatusRef.current !== 'denied') {
-                    setRequestStatus("denied");
-                    currentStatusRef.current = "denied";
-                    toast({ variant: "destructive", title: "Request Denied", description: "The host has denied your request to join." });
-                }
-            } else {
-                 setRequestStatus("pending");
-                 currentStatusRef.current = "pending";
-            }
-        } else {
-             // Ignore deletion if we were already accepted.
-            if (currentStatusRef.current !== "accepted") {
-                setRequestStatus("idle");
-                currentStatusRef.current = "idle";
-            }
+          // participant doc created → approved, redirect
+          redirectToMeeting();
         }
-    });
+      });
+    } catch (e) {
+      console.warn("Failed to attach participant listener", e);
+    }
 
-    return () => unsub();
-  }, [meetingId, user, isHost, authLoading, topic, isCameraOn, isMicOn, router, toast, requestStatus]);
+    // Fallback polling (covers edge-case race where snapshots didn't fire)
+    let tries = 0;
+    pollHandle = window.setInterval(async () => {
+      if (!mounted || didRedirectRef.current || tries >= 8) {
+        if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+        return;
+      }
+      tries++;
+      try {
+        const [pSnap, rSnap] = await Promise.all([getDoc(partRef), getDoc(reqRef)]);
+        if (pSnap.exists() || (rSnap.exists() && (rSnap.data() as any).status === "approved")) {
+          redirectToMeeting();
+        }
+      } catch (e) {
+        // ignore transient read errors
+      }
+    }, 1000);
+
+    // Stop auth listener (we only needed it to ensure user is loaded)
+    stopAuth();
+  });
+
+  return () => {
+    mounted = false;
+    cleanupAll();
+    try { stopAuth(); } catch {}
+    if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+  };
+}, [meetingId, isHost, router, topic, isCameraOn, isMicOn]);
 
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user || !isHost) return;
@@ -383,5 +441,3 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
-
-    
