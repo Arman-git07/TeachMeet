@@ -429,13 +429,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="flex-grow flex flex-col min-h-0">
+      <main className="flex-1 overflow-hidden">
           {loadingMedia ? (
               <div className="w-full h-full flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
           ) : (
-              <div className="relative flex-1 flex items-center justify-center p-2">
+              <div className="w-full h-full relative">
                   {renderLayout()}
               </div>
           )}
