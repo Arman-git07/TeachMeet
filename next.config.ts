@@ -38,8 +38,6 @@ const nextConfig = {
       'firebase/auth',
       'firebase/firestore',
       'firebase/storage',
-      '@genkit-ai/flow',
-      '@genkit-ai/googleai',
     ],
     fontLoaders: [
       { loader: '@next/font/google', options: { subsets: ['latin'] } },
