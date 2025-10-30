@@ -139,22 +139,19 @@ const VideoTile: React.FC<Props> = ({
       )}
 
       {/* Bottom-left info */}
-      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2">
+      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2 text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
         <Avatar className="w-7 h-7 shrink-0">
           <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
           <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
         </Avatar>
-        <div className="text-sm font-medium truncate max-w-[160px] text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>{name}</div>
-
-        {/* Mic + screen share */}
-        <div className="flex items-center gap-2">
-          {isMicOn ? (
-            <Mic className="h-4 w-4 text-green-400" />
-          ) : (
-            <MicOff className="h-4 w-4 text-red-400" />
-          )}
-          {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
-        </div>
+        <div className="text-sm font-medium truncate max-w-[160px]">{name}</div>
+        
+        {isMicOn ? (
+          <Mic className="h-4 w-4 text-green-400" />
+        ) : (
+          <MicOff className="h-4 w-4 text-red-400" />
+        )}
+        {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
       </div>
 
       {/* Pin toggle (bottom-right) */}
