@@ -139,12 +139,12 @@ const VideoTile: React.FC<Props> = ({
       )}
 
       {/* Bottom-left info */}
-      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
+      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2">
         <Avatar className="w-7 h-7 shrink-0">
           <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
           <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
         </Avatar>
-        <div className="text-sm font-medium truncate max-w-[160px]">{name}</div>
+        <div className="text-sm font-medium truncate max-w-[160px] text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>{name}</div>
 
         {/* Mic + screen share */}
         <div className="flex items-center gap-2">
