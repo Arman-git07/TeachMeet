@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -162,7 +161,7 @@ const VideoTile: React.FC<Props> = ({
             onTogglePin?.();
           }}
           aria-label={isPinned ? "Unpin participant" : "Pin participant"}
-          className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-black/60 hover:bg-black/70 text-white"
+          className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-transparent hover:bg-black/70 text-white"
           title={isPinned ? "Unpin (restore grid)" : "Pin (fullscreen)"}
         >
           {isPinned ? (
