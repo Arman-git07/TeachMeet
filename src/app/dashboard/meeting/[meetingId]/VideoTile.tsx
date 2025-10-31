@@ -137,40 +137,45 @@ const VideoTile: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Bottom-left info */}
-      <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2 text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
-        <Avatar className="w-7 h-7 shrink-0">
-          <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-          <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <div className="text-sm font-medium truncate max-w-[160px]">{name}</div>
-        
-        {isMicOn ? (
-          <Mic className="h-4 w-4 text-green-400" />
-        ) : (
-          <MicOff className="h-4 w-4 text-red-400" />
-        )}
-        {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
-      </div>
-
-      {/* Pin toggle (bottom-right) */}
-      {onTogglePin && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePin?.();
-          }}
-          aria-label={isPinned ? "Unpin participant" : "Pin participant"}
-          className="absolute bottom-3 right-3 z-30 p-1 rounded-md bg-transparent hover:bg-black/70 text-white"
-          title={isPinned ? "Unpin (restore grid)" : "Pin (fullscreen)"}
-        >
-          {isPinned ? (
-            <Minimize2 className="h-4 w-4" />
+      {/* Bottom info container */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 flex items-end justify-between pointer-events-none">
+        {/* Left-aligned info: Avatar, Name, Status icons */}
+        <div className="flex items-center gap-2 text-white pointer-events-auto" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
+          <Avatar className="w-7 h-7 shrink-0">
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
+            <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div className="text-sm font-medium truncate max-w-[160px]">{name}</div>
+          
+          {isMicOn ? (
+            <Mic className="h-4 w-4 text-green-400" />
           ) : (
-            <Maximize2 className="h-4 w-4" />
+            <MicOff className="h-4 w-4 text-red-400" />
           )}
-        </button>
-      )}
+          {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
+        </div>
+
+        {/* Right-aligned info: Pin button */}
+        {onTogglePin && (
+          <div className="pointer-events-auto">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin?.();
+              }}
+              aria-label={isPinned ? "Unpin participant" : "Pin participant"}
+              className="p-1 rounded-md bg-transparent hover:bg-black/70 text-white"
+              title={isPinned ? "Unpin (restore grid)" : "Pin (fullscreen)"}
+            >
+              {isPinned ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
