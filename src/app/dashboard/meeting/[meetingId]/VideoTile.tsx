@@ -128,7 +128,7 @@ const VideoTile: React.FC<Props> = ({
 
       {/* Camera status (top-right) - hidden if stop button is shown */}
       {!onStopShare && (
-        <div className="absolute top-3 right-3 z-30 p-1 rounded-md bg-black/50">
+        <div className="absolute top-3 right-3 z-30 p-1 rounded-md bg-transparent backdrop-blur-0 shadow-none">
           {isCameraOn ? (
             <Video className="h-5 w-5 text-white" />
           ) : (
@@ -138,7 +138,7 @@ const VideoTile: React.FC<Props> = ({
       )}
 
       {/* Bottom info container */}
-      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 flex items-end justify-between pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 flex items-end justify-between pointer-events-none bg-transparent backdrop-blur-0 shadow-none">
         {/* Left-aligned info: Avatar, Name, Status icons */}
         <div className="flex items-center gap-2 text-white pointer-events-auto" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
           <Avatar className="w-7 h-7 shrink-0">

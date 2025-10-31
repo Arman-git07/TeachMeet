@@ -409,7 +409,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       return (
         <div className="w-full h-full relative p-0">
           {remote && <div className="w-full h-full relative"><VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} isLocal={!!remote.isLocal} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} onTogglePin={() => togglePin(remote.id)} onDoubleClick={() => togglePin(remote.id)} className="w-full h-full"/></div>}
-          {local && <div className="absolute bottom-20 right-4 sm:right-6 w-1/4 sm:w-1/5 shadow-lg rounded-lg overflow-hidden aspect-video"><VideoTile stream={local.stream} isCameraOn={!local.isCamOff} isMicOn={!local.isMicOff} isHandRaised={local.isHandRaised || false} isFirstHand={local.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={local.volumeLevel} isLocal={!!local.isLocal} profileUrl={local.avatar} name={local.name} isScreenSharing={local.isScreenSharing} onTogglePin={() => togglePin(local.id)} onDoubleClick={() => togglePin(local.id)} draggable={true} onStopShare={isSharingScreen && local.id === userId ? handleStopSharing : undefined}/></div>}
+          {local && <div className="absolute bottom-20 right-4 sm:right-6 w-1/4 sm:w-1/5 shadow-lg rounded-lg aspect-video isolate z-50"><VideoTile stream={local.stream} isCameraOn={!local.isCamOff} isMicOn={!local.isMicOff} isHandRaised={local.isHandRaised || false} isFirstHand={local.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={local.volumeLevel} isLocal={!!local.isLocal} profileUrl={local.avatar} name={local.name} isScreenSharing={local.isScreenSharing} onTogglePin={() => togglePin(local.id)} onDoubleClick={() => togglePin(local.id)} draggable={true} onStopShare={isSharingScreen && local.id === userId ? handleStopSharing : undefined}/></div>}
         </div>
       );
     }
@@ -428,7 +428,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="flex-1 relative bg-black">
+      <main className="flex-1 relative bg-black isolate">
         <div className="w-full h-full flex items-center justify-center">
             {loadingMedia ? (
                 <div className="flex items-center justify-center">
