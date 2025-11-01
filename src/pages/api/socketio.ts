@@ -1,3 +1,4 @@
+
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer } from "socket.io";
@@ -63,7 +64,6 @@ export default function handler(
       
       socket.on("disconnect", () => {
         console.log("❌ User disconnected:", socket.id);
-        io.sockets.emit("user-left", socket.id);
       });
     });
   }
