@@ -6,7 +6,6 @@ import { io, Socket } from "socket.io-client";
 type Remote = {
   pc: RTCPeerConnection;
   stream: MediaStream;
-  negotiating: boolean; 
 };
 
 type MeshOptions = {
@@ -113,7 +112,7 @@ export class MeshRTC {
     
     const pc = new RTCPeerConnection({ iceServers: ICE });
     const stream = new MediaStream();
-    this.remotes.set(remoteSocketId, { pc, stream, negotiating: false });
+    this.remotes.set(remoteSocketId, { pc, stream });
     
     // Add local tracks to the connection
     this.localStream?.getTracks().forEach((track) => {
@@ -135,12 +134,10 @@ export class MeshRTC {
     };
     
     pc.onnegotiationneeded = async () => {
-      const remote = this.remotes.get(remoteSocketId);
-      if (remote && !remote.negotiating) {
-        remote.negotiating = true;
-        await this.createOffer(remoteSocketId);
-        remote.negotiating = false;
-      }
+      // This event can fire multiple times and is tricky to handle perfectly.
+      // The primary offer is now sent directly from onUserJoined.
+      // This handler can be used for re-negotiation if features like screen sharing are added later.
+      console.log("Negotiation needed for:", remoteSocketId);
     };
 
     return pc;
