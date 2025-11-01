@@ -1,4 +1,4 @@
-'use client';
+
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer } from "socket.io";
@@ -14,19 +14,23 @@ export default function handler(
   res: NextApiResponseServerIO
 ) {
   if (!res.socket.server.io) {
-    console.log("Initializing Socket.IO server...");
+    console.log("🔌 Initializing new Socket.IO server...");
     const io = new IOServer(res.socket.server, {
       path: "/api/socketio",
       addTrailingSlash: false,
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+      },
     });
     res.socket.server.io = io;
 
     io.on("connection", (socket) => {
-      console.log("A user connected:", socket.id);
+      console.log("✅ User connected:", socket.id);
 
       socket.on("join", (roomId) => {
         socket.join(roomId);
-        console.log(`Socket ${socket.id} joined room ${roomId}`);
+        console.log(`👥 ${socket.id} joined room ${roomId}`);
         socket.to(roomId).emit("user-joined", socket.id);
       });
 
@@ -59,7 +63,8 @@ export default function handler(
       });
       
       socket.on("disconnect", () => {
-        console.log("A user disconnected:", socket.id);
+        console.log("❌ User disconnected:", socket.id);
+        io.sockets.emit("user-left", socket.id);
       });
     });
   }
