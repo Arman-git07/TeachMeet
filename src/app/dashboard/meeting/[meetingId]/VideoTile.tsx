@@ -138,7 +138,7 @@ const VideoTile: React.FC<Props> = ({
       )}
 
       {/* Bottom info container */}
-      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 flex items-end justify-between pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 flex items-center justify-between pointer-events-none">
         {/* Left-aligned info: Avatar, Name, Status icons */}
         <div className="flex items-center gap-2 text-white pointer-events-auto" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
           <Avatar className="w-7 h-7 shrink-0">
