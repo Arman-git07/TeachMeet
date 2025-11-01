@@ -2,7 +2,7 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { initializeAuth, browserLocalPersistence, getAuth } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
 import { errorEmitter } from '@/firebase/error-emitter'; // Emitter for centralized error handling
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors'; // Error types
@@ -38,6 +38,25 @@ const auth = initializeAuth(app, {
 });
 
 const db = getFirestore(app);
+
+// Enable offline persistence for Firestore.
+// This must be done after getting the Firestore instance.
+if (typeof window !== 'undefined') {
+  try {
+    enableIndexedDbPersistence(db)
+      .then(() => console.log("Firestore persistence enabled."))
+      .catch((err) => {
+        if (err.code == 'failed-precondition') {
+          console.warn("Firestore persistence failed. Multiple tabs open?");
+        } else if (err.code == 'unimplemented') {
+          console.warn("Firestore persistence not available in this browser.");
+        }
+      });
+  } catch (err) {
+      console.error("Error enabling firestore persistence", err)
+  }
+}
+
 const storage = getStorage(app);
 let messaging: Messaging | null = null;
 
