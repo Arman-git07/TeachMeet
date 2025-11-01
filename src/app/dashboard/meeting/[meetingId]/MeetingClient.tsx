@@ -102,11 +102,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [meetingId, userId]);
 
   const rtc = useMemo(() => {
-    if (!userId || !meetingId || !user?.displayName) return null;
+    if (!userId || !meetingId) return null;
     return new MeshRTC({
       roomId: meetingId,
       userId,
-      userName: user.displayName, // Pass user name for auth
       onRemoteStream: (remoteSocketId, stream) => {
         if(stream.getVideoTracks().some(t => t.label.includes('screen'))) {
            setRemoteScreenTiles(prev => [...prev, { peerId: remoteSocketId, stream }]);
@@ -128,7 +127,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setPinnedId(prev => prev === socketId ? null : prev);
       },
     });
-  }, [meetingId, userId, user?.displayName]);
+  }, [meetingId, userId]);
 
   const screenShareHelper = useMemo(() => {
     if (!rtc) return null;
@@ -458,9 +457,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
       <main className="flex-1 relative bg-black isolate">
-        <div className="w-full h-full flex items-center justify-center">
+        <div className="w-full h-full">
             {loadingMedia ? (
-                <div className="flex items-center justify-center">
+                <div className="w-full h-full flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             ) : (
