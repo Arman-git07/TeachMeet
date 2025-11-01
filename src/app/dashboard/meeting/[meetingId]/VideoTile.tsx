@@ -128,7 +128,7 @@ const VideoTile: React.FC<Props> = ({
 
       {/* Camera status (top-right) - hidden if stop button is shown */}
       {!onStopShare && (
-        <div className="absolute top-3 right-3 z-30 p-1 rounded-md bg-transparent backdrop-blur-0 shadow-none">
+        <div className="absolute top-3 right-3 z-30 p-1 rounded-md bg-transparent">
           {isCameraOn ? (
             <Video className="h-5 w-5 text-white" />
           ) : (
@@ -164,7 +164,7 @@ const VideoTile: React.FC<Props> = ({
                 onTogglePin?.();
               }}
               aria-label={isPinned ? "Unpin participant" : "Pin participant"}
-              className="p-1 rounded-md bg-transparent backdrop-blur-0 shadow-none hover:bg-black/70 text-white"
+              className="p-1 rounded-md bg-transparent hover:bg-black/70 text-white"
               title={isPinned ? "Unpin (restore grid)" : "Pin (fullscreen)"}
             >
               {isPinned ? (
