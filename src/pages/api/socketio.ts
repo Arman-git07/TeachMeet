@@ -28,12 +28,16 @@ export default function handler(
     io.on("connection", (socket) => {
       console.log("✅ User connected:", socket.id);
 
+      // --- Join Room ---
       socket.on("join", (roomId) => {
         socket.join(roomId);
+        // @ts-ignore - Storing roomId on socket data for disconnect handling
+        socket.data.roomId = roomId; 
         console.log(`👥 ${socket.id} joined room ${roomId}`);
         socket.to(roomId).emit("user-joined", socket.id);
       });
 
+      // --- WebRTC Signaling Events ---
       socket.on("offer", (remoteId, sdp) => {
         io.to(remoteId).emit("offer", socket.id, sdp);
       });
@@ -54,16 +58,16 @@ export default function handler(
           socket.to(roomId).emit("participant-stopped-sharing", { participantId: socket.id });
       });
 
-      socket.on("disconnecting", () => {
-        socket.rooms.forEach((room) => {
-          if (room !== socket.id) {
-            socket.to(room).emit("user-left", socket.id);
-          }
-        });
-      });
-      
+      // --- Handle User Leaving ---
       socket.on("disconnect", () => {
-        console.log("❌ User disconnected:", socket.id);
+        // @ts-ignore
+        const roomId = socket.data.roomId;
+        console.log(`❌ ${socket.id} disconnected (room: ${roomId || "none"})`);
+        
+        // Broadcast ONLY to the same room
+        if (roomId) {
+          socket.to(roomId).emit("user-left", socket.id);
+        }
       });
     });
   }
