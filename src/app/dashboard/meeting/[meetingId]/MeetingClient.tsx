@@ -429,8 +429,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="flex-1 relative bg-background isolate">
-        <div className="w-full h-full">
+      <main className="flex-1 flex relative bg-background isolate">
+        <div className="w-full h-full flex items-center justify-center">
             {loadingMedia ? (
                 <div className="w-full h-full flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
