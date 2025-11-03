@@ -159,41 +159,58 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
 
-    // ✅ Ensure local tracks are attached cleanly
+    // --- Add local media tracks safely ---
     if (this.localStream) {
-        this.localStream.getTracks().forEach(track => {
-        try {
-            pc.addTrack(track, this.localStream as MediaStream);
-        } catch (err) {
-            console.warn("Error adding local track:", err);
-        }
-        });
+      this.localStream.getTracks().forEach(track => {
+        pc.addTrack(track, this.localStream as MediaStream);
+      });
     }
 
-    const remoteStream = new MediaStream();
-    const entry: PeerEntry = { pc, stream: null };
-
-    pc.ontrack = (ev) => {
-        const [stream] = ev.streams;
-        if (stream) {
-            entry.stream = stream;
-            this.onRemoteStream(remoteId, stream);
-        }
+    // --- Handle incoming remote tracks ---
+    pc.ontrack = (event) => {
+      const [remoteStream] = event.streams;
+      if (remoteStream) {
+        this.onRemoteStream(remoteId, remoteStream);
+      } else if (event.track) {
+        const stream = new MediaStream([event.track]);
+        this.onRemoteStream(remoteId, stream);
+      }
     };
 
-    pc.onicecandidate = (ev) => {
-        if (ev.candidate) {
-            this.socket?.emit("ice-candidate", remoteId, ev.candidate);
-        }
+    // --- ICE candidates ---
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.socket?.emit("ice-candidate", remoteId, event.candidate);
+      }
     };
 
+    // --- Handle connection state changes ---
     pc.onconnectionstatechange = () => {
-        if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
-            this.cleanupPeer(remoteId);
-            this.onRemoteLeft?.(remoteId);
-        }
+      if (
+        pc.connectionState === "failed" ||
+        pc.connectionState === "closed" ||
+        pc.connectionState === "disconnected"
+      ) {
+        this.cleanupPeer(remoteId);
+        this.onRemoteLeft?.(remoteId);
+      }
     };
 
+    // --- Trigger negotiation when needed (critical fix) ---
+    if (isInitiator) {
+      pc.onnegotiationneeded = async () => {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          this.socket?.emit("offer", remoteId, offer);
+        } catch (err) {
+          console.error("Negotiation error:", err);
+        }
+      };
+    }
+
+    // --- Store peer entry ---
+    const entry: PeerEntry = { pc, stream: null };
     this.peers.set(remoteId, entry);
     return entry;
   }
