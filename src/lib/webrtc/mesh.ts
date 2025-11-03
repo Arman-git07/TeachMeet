@@ -1,3 +1,4 @@
+
 // src/lib/webrtc/mesh.ts
 "use client";
 
@@ -32,18 +33,18 @@ type PeerEntry = {
 };
 
 export class MeshRTC {
-  public roomId: string;
-  public userId: string;
+  private roomId: string;
+  private userId: string;
   private onRemoteStream: (socketId: string, stream: MediaStream) => void;
   private onRemoteLeft?: (socketId: string) => void;
-  public socket: Socket | null = null;
+  private socket: Socket | null = null;
   private peers = new Map<string, PeerEntry>();
   private localStream: MediaStream | null = null;
   private defaultIceServers: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },
   ];
   private iceServers: RTCIceServer[];
-  private originalVideoTrack?: MediaStreamTrack | null;
+  public originalVideoTrack?: MediaStreamTrack | null;
 
   constructor(opts: MeshOptions) {
     this.roomId = opts.roomId;
