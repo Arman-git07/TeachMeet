@@ -45,6 +45,7 @@ export class MeshRTC {
   ];
   private iceServers: RTCIceServer[];
   public originalVideoTrack?: MediaStreamTrack | null;
+  public socketId: string | null = null;
 
   constructor(opts: MeshOptions) {
     this.roomId = opts.roomId;
@@ -65,6 +66,7 @@ export class MeshRTC {
     });
 
     this.socket.on("connect", () => {
+      this.socketId = this.socket?.id || null;
       // join room on connect
       this.socket?.emit("join", this.roomId);
     });
