@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch, deleteDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -59,17 +59,17 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
       const batch = writeBatch(db);
 
-      // Create participant
+      // Create participant document
       batch.set(participantRef, {
         userId: req.userId,
         name: req.userName || "Guest",
         photoURL: req.userPhotoURL || "",
         joinedAt: serverTimestamp(),
-        isHost: false,
+        isHost: false, // Approved users are not hosts
         approvedBy: hostId || null,
       });
 
-      // Update join request status
+      // Update join request status to 'approved'
       batch.update(joinRequestRef, {
         status: "approved",
         approvedAt: serverTimestamp(),
@@ -82,8 +82,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         title: "Request Approved",
         description: `${req.userName} can now join the meeting.`,
       });
-      // ⛔ REMOVED: Do not auto-delete the request document.
-      // Let the participant's redirect logic handle it.
 
     } catch (error) {
       console.error("❌ handleApprove failed:", error);
@@ -99,7 +97,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const handleDeny = async (req: JoinRequest) => {
     try {
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
-      await updateDoc(reqRef, { status: "denied" });
+      await writeBatch(db).update(reqRef, { status: "denied" }).commit();
       
       toast({
         variant: "destructive",

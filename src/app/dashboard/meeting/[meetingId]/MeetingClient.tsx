@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -428,7 +429,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="flex-1 relative bg-black isolate">
+      <main className="flex-1 relative bg-background isolate">
         <div className="w-full h-full">
             {loadingMedia ? (
                 <div className="w-full h-full flex items-center justify-center">
