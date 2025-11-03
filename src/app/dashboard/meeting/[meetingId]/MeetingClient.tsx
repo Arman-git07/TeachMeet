@@ -356,7 +356,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const pinned = allParticipants.find(p => p.id === pinnedId);
       const others = allParticipants.filter(p => p.id !== pinnedId);
       return (
-        <div className="w-full h-full flex gap-2 p-0">
+        <div className="w-full h-full flex gap-2">
           <div className="flex-1 min-h-0 relative">{pinned && (<div className="w-full h-full relative"><VideoTile stream={pinned.stream} isCameraOn={!pinned.isCamOff} isMicOn={!pinned.isMicOff} isHandRaised={pinned.isHandRaised || false} isFirstHand={pinned.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={pinned.volumeLevel} isLocal={!!pinned.isLocal} profileUrl={pinned.avatar} name={pinned.name} isScreenSharing={pinned.isScreenSharing} isPinned={true} onTogglePin={() => togglePin(pinned.id)} onDoubleClick={() => togglePin(pinned.id)} className="w-full h-full" onStopShare={isSharingScreen && pinned.id === userId ? handleStopSharing : undefined} /></div>)}</div>
           {others.length > 0 && (<div className="w-48 hidden md:flex md:flex-col gap-2 overflow-auto">{others.map(p => (<div key={p.id} className="h-28 rounded-lg"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/></div>))}</div>)}
         </div>
@@ -367,7 +367,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     if (screenSharingParticipant) {
       const otherTiles = allParticipants.filter(p => p.id !== screenSharingParticipant.id);
       return (
-        <div className="w-full h-full flex flex-col md:flex-row gap-2 p-2">
+        <div className="w-full h-full flex flex-col md:flex-row gap-2">
           <div className="flex-1 min-h-0"><div className="w-full h-full relative"><VideoTile stream={screenSharingParticipant.stream} isCameraOn={!screenSharingParticipant.isCamOff} isMicOn={!screenSharingParticipant.isMicOff} name={screenSharingParticipant.name + "'s Screen" || 'Screen Share'} isScreenSharing={true} onTogglePin={() => togglePin(screenSharingParticipant.id)} onDoubleClick={() => togglePin(screenSharingParticipant.id)} className="w-full h-full" onStopShare={isSharingScreen && screenSharingParticipant.id === userId ? handleStopSharing : undefined} /></div></div>
           {otherTiles.length > 0 && (<div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">{otherTiles.map(p => (<div key={p.id} className="md:h-32 aspect-video md:aspect-auto"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/></div>))}</div>)}
         </div>
@@ -375,7 +375,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
 
     const count = allParticipants.length;
-    if (count === 1) return <div className="w-full h-full p-0"><VideoTile stream={allParticipants[0].stream} isCameraOn={!allParticipants[0].isCamOff} isMicOn={!allParticipants[0].isMicOff} isHandRaised={allParticipants[0].isHandRaised || false} isFirstHand={allParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={allParticipants[0].volumeLevel} isLocal={!!allParticipants[0].isLocal} profileUrl={allParticipants[0].avatar} name={allParticipants[0].name} isScreenSharing={allParticipants[0].isScreenSharing} onTogglePin={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} onDoubleClick={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} className="w-full h-full" onStopShare={isSharingScreen && allParticipants[0].id === userId ? handleStopSharing : undefined} /></div>;
+    if (count === 1) return <div className="w-full h-full"><VideoTile stream={allParticipants[0].stream} isCameraOn={!allParticipants[0].isCamOff} isMicOn={!allParticipants[0].isMicOff} isHandRaised={allParticipants[0].isHandRaised || false} isFirstHand={allParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={allParticipants[0].volumeLevel} isLocal={!!allParticipants[0].isLocal} profileUrl={allParticipants[0].avatar} name={allParticipants[0].name} isScreenSharing={allParticipants[0].isScreenSharing} onTogglePin={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} onDoubleClick={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} className="w-full h-full" onStopShare={isSharingScreen && allParticipants[0].id === userId ? handleStopSharing : undefined} /></div>;
 
     const remoteParticipants = allParticipants.filter((p) => !p.isLocal);
     const localParticipant = allParticipants.find((p) => p.isLocal);
@@ -383,7 +383,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     if (count > 1) {
         const gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
         return (
-            <div className="w-full h-full relative p-2">
+            <div className="w-full h-full relative">
                 <div className="w-full h-full grid gap-2" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
                     {remoteParticipants.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-video">
