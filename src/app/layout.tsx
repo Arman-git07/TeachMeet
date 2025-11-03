@@ -5,7 +5,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { Providers } from '@/components/common/Providers';
-import { ClientLayout } from '@/components/common/ClientLayout';
+import { AppShell } from '@/components/common/AppShell';
 
 const geistSansFont = GeistSans;
 const geistMonoFont = GeistMono;
@@ -26,9 +26,9 @@ export default function RootLayout({
         geistMonoFont.variable
       )}>
         <Providers>
-          <ClientLayout>
+          <AppShell>
             {children}
-          </ClientLayout>
+          </AppShell>
         </Providers>
         <Toaster />
       </body>
