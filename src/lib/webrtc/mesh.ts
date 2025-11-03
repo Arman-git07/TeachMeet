@@ -71,8 +71,10 @@ export class MeshRTC {
     // someone joined -> create a peer and initiate offer to them
     this.socket.on("user-joined", (remoteId: string) => {
       if (!remoteId || remoteId === this.socket?.id) return;
-      // create peer and immediately offer to that user
-      this.createPeerAndOffer(remoteId);
+      // ✅ Delay offer creation slightly to ensure tracks are attached
+      setTimeout(() => {
+        this.createPeerAndOffer(remoteId);
+      }, 300);
     });
 
     // receiving an offer from somebody (we are callee)
@@ -154,40 +156,40 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
 
+    // ✅ Ensure local tracks are attached cleanly
     if (this.localStream) {
-      try {
-        this.localStream.getTracks().forEach(track => pc.addTrack(track, this.localStream as MediaStream));
-      } catch (err) {
-        console.warn("Error adding local tracks to PC:", err);
-      }
+        this.localStream.getTracks().forEach(track => {
+        try {
+            pc.addTrack(track, this.localStream as MediaStream);
+        } catch (err) {
+            console.warn("Error adding local track:", err);
+        }
+        });
     }
 
     const remoteStream = new MediaStream();
     const entry: PeerEntry = { pc, stream: null };
 
-    pc.addEventListener("track", (ev) => {
-      ev.streams?.forEach(s => {
-        s.getTracks().forEach(t => remoteStream.addTrack(t));
-      });
-      if (ev.track && !ev.streams?.length) {
-        remoteStream.addTrack(ev.track);
-      }
-      entry.stream = remoteStream;
-      this.onRemoteStream(remoteId, remoteStream);
-    });
+    pc.ontrack = (ev) => {
+        const [stream] = ev.streams;
+        if (stream) {
+            entry.stream = stream;
+            this.onRemoteStream(remoteId, stream);
+        }
+    };
 
-    pc.addEventListener("icecandidate", (ev) => {
-      if (ev.candidate) {
-        this.socket?.emit("ice-candidate", remoteId, ev.candidate);
-      }
-    });
+    pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+            this.socket?.emit("ice-candidate", remoteId, ev.candidate);
+        }
+    };
 
-    pc.addEventListener("connectionstatechange", () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "closed" || pc.connectionState === "disconnected") {
-        this.cleanupPeer(remoteId);
-        this.onRemoteLeft?.(remoteId); // Ensure callback is fired on state change
-      }
-    });
+    pc.onconnectionstatechange = () => {
+        if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
+            this.cleanupPeer(remoteId);
+            this.onRemoteLeft?.(remoteId);
+        }
+    };
 
     this.peers.set(remoteId, entry);
     return entry;
@@ -195,17 +197,17 @@ export class MeshRTC {
 
   // Create peer then create+send an offer immediately
   private async createPeerAndOffer(remoteId: string) {
-    if (!this.socket || this.peers.has(remoteId)) return;
-    
+    if (this.peers.has(remoteId)) return;
     const entry = this.createPeerEntry(remoteId, true);
+    const pc = entry.pc;
+
     try {
-      const pc = entry.pc;
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      this.socket.emit("offer", remoteId, pc.localDescription);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        this.socket?.emit("offer", remoteId, offer);
     } catch (err) {
-      console.error("Failed to create/send offer:", err);
-      this.cleanupPeer(remoteId);
+        console.error("Failed to create/send offer:", err);
+        this.cleanupPeer(remoteId);
     }
   }
 
@@ -251,12 +253,12 @@ export class MeshRTC {
   }
   
   public async replaceTrack(newTrack: MediaStreamTrack) {
-    this.peers.forEach(({ pc }) => {
-      const sender = pc.getSenders().find(s => s.track?.kind === newTrack.kind);
-      if (sender) {
-        sender.replaceTrack(newTrack).catch(e => console.error("Failed to replace track:", e));
-      }
-    });
+    for (const { pc } of this.peers.values()) {
+        const sender = pc.getSenders().find(s => s.track?.kind === newTrack.kind);
+        if (sender) {
+            await sender.replaceTrack(newTrack).catch(e => console.error("Failed to replace track:", e));
+        }
+    }
   }
 
   public async restoreCameraTrack() {
