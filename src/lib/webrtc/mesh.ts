@@ -20,10 +20,8 @@ import { io, Socket } from "socket.io-client";
 type MeshOptions = {
   roomId: string;
   userId: string;
-  userName: string; // Added userName to conform to existing usage
   onRemoteStream: (socketId: string, stream: MediaStream) => void;
   onRemoteLeft?: (socketId: string) => void;
-  onUserJoined?: (socketId: string) => void; // Added to conform to existing usage
   iceServers?: RTCIceServer[];
 };
 
@@ -34,8 +32,8 @@ type PeerEntry = {
 };
 
 export class MeshRTC {
-  private roomId: string;
-  private userId: string;
+  public roomId: string;
+  public userId: string;
   private onRemoteStream: (socketId: string, stream: MediaStream) => void;
   private onRemoteLeft?: (socketId: string) => void;
   public socket: Socket | null = null;
@@ -45,11 +43,9 @@ export class MeshRTC {
     { urls: "stun:stun.l.google.com:19302" },
   ];
   private iceServers: RTCIceServer[];
-  
-  // Conform to existing usage in MeetingClient
-  private originalVideoTrack?: MediaStreamTrack;
+  private originalVideoTrack?: MediaStreamTrack | null;
 
-  constructor(private opts: MeshOptions) {
+  constructor(opts: MeshOptions) {
     this.roomId = opts.roomId;
     this.userId = opts.userId;
     this.onRemoteStream = opts.onRemoteStream;
@@ -65,7 +61,6 @@ export class MeshRTC {
     this.socket = io({
       path: "/api/socketio",
       transports: ["websocket", "polling"],
-      auth: { name: this.opts.userName }, // Added to conform to existing usage
     });
 
     this.socket.on("connect", () => {
@@ -76,7 +71,6 @@ export class MeshRTC {
     // someone joined -> create a peer and initiate offer to them
     this.socket.on("user-joined", (remoteId: string) => {
       if (!remoteId || remoteId === this.socket?.id) return;
-      this.opts.onUserJoined?.(remoteId); // Added to conform
       // create peer and immediately offer to that user
       this.createPeerAndOffer(remoteId);
     });
@@ -138,7 +132,7 @@ export class MeshRTC {
   public init(localStream: MediaStream) {
     this.initSocketIfNeeded();
     this.localStream = localStream;
-    this.originalVideoTrack = localStream.getVideoTracks()[0]; // Conform to existing usage
+    this.originalVideoTrack = localStream.getVideoTracks()[0];
 
     // Add local tracks to existing peers (if any)
     this.peers.forEach((entry) => {
@@ -239,7 +233,6 @@ export class MeshRTC {
     this.localStream = null;
   }
   
-  // --- Conformance methods for existing ScreenShareHelper and MeetingClient ---
   public async addTrack(track: MediaStreamTrack) {
     if (!this.localStream) return;
     this.localStream.addTrack(track);
@@ -249,7 +242,7 @@ export class MeshRTC {
   }
 
   public async removeTrack(track: MediaStreamTrack) {
-    if (!this.localStream) return;
+    if (!this.localStream || !track) return;
     this.localStream.removeTrack(track);
     this.peers.forEach(({ pc }) => {
         const sender = pc.getSenders().find(s => s.track === track);
@@ -270,6 +263,10 @@ export class MeshRTC {
     if (this.originalVideoTrack) {
         await this.replaceTrack(this.originalVideoTrack);
     }
+  }
+
+  public getLocalVideoTrack(): MediaStreamTrack | null {
+    return this.localStream?.getVideoTracks()[0] || null;
   }
 }
 

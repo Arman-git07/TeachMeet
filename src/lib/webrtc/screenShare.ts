@@ -127,10 +127,12 @@ export class ScreenShareHelper {
         }
       } else {
         // If we were sending alongside, ask mesh to remove the screen track sender
-        try {
-          await this.mesh.removeTrack?.(this.screenTrack);
-        } catch (err) {
-          console.warn("mesh.removeTrack failed (maybe not implemented):", err);
+        if(this.screenTrack) {
+          try {
+            await this.mesh.removeTrack?.(this.screenTrack);
+          } catch (err) {
+            console.warn("mesh.removeTrack failed (maybe not implemented):", err);
+          }
         }
       }
 
