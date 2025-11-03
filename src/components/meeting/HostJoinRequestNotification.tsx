@@ -61,12 +61,10 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
       // Create participant document
       batch.set(participantRef, {
-        userId: req.userId,
         name: req.userName || "Guest",
         photoURL: req.userPhotoURL || "",
         joinedAt: serverTimestamp(),
         isHost: false, // Approved users are not hosts
-        approvedBy: hostId || null,
       });
 
       // Update join request status to 'approved'
