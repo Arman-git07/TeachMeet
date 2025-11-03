@@ -31,23 +31,28 @@ export default function handler(
       // --- Join Room ---
       socket.on("join", (roomId) => {
         socket.join(roomId);
-        // @ts-ignore - Storing roomId on socket data for disconnect handling
-        socket.data.roomId = roomId; 
         console.log(`👥 ${socket.id} joined room ${roomId}`);
         socket.to(roomId).emit("user-joined", socket.id);
       });
 
       // --- WebRTC Signaling Events ---
-      socket.on("offer", (remoteId, sdp) => {
-        io.to(remoteId).emit("offer", socket.id, sdp);
+      // Offer: (remoteSocketId, offer)
+      socket.on("offer", (remoteSocketId, offer) => {
+        if (!remoteSocketId) return;
+        // send to the specific socket
+        socket.to(remoteSocketId).emit("offer", socket.id, offer);
       });
 
-      socket.on("answer", (remoteId, sdp) => {
-        io.to(remoteId).emit("answer", socket.id, sdp);
+      // Answer: (remoteSocketId, answer)
+      socket.on("answer", (remoteSocketId, answer) => {
+        if (!remoteSocketId) return;
+        socket.to(remoteSocketId).emit("answer", socket.id, answer);
       });
 
-      socket.on("ice-candidate", (remoteId, candidate) => {
-        io.to(remoteId).emit("ice-candidate", socket.id, candidate);
+      // ICE Candidate: (remoteSocketId, candidate)
+      socket.on("ice-candidate", (remoteSocketId, candidate) => {
+        if (!remoteSocketId) return;
+        socket.to(remoteSocketId).emit("ice-candidate", socket.id, candidate);
       });
       
       socket.on("screen-share-started", ({ roomId, mode }) => {
@@ -60,13 +65,11 @@ export default function handler(
 
       // --- Handle User Leaving ---
       socket.on("disconnect", () => {
-        // @ts-ignore
-        const roomId = socket.data.roomId;
-        console.log(`❌ ${socket.id} disconnected (room: ${roomId || "none"})`);
-        
-        // Broadcast ONLY to the same room
-        if (roomId) {
-          socket.to(roomId).emit("user-left", socket.id);
+        console.log(`❌ ${socket.id} disconnected`);
+        // find rooms the socket was in (ignore socket.id room)
+        for (const room of socket.rooms) {
+          if (room === socket.id) continue;
+          socket.to(room).emit("user-left", socket.id);
         }
       });
     });

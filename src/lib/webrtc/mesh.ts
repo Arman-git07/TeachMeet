@@ -74,10 +74,14 @@ export class MeshRTC {
     // someone joined -> create a peer and initiate offer to them
     this.socket.on("user-joined", (remoteId: string) => {
       if (!remoteId || remoteId === this.socket?.id) return;
-      // ✅ Delay offer creation slightly to ensure tracks are attached
+      // tiny delay to ensure local tracks are attached to new RTCPeerConnection
       setTimeout(() => {
-        this.createPeerAndOffer(remoteId);
-      }, 300);
+        try {
+          this.createPeerAndOffer(remoteId);
+        } catch (err) {
+          console.error("createPeerAndOffer failed:", err);
+        }
+      }, 80); // 50-120 ms works; 80 ms is a good compromise
     });
 
     // receiving an offer from somebody (we are callee)
@@ -158,59 +162,68 @@ export class MeshRTC {
   // Create PeerEntry and RTCPeerConnection
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
-
-    // --- Add local media tracks safely ---
+  
+    // Add local media tracks (if any)
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => {
-        pc.addTrack(track, this.localStream as MediaStream);
-      });
+      try {
+        this.localStream.getTracks().forEach(track => {
+          pc.addTrack(track, this.localStream as MediaStream);
+        });
+      } catch (err) {
+        console.warn("Error adding local tracks to PC:", err);
+      }
     }
-
-    // --- Handle incoming remote tracks ---
+  
+    // Prepare a remote MediaStream container
+    let remoteStream = new MediaStream();
+    const entry: PeerEntry = { pc, stream: null };
+  
+    // Handle incoming remote tracks
     pc.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      if (remoteStream) {
-        this.onRemoteStream(remoteId, remoteStream);
+      console.log(`[mesh] ontrack from ${remoteId}`, event.streams?.[0] || event.track);
+      // If event.streams provided, use it; otherwise create from event.track
+      if (event.streams && event.streams.length > 0) {
+        remoteStream = event.streams[0];
       } else if (event.track) {
-        const stream = new MediaStream([event.track]);
-        this.onRemoteStream(remoteId, stream);
+        remoteStream.addTrack(event.track);
+      }
+  
+      entry.stream = remoteStream;
+      // Call the callback so MeetingClient receives the MediaStream
+      try { this.onRemoteStream(remoteId, remoteStream); } catch (e) { console.error("onRemoteStream error", e); }
+    };
+  
+    // ICE candidate forwarding
+    pc.onicecandidate = (ev) => {
+      if (ev.candidate) {
+        console.log(`[mesh] sending ice-candidate to ${remoteId}`);
+        this.socket?.emit("ice-candidate", remoteId, ev.candidate);
       }
     };
-
-    // --- ICE candidates ---
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        this.socket?.emit("ice-candidate", remoteId, event.candidate);
-      }
-    };
-
-    // --- Handle connection state changes ---
+  
+    // Connection state cleanup
     pc.onconnectionstatechange = () => {
-      if (
-        pc.connectionState === "failed" ||
-        pc.connectionState === "closed" ||
-        pc.connectionState === "disconnected"
-      ) {
+      if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
         this.cleanupPeer(remoteId);
-        this.onRemoteLeft?.(remoteId);
+        try { this.onRemoteLeft?.(remoteId); } catch(e) { console.error("onRemoteLeft error", e); }
       }
     };
-
-    // --- Trigger negotiation when needed (critical fix) ---
+  
+    // If this side is the initiator, ensure negotiation creates and sends offer
     if (isInitiator) {
       pc.onnegotiationneeded = async () => {
         try {
+          console.log(`[mesh] negotiationneeded -> creating offer for ${remoteId}`);
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
+          // emit to exactly the remote peer
           this.socket?.emit("offer", remoteId, offer);
         } catch (err) {
-          console.error("Negotiation error:", err);
+          console.error("pc.onnegotiationneeded error:", err);
         }
       };
     }
-
-    // --- Store peer entry ---
-    const entry: PeerEntry = { pc, stream: null };
+  
     this.peers.set(remoteId, entry);
     return entry;
   }
