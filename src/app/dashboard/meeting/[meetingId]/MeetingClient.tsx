@@ -41,6 +41,8 @@ type LiveParticipantInfo = {
     handRaisedAt?: number | null;
     isScreenSharing?: boolean;
     isHost?: boolean;
+    isCameraOn?: boolean;
+    isMicOn?: boolean;
 };
 
 type Props = { 
@@ -301,13 +303,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     name: user.displayName || 'Anonymous',
                     photoURL: user.photoURL || '',
                     isHost: isHost,
+                    isCameraOn: initialCamOn,
+                    isMicOn: initialMicOn,
                     joinedAt: serverTimestamp(),
                 });
             }
         }
     };
     addSelfToParticipants();
-  }, [user, meetingId, isHost, isLoadingRole]);
+  }, [user, meetingId, isHost, isLoadingRole, initialCamOn, initialMicOn]);
 
   const { allParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
@@ -323,13 +327,11 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       .filter(([id]) => id !== userId)
       .map(([id, data]) => {
         const remoteStream = remoteStreams.get(id) || null;
-        const videoTracks = remoteStream?.getVideoTracks() || [];
-        const audioTracks = remoteStream?.getAudioTracks() || [];
         return {
           id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://placehold.co/128x128.png?text=${(data.name || 'G').charAt(0)}`,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
-          isCamOff: data.isScreenSharing ? false : (videoTracks.length === 0 || !videoTracks.some(t => t.enabled && !t.muted)),
-          isMicOff: audioTracks.length === 0 || audioTracks.every(t => !t.enabled),
+          isCamOff: !data.isCameraOn,
+          isMicOff: !data.isMicOn,
           stream: remoteStream, volumeLevel: volumeLevels.get(id) ?? 0,
         };
       });
@@ -347,7 +349,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [user, meetingId]);
 
   const toggleMic = useCallback(() => { if (!localStream) return; const nextState = !micOn; localStream.getAudioTracks().forEach(track => (track.enabled = nextState)); setMicOn(nextState); updateMyStatus({ isMicOn: nextState }); setVolumeLevels(prev => { const next = new Map(prev); next.set(userId, nextState ? (next.get(userId) ?? 0) : 0); return next; }); }, [localStream, micOn, updateMyStatus, userId]);
-  const toggleCamera = useCallback(() => { if (!localStream) return; const videoTrack = localStream.getVideoTracks()[0]; if (videoTrack) { const nextState = !videoTrack.enabled; videoTrack.enabled = nextState; setCamOn(nextState); updateMyStatus({ isCameraOn: nextState }); } }, [localStream, updateMyStatus, camOn]);
+  const toggleCamera = useCallback(() => { if (!localStream) return; const nextState = !camOn; localStream.getVideoTracks().forEach(track => { track.enabled = nextState; }); setCamOn(nextState); updateMyStatus({ isCameraOn: nextState }); }, [localStream, camOn, updateMyStatus]);
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   const togglePin = useCallback((id: string) => { setPinnedId(prev => prev === id ? null : id); }, []);
 
@@ -430,13 +432,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
       <main className="flex-1 flex relative bg-background isolate">
-        <div className="w-full h-full flex items-center justify-center">
+        <div className="w-full h-full flex">
             {loadingMedia ? (
                 <div className="w-full h-full flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             ) : (
-                renderLayout()
+                <div className="w-full h-full">
+                    {renderLayout()}
+                </div>
             )}
         </div>
       </main>
