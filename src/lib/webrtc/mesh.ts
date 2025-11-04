@@ -77,7 +77,7 @@ export class MeshRTC {
       if (this.peers.has(remoteId)) return;
 
       console.log(`[MeshRTC] user-joined: preparing to connect with ${remoteId}`);
-
+    
       // ✅ Wait for local tracks to fully attach before sending offer
       setTimeout(() => {
         console.log(`[MeshRTC] Delayed offer creation for ${remoteId}`);
@@ -153,6 +153,7 @@ export class MeshRTC {
   public init(localStream: MediaStream) {
     this.initSocketIfNeeded();
     this.localStream = localStream;
+    console.log("[MeshRTC] Local stream tracks:", this.localStream.getTracks().map(t => t.kind));
     this.originalVideoTrack = localStream.getVideoTracks()[0];
 
     // Add local tracks to existing peers (if any)
@@ -175,13 +176,13 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
   
-    // Add local media tracks (if any)
     if (this.localStream) {
       try {
         const tracks = this.localStream.getTracks();
         console.log(`[MeshRTC] Attaching ${tracks.length} local tracks to peer ${remoteId}`);
         tracks.forEach(track => {
-          pc.addTrack(track, this.localStream as MediaStream);
+          // ✅ Use track.clone() to avoid browser issues with track reuse
+          pc.addTrack(track.clone(), this.localStream as MediaStream);
         });
       } catch (err) {
         console.warn("Error adding local tracks to PC:", err);
@@ -196,7 +197,7 @@ export class MeshRTC {
   
     // Handle incoming remote tracks
     pc.ontrack = (event) => {
-      console.log(`[mesh] ontrack from ${remoteId}`, event.streams?.[0] || event.track);
+      console.log(`[MeshRTC] ontrack triggered from ${remoteId}`, event.streams?.[0] || event.track);
       // If event.streams provided, use it; otherwise create from event.track
       if (event.streams && event.streams.length > 0) {
         remoteStream = event.streams[0];
