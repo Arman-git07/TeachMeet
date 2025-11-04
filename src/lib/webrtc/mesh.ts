@@ -74,14 +74,14 @@ export class MeshRTC {
     // someone joined -> create a peer and initiate offer to them
     this.socket.on("user-joined", (remoteId: string) => {
         if (!remoteId || remoteId === this.socket?.id) return;
-        // tiny delay to ensure local tracks are attached to new RTCPeerConnection
+        
+        console.log(`[MeshRTC] Preparing to create offer for ${remoteId}...`);
+
+        // ✅ Delay ensures camera track is attached before creating offer
         setTimeout(() => {
-            try {
-                this.createPeerAndOffer(remoteId);
-            } catch (err) {
-                console.error("createPeerAndOffer failed:", err);
-            }
-        }, 80); // 80ms is a safe compromise
+          console.log(`[MeshRTC] Creating peer and offer for ${remoteId} after delay`);
+          this.createPeerAndOffer(remoteId);
+        }, 500); // 0.5 second delay fixes race condition
     });
 
 
