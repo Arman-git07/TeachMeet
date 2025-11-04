@@ -173,21 +173,38 @@ export class MeshRTC {
   // Peer creation logic (called before making or receiving offers)
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
-    let remoteStream = new MediaStream();
   
+    // Add local media tracks (if any)
+    if (this.localStream) {
+      try {
+        this.localStream.getTracks().forEach(track => {
+          pc.addTrack(track, this.localStream as MediaStream);
+        });
+      } catch (err) {
+        console.warn("Error adding local tracks to PC:", err);
+      }
+    }
+  
+    // Prepare a remote MediaStream container
+    let remoteStream = new MediaStream();
     const entry: PeerEntry = { pc, stream: null };
   
+    // Handle incoming remote tracks
     pc.ontrack = (event) => {
       console.log(`[mesh] ontrack from ${remoteId}`, event.streams?.[0] || event.track);
-      if (event.streams && event.streams[0]) {
+      // If event.streams provided, use it; otherwise create from event.track
+      if (event.streams && event.streams.length > 0) {
         remoteStream = event.streams[0];
-      } else {
+      } else if (event.track) {
         remoteStream.addTrack(event.track);
       }
+  
       entry.stream = remoteStream;
+      // Call the callback so MeetingClient receives the MediaStream
       try { this.onRemoteStream(remoteId, remoteStream); } catch (e) { console.error("onRemoteStream error", e); }
     };
   
+    // ICE candidate forwarding
     pc.onicecandidate = (ev) => {
       if (ev.candidate) {
         console.log(`[mesh] sending ice-candidate to ${remoteId}`);
@@ -195,24 +212,27 @@ export class MeshRTC {
       }
     };
   
+    // Connection state cleanup
     pc.onconnectionstatechange = () => {
       if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
         this.cleanupPeer(remoteId);
         try { this.onRemoteLeft?.(remoteId); } catch(e) { console.error("onRemoteLeft error", e); }
       }
     };
-    
+  
+    // If this side is the initiator, ensure negotiation creates and sends offer
     if (isInitiator) {
-        pc.onnegotiationneeded = async () => {
-          try {
-            console.log(`[mesh] negotiationneeded -> creating offer for ${remoteId}`);
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            this.socket?.emit("offer", remoteId, offer);
-          } catch (err) {
-            console.error("Negotiation error:", err);
-          }
-        };
+      pc.onnegotiationneeded = async () => {
+        try {
+          console.log(`[mesh] negotiationneeded -> creating offer for ${remoteId}`);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          // emit to exactly the remote peer
+          this.socket?.emit("offer", remoteId, offer);
+        } catch (err) {
+          console.error("pc.onnegotiationneeded error:", err);
+        }
+      };
     }
   
     this.peers.set(remoteId, entry);
@@ -224,27 +244,6 @@ export class MeshRTC {
     if (this.peers.has(remoteId)) return;
     
     const entry = this.createPeerEntry(remoteId, true);
-    const pc = entry.pc;
-  
-    // ✅ Ensure local tracks are attached BEFORE creating an offer
-    if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
-        const senders = pc.getSenders();
-        if (!senders.find((s) => s.track === track)) {
-          pc.addTrack(track, this.localStream as MediaStream);
-        }
-      });
-    }
-  
-    // ✅ Explicitly create and send the offer after tracks exist
-    try {
-      const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
-      await pc.setLocalDescription(offer);
-      this.socket?.emit("offer", remoteId, offer);
-      console.log("[mesh] Sent offer with video track to", remoteId);
-    } catch (err) {
-      console.error("[mesh] Offer creation failed:", err);
-    }
   }
 
 
