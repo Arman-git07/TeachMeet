@@ -213,7 +213,6 @@ export class MeshRTC {
     // ICE candidate forwarding
     pc.onicecandidate = (ev) => {
       if (ev.candidate) {
-        console.log(`[mesh] sending ice-candidate to ${remoteId}`);
         this.socket?.emit("ice-candidate", remoteId, ev.candidate);
       }
     };
@@ -230,7 +229,6 @@ export class MeshRTC {
     if (isInitiator) {
       pc.onnegotiationneeded = async () => {
         try {
-          console.log(`[mesh] negotiationneeded -> creating offer for ${remoteId}`);
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           // emit to exactly the remote peer
