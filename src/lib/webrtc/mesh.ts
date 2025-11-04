@@ -73,15 +73,16 @@ export class MeshRTC {
 
     // someone joined -> create a peer and initiate offer to them
     this.socket.on("user-joined", (remoteId: string) => {
-        if (!remoteId || remoteId === this.socket?.id) return;
-        
-        console.log(`[MeshRTC] Preparing to create offer for ${remoteId}...`);
+      if (!remoteId || remoteId === this.socket?.id) return;
+      if (this.peers.has(remoteId)) return;
 
-        // ✅ Delay ensures camera track is attached before creating offer
-        setTimeout(() => {
-          console.log(`[MeshRTC] Creating peer and offer for ${remoteId} after delay`);
-          this.createPeerAndOffer(remoteId);
-        }, 500); // 0.5 second delay fixes race condition
+      console.log(`[MeshRTC] user-joined: preparing to connect with ${remoteId}`);
+
+      // ✅ Wait for local tracks to fully attach before sending offer
+      setTimeout(() => {
+        console.log(`[MeshRTC] Delayed offer creation for ${remoteId}`);
+        this.createPeerAndOffer(remoteId);
+      }, 500); // 0.5s delay ensures video track is included in offer
     });
 
 
@@ -177,12 +178,16 @@ export class MeshRTC {
     // Add local media tracks (if any)
     if (this.localStream) {
       try {
-        this.localStream.getTracks().forEach(track => {
+        const tracks = this.localStream.getTracks();
+        console.log(`[MeshRTC] Attaching ${tracks.length} local tracks to peer ${remoteId}`);
+        tracks.forEach(track => {
           pc.addTrack(track, this.localStream as MediaStream);
         });
       } catch (err) {
         console.warn("Error adding local tracks to PC:", err);
       }
+    } else {
+      console.warn("[MeshRTC] No localStream available when creating peer for", remoteId);
     }
   
     // Prepare a remote MediaStream container
@@ -200,6 +205,7 @@ export class MeshRTC {
       }
   
       entry.stream = remoteStream;
+      console.log(`[MeshRTC] Remote video received from ${remoteId}:`, event.streams?.[0]);
       // Call the callback so MeetingClient receives the MediaStream
       try { this.onRemoteStream(remoteId, remoteStream); } catch (e) { console.error("onRemoteStream error", e); }
     };
