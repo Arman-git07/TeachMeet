@@ -100,7 +100,7 @@ export class MeshRTC {
         if (this.localStream) {
             this.localStream.getTracks().forEach((track) => {
                 if (!pc.getSenders().find(s => s.track === track)) {
-                    pc.addTrack(track, this.localStream!);
+                    pc.addTrack(track.clone(), this.localStream!);
                 }
             });
         }
@@ -163,7 +163,7 @@ export class MeshRTC {
       try {
         this.localStream?.getTracks().forEach(track => {
             if (!pc.getSenders().find(s => s.track === track)) {
-                pc.addTrack(track, this.localStream as MediaStream)
+                pc.addTrack(track.clone(), this.localStream as MediaStream)
             }
         });
       } catch (err) {
@@ -181,7 +181,7 @@ export class MeshRTC {
         const tracks = this.localStream.getTracks();
         console.log(`[MeshRTC] Attaching ${tracks.length} local tracks to peer ${remoteId}`);
         tracks.forEach(track => {
-          pc.addTrack(track, this.localStream as MediaStream);
+          pc.addTrack(track.clone(), this.localStream as MediaStream);
         });
       } catch (err) {
         console.warn("Error adding local tracks to PC:", err);
@@ -281,7 +281,7 @@ export class MeshRTC {
     if (!this.localStream) return;
     this.localStream.addTrack(track);
     for (const [id, entry] of this.peers.entries()) {
-      entry.pc.addTrack(track, this.localStream);
+      entry.pc.addTrack(track.clone(), this.localStream);
       // Trigger renegotiation
       try {
         const offer = await entry.pc.createOffer();
