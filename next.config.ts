@@ -14,7 +14,8 @@ const nextConfig = {
   // },
   experimental: {
     optimizePackageImports: [
-      'lucide-react',
+      '@genkit-ai/flow',
+      '@genkit-ai/googleai',
       '@radix-ui/react-accordion',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-avatar',
@@ -38,6 +39,8 @@ const nextConfig = {
       'firebase/auth',
       'firebase/firestore',
       'firebase/storage',
+      'lucide-react',
+      'recharts',
     ],
     fontLoaders: [
       { loader: '@next/font/google', options: { subsets: ['latin'] } },
@@ -45,5 +48,5 @@ const nextConfig = {
   },
 };
 
-// Incrementing this comment to force a cache clear: 12
+// Incrementing this comment to force a cache clear: 13
 module.exports = nextConfig;
