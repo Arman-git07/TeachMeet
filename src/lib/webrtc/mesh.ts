@@ -122,7 +122,7 @@ export class MeshRTC {
       }, 400); // 400ms = safe window for video to attach
     });
   }
-  
+
   // ✅ NEW: Helper to wait for the local stream
   private async waitForLocalStream(): Promise<void> {
     let tries = 0;
