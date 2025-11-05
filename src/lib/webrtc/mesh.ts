@@ -80,55 +80,48 @@ export class MeshRTC {
         console.warn("WebRTC signaling is currently disabled because the backend socket server is not running or unreachable. Real-time communication will not work.", err.message);
     });
   }
-
-  // ✅ NEW: Centralized socket event handlers
+  
   private setupSocketListeners() {
     if (!this.socket) return;
 
-    // Handle incoming offers
     this.socket.on("offer", async (remoteId: string, sdp: RTCSessionDescriptionInit) => {
       await this.handleOffer(remoteId, sdp);
     });
 
-    // Handle incoming answers
     this.socket.on("answer", async (remoteId: string, sdp: RTCSessionDescriptionInit) => {
       await this.handleAnswer(remoteId, sdp);
     });
 
-    // Handle incoming ICE candidates
     this.socket.on("ice-candidate", async (remoteId: string, candidate: RTCIceCandidateInit) => {
       await this.handleCandidate(remoteId, candidate);
     });
 
-    // ✅ FIXED: ensure camera track fully attached before making an offer
     this.socket.on("user-joined", async (remoteId: string) => {
-      console.log("[MeshRTC] user-joined:", remoteId);
-
-      // Skip self and existing peers
-      if (!remoteId || remoteId === this.socket?.id || this.peers.has(remoteId)) {
-        if(this.peers.has(remoteId)) console.warn(`[MeshRTC] Peer ${remoteId} already exists, skipping.`);
-        return;
-      }
+      if (!remoteId || remoteId === this.socket?.id || this.peers.has(remoteId)) return;
       
-      // Wait for localStream to be ready
+      console.log(`[MeshRTC] user-joined: preparing to connect with ${remoteId}`);
+      
+      // Wait for localStream to be ready to avoid race conditions
       if (!this.localStream) {
-        console.warn("[MeshRTC] No local stream yet, waiting...");
         await this.waitForLocalStream();
       }
 
-      // ✅ Delay to ensure browser attaches all tracks before offer
+      // Delay slightly to ensure browser has time to attach media tracks before creating the offer.
       setTimeout(() => {
+        console.log(`[MeshRTC] Delayed offer creation for ${remoteId}`);
         this.createPeerAndOffer(remoteId);
-      }, 400); // 400ms = safe window for video to attach
+      }, 500); 
     });
   }
 
-  // ✅ NEW: Helper to wait for the local stream
   private async waitForLocalStream(): Promise<void> {
     let tries = 0;
     while (!this.localStream && tries < 20) {
       await new Promise(res => setTimeout(res, 100));
       tries++;
+    }
+    if (!this.localStream) {
+      console.error("[MeshRTC] Local stream was not available after waiting.");
     }
   }
 
@@ -136,7 +129,7 @@ export class MeshRTC {
     try {
       let entry = this.peers.get(remoteId);
       if (!entry) {
-        entry = this.createPeerEntry(remoteId, false);
+        entry = this.createPeerEntry(remoteId); // No longer passing isInitiator
       }
       const pc = entry.pc;
 
@@ -173,9 +166,10 @@ export class MeshRTC {
   public init(localStream: MediaStream) {
     this.initSocketIfNeeded();
     this.localStream = localStream;
-    console.log("[MeshRTC] Local stream tracks:", this.localStream.getTracks().map(t => t.kind));
+    console.log("[MeshRTC] Local stream initialized with tracks:", this.localStream.getTracks().map(t => t.kind));
     this.originalVideoTrack = localStream.getVideoTracks()[0];
 
+    // Retroactively add tracks to any peers that might have been created before the stream was ready
     this.peers.forEach((entry) => {
       if (!entry) return;
       const pc = entry.pc;
@@ -186,31 +180,32 @@ export class MeshRTC {
             }
         });
       } catch (err) {
-        console.warn("Failed to add local tracks to existing peer", err);
+        console.warn("Failed to add local tracks to existing peer during init:", err);
       }
     });
   }
 
-  private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
+  private createPeerEntry(remoteId: string): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     let remoteStream = new MediaStream();
     const entry: PeerEntry = { pc, stream: null };
 
     pc.ontrack = (event) => {
-      console.log(`[mesh] ontrack from ${remoteId}`, event.streams?.[0] || event.track);
-      console.log(`[MeshRTC] Remote video received from ${remoteId}:`, event.streams?.[0]);
+      console.log(`[MeshRTC] ontrack from ${remoteId}. Tracks received:`, event.track.kind);
       if (event.streams && event.streams.length > 0) {
         remoteStream = event.streams[0];
-      } else if (event.track) {
+      } else {
         remoteStream.addTrack(event.track);
       }
       entry.stream = remoteStream;
+      
+      console.log(`[MeshRTC] Calling onRemoteStream for ${remoteId} with stream ID ${remoteStream.id}. Total tracks:`, remoteStream.getTracks().length);
       try { this.onRemoteStream(remoteId, remoteStream); } catch (e) { console.error("onRemoteStream error", e); }
     };
 
     pc.onicecandidate = (ev) => {
       if (ev.candidate) {
-        console.log(`[mesh] sending ice-candidate to ${remoteId}`);
+        console.log(`[MeshRTC] Sending ice-candidate to ${remoteId}`);
         this.socket?.emit("ice-candidate", remoteId, ev.candidate);
       }
     };
@@ -222,18 +217,17 @@ export class MeshRTC {
       }
     };
   
-    if (isInitiator) {
-      pc.onnegotiationneeded = async () => {
-        try {
-          console.log(`[mesh] negotiationneeded -> creating offer for ${remoteId}`);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          this.socket?.emit("offer", remoteId, offer);
-        } catch (err) {
-          console.error("pc.onnegotiationneeded error:", err);
-        }
-      };
-    }
+    // *** THE CRITICAL FIX: ALWAYS ATTACH THIS HANDLER ***
+    pc.onnegotiationneeded = async () => {
+      try {
+        console.log(`[MeshRTC] onnegotiationneeded triggered for ${remoteId}, creating offer...`);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        this.socket?.emit("offer", remoteId, offer);
+      } catch (err) {
+        console.error(`[MeshRTC] onnegotiationneeded error for ${remoteId}:`, err);
+      }
+    };
 
     this.peers.set(remoteId, entry);
     return entry;
@@ -242,23 +236,22 @@ export class MeshRTC {
   private async createPeerAndOffer(remoteId: string) {
     if (this.peers.has(remoteId)) return;
 
-    console.log(`[MeshRTC] Creating peer connection for ${remoteId}`);
+    console.log(`[MeshRTC] Creating peer connection and offering to ${remoteId}`);
 
-    const entry = this.createPeerEntry(remoteId, true);
+    const entry = this.createPeerEntry(remoteId);
 
-    // ✅ Ensure all local tracks are attached before negotiation
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         try {
-          // Use track.clone() to avoid issues with reusing the same track across multiple connections
-          entry.pc.addTrack(track, this.localStream as MediaStream);
-          console.log(`[MeshRTC] Attached ${track.kind} track to ${remoteId}`);
+          // *** THE SECOND CRITICAL FIX: CLONE THE TRACK ***
+          entry.pc.addTrack(track.clone(), this.localStream as MediaStream);
+          console.log(`[MeshRTC] Attached cloned ${track.kind} track to peer ${remoteId}`);
         } catch (e) {
-          console.error("[MeshRTC] addTrack error:", e);
+          console.error(`[MeshRTC] addTrack error for ${remoteId}:`, e);
         }
       });
     } else {
-      console.warn("[MeshRTC] createPeerAndOffer called with no localStream!");
+      console.warn("[MeshRTC] createPeerAndOffer called but localStream is still not available!");
     }
   }
 
@@ -284,22 +277,23 @@ export class MeshRTC {
     if (!this.localStream) return;
     this.localStream.addTrack(track);
     for (const [id, entry] of this.peers.entries()) {
+      // Use clone here as well for robustness
       entry.pc.addTrack(track.clone(), this.localStream);
-      try {
-        const offer = await entry.pc.createOffer();
-        await entry.pc.setLocalDescription(offer);
-        this.socket?.emit("offer", id, offer);
-      } catch (err) {
-        console.error("Renegotiation after addTrack failed:", err);
-      }
+      // Renegotiation will be handled automatically by onnegotiationneeded
     }
   }
 
   public async removeTrack(track: MediaStreamTrack) {
     if (!this.localStream || !track) return;
-    this.localStream.removeTrack(track);
+    
+    // Find the original track to remove, not a clone
+    const senderToStop = Array.from(this.peers.values())[0]?.pc.getSenders().find(s => s.track?.id === track.id);
+    if (senderToStop?.track) {
+        this.localStream.removeTrack(senderToStop.track);
+    }
+    
     this.peers.forEach(({ pc }) => {
-        const sender = pc.getSenders().find(s => s.track === track);
+        const sender = pc.getSenders().find(s => s.track?.id === track.id);
         if (sender) pc.removeTrack(sender);
     });
   }
