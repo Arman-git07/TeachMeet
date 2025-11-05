@@ -197,7 +197,8 @@ export class MeshRTC {
   
     // Handle incoming remote tracks
     pc.ontrack = (event) => {
-      console.log(`[MeshRTC] ontrack triggered from ${remoteId}`, event.streams?.[0] || event.track);
+      console.log(`[mesh] ontrack from ${remoteId}`, event.streams?.[0] || event.track);
+      console.log(`[MeshRTC] Remote video received from ${remoteId}:`, event.streams?.[0]);
       // If event.streams provided, use it; otherwise create from event.track
       if (event.streams && event.streams.length > 0) {
         remoteStream = event.streams[0];
@@ -206,7 +207,6 @@ export class MeshRTC {
       }
   
       entry.stream = remoteStream;
-      console.log(`[MeshRTC] Remote video received from ${remoteId}:`, event.streams?.[0]);
       // Call the callback so MeetingClient receives the MediaStream
       try { this.onRemoteStream(remoteId, remoteStream); } catch (e) { console.error("onRemoteStream error", e); }
     };
