@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -61,6 +62,7 @@ const VideoTile: React.FC<Props> = ({
     const videoEl = videoRef.current;
     if (!videoEl) return;
     if (stream && videoEl.srcObject !== stream) {
+      console.log("[VideoTile] Assigned stream to video element", stream.id, stream.getTracks().map(t => t.kind));
       videoEl.srcObject = stream;
       videoEl.play().catch(() => {});
     }

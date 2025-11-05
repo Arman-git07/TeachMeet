@@ -143,7 +143,7 @@ export class MeshRTC {
     try {
       let entry = this.peers.get(remoteId);
       if (!entry) {
-        entry = this.createPeerEntry(remoteId); // No longer passing isInitiator
+        entry = this.createPeerEntry(remoteId);
       }
       const pc = entry.pc;
 
@@ -213,7 +213,7 @@ export class MeshRTC {
       }
       entry.stream = remoteStream;
       
-      console.log(`[MeshRTC] Calling onRemoteStream for ${remoteId} with stream ID ${remoteStream.id}. Total tracks:`, remoteStream.getTracks().length);
+      console.log(`[MeshRTC] Remote video received from ${remoteId}:`, remoteStream.getTracks().map(t => t.kind));
       try { this.onRemoteStream(remoteId, remoteStream); } catch (e) { console.error("onRemoteStream error", e); }
     };
 
@@ -231,7 +231,6 @@ export class MeshRTC {
       }
     };
   
-    // *** THE CRITICAL FIX: ALWAYS ATTACH THIS HANDLER ***
     pc.onnegotiationneeded = async () => {
       try {
         console.log(`[MeshRTC] onnegotiationneeded triggered for ${remoteId}, creating offer...`);
@@ -255,9 +254,9 @@ export class MeshRTC {
     const entry = this.createPeerEntry(remoteId);
 
     if (this.localStream) {
+      console.log(`[MeshRTC] Added tracks for ${remoteId}:`, this.localStream.getTracks().map(t => t.kind));
       this.localStream.getTracks().forEach(track => {
         try {
-          // *** THE SECOND CRITICAL FIX: CLONE THE TRACK ***
           entry.pc.addTrack(track.clone(), this.localStream as MediaStream);
           console.log(`[MeshRTC] Attached cloned ${track.kind} track to peer ${remoteId}`);
         } catch (e) {
@@ -293,14 +292,12 @@ export class MeshRTC {
     for (const [id, entry] of this.peers.entries()) {
       // Use clone here as well for robustness
       entry.pc.addTrack(track.clone(), this.localStream);
-      // Renegotiation will be handled automatically by onnegotiationneeded
     }
   }
 
   public async removeTrack(track: MediaStreamTrack) {
     if (!this.localStream || !track) return;
     
-    // Find the original track to remove, not a clone
     const senderToStop = Array.from(this.peers.values())[0]?.pc.getSenders().find(s => s.track?.id === track.id);
     if (senderToStop?.track) {
         this.localStream.removeTrack(senderToStop.track);
