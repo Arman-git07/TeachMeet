@@ -99,17 +99,15 @@ export class MeshRTC {
 
     this.socket.on("user-joined", async (remoteId: string) => {
       console.log("[MeshRTC] user-joined:", remoteId);
-
       if (this.peers.has(remoteId)) {
-        console.warn(`[MeshRTC] Peer ${remoteId} already exists`);
+        console.warn(`[MeshRTC] Peer ${remoteId} already exists, skipping.`);
         return;
       }
-      
+      // Wait for localStream to be ready
       if (!this.localStream) {
-        console.warn("[MeshRTC] No local stream yet, waiting...");
+        console.warn("[MeshRTC] Local stream not ready, waiting...");
         await this.waitForLocalStream();
       }
-
       // Delay to ensure browser attaches all tracks before offer
       setTimeout(() => {
         this.createPeerAndOffer(remoteId);
@@ -184,7 +182,7 @@ export class MeshRTC {
       try {
         this.localStream?.getTracks().forEach(track => {
             if (!pc.getSenders().find(s => s.track === track)) {
-                pc.addTrack(track.clone(), this.localStream as MediaStream);
+                pc.addTrack(track, this.localStream as MediaStream);
             }
         });
       } catch (err) {
@@ -245,7 +243,7 @@ export class MeshRTC {
     if (this.localStream) {
         this.localStream.getTracks().forEach(track => {
         try {
-            entry.pc.addTrack(track.clone(), this.localStream!);
+            entry.pc.addTrack(track, this.localStream!);
             console.log(`[MeshRTC] Attached ${track.kind} track to ${remoteId}`);
         } catch (err) {
             console.error("addTrack error:", err);
@@ -336,3 +334,4 @@ export class MeshRTC {
 }
 
 export default MeshRTC;
+
