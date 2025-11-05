@@ -97,20 +97,34 @@ export class MeshRTC {
     });
 
     this.socket.on("user-joined", async (remoteId: string) => {
-      if (!remoteId || remoteId === this.socket?.id || this.peers.has(remoteId)) return;
-      
-      console.log(`[MeshRTC] user-joined: preparing to connect with ${remoteId}`);
-      
-      // Wait for localStream to be ready to avoid race conditions
-      if (!this.localStream) {
-        await this.waitForLocalStream();
-      }
-
-      // Delay slightly to ensure browser has time to attach media tracks before creating the offer.
-      setTimeout(() => {
-        console.log(`[MeshRTC] Delayed offer creation for ${remoteId}`);
-        this.createPeerAndOffer(remoteId);
-      }, 500); 
+      if (!remoteId || remoteId === this.socket?.id) return;
+      if (this.peers.has(remoteId)) return;
+    
+      console.log("[MeshRTC] user-joined:", remoteId);
+    
+      // Wait a moment to ensure local video track is attached
+      const waitForLocalTracks = async () => {
+        const localStream = this.localStream;
+        if (!localStream) return;
+    
+        let retries = 0;
+        while (
+          localStream.getVideoTracks().length === 0 &&
+          retries < 10
+        ) {
+          console.warn("[MeshRTC] Waiting for local video track...");
+          await new Promise((res) => setTimeout(res, 100)); // 100ms
+          retries++;
+        }
+      };
+    
+      await waitForLocalTracks();
+    
+      // Add slight delay before negotiation to avoid race condition
+      setTimeout(async () => {
+        console.log("[MeshRTC] Proceeding to create connection for", remoteId);
+        await this.createPeerAndOffer(remoteId);
+      }, 400); // 400ms delay ensures video included
     });
   }
 
