@@ -103,10 +103,10 @@ export class MeshRTC {
     // ✅ FIXED: ensure camera track fully attached before making an offer
     this.socket.on("user-joined", async (remoteId: string) => {
       console.log("[MeshRTC] user-joined:", remoteId);
-      if (!remoteId || remoteId === this.socket?.id) return;
 
-      if (this.peers.has(remoteId)) {
-        console.warn(`[MeshRTC] Peer ${remoteId} already exists`);
+      // Skip self and existing peers
+      if (!remoteId || remoteId === this.socket?.id || this.peers.has(remoteId)) {
+        if(this.peers.has(remoteId)) console.warn(`[MeshRTC] Peer ${remoteId} already exists, skipping.`);
         return;
       }
       
@@ -182,7 +182,7 @@ export class MeshRTC {
       try {
         this.localStream?.getTracks().forEach(track => {
             if (!pc.getSenders().find(s => s.track === track)) {
-                pc.addTrack(track.clone(), this.localStream as MediaStream);
+                pc.addTrack(track, this.localStream as MediaStream);
             }
         });
       } catch (err) {
@@ -239,7 +239,6 @@ export class MeshRTC {
     return entry;
   }
   
-  // ✅ UPDATED: createPeerAndOffer with robust track attachment
   private async createPeerAndOffer(remoteId: string) {
     if (this.peers.has(remoteId)) return;
 
@@ -251,7 +250,8 @@ export class MeshRTC {
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         try {
-          entry.pc.addTrack(track.clone(), this.localStream as MediaStream);
+          // Use track.clone() to avoid issues with reusing the same track across multiple connections
+          entry.pc.addTrack(track, this.localStream as MediaStream);
           console.log(`[MeshRTC] Attached ${track.kind} track to ${remoteId}`);
         } catch (e) {
           console.error("[MeshRTC] addTrack error:", e);
