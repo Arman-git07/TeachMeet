@@ -75,7 +75,7 @@ export class MeshRTC {
     this.socket.on("user-joined", (remoteId: string) => {
       if (!remoteId || remoteId === this.socket?.id) return;
       if (this.peers.has(remoteId)) return;
-    
+
       console.log(`[MeshRTC] user-joined: preparing to connect with ${remoteId}`);
     
       // ✅ Wait for local tracks to fully attach before sending offer
