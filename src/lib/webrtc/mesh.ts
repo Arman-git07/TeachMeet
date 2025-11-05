@@ -75,7 +75,7 @@ export class MeshRTC {
     this.socket.on("user-joined", (remoteId: string) => {
       if (!remoteId || remoteId === this.socket?.id) return;
       if (this.peers.has(remoteId)) return;
-
+    
       console.log(`[MeshRTC] user-joined: preparing to connect with ${remoteId}`);
     
       // ✅ Wait for local tracks to fully attach before sending offer
@@ -181,8 +181,7 @@ export class MeshRTC {
         const tracks = this.localStream.getTracks();
         console.log(`[MeshRTC] Attaching ${tracks.length} local tracks to peer ${remoteId}`);
         tracks.forEach(track => {
-          // ✅ Use track.clone() to avoid browser issues with track reuse
-          pc.addTrack(track.clone(), this.localStream as MediaStream);
+          pc.addTrack(track, this.localStream as MediaStream);
         });
       } catch (err) {
         console.warn("Error adding local tracks to PC:", err);
@@ -214,6 +213,7 @@ export class MeshRTC {
     // ICE candidate forwarding
     pc.onicecandidate = (ev) => {
       if (ev.candidate) {
+        console.log(`[mesh] sending ice-candidate to ${remoteId}`);
         this.socket?.emit("ice-candidate", remoteId, ev.candidate);
       }
     };
@@ -230,6 +230,7 @@ export class MeshRTC {
     if (isInitiator) {
       pc.onnegotiationneeded = async () => {
         try {
+          console.log(`[mesh] negotiationneeded -> creating offer for ${remoteId}`);
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           // emit to exactly the remote peer
