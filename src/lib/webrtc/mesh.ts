@@ -46,6 +46,7 @@ export class MeshRTC {
   private iceServers: RTCIceServer[];
   public originalVideoTrack?: MediaStreamTrack | null;
   public socketId: string | null = null;
+  private videoTrack: MediaStreamTrack | null = null;
 
   constructor(opts: MeshOptions) {
     this.roomId = opts.roomId;
@@ -97,34 +98,22 @@ export class MeshRTC {
     });
 
     this.socket.on("user-joined", async (remoteId: string) => {
-      if (!remoteId || remoteId === this.socket?.id) return;
-      if (this.peers.has(remoteId)) return;
-    
       console.log("[MeshRTC] user-joined:", remoteId);
-    
-      // Wait a moment to ensure local video track is attached
-      const waitForLocalTracks = async () => {
-        const localStream = this.localStream;
-        if (!localStream) return;
-    
-        let retries = 0;
-        while (
-          localStream.getVideoTracks().length === 0 &&
-          retries < 10
-        ) {
-          console.warn("[MeshRTC] Waiting for local video track...");
-          await new Promise((res) => setTimeout(res, 100)); // 100ms
-          retries++;
-        }
-      };
-    
-      await waitForLocalTracks();
-    
-      // Add slight delay before negotiation to avoid race condition
-      setTimeout(async () => {
-        console.log("[MeshRTC] Proceeding to create connection for", remoteId);
-        await this.createPeerAndOffer(remoteId);
-      }, 400); // 400ms delay ensures video included
+
+      if (this.peers.has(remoteId)) {
+        console.warn(`[MeshRTC] Peer ${remoteId} already exists`);
+        return;
+      }
+      
+      if (!this.localStream) {
+        console.warn("[MeshRTC] No local stream yet, waiting...");
+        await this.waitForLocalStream();
+      }
+
+      // Delay to ensure browser attaches all tracks before offer
+      setTimeout(() => {
+        this.createPeerAndOffer(remoteId);
+      }, 400); // 400ms is a safe window
     });
   }
 
@@ -181,7 +170,12 @@ export class MeshRTC {
     this.initSocketIfNeeded();
     this.localStream = localStream;
     console.log("[MeshRTC] Local stream initialized with tracks:", this.localStream.getTracks().map(t => t.kind));
-    this.originalVideoTrack = localStream.getVideoTracks()[0];
+    
+    this.originalVideoTrack = localStream.getVideoTracks()[0] || null;
+    this.videoTrack = this.originalVideoTrack;
+    if (this.videoTrack) {
+        this._attachVideoToAllPeers();
+    }
 
     // Retroactively add tracks to any peers that might have been created before the stream was ready
     this.peers.forEach((entry) => {
@@ -190,7 +184,7 @@ export class MeshRTC {
       try {
         this.localStream?.getTracks().forEach(track => {
             if (!pc.getSenders().find(s => s.track === track)) {
-                pc.addTrack(track, this.localStream as MediaStream);
+                pc.addTrack(track.clone(), this.localStream as MediaStream);
             }
         });
       } catch (err) {
@@ -205,16 +199,10 @@ export class MeshRTC {
     const entry: PeerEntry = { pc, stream: null };
 
     pc.ontrack = (event) => {
-      console.log(`[MeshRTC] ontrack from ${remoteId}. Tracks received:`, event.track.kind);
-      if (event.streams && event.streams.length > 0) {
-        remoteStream = event.streams[0];
-      } else {
-        remoteStream.addTrack(event.track);
-      }
+      event.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
       entry.stream = remoteStream;
-      
-      console.log(`[MeshRTC] Remote video received from ${remoteId}:`, remoteStream.getTracks().map(t => t.kind));
-      try { this.onRemoteStream(remoteId, remoteStream); } catch (e) { console.error("onRemoteStream error", e); }
+      this.onRemoteStream(remoteId, remoteStream);
+      console.log("[mesh] ontrack from", remoteId, "=>", event.streams[0].getTracks().map(t => t.kind));
     };
 
     pc.onicecandidate = (ev) => {
@@ -249,23 +237,25 @@ export class MeshRTC {
   private async createPeerAndOffer(remoteId: string) {
     if (this.peers.has(remoteId)) return;
 
-    console.log(`[MeshRTC] Creating peer connection and offering to ${remoteId}`);
+    console.log(`[MeshRTC] Creating peer connection for ${remoteId}`);
 
     const entry = this.createPeerEntry(remoteId);
 
+    // Attach all local tracks safely
     if (this.localStream) {
-      console.log(`[MeshRTC] Added tracks for ${remoteId}:`, this.localStream.getTracks().map(t => t.kind));
-      this.localStream.getTracks().forEach(track => {
+        this.localStream.getTracks().forEach(track => {
         try {
-          entry.pc.addTrack(track.clone(), this.localStream as MediaStream);
-          console.log(`[MeshRTC] Attached cloned ${track.kind} track to peer ${remoteId}`);
-        } catch (e) {
-          console.error(`[MeshRTC] addTrack error for ${remoteId}:`, e);
+            entry.pc.addTrack(track.clone(), this.localStream!);
+            console.log(`[MeshRTC] Attached ${track.kind} track to ${remoteId}`);
+        } catch (err) {
+            console.error("addTrack error:", err);
         }
-      });
+        });
     } else {
-      console.warn("[MeshRTC] createPeerAndOffer called but localStream is still not available!");
+        console.warn("[MeshRTC] createPeerAndOffer called with no localStream!");
     }
+
+    // Negotiation is handled in createPeerEntry’s onnegotiationneeded
   }
 
   private cleanupPeer(remoteId: string) {
@@ -289,10 +279,8 @@ export class MeshRTC {
   public async addTrack(track: MediaStreamTrack) {
     if (!this.localStream) return;
     this.localStream.addTrack(track);
-    for (const [id, entry] of this.peers.entries()) {
-      // Use clone here as well for robustness
-      entry.pc.addTrack(track.clone(), this.localStream);
-    }
+    if (track.kind === "video") this.videoTrack = track;
+    this._attachVideoToAllPeers(); // ensure propagation
   }
 
   public async removeTrack(track: MediaStreamTrack) {
@@ -327,6 +315,24 @@ export class MeshRTC {
   public getLocalVideoTrack(): MediaStreamTrack | null {
     return this.localStream?.getVideoTracks()[0] || null;
   }
+
+  private _attachVideoToAllPeers() {
+    if (!this.videoTrack) return;
+    console.log("[mesh] Attaching local video to all peers");
+
+    this.peers.forEach((entry, remoteId) => {
+        if (!entry.pc) return;
+        const senders = entry.pc.getSenders();
+        const already = senders.find((s) => s.track && s.track.kind === "video");
+        if (already) {
+        already.replaceTrack(this.videoTrack);
+        console.log("[mesh] Replaced video track for", remoteId);
+        } else {
+        entry.pc.addTrack(this.videoTrack, this.localStream!);
+        console.log("[mesh] Added video track for", remoteId);
+        }
+    });
+    }
 }
 
 export default MeshRTC;
