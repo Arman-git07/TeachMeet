@@ -50,17 +50,7 @@ export class MeshRTC {
     this.originalVideoTrack = this.localStream.getVideoTracks()[0] || null;
     this.videoTrack = this.originalVideoTrack;
     
-    this.socket.emit("join", this.roomId);
-    
-    // Since init is called after connection, we might need to create offers to existing users
-    this.socket.on("room-users", (users: string[]) => {
-        users.forEach(remoteId => {
-            if (remoteId !== this.socket.id) {
-                const pc = this.createPeerConnection(remoteId);
-                this.addLocalTracks(pc);
-            }
-        });
-    });
+    this.socket.emit("join-room", this.roomId, this.userId);
   }
 
   /** Clean up everything */
@@ -78,25 +68,27 @@ export class MeshRTC {
     });
     
     this.socket.on("user-joined", async (remoteId: string) => {
-      if (remoteId === this.socketId) return;
-      console.log(`[MeshRTC] User ${remoteId} joined, creating offer.`);
+      if (remoteId === this.userId) return;
+      console.log("New user joined:", remoteId);
       const pc = this.createPeerConnection(remoteId);
       this.addLocalTracks(pc);
-      // Let negotiationneeded handle the offer creation
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      this.socket.emit("offer", remoteId, offer);
     });
 
     this.socket.on("offer", async (remoteId: string, offer: RTCSessionDescriptionInit) => {
-      console.log(`[MeshRTC] Received offer from ${remoteId}.`);
+      console.log("Received offer from:", remoteId);
       const pc = this.createPeerConnection(remoteId);
-      this.addLocalTracks(pc); // ✅ CRITICAL FIX — attach own tracks before answering
+      this.addLocalTracks(pc); // ✅ Key fix: attach local tracks BEFORE answering
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      this.socket.emit("answer", remoteId, pc.localDescription);
+      this.socket.emit("answer", remoteId, answer);
     });
 
     this.socket.on("answer", async (remoteId: string, answer: RTCSessionDescriptionInit) => {
-      console.log(`[MeshRTC] Received answer from ${remoteId}.`);
+      console.log("Received answer from:", remoteId);
       const peer = this.peers.get(remoteId);
       if (!peer) return;
       await peer.pc.setRemoteDescription(new RTCSessionDescription(answer));
@@ -104,24 +96,25 @@ export class MeshRTC {
 
     this.socket.on("ice-candidate", async (remoteId: string, candidate: RTCIceCandidateInit) => {
       const peer = this.peers.get(remoteId);
-      if (!peer || !candidate) return;
-      try {
-        await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) {
-        console.error("Error adding ICE candidate:", err);
+      if (peer && candidate) {
+        try {
+          await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn("Error adding ICE candidate:", e);
+        }
       }
     });
 
     this.socket.on("user-left", (remoteId: string) => {
-      console.log(`[MeshRTC] User ${remoteId} left.`);
-      const peer = this.peers.get(remoteId);
-      if (peer) {
-        peer.pc.close();
-        this.peers.delete(remoteId);
-      }
-      if (this.onRemoteLeft) {
-        this.onRemoteLeft(remoteId);
-      }
+        console.log(`[MeshRTC] User ${remoteId} left.`);
+        const peer = this.peers.get(remoteId);
+        if (peer) {
+            peer.pc.close();
+            this.peers.delete(remoteId);
+        }
+        if (this.onRemoteLeft) {
+            this.onRemoteLeft(remoteId);
+        }
     });
 
     this.socket.on("connect_error", (err) => {
@@ -148,20 +141,10 @@ export class MeshRTC {
       this.onRemoteStream(remoteId, remoteStream);
     };
     
-    pc.onnegotiationneeded = async () => {
-        try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            this.socket.emit("offer", remoteId, pc.localDescription);
-        } catch(err) {
-            console.error("onnegotiationneeded error:", err);
-        }
-    }
-
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        pc.close();
         this.peers.delete(remoteId);
-        if (this.onRemoteLeft) this.onRemoteLeft(remoteId);
       }
     };
 
@@ -173,10 +156,9 @@ export class MeshRTC {
   private addLocalTracks(pc: RTCPeerConnection) {
     if (!this.localStream) return;
     this.localStream.getTracks().forEach((track) => {
-      // Use track.clone() for robustness across browsers
       const senderExists = pc.getSenders().some((s) => s.track && s.track.id === track.id);
       if (!senderExists) {
-          pc.addTrack(track.clone(), this.localStream!);
+          pc.addTrack(track, this.localStream!);
       }
     });
   }

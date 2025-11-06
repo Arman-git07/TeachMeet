@@ -9,6 +9,8 @@ export const config = {
   },
 };
 
+const rooms = new Map<string, Set<string>>(); // roomId -> Set of userIds
+
 export default function handler(
   req: NextApiRequest,
   res: NextApiResponseServerIO
@@ -26,51 +28,53 @@ export default function handler(
     res.socket.server.io = io;
 
     io.on("connection", (socket) => {
-      console.log("✅ User connected:", socket.id);
+      console.log("Socket connected:", socket.id);
 
-      // --- Join Room ---
-      socket.on("join", (roomId) => {
+      socket.on("join-room", (roomId: string, userId: string) => {
         socket.join(roomId);
-        console.log(`👥 ${socket.id} joined room ${roomId}`);
-        socket.to(roomId).emit("user-joined", socket.id);
+        // @ts-ignore - extending socket object
+        socket.data = { roomId, userId };
+
+        if (!rooms.has(roomId)) {
+          rooms.set(roomId, new Set());
+        }
+        rooms.get(roomId)!.add(userId);
+
+        // Notify all others in the room
+        socket.to(roomId).emit("user-joined", userId);
+        console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
 
-      // --- WebRTC Signaling Events ---
-      // Offer: (remoteSocketId, offer)
-      socket.on("offer", (remoteSocketId, offer) => {
-        if (!remoteSocketId) return;
-        // send to the specific socket
-        socket.to(remoteSocketId).emit("offer", socket.id, offer);
-      });
-
-      // Answer: (remoteSocketId, answer)
-      socket.on("answer", (remoteSocketId, answer) => {
-        if (!remoteSocketId) return;
-        socket.to(remoteSocketId).emit("answer", socket.id, answer);
-      });
-
-      // ICE Candidate: (remoteSocketId, candidate)
-      socket.on("ice-candidate", (remoteSocketId, candidate) => {
-        if (!remoteSocketId) return;
-        socket.to(remoteSocketId).emit("ice-candidate", socket.id, candidate);
+      socket.on("offer", (remoteId: string, offer: any) => {
+        // @ts-ignore
+        const { userId } = socket.data || {};
+        if (!userId) return;
+        // Forward offer to the specific user (remoteId) from the sender (userId)
+        io.to(remoteId).emit("offer", userId, offer);
       });
       
-      socket.on("screen-share-started", ({ roomId, mode }) => {
-        socket.to(roomId).emit("participant-started-sharing", { participantId: socket.id, mode });
+      socket.on("answer", (remoteId: string, answer: any) => {
+        // @ts-ignore
+        const { userId } = socket.data || {};
+        if (!userId) return;
+        io.to(remoteId).emit("answer", userId, answer);
       });
 
-      socket.on("screen-share-stopped", ({ roomId }) => {
-          socket.to(roomId).emit("participant-stopped-sharing", { participantId: socket.id });
+      socket.on("ice-candidate", (remoteId: string, candidate: any) => {
+        // @ts-ignore
+        const { userId } = socket.data || {};
+        if (!userId) return;
+        io.to(remoteId).emit("ice-candidate", userId, candidate);
       });
 
-      // --- Handle User Leaving ---
       socket.on("disconnect", () => {
-        console.log(`❌ ${socket.id} disconnected`);
-        // find rooms the socket was in (ignore socket.id room)
-        for (const room of socket.rooms) {
-          if (room === socket.id) continue;
-          socket.to(room).emit("user-left", socket.id);
+        // @ts-ignore
+        const { roomId, userId } = socket.data || {};
+        if (roomId && userId && rooms.has(roomId)) {
+          rooms.get(roomId)!.delete(userId);
+          socket.to(roomId).emit("user-left", userId);
         }
+        console.log("Disconnected:", socket.id);
       });
     });
   }
