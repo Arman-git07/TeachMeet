@@ -69,7 +69,7 @@ export class MeshRTC {
     
     this.socket.on("user-joined", async (remoteId: string) => {
       if (remoteId === this.userId) return;
-      console.log("New user joined:", remoteId);
+      console.log("[mesh] New user joined:", remoteId);
 
       // Add a delay to prevent race condition
       setTimeout(async () => {
@@ -80,16 +80,18 @@ export class MeshRTC {
             await pc.setLocalDescription(offer);
             this.socket.emit("offer", remoteId, offer);
         } catch(e) {
-            console.error("Error creating offer", e)
+            console.error("[mesh] Error creating offer", e)
         }
       }, 400);
     });
 
     this.socket.on("offer", async (remoteId: string, offer: RTCSessionDescriptionInit) => {
-      console.log("Received offer from:", remoteId);
-      console.log("[mesh] (Offer handler) Current local tracks before answer:", this.localStream?.getTracks().map(t => t.kind));
+      console.log("[mesh] Received offer from:", remoteId);
       const pc = this.createPeerConnection(remoteId);
-      this.addLocalTracks(pc); // ✅ Key fix: attach local tracks BEFORE answering
+      
+      // ✅ CRITICAL FIX: Attach own tracks before answering so video is sent back.
+      this.addLocalTracks(pc);
+      
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -97,7 +99,7 @@ export class MeshRTC {
     });
 
     this.socket.on("answer", async (remoteId: string, answer: RTCSessionDescriptionInit) => {
-      console.log("Received answer from:", remoteId);
+      console.log("[mesh] Received answer from:", remoteId);
       const peer = this.peers.get(remoteId);
       if (!peer) return;
       await peer.pc.setRemoteDescription(new RTCSessionDescription(answer));
@@ -109,13 +111,13 @@ export class MeshRTC {
         try {
           await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (e) {
-          console.warn("Error adding ICE candidate:", e);
+          console.warn("[mesh] Error adding ICE candidate:", e);
         }
       }
     });
 
     this.socket.on("user-left", (remoteId: string) => {
-        console.log(`[MeshRTC] User ${remoteId} left.`);
+        console.log(`[mesh] User ${remoteId} left.`);
         const peer = this.peers.get(remoteId);
         if (peer) {
             peer.pc.close();
@@ -127,7 +129,7 @@ export class MeshRTC {
     });
 
     this.socket.on("connect_error", (err) => {
-        console.warn("WebRTC signaling is currently disabled because the backend socket server is not running or unreachable. Real-time communication will not work.", err.message);
+        console.warn("[mesh] Signaling is disabled, backend socket server is not running or unreachable.", err.message);
     });
   }
 
@@ -173,6 +175,7 @@ export class MeshRTC {
       try {
         const senderExists = pc.getSenders().some((s) => s.track && s.track.kind === track.kind);
         if (!senderExists) {
+            // Using track.clone() can prevent some browser-specific issues with track reuse
             pc.addTrack(track.clone(), this.localStream!);
             console.log("[mesh] Added track to peerConnection:", track.kind);
         }
