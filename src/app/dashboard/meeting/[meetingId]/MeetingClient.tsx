@@ -388,7 +388,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <div className="w-full h-full relative">
                 <div className="w-full h-full grid gap-2" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
                     {remoteParticipants.map((p) => (
-                        <div key={p.id} className="w-full h-full rounded-lg relative aspect-video">
+                        <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
                             <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
                         </div>
                     ))}
@@ -397,7 +397,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     <motion.div
                         drag
                         dragMomentum={false}
-                        className="absolute bottom-20 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-video isolate cursor-grab active:cursor-grabbing"
+                        className="absolute bottom-20 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
                     >
                         <VideoTile
                             stream={localParticipant.stream}
