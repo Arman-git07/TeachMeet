@@ -70,11 +70,19 @@ export class MeshRTC {
     this.socket.on("user-joined", async (remoteId: string) => {
       if (remoteId === this.userId) return;
       console.log("New user joined:", remoteId);
-      const pc = this.createPeerConnection(remoteId);
-      this.addLocalTracks(pc);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      this.socket.emit("offer", remoteId, offer);
+
+      // Add a delay to prevent race condition
+      setTimeout(async () => {
+        const pc = this.createPeerConnection(remoteId);
+        this.addLocalTracks(pc);
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            this.socket.emit("offer", remoteId, offer);
+        } catch(e) {
+            console.error("Error creating offer", e)
+        }
+      }, 400);
     });
 
     this.socket.on("offer", async (remoteId: string, offer: RTCSessionDescriptionInit) => {
@@ -156,9 +164,11 @@ export class MeshRTC {
   private addLocalTracks(pc: RTCPeerConnection) {
     if (!this.localStream) return;
     this.localStream.getTracks().forEach((track) => {
-      const senderExists = pc.getSenders().some((s) => s.track && s.track.id === track.id);
+      // Use track.clone() to avoid issues with reusing tracks
+      const clonedTrack = track.clone();
+      const senderExists = pc.getSenders().some((s) => s.track && s.track.kind === clonedTrack.kind);
       if (!senderExists) {
-          pc.addTrack(track, this.localStream!);
+          pc.addTrack(clonedTrack, this.localStream!);
       }
     });
   }
