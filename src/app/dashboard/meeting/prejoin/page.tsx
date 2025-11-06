@@ -355,6 +355,7 @@ useEffect(() => {
       return <Button onClick={handleCreateAndJoinMeeting} disabled={!agreed || isCreatingMeeting} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>{isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Join Now as Host</Button>
     }
 
+    // Participant flow
     switch (requestStatus) {
       case 'pending':
       case 'accepted':
@@ -367,7 +368,7 @@ useEffect(() => {
       case 'denied':
          return (
           <div className="text-center space-y-2">
-            <Button onClick={handleAskToJoin} disabled={!agreed} className="w-full py-3 text-lg font-semibold rounded-xl btn-gel">
+            <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-primary/50 text-primary-foreground/70 cursor-not-allowed")}>
               Ask to Join Again
             </Button>
             <p className="text-xs text-destructive">Your previous request was declined.</p>
@@ -375,7 +376,11 @@ useEffect(() => {
          );
       case 'idle':
       default:
-        return <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-primary/50 text-primary-foreground/70 cursor-not-allowed")}>Ask to Join</Button>;
+        return (
+          <Button onClick={handleAskToJoin} disabled={!agreed} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-primary/50 text-primary-foreground/70 cursor-not-allowed")}>
+            Ask to Join
+          </Button>
+        );
     }
   };
   
