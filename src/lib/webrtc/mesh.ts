@@ -196,6 +196,20 @@ export class MeshRTC {
     let remoteStream = new MediaStream();
     const entry: PeerEntry = { pc, stream: null };
 
+    // ALWAYS attach local tracks to every new peer connection
+    if (this.localStream) {
+        this.localStream.getTracks().forEach(track => {
+            try {
+                pc.addTrack(track.clone(), this.localStream!);
+            } catch (err) {
+                console.error(`[MeshRTC] Failed to add track for ${remoteId}:`, err);
+            }
+        });
+        console.log(`[MeshRTC] Attached all local tracks for new peer ${remoteId}`);
+    } else {
+        console.warn(`[MeshRTC] createPeerEntry for ${remoteId} called without a local stream.`);
+    }
+
     pc.ontrack = (event) => {
       event.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
       entry.stream = remoteStream;
@@ -239,21 +253,7 @@ export class MeshRTC {
 
     const entry = this.createPeerEntry(remoteId);
 
-    // Attach all local tracks safely
-    if (this.localStream) {
-        this.localStream.getTracks().forEach(track => {
-        try {
-            entry.pc.addTrack(track, this.localStream!);
-            console.log(`[MeshRTC] Attached ${track.kind} track to ${remoteId}`);
-        } catch (err) {
-            console.error("addTrack error:", err);
-        }
-        });
-    } else {
-        console.warn("[MeshRTC] createPeerAndOffer called with no localStream!");
-    }
-
-    // Negotiation is handled in createPeerEntry’s onnegotiationneeded
+    // Negotiation is now handled automatically by `onnegotiationneeded`
   }
 
   private cleanupPeer(remoteId: string) {
@@ -335,3 +335,4 @@ export class MeshRTC {
 
 export default MeshRTC;
 
+    
