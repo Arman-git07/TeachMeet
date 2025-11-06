@@ -87,6 +87,7 @@ export class MeshRTC {
 
     this.socket.on("offer", async (remoteId: string, offer: RTCSessionDescriptionInit) => {
       console.log("Received offer from:", remoteId);
+      console.log("[mesh] (Offer handler) Current local tracks before answer:", this.localStream?.getTracks().map(t => t.kind));
       const pc = this.createPeerConnection(remoteId);
       this.addLocalTracks(pc); // ✅ Key fix: attach local tracks BEFORE answering
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
@@ -143,9 +144,9 @@ export class MeshRTC {
       if (e.candidate) this.socket.emit("ice-candidate", remoteId, e.candidate);
     };
 
-    const remoteStream = new MediaStream();
     pc.ontrack = (e) => {
-      e.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
+      console.log("[mesh] ontrack event fired from", remoteId, "tracks:", e.streams[0].getTracks().map(t => t.kind));
+      const remoteStream = new MediaStream(e.streams[0].getTracks());
       this.onRemoteStream(remoteId, remoteStream);
     };
     
@@ -156,19 +157,27 @@ export class MeshRTC {
       }
     };
 
-    this.peers.set(remoteId, { pc, stream: remoteStream });
+    this.peers.set(remoteId, { pc, stream: new MediaStream() });
     return pc;
   }
 
   /** Attach all local tracks (video/audio) to peer connection */
   private addLocalTracks(pc: RTCPeerConnection) {
-    if (!this.localStream) return;
+    if (!this.localStream) {
+      console.warn("[mesh] No localStream found when adding tracks");
+      return;
+    }
+  
+    console.log("[mesh] Attaching local tracks:", this.localStream.getTracks().map(t => t.kind));
     this.localStream.getTracks().forEach((track) => {
-      // Use track.clone() to avoid issues with reusing tracks
-      const clonedTrack = track.clone();
-      const senderExists = pc.getSenders().some((s) => s.track && s.track.kind === clonedTrack.kind);
-      if (!senderExists) {
-          pc.addTrack(clonedTrack, this.localStream!);
+      try {
+        const senderExists = pc.getSenders().some((s) => s.track && s.track.kind === track.kind);
+        if (!senderExists) {
+            pc.addTrack(track.clone(), this.localStream!);
+            console.log("[mesh] Added track to peerConnection:", track.kind);
+        }
+      } catch (err) {
+        console.error("[mesh] Failed to add track:", track.kind, err);
       }
     });
   }
