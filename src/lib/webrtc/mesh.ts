@@ -19,10 +19,10 @@ export class MeshRTC {
   private onRemoteStream: (userId: string, stream: MediaStream) => void;
   private onRemoteLeft?: (socketId: string) => void;
   public socketId: string | null = null;
+  public removeTrack?: (track: MediaStreamTrack) => void; // Make it public for screen sharing
 
-  // ✅ 1. Queue + ready flag
-  private _ready = false; // localStream ready flag
-  private _pendingSignals: Array<() => void> = []; // queued incoming handlers
+  private _ready = false;
+  private _pendingSignals: Array<() => void> = [];
 
   constructor(opts: {
     roomId: string;
@@ -44,17 +44,14 @@ export class MeshRTC {
     try { (window as any).__mesh = this; console.log("[mesh] exported instance to window.__mesh"); } catch {}
   }
   
-  // ✅ 2. Modified init() to set ready and flush queue
   public async init(localStream: MediaStream) {
     this.localStream = localStream;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
   
-    // Mark as ready and flush pending signals
     this._ready = true;
   
     if (this._pendingSignals.length > 0) {
       console.log("[mesh] init(): processing", this._pendingSignals.length, "queued signals");
-      // Flush in FIFO order
       while (this._pendingSignals.length) {
         const fn = this._pendingSignals.shift();
         try { fn && fn(); } catch (e) { console.error("[mesh] queued signal handler failed", e); }
@@ -65,10 +62,9 @@ export class MeshRTC {
   private registerSocketEvents() {
     this.socket.on("connect", () => { 
         this.socketId = this.socket.id; 
-        this.socket.emit("join-room", this.roomId, this.socketId);
+        this.socket.emit("join-room", this.roomId, this.socket.id);
     });
 
-    // ✅ 3. Wrap socket handlers to queue when not ready
     this.socket.on("user-joined", (remoteId: string) => {
       const handler = () => this._handleUserJoined(remoteId);
       if (!this._ready) {
@@ -109,13 +105,12 @@ export class MeshRTC {
     });
   }
 
-  // ✅ 4. Implement _handleOffer to attach tracks BEFORE creating answer
   private async _handleOffer(fromId: string, offer: RTCSessionDescriptionInit) {
     console.log("[mesh] Received offer from", fromId);
 
     let entry = this.peers.get(fromId);
     if (!entry) {
-      entry = this.createPeerEntry(fromId, false); // non-initiator
+      entry = this.createPeerEntry(fromId, false);
       this.peers.set(fromId, entry);
     }
     const pc = entry.pc;
@@ -150,7 +145,6 @@ export class MeshRTC {
     }
   }
 
-  // ✅ 5. Implement _handleUserJoined with breathing room
   private async _handleUserJoined(remoteId: string) {
     if (!remoteId || remoteId === this.socket?.id || this.peers.has(remoteId)) return;
 
@@ -173,7 +167,6 @@ export class MeshRTC {
     }
   }
 
-  // ✅ 6. Implement _handleAnswer and _handleIceCandidate
   private async _handleAnswer(fromId: string, answer: RTCSessionDescriptionInit) {
     const entry = this.peers.get(fromId);
     if (!entry) { console.warn("[mesh] got answer but no pc for", fromId); return; }
@@ -192,7 +185,6 @@ export class MeshRTC {
     } catch (e) { console.error("[mesh] handleIceCandidate error", e); }
   }
 
-  // ✅ 7. Ensure createPeerEntry is robust
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     if (this.peers.has(remoteId)) return this.peers.get(remoteId)!;
 
@@ -228,7 +220,7 @@ export class MeshRTC {
     });
 
     pc.addEventListener("negotiationneeded", async () => {
-      if (entry.negotiating) return;
+      if (entry.negotiating || !isInitiator) return;
       entry.negotiating = true;
       try {
         const offer = await pc.createOffer();
