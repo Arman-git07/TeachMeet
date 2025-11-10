@@ -62,6 +62,7 @@ export class MeshRTC {
     this.localStream = localStream;
     this.ready = true;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
+
     if (this.pendingSignals.length > 0) {
       console.log(`[mesh] processing ${this.pendingSignals.length} queued signals`);
       const queued = [...this.pendingSignals];
@@ -117,7 +118,7 @@ export class MeshRTC {
     });
   }
 
-  private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
+  private createPeerEntry(remoteId: string): PeerEntry {
     if (this.peers.has(remoteId)) return this.peers.get(remoteId)!;
 
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
@@ -184,32 +185,26 @@ export class MeshRTC {
   }
 
   private async handleOffer(peerId: string, offer: RTCSessionDescriptionInit) {
+    console.log("[mesh] Received offer from", peerId);
     let entry = this.peers.get(peerId);
-    if (!entry) entry = this.createPeerEntry(peerId, false);
+    if (!entry) entry = this.createPeerEntry(peerId);
 
     const pc = entry.pc;
 
-    // 1) set remote description first (standard)
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-    // 2) --- CRITICAL FIX: ensure transceivers exist for audio+video and are sendrecv ---
-    // This forces m=video/m=audio into the answer SDP even if no senders exist yet.
     try {
       const hasVideoTransceiver = pc.getTransceivers().some(t => {
-        const recvKind = t.receiver && t.receiver.track && t.receiver.track.kind;
-        // either a video receiver exists OR transceiver is for video already
-        return (t.sender && t.sender.track && t.sender.track.kind === "video") || t.receiver?.track?.kind === "video" || (t as any).mid === "video" || (t as any).kind === "video";
+        return (t.sender && t.sender.track?.kind === "video") || t.receiver?.track?.kind === "video" || (t as any).mid === "video" || (t as any).kind === "video";
       });
 
-      // Add explicit transceivers when missing (keeps it robust across browsers)
       if (!hasVideoTransceiver) {
-        // create video transceiver to ensure m=video in SDP and allow sending
         pc.addTransceiver("video", { direction: "sendrecv" });
         console.log("[mesh] (offer handler) added video transceiver (sendrecv) to ensure m=video");
       }
 
       const hasAudioTransceiver = pc.getTransceivers().some(t => {
-        return (t.sender && t.sender.track && t.sender.track.kind === "audio") || t.receiver?.track?.kind === "audio" || (t as any).kind === "audio";
+        return (t.sender && t.sender.track?.kind === "audio") || t.receiver?.track?.kind === "audio" || (t as any).kind === "audio";
       });
       if (!hasAudioTransceiver) {
         pc.addTransceiver("audio", { direction: "sendrecv" });
@@ -218,15 +213,12 @@ export class MeshRTC {
     } catch (err) {
       console.warn("[mesh] (offer handler) transceiver setup failed:", err);
     }
-
-    // 3) Attach local tracks (only if we have a localStream) BEFORE creating an answer.
-    //    Clone tracks to avoid "track reuse" browser bugs.
+    
     if (this.localStream) {
       try {
         const existingKinds = pc.getSenders().map(s => s.track?.kind).filter(Boolean);
         for (const track of this.localStream.getTracks()) {
           if (!existingKinds.includes(track.kind)) {
-            // clone if possible
             const toAdd = (typeof (track as any).clone === "function") ? (track as any).clone() : track;
             try {
               pc.addTrack(toAdd, this.localStream);
@@ -235,7 +227,7 @@ export class MeshRTC {
               console.warn("[mesh] (offer handler) addTrack failed for", track.kind, e);
             }
           } else {
-            console.log("[mesh] (offer handler) sender for", track.kind, "already present");
+             console.log("[mesh] (offer handler) sender for", track.kind, "already present");
           }
         }
       } catch (err) {
@@ -245,11 +237,9 @@ export class MeshRTC {
       console.warn("[mesh] (offer handler) WARNING: localStream is not available when handling offer");
     }
 
-    // 4) Create answer and set local description (this SDP will now include m=video)
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    // 5) Send answer to the remote peer (match your socket argument order)
     this.socket?.emit("answer", peerId, answer);
     console.log("[mesh] (offer handler) Sent answer to", peerId);
     console.log("[mesh] (offer handler) localDescription SDP contains video?:", (pc.localDescription?.sdp || "").includes("\r\nm=video"));
@@ -257,7 +247,7 @@ export class MeshRTC {
 
   private async createPeerAndOffer(remoteId: string) {
     if (this.peers.has(remoteId)) return;
-    const entry = this.createPeerEntry(remoteId, true);
+    const entry = this.createPeerEntry(remoteId);
     
     console.log("[mesh] createPeerAndOffer: senders before offer:", entry.pc.getSenders().map(s=> s.track ? `${s.track.kind}:${s.track.enabled}` : 'null'));
 
