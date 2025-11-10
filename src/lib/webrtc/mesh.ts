@@ -41,6 +41,7 @@ export class MeshRTC {
     });
 
     this.registerSocketEvents();
+    try { (window as any).__mesh = this; console.log("[mesh] exported instance to window.__mesh"); } catch {}
   }
   
   private runOrQueue(handler: () => Promise<void> | void) {
@@ -60,59 +61,60 @@ export class MeshRTC {
   public async init(localStream: MediaStream) {
     this.localStream = localStream;
     this.ready = true;
+    console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
+    
     if (this.pendingSignals.length > 0) {
-      console.log("[mesh] init(): localStream ready, processing", this.pendingSignals.length, "queued signals");
+      console.log(`[mesh] processing ${this.pendingSignals.length} queued signals`);
       const queued = [...this.pendingSignals];
       this.pendingSignals = [];
       for (const fn of queued) {
-        try { await fn(); } catch (e) { console.error("[mesh] queued signal processing error", e); }
+        try { await fn(); } catch (e) { console.error("[mesh] queued signal error", e); }
       }
-    } else {
-      console.log("[mesh] init(): localStream ready, no queued signals");
     }
-    this.socket.emit("join-room", this.roomId, this.userId);
   }
 
   private registerSocketEvents() {
     this.socket.on("connect", () => { this.socketId = this.socket.id; });
 
     this.socket.on("user-joined", (remoteId: string) => {
-        this.runOrQueue(async () => {
-            if (!remoteId || remoteId === this.socket?.id) return;
-            console.log("[mesh] user-joined", remoteId);
-            await this.createPeerAndOffer(remoteId);
-        });
+      this.runOrQueue(async () => {
+        if (!remoteId || remoteId === this.socket?.id) return;
+        console.log("[mesh] user-joined", remoteId);
+        await this.createPeerAndOffer(remoteId);
+      });
     });
 
     this.socket.on("offer", (remoteId: string, offer: RTCSessionDescriptionInit) => {
-        this.runOrQueue(async () => {
-            console.log("[mesh] Received offer from", remoteId);
-            const entry = this.createPeerEntry(remoteId, false);
+      this.runOrQueue(async () => {
+        if (!this.localStream) {
+          console.warn("[mesh] handleOffer called but localStream missing — re-queuing");
+          this.pendingSignals.push(() => this.runOrQueue(() => this.registerSocketEvents()));
+          return;
+        }
 
-            if (this.localStream) {
-                try {
-                    this.localStream.getTracks().forEach(t => {
-                        const clone = typeof (t as any).clone === "function" ? (t as any).clone() : t;
-                        try { entry.pc.addTrack(clone, this.localStream as MediaStream); } catch (e) { console.warn("[mesh] addTrack (offer handler) failed", e); }
-                    });
-                    console.log("[mesh] (offer handler) Attaching local tracks before answer:", this.localStream.getTracks().map(t => t.kind));
-                } catch (e) {
-                    console.warn("[mesh] (offer handler) error attaching local tracks", e);
-                }
-            } else {
-                console.warn("[mesh] (offer handler) no localStream available when answering offer");
-            }
+        console.log("[mesh] Received offer from", remoteId);
+        const entry = this.createPeerEntry(remoteId, false);
 
-            try {
-                await entry.pc.setRemoteDescription(offer);
-                const answer = await entry.pc.createAnswer();
-                await entry.pc.setLocalDescription(answer);
-                this.socket?.emit("answer", remoteId, answer);
-                console.log("[mesh] Sent answer to", remoteId);
-            } catch (err) {
-                console.error("[mesh] offer handler error for", remoteId, err);
+        console.log("[mesh] (offer handler) localStream before answer:", this.localStream ? this.localStream.getTracks().map(t=>t.kind) : 'NO STREAM');
+        this.localStream.getTracks().forEach(track => {
+            const senderExists = entry.pc.getSenders().find(s => s.track?.id === track.id);
+            if (!senderExists) {
+                entry.pc.addTrack(track, this.localStream!);
+                console.log(`[mesh] (offer handler) Added local ${track.kind} track before answering`);
             }
         });
+
+        try {
+          await entry.pc.setRemoteDescription(offer);
+          const answer = await entry.pc.createAnswer();
+          await entry.pc.setLocalDescription(answer);
+          console.log("[mesh] localDescription SDP contains video?:", !!(entry && entry.pc.localDescription && entry.pc.localDescription.sdp?.includes('\r\nm=video')));
+          this.socket?.emit("answer", remoteId, answer);
+          console.log("[mesh] Sent answer to", remoteId);
+        } catch (err) {
+          console.error("[mesh] offer handler error for", remoteId, err);
+        }
+      });
     });
 
     this.socket.on("answer", (remoteId: string, answer: RTCSessionDescriptionInit) => {
@@ -150,6 +152,9 @@ export class MeshRTC {
     const entry: PeerEntry = { pc, stream: null, negotiating: false };
 
     pc.addEventListener("track", (ev) => {
+      const kinds = (ev.streams && ev.streams[0]) ? ev.streams[0].getTracks().map(t => t.kind) : (ev.track ? [ev.track.kind] : []);
+      console.log("[mesh] ontrack from", remoteId, "event tracks:", kinds, "ev.streams:", (ev.streams && ev.streams.length));
+      
       try {
         if (ev.streams && ev.streams.length > 0) {
           entry.stream = ev.streams[0];
@@ -158,7 +163,6 @@ export class MeshRTC {
           entry.stream = remoteStream;
         }
         try { this.onRemoteStream?.(remoteId, entry.stream); } catch (e) { console.error("[mesh] onRemoteStream callback error", e); }
-        console.log("[mesh] ontrack from", remoteId, "tracks:", entry.stream?.getTracks().map(t => t.kind));
       } catch (e) {
         console.error("[mesh] track handler error", e);
       }
@@ -209,13 +213,17 @@ export class MeshRTC {
   private async createPeerAndOffer(remoteId: string) {
     if (this.peers.has(remoteId)) return;
     const entry = this.createPeerEntry(remoteId, true);
+    
+    console.log("[mesh] createPeerAndOffer: senders before offer:", entry.pc.getSenders().map(s=> s.track ? `${s.track.kind}:${s.track.enabled}` : 'null'));
 
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 500));
 
     try {
       if (!entry.pc.localDescription || !entry.pc.localDescription.sdp) {
         const offer = await entry.pc.createOffer();
         await entry.pc.setLocalDescription(offer);
+        console.log("[mesh] (sending offer) pc.getSenders:", entry?.pc.getSenders().map(s => s.track?.kind || 'null'));
+        console.log("[mesh] localDescription SDP contains video?:", !!(entry && entry.pc.localDescription && entry.pc.localDescription.sdp?.includes('\r\nm=video')));
         this.socket?.emit("offer", remoteId, offer);
         console.log("[mesh] createPeerAndOffer -> explicit offer sent to", remoteId);
       } else {
@@ -243,6 +251,7 @@ export class MeshRTC {
 
   public async addTrack(track: MediaStreamTrack) {
     if (!this.localStream) return;
+    console.log("[mesh] addTrack called, track:", track.kind, "localStreamTrackKinds:", this.localStream?.getTracks().map(t=>t.kind));
     try { this.localStream.addTrack(track); } catch (e) { console.warn("[mesh] localStream.addTrack failed", e); }
 
     for (const [id, entry] of this.peers.entries()) {
