@@ -431,17 +431,24 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="flex-1 flex relative bg-background isolate">
-        <div className="w-full h-full flex">
-            {loadingMedia ? (
-                <div className="w-full h-full flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            ) : (
-                <div className="w-full h-full">
-                    {renderLayout()}
-                </div>
-            )}
+      <main className="flex-1 overflow-hidden relative bg-black">
+        <div
+          className="w-full h-full flex items-center justify-center overflow-hidden"
+          style={{
+            paddingBottom:
+              allParticipants.length === 2
+                ? `${typeof document !== 'undefined' ? document.querySelector('footer')?.offsetHeight || 80 : 80}px`
+                : "0",
+            transition: "padding-bottom 0.3s ease-in-out",
+          }}
+        >
+          {loadingMedia ? (
+              <div className="w-full h-full flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+          ) : (
+              renderLayout()
+          )}
         </div>
       </main>
 
