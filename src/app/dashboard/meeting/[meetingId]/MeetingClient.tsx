@@ -84,6 +84,22 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   
+  const [footerHeight, setFooterHeight] = useState(80);
+
+  useEffect(() => {
+    const footer = document.querySelector("footer");
+    if (!footer) return;
+  
+    const updateHeight = () => setFooterHeight(footer.offsetHeight || 80);
+    updateHeight(); // initial check
+  
+    // Watch for any footer size changes (responsive, mobile, etc.)
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(footer);
+  
+    return () => resizeObserver.disconnect();
+  }, []);
+
   useEffect(() => {
     const fetchMeetingCreator = async () => {
       setIsLoadingRole(true);
@@ -436,9 +452,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           className="w-full h-full flex items-center justify-center overflow-hidden"
           style={{
             paddingBottom:
-              allParticipants.length === 2
-                ? `${typeof document !== 'undefined' ? document.querySelector('footer')?.offsetHeight || 80 : 80}px`
-                : "0",
+              allParticipants.length === 2 ? `${footerHeight}px` : "0px",
             transition: "padding-bottom 0.3s ease-in-out",
           }}
         >
