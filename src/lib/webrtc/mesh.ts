@@ -19,10 +19,11 @@ export class MeshRTC {
   private onRemoteStream: (userId: string, stream: MediaStream) => void;
   private onRemoteLeft?: (socketId: string) => void;
   public socketId: string | null = null;
-  public removeTrack?: (track: MediaStreamTrack) => void; // Make it public for screen sharing
+  public removeTrack?: (track: MediaStreamTrack) => void;
 
-  private _ready = false;
-  private _pendingSignals: Array<() => void> = [];
+  // --- FIX: Add queue and ready flag ---
+  private _ready = false; 
+  private _pendingSignals: Array<() => void> = []; 
 
   constructor(opts: {
     roomId: string;
@@ -47,9 +48,9 @@ export class MeshRTC {
   public async init(localStream: MediaStream) {
     this.localStream = localStream;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
-  
+    
+    // --- FIX: Mark as ready and flush the signal queue ---
     this._ready = true;
-  
     if (this._pendingSignals.length > 0) {
       console.log("[mesh] init(): processing", this._pendingSignals.length, "queued signals");
       while (this._pendingSignals.length) {
@@ -65,6 +66,7 @@ export class MeshRTC {
         this.socket.emit("join-room", this.roomId, this.socket.id);
     });
 
+    // --- FIX: Wrap all event handlers to queue if not ready ---
     this.socket.on("user-joined", (remoteId: string) => {
       const handler = () => this._handleUserJoined(remoteId);
       if (!this._ready) {
@@ -181,7 +183,6 @@ export class MeshRTC {
     if (!entry) { console.warn("[mesh] got ice-candidate but no pc for", fromId); return; }
     try {
       entry.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => console.warn("[mesh] addIceCandidate failed", err));
-      console.log("[mesh] added ice-candidate from", fromId);
     } catch (e) { console.error("[mesh] handleIceCandidate error", e); }
   }
 
