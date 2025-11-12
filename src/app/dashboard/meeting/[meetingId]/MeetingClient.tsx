@@ -398,42 +398,37 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const remoteParticipants = allParticipants.filter((p) => !p.isLocal);
     const localParticipant = allParticipants.find((p) => p.isLocal);
 
-    if (count > 1) {
-        const gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
+    if (count === 2 && remoteParticipants.length === 1 && localParticipant) {
+      const remote = remoteParticipants[0];
+      return (
+        <div className="w-full h-full relative">
+          {/* Remote participant fills the background */}
+          <div className="w-full h-full">
+            <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} onTogglePin={() => togglePin(remote.id)} onDoubleClick={() => togglePin(remote.id)} />
+          </div>
+          {/* Local participant as a draggable thumbnail */}
+          <motion.div
+            drag
+            dragMomentum={false}
+            className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
+          >
+            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
+          </motion.div>
+        </div>
+      );
+    }
+
+    if (count > 2) {
+        const gridCols = Math.ceil(Math.sqrt(allParticipants.length));
         return (
             <div className="w-full h-full relative">
                 <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
-                    {remoteParticipants.map((p) => (
+                    {allParticipants.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
                             <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
                         </div>
                     ))}
                 </div>
-                {localParticipant && (
-                    <motion.div
-                        drag
-                        dragMomentum={false}
-                        className="absolute bottom-20 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
-                    >
-                        <VideoTile
-                            stream={localParticipant.stream}
-                            isCameraOn={!localParticipant.isCamOff}
-                            isMicOn={!localParticipant.isMicOff}
-                            isHandRaised={localParticipant.isHandRaised || false}
-                            isFirstHand={localParticipant.id === firstHandRaisedId}
-                            raisedCount={raisedCount}
-                            volumeLevel={localParticipant.volumeLevel}
-                            isLocal={!!localParticipant.isLocal}
-                            profileUrl={localParticipant.avatar}
-                            name={localParticipant.name}
-                            isScreenSharing={localParticipant.isScreenSharing}
-                            onTogglePin={() => togglePin(localParticipant.id)}
-                            onDoubleClick={() => togglePin(localParticipant.id)}
-                            draggable={true}
-                            onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined}
-                        />
-                    </motion.div>
-                )}
             </div>
         );
     }
@@ -474,7 +469,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <Button onClick={toggleCamera} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleShareClick} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm-w-14", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <ScreenShare className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
-            <Button onClick={onLeave} className="h-12 sm:h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-4 sm:px-6" aria-label="Leave Meeting"><PhoneOff className="h-5 w-5 sm:h-6 sm:w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button>
+            <Button onClick={onLeave} className="h-12 sm:h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-4 sm:px-6" aria-label="Leave Meeting"><PhoneOff className="h-5 w-5 sm:h-6 sm-w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button>
         </div>
       </footer>
     </div>
