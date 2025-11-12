@@ -441,7 +441,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="flex-1 overflow-hidden relative bg-black">
+      <main className="flex-1 overflow-hidden relative">
         <div
           className="w-full h-full flex items-center justify-center overflow-hidden"
           style={{
