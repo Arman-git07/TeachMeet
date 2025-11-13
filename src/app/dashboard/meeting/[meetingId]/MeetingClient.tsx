@@ -84,7 +84,20 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   
-  const [footerHeight, setFooterHeight] = useState(80);
+  const footerRef = useRef<HTMLElement>(null);
+  const [footerHeight, setFooterHeight] = useState(80); // Default height
+
+  useEffect(() => {
+    if (footerRef.current) {
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                setFooterHeight(entry.contentRect.height);
+            }
+        });
+        resizeObserver.observe(footerRef.current);
+        return () => resizeObserver.disconnect();
+    }
+  }, []);
 
   useEffect(() => {
     const fetchMeetingCreator = async () => {
@@ -388,15 +401,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const remote = remoteParticipants[0];
       return (
         <div className="w-full h-full relative">
-          {/* Remote participant fills the background */}
-          <div className="w-full h-full">
+          <div className="absolute top-0 left-0 right-0" style={{ bottom: `${footerHeight}px` }}>
             <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} onTogglePin={() => togglePin(remote.id)} onDoubleClick={() => togglePin(remote.id)} />
           </div>
-          {/* Local participant as a draggable thumbnail */}
           <motion.div
             drag
             dragMomentum={false}
             className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
+            style={{ bottom: `${footerHeight + 16}px` }}
+            dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
           >
             <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
           </motion.div>
@@ -423,12 +436,12 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="grid h-full grid-rows-[1fr_auto] overflow-hidden">
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
-      <main className="flex-1 overflow-hidden relative">
+      <main className="relative overflow-hidden">
         <div className="w-full h-full flex items-center justify-center overflow-hidden">
           {loadingMedia ? (
               <div className="w-full h-full flex items-center justify-center">
@@ -442,7 +455,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
       {isSharingScreen && (<div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full shadow-lg z-50">🔴 You’re sharing your screen</div>)}
 
-      <footer className="p-2 sm:p-4 bg-background/80 backdrop-blur-sm border-t border-border shrink-0 relative z-10">
+      <footer ref={footerRef} className="p-2 sm:p-4 bg-background/80 backdrop-blur-sm border-t border-border shrink-0 relative z-10">
         <div className="flex items-center justify-center gap-2 sm:gap-4">
             <Button onClick={toggleMic} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={toggleCamera} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
