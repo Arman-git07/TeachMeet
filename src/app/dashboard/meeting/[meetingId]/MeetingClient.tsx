@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -436,20 +437,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full">
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 
       <main className="flex-1 overflow-hidden relative">
-        <div
-          className="w-full h-full flex items-center justify-center overflow-hidden"
-          style={{
-            paddingBottom:
-              allParticipants.length === 2 ? `${footerHeight}px` : "0px",
-            transition: "padding-bottom 0.3s ease-in-out",
-          }}
-        >
+        <div className="w-full h-full flex items-center justify-center overflow-hidden">
           {loadingMedia ? (
               <div className="w-full h-full flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
