@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -9,7 +10,7 @@ import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareO
 import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
@@ -374,7 +375,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const others = allParticipants.filter(p => p.id !== pinnedId);
       return (
         <div className="w-full h-full flex gap-2">
-          <div className="flex-1 min-h-0 p-0 m-0 w-full h-full"><div className="w-full h-full relative"><VideoTile stream={pinned.stream} isCameraOn={!pinned.isCamOff} isMicOn={!pinned.isMicOff} isHandRaised={pinned.isHandRaised || false} isFirstHand={pinned.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={pinned.volumeLevel} isLocal={!!pinned.isLocal} profileUrl={pinned.avatar} name={pinned.name} isScreenSharing={pinned.isScreenSharing} isPinned={true} onTogglePin={() => togglePin(pinned.id)} onDoubleClick={() => togglePin(pinned.id)} className="w-full h-full" onStopShare={isSharingScreen && pinned.id === userId ? handleStopSharing : undefined} /></div></div>
+          <div className="flex-1 min-h-0 p-0 m-0 w-full h-full"><div className="w-full h-full relative"><VideoTile stream={pinned!.stream} isCameraOn={!pinned!.isCamOff} isMicOn={!pinned!.isMicOff} isHandRaised={pinned!.isHandRaised || false} isFirstHand={pinned!.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={pinned!.volumeLevel} isLocal={!!pinned!.isLocal} profileUrl={pinned!.avatar} name={pinned!.name} isScreenSharing={pinned!.isScreenSharing} isPinned={true} onTogglePin={() => togglePin(pinned!.id)} onDoubleClick={() => togglePin(pinned!.id)} className="w-full h-full" onStopShare={isSharingScreen && pinned!.id === userId ? handleStopSharing : undefined} /></div></div>
           {others.length > 0 && (<div className="w-48 hidden md:flex md:flex-col gap-2 overflow-auto">{others.map(p => (<div key={p.id} className="h-28 rounded-lg aspect-[9/16] md:aspect-video"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/></div>))}</div>)}
         </div>
       );
@@ -406,10 +407,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           </div>
           <motion.div
             drag
+            dragConstraints={mainContainerRef}
             dragMomentum={false}
             className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
             style={{ bottom: `${footerHeight + 16}px` }}
-            dragConstraints={mainContainerRef}
           >
             <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
           </motion.div>
