@@ -83,6 +83,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const lastRemoteUpdateRef = useRef<number>(0);
 
   const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const mainContainerRef = useRef<HTMLDivElement>(null);
   
   const footerRef = useRef<HTMLElement>(null);
   const [footerHeight, setFooterHeight] = useState(80); // Default height
@@ -400,7 +401,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     if (count === 2 && remoteParticipants.length === 1 && localParticipant) {
       const remote = remoteParticipants[0];
       return (
-        <div className="w-full h-full relative">
+        <div className="w-full h-full relative" ref={mainContainerRef}>
           <div className="absolute inset-0" style={{ bottom: `${footerHeight}px` }}>
             <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} onTogglePin={() => togglePin(remote.id)} onDoubleClick={() => togglePin(remote.id)} />
           </div>
@@ -409,7 +410,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             dragMomentum={false}
             className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
             style={{ bottom: `${footerHeight + 16}px` }}
-            dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
+            dragConstraints={mainContainerRef}
           >
             <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
           </motion.div>
