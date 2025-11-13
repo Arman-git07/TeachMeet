@@ -136,7 +136,6 @@ export default function MeetingPage() {
 
   return (
     <div className="w-full h-full bg-[#223D4A] text-foreground flex flex-col">
-      {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       
       {meetingId && user?.uid && (
         <MeetingClient
