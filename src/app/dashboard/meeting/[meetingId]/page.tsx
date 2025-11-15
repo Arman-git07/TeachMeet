@@ -135,7 +135,7 @@ export default function MeetingPage() {
   if (loading || authLoading) return null; 
 
   return (
-    <div className="flex-1 w-full h-full bg-[#223D4A] text-foreground flex flex-col">
+    <div className="flex-1 w-full bg-[#223D4A] text-foreground flex flex-col h-full">
       {meetingId && user?.uid && (
         <MeetingClient
           meetingId={meetingId}
