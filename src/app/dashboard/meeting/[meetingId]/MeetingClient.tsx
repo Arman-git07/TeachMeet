@@ -378,7 +378,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
 
     const count = allParticipants.length;
-    if (count === 1) return <div className="w-full h-full flex items-center justify-center p-2"><div className="w-full max-w-full h-full max-h-full aspect-[9/16] md:aspect-video"><VideoTile stream={allParticipants[0].stream} isCameraOn={!allParticipants[0].isCamOff} isMicOn={!allParticipants[0].isMicOff} isHandRaised={allParticipants[0].isHandRaised || false} isFirstHand={allParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={allParticipants[0].volumeLevel} isLocal={!!allParticipants[0].isLocal} profileUrl={allParticipants[0].avatar} name={allParticipants[0].name} isScreenSharing={allParticipants[0].isScreenSharing} onTogglePin={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} onDoubleClick={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} className="w-full h-full" onStopShare={isSharingScreen && allParticipants[0].id === userId ? handleStopSharing : undefined} /></div></div>;
+    if (count === 1) return <div className="w-full h-full flex items-center justify-center p-2"><div className="w-full h-full"><VideoTile stream={allParticipants[0].stream} isCameraOn={!allParticipants[0].isCamOff} isMicOn={!allParticipants[0].isMicOff} isHandRaised={allParticipants[0].isHandRaised || false} isFirstHand={allParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={allParticipants[0].volumeLevel} isLocal={!!allParticipants[0].isLocal} profileUrl={allParticipants[0].avatar} name={allParticipants[0].name} isScreenSharing={allParticipants[0].isScreenSharing} onTogglePin={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} onDoubleClick={count > 1 ? () => togglePin(allParticipants[0].id) : undefined} className="w-full h-full" onStopShare={isSharingScreen && allParticipants[0].id === userId ? handleStopSharing : undefined} /></div></div>;
 
     const remoteParticipants = allParticipants.filter((p) => !p.isLocal);
     const localParticipant = allParticipants.find((p) => p.isLocal);
@@ -394,7 +394,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             drag
             dragConstraints={mainContainerRef}
             dragMomentum={false}
-            className="absolute right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
+            className="absolute bottom-0 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
           >
             <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
           </motion.div>
