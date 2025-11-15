@@ -12,7 +12,6 @@ import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings } from 'lucide-react';
-import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 
 
 // --------------------------- Meeting Page ---------------------------
