@@ -6,3 +6,5 @@ export const disposableEmailDomains: string[] = [];
 export const blockedTlds = [
   'xyz', 'icu', 'buzz', 'top', 'click', 'monster', 'live', 'site', 'online', 'loan', 'work', 'gq', 'shop', 'link', 'email'
 ];
+
+    

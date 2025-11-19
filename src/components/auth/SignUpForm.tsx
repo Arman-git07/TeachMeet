@@ -51,7 +51,6 @@ const allowedDomains = [
   "hotmail.com",
   "icloud.com",
   "protonmail.com",
-  // Add other trusted domains here, e.g., your company's domain
 ];
 
 function isAllowedEmailDomain(email: string): boolean {
@@ -81,15 +80,15 @@ export function SignUpForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
 
-    // --- Whitelist Check ---
     if (!isAllowedEmailDomain(values.email)) {
       toast({
         variant: "destructive",
         title: "Untrusted Email Provider",
-        description: "Only trusted email providers are allowed. Temporary or custom emails are not supported.",
+        description: "Only Gmail, Yahoo, Outlook, Hotmail, iCloud, and ProtonMail are allowed.",
+        duration: 7000,
       });
       setIsLoading(false);
-      return; // Stop signup process
+      return;
     }
 
     try {
@@ -316,3 +315,5 @@ export function SignUpForm() {
     </>
   );
 }
+
+    

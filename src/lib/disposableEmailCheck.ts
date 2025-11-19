@@ -23,6 +23,7 @@ export function isSuspiciousTLD(email: string): boolean {
 
 // --- 3. Common disposable patterns ---
 export function isPatternFake(email: string): boolean {
+  if (!email || !email.includes('@')) return false;
   const domain = email.split("@")[1]?.toLowerCase();
   if (!domain) return true; // Invalid email format
 
@@ -78,3 +79,5 @@ export async function isTemporaryEmail(email: string): Promise<boolean> {
 
   return false;
 }
+
+    
