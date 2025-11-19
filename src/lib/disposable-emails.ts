@@ -40,7 +40,7 @@ export const disposableEmailDomains = [
   'h.mintemail.com', 'h8s.org', 'haltospam.com', 'hatespam.org', 'hidemail.de', 'hidemyass.com', 
   'hochsitze.com', 'hot-mail.cf', 'hot-mail.ga', 'hot-mail.gq', 'hot-mail.ml', 'hot-mail.tk', 
   'hotpop.com', 'hulapla.de', 'hush.com', 'hushmail.com', 'ieatspam.eu', 'ieatspam.info', 
-  'ihateyoualot.info', 'iheartspam.org', 'imails.info', 'inbax.tk', 'inbox.si', 'inbox2.info', 
+  'iheartspam.org', 'imails.info', 'inbax.tk', 'inbox.si', 'inbox2.info', 
   'inboxalias.com', 'inboxclean.com', 'inboxclean.org', 'incognitomail.com', 'incognitomail.net', 
   'incognitomail.org', 'infocom.zp.ua', 'insorg-mail.info', 'instant-mail.de', 'ipoo.org', 
   'irish2me.com', 'iwi.net', 'jetable.com', 'jetable.fr.nf', 'jetable.net', 'jetable.org', 
@@ -125,5 +125,6 @@ export const disposableEmailDomains = [
   'yourdomain.com', 'ypmail.webarnak.fr.eu.org', 'yuurok.com', 'z1p.biz', 'za.com', 'zehnminutenmail.de', 
   'zeta-telecom.com', 'zippymail.info', 'zomg.info', 'zxcv.com', 'zxcvbnm.com', 'zzz.com',
   // Added from another common list
-  'mail.tm', 'mailinator.co.uk', 'mailinator.info', 'mailinator.us', 'tempmail.com', '10minemail.com'
+  'mail.tm', 'mailinator.co.uk', 'mailinator.info', 'mailinator.us', 'tempmail.com', '10minemail.com',
+  'guerrillamail.block', 'maildrop.cc', 'temp-mail.io', 'yopmail.net'
 ];
