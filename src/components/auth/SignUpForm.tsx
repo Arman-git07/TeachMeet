@@ -22,7 +22,7 @@ import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
 import { cn } from '@/lib/utils';
-import { blockedTlds } from '@/lib/disposable-emails';
+import { isTemporaryEmail } from '@/lib/disposableEmailCheck';
 
 
 const formSchema = z.object({
@@ -43,23 +43,6 @@ const formSchema = z.object({
   message: "Passwords don't match.",
   path: ['confirmPassword'],
 });
-
-async function isTempEmail(email: string) {
-  try {
-    const res = await fetch(`https://open.kickbox.com/v1/disposable/${email}`);
-    if (!res.ok) return false; // Fail open if API has an issue
-    const data = await res.json();
-    return data.disposable === true;
-  } catch (error) {
-    console.warn("Kickbox API call failed, failing open:", error);
-    return false; // Fail open on network error
-  }
-}
-
-function hasBlockedTld(email: string) {
-    const tld = email.split('.').pop()?.toLowerCase();
-    return tld ? blockedTlds.includes(tld) : false;
-}
 
 
 export function SignUpForm() {
@@ -83,18 +66,8 @@ export function SignUpForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
 
-    if (hasBlockedTld(values.email)) {
-        toast({
-            variant: "destructive",
-            title: "Sign Up Failed",
-            description: "This email domain is not allowed. Please use a different email provider.",
-        });
-        setIsLoading(false);
-        return;
-    }
-
-    const isDisposable = await isTempEmail(values.email);
-    if (isDisposable) {
+    const isTemp = await isTemporaryEmail(values.email);
+    if (isTemp) {
         toast({
             variant: "destructive",
             title: "Sign Up Failed",
