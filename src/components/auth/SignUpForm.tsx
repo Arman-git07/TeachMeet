@@ -44,6 +44,21 @@ const formSchema = z.object({
   path: ['confirmPassword'],
 });
 
+const allowedDomains = [
+  "gmail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+  "icloud.com",
+  "protonmail.com",
+  // Add other trusted domains here, e.g., your company's domain
+];
+
+function isAllowedEmailDomain(email: string): boolean {
+  if (!email || !email.includes('@')) return false;
+  const domain = email.split('@')[1].toLowerCase();
+  return allowedDomains.includes(domain);
+}
 
 export function SignUpForm() {
   const { toast } = useToast();
@@ -66,15 +81,15 @@ export function SignUpForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
 
-    const isTemp = await isTemporaryEmail(values.email);
-    if (isTemp) {
-        toast({
-            variant: "destructive",
-            title: "Sign Up Failed",
-            description: "Temporary or disposable emails are not allowed. Please use a permanent email address.",
-        });
-        setIsLoading(false);
-        return;
+    // --- Whitelist Check ---
+    if (!isAllowedEmailDomain(values.email)) {
+      toast({
+        variant: "destructive",
+        title: "Untrusted Email Provider",
+        description: "Only trusted email providers are allowed. Temporary or custom emails are not supported.",
+      });
+      setIsLoading(false);
+      return; // Stop signup process
     }
 
     try {
