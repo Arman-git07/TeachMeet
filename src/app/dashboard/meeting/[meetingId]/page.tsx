@@ -142,6 +142,7 @@ export default function MeetingPage() {
           initialCamOn={searchParams.get('cam') !== 'false'}
           initialMicOn={searchParams.get('mic') !== 'false'}
           onLeave={handleLeave}
+          topic={topic}
         />
       )}
     </div>
