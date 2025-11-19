@@ -126,5 +126,14 @@ export const disposableEmailDomains = [
   'zeta-telecom.com', 'zippymail.info', 'zomg.info', 'zxcv.com', 'zxcvbnm.com', 'zzz.com',
   // Added from another common list
   'mail.tm', 'mailinator.co.uk', 'mailinator.info', 'mailinator.us', 'tempmail.com', '10minemail.com',
-  'guerrillamail.block', 'maildrop.cc', 'temp-mail.io', 'yopmail.net'
+  'guerrillamail.block', 'maildrop.cc', 'temp-mail.io', 'yopmail.net', 'throwawaymail.com',
+  'tempmail.dev', 'tempmail.alt.za', 'temp-mail.de', 'mailtemporaire.fr', 'tempmail.live',
+  'mailpoof.com', 'trashmail.com', 'mailinator.net', 'temp-mail.address', 'emltmp.com',
+  'disposable.ml', 'disposable.cf', 'disposable.ga', 'disposable.gq', 'tempmail.ws', 'mohmal.com',
+  '10minutemail.net', 'emailondeck.com', 'getnada.com', 'guerrillamail.info', 'tempmail.org'
+];
+
+// Block TLDs commonly used for spam or temporary services
+export const blockedTlds = [
+  'xyz', 'icu', 'buzz', 'top', 'click', 'monster', 'live', 'site', 'online', 'loan', 'work', 'gq'
 ];
