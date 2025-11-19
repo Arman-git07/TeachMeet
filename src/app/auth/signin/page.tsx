@@ -43,9 +43,20 @@ export default function SignInPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     
-    // Persistence is now handled in firebase.ts, so we can directly sign in.
     signInWithEmailAndPassword(auth, values.email, values.password)
       .then((userCredential) => {
+        if (!userCredential.user.emailVerified) {
+            toast({
+              variant: "destructive",
+              title: "Email Not Verified",
+              description: "Please check your inbox and verify your email address before signing in.",
+              duration: 7000,
+            });
+            // Optionally sign the user out again
+            auth.signOut();
+            return; 
+        }
+
         toast({
           title: "Sign In Successful",
           description: "Welcome back!",

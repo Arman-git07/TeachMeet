@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Mail, Lock, User, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
@@ -46,6 +46,7 @@ export function SignUpForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerificationSent, setIsVerificationSent] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -63,17 +64,23 @@ export function SignUpForm() {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      // Update Firebase profile with displayName
+      
       if (userCredential.user) {
         await updateProfile(userCredential.user, {
           displayName: values.profileName,
         });
+        
+        await sendEmailVerification(userCredential.user);
+        
+        toast({
+          title: "Verification Email Sent",
+          description: `A verification link has been sent to ${values.email}. Please check your inbox.`,
+          duration: 10000,
+        });
+
+        setIsVerificationSent(true); 
       }
-      toast({
-        title: "Sign Up Successful",
-        description: `Account created for ${values.profileName}. Please sign in.`,
-      });
-      router.push('/auth/signin');
+      
     } catch (error: any) {
       if (error.code === 'auth/network-request-failed') {
         toast({
@@ -124,6 +131,24 @@ export function SignUpForm() {
     } finally {
       setIsLoading(false);
     }
+  }
+  
+  if (isVerificationSent) {
+    return (
+      <div className="text-center space-y-6">
+        <Mail className="mx-auto h-12 w-12 text-primary" />
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">Verify Your Email</h2>
+        <p className="text-muted-foreground">
+          We've sent a verification link to your email address. Please click the link in the email to activate your account.
+        </p>
+        <Button asChild className="w-full btn-gel text-base py-3 rounded-lg">
+          <Link href="/auth/signin">Back to Sign In</Link>
+        </Button>
+         <p className="text-xs text-muted-foreground">
+            Didn't receive an email? Check your spam folder.
+        </p>
+      </div>
+    );
   }
 
   return (
