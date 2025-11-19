@@ -22,24 +22,12 @@ import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
 import { cn } from '@/lib/utils';
-import { disposableEmailDomains, blockedTlds } from '@/lib/disposable-emails';
+import { blockedTlds } from '@/lib/disposable-emails';
 
 
 const formSchema = z.object({
   profileName: z.string().min(1, { message: 'Profile name is required.' }),
-  email: z.string().email({ message: 'Invalid email address.' })
-    .refine(email => {
-      const domain = email.split('@')[1];
-      return !disposableEmailDomains.includes(domain);
-    }, {
-      message: "Temporary or disposable emails are not allowed."
-    })
-    .refine(email => {
-        const tld = email.split('.').pop();
-        return tld ? !blockedTlds.includes(tld) : true;
-    }, {
-        message: "This email domain is not allowed."
-    }),
+  email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string()
     .min(8, { message: 'Password must be at least 8 characters.' })
     .regex(/[a-z]/, { message: 'Password must contain at least one lowercase letter.' })
@@ -47,7 +35,7 @@ const formSchema = z.object({
     .regex(/[0-9]/, { message: 'Password must contain at least one number.' })
     .regex(/[^a-zA-Z0-9]/, { message: 'Password must contain at least one special character.' }),
   confirmPassword: z.string(),
-  dateOfBirth: z.string().optional(), // Optional for now, browser's date input handles format
+  dateOfBirth: z.string().optional(),
   agreeToTerms: z.boolean().refine(val => val === true, {
     message: "You must agree to the Terms of Service and Privacy Policy.",
   }),
@@ -55,6 +43,24 @@ const formSchema = z.object({
   message: "Passwords don't match.",
   path: ['confirmPassword'],
 });
+
+async function isTempEmail(email: string) {
+  try {
+    const res = await fetch(`https://open.kickbox.com/v1/disposable/${email}`);
+    if (!res.ok) return false; // Fail open if API has an issue
+    const data = await res.json();
+    return data.disposable === true;
+  } catch (error) {
+    console.warn("Kickbox API call failed, failing open:", error);
+    return false; // Fail open on network error
+  }
+}
+
+function hasBlockedTld(email: string) {
+    const tld = email.split('.').pop()?.toLowerCase();
+    return tld ? blockedTlds.includes(tld) : false;
+}
+
 
 export function SignUpForm() {
   const { toast } = useToast();
@@ -76,6 +82,28 @@ export function SignUpForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+
+    if (hasBlockedTld(values.email)) {
+        toast({
+            variant: "destructive",
+            title: "Sign Up Failed",
+            description: "This email domain is not allowed. Please use a different email provider.",
+        });
+        setIsLoading(false);
+        return;
+    }
+
+    const isDisposable = await isTempEmail(values.email);
+    if (isDisposable) {
+        toast({
+            variant: "destructive",
+            title: "Sign Up Failed",
+            description: "Temporary or disposable emails are not allowed. Please use a permanent email address.",
+        });
+        setIsLoading(false);
+        return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       
@@ -216,7 +244,6 @@ export function SignUpForm() {
                       {...field} 
                       className="pl-10 rounded-lg text-base" 
                       disabled={isLoading}
-                      // To prevent future dates, you could add max={new Date().toISOString().split("T")[0]}
                     />
                   </div>
                 </FormControl>
