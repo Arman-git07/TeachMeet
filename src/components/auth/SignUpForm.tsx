@@ -22,10 +22,17 @@ import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
 import { cn } from '@/lib/utils';
+import { disposableEmailDomains } from '@/lib/disposable-emails';
+
 
 const formSchema = z.object({
   profileName: z.string().min(1, { message: 'Profile name is required.' }),
-  email: z.string().email({ message: 'Invalid email address.' }),
+  email: z.string().email({ message: 'Invalid email address.' }).refine(email => {
+    const domain = email.split('@')[1];
+    return !disposableEmailDomains.includes(domain);
+  }, {
+    message: "Temporary or disposable email addresses are not allowed."
+  }),
   password: z.string()
     .min(8, { message: 'Password must be at least 8 characters.' })
     .regex(/[a-z]/, { message: 'Password must contain at least one lowercase letter.' })

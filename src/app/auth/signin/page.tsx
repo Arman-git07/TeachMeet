@@ -52,7 +52,7 @@ export default function SignInPage() {
               description: "Please check your inbox and verify your email address before signing in.",
               duration: 7000,
             });
-            // Optionally sign the user out again
+            // Sign the user out to prevent access until verification is complete
             auth.signOut();
             return; 
         }
