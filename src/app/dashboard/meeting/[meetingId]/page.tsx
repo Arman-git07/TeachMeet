@@ -26,6 +26,7 @@ export default function MeetingPage() {
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showHeaderAsId, setShowHeaderAsId] = useState(false);
   
   useEffect(() => {
     if (authLoading || !meetingId) return;
@@ -71,7 +72,16 @@ export default function MeetingPage() {
   };
   
   useEffect(() => {
-    setHeaderContent(<span className="text-sm font-medium truncate">{topic}</span>);
+    setHeaderContent(
+      <div onClick={() => setShowHeaderAsId(prev => !prev)} className="cursor-pointer group">
+        <span className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+          {showHeaderAsId ? meetingId : topic}
+        </span>
+        <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+          Click to show {showHeaderAsId ? 'topic' : 'Meeting ID'}
+        </p>
+      </div>
+    );
     
     const MeetingActions = () => (
       <DropdownMenu>
@@ -115,7 +125,7 @@ export default function MeetingPage() {
       setHeaderContent(null);
       setHeaderAction(null);
     };
-  }, [topic, meetingId, setHeaderContent, setHeaderAction]);
+  }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId]);
 
   const handleLeave = async () => {
     if (user && meetingId) {
