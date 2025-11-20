@@ -508,7 +508,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               <div className="w-1/2 h-full min-h-0"><VideoTile stream={p3.stream} isCameraOn={!p3.isCamOff} isMicOn={!p3.isMicOff} isHandRaised={p3.isHandRaised||false} isFirstHand={p3.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p3.volumeLevel} profileUrl={p3.avatar} name={p3.name} onTogglePin={() => togglePin(p3.id)} onDoubleClick={() => togglePin(p3.id)} className="w-full h-full" /></div>
               <div className="w-1/2 h-full min-h-0">
                   <Link href={participantsUrl} className="w-full h-full">
-                    <div className="w-full h-full bg-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/80 transition-colors">
+                    <div className="w-full h-full bg-[#223D4A] rounded-lg flex flex-col items-center justify-center text-white/80 hover:bg-[#2c4c5c] transition-colors">
                       <Users className="h-12 w-12" />
                       <p className="font-bold text-2xl mt-2">+{othersCount} more</p>
                     </div>
