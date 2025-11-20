@@ -22,6 +22,7 @@ import {
   Maximize,
   UserX,
   Loader2,
+  CameraOff,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -36,14 +37,14 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch, updateDoc } from 'firebase/firestore';
 
 interface Participant {
   id: string; // This will be the userId
   name: string;
   photoURL?: string;
-  isMicMuted?: boolean;
-  isCameraOff?: boolean;
+  isMicOn?: boolean;
+  isCameraOn?: boolean;
   role: 'host' | 'participant'; // Assuming role is available
 }
 
@@ -51,12 +52,14 @@ const ParticipantItem = React.memo(({
   participant, 
   isCurrentUserHost, 
   isThisParticipantTheHost,
-  onRemoveClick
+  onRemoveClick,
+  onToggleCamera
 }: { 
   participant: Participant, 
   isCurrentUserHost: boolean,
   isThisParticipantTheHost: boolean,
   onRemoveClick: (participant: Participant) => void;
+  onToggleCamera: (participant: Participant) => void;
 }) => {
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
@@ -82,16 +85,16 @@ const ParticipantItem = React.memo(({
             {isThisParticipantTheHost && <ShieldCheck className="inline-block ml-1.5 h-4 w-4 text-primary" title="Host" />}
           </p>
           <p className="text-xs text-muted-foreground">
-            {participant.isMicMuted ? "Muted" : "Unmuted"} | {participant.isCameraOff ? "Camera Off" : "Camera On"}
+            {participant.isMicOn ? "Unmuted" : "Muted"} | {participant.isCameraOn ? "Camera On" : "Camera Off"}
           </p>
         </div>
       </div>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
-          {participant.isMicMuted ? <MicOff className="h-4 w-4 text-muted-foreground" /> : <Mic className="h-4 w-4 text-foreground" />}
+          {participant.isMicOn ? <Mic className="h-4 w-4 text-foreground" /> : <MicOff className="h-4 w-4 text-muted-foreground" />}
         </Button>
         <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
-          {participant.isCameraOff ? <VideoOff className="h-4 w-4 text-muted-foreground" /> : <Video className="h-4 w-4 text-foreground" />}
+          {participant.isCameraOn ? <Video className="h-4 w-4 text-foreground" /> : <VideoOff className="h-4 w-4 text-muted-foreground" />}
         </Button>
         {!isMe && (
           <DropdownMenu>
@@ -109,19 +112,25 @@ const ParticipantItem = React.memo(({
                 <Pin className="mr-2 h-4 w-4" />
                 <span>Pin User</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleActionClick('Full Screen for', participant.name)} className="cursor-pointer">
-                <Maximize className="mr-2 h-4 w-4" />
-                <span>Full Screen</span>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {isCurrentUserHost && !isThisParticipantTheHost && ( 
-                <DropdownMenuItem 
-                  onSelect={(e) => { e.preventDefault(); onRemoveClick(participant); }}
-                  className="text-destructive focus:text-destructive cursor-pointer"
-                >
-                  <UserX className="mr-2 h-4 w-4" />
-                  <span>Remove Participant</span>
-                </DropdownMenuItem>
+              {isCurrentUserHost && !isThisParticipantTheHost && (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() => onToggleCamera(participant)}
+                    className="cursor-pointer"
+                    disabled={!participant.isCameraOn}
+                  >
+                    <CameraOff className="mr-2 h-4 w-4" />
+                    <span>Turn Off Camera</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onSelect={(e) => { e.preventDefault(); onRemoveClick(participant); }}
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                  >
+                    <UserX className="mr-2 h-4 w-4" />
+                    <span>Remove Participant</span>
+                  </DropdownMenuItem>
+                </>
               )}
               <DropdownMenuItem onSelect={() => handleActionClick('Report', participant.name)} className="text-destructive focus:text-destructive cursor-pointer">
                 <AlertCircle className="mr-2 h-4 w-4" />
@@ -185,8 +194,8 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
           id: docSnap.id, 
           name: data.name || "Guest", 
           photoURL: data.photoURL,
-          isMicMuted: data.isMicMuted,
-          isCameraOff: data.isCameraOff,
+          isMicOn: data.isMicOn,
+          isCameraOn: data.isCameraOn,
           role: data.isHost ? 'host' : 'participant',
         });
       });
@@ -223,6 +232,18 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
         toast({ variant: "destructive", title: "Removal Failed", description: "Could not remove the participant." });
     } finally {
         setParticipantToRemove(null);
+    }
+  };
+
+  const handleToggleCamera = async (participant: Participant) => {
+    if (!isCurrentUserTheHost || participant.id === currentUserId) return;
+    try {
+      const participantRef = doc(db, 'meetings', meetingId, 'participants', participant.id);
+      await updateDoc(participantRef, { isCameraOn: false });
+      toast({ title: 'Camera Off', description: `Turned off ${participant.name}'s camera.` });
+    } catch (error) {
+      console.error('Failed to turn off camera:', error);
+      toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not turn off the camera.' });
     }
   };
 
@@ -286,6 +307,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                       isCurrentUserHost={isCurrentUserTheHost}
                       isThisParticipantTheHost={participant.id === meetingHostId}
                       onRemoveClick={() => setParticipantToRemove(participant)}
+                      onToggleCamera={handleToggleCamera}
                     />
                   ))}
                 </div>
@@ -315,4 +337,3 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     </>
   );
 }
-

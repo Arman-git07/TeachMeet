@@ -216,11 +216,26 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const participantsCol = collection(db, "meetings", meetingId, "participants");
     const unsubscribe = onSnapshot(participantsCol, (snapshot) => {
       const newParticipants = new Map<string, LiveParticipantInfo>();
-      snapshot.forEach(doc => { newParticipants.set(doc.id, doc.data() as LiveParticipantInfo); });
+      let localParticipantData: LiveParticipantInfo | undefined;
+      
+      snapshot.forEach(doc => { 
+        const data = doc.data() as LiveParticipantInfo;
+        if (doc.id === userId) {
+          localParticipantData = data;
+        }
+        newParticipants.set(doc.id, data); 
+      });
+
+      // Handle host turning off camera remotely
+      if (localParticipantData && localParticipantData.isCameraOn === false && camOn) {
+        toggleCamera(false); // Force camera off
+        toast({ title: "Camera Turned Off", description: "The host has turned off your camera." });
+      }
+
       setLiveParticipants(newParticipants);
     });
     return () => unsubscribe();
-  }, [meetingId]);
+  }, [meetingId, userId, camOn]);
 
   useEffect(() => { if (localStream && rtc) { rtc.init(localStream); } return () => rtc?.leave(); }, [rtc, localStream]);
 
@@ -352,7 +367,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [user, meetingId]);
 
   const toggleMic = useCallback(() => { if (!localStream) return; const nextState = !micOn; localStream.getAudioTracks().forEach(track => (track.enabled = nextState)); setMicOn(nextState); updateMyStatus({ isMicOn: nextState }); setVolumeLevels(prev => { const next = new Map(prev); next.set(userId, nextState ? (next.get(userId) ?? 0) : 0); return next; }); }, [localStream, micOn, updateMyStatus, userId]);
-  const toggleCamera = useCallback(() => { if (!localStream) return; const nextState = !camOn; localStream.getVideoTracks().forEach(track => { track.enabled = nextState; }); setCamOn(nextState); updateMyStatus({ isCameraOn: nextState }); }, [localStream, camOn, updateMyStatus]);
+  const toggleCamera = useCallback((forceState?: boolean) => {
+    if (!localStream) return;
+    const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
+    localStream.getVideoTracks().forEach(track => { track.enabled = nextState; });
+    setCamOn(nextState);
+    updateMyStatus({ isCameraOn: nextState });
+  }, [localStream, camOn, updateMyStatus]);
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   const togglePin = useCallback((id: string) => { setPinnedId(prev => prev === id ? null : id); }, []);
 
@@ -509,7 +530,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               <div className="w-1/2 h-full min-h-0"><VideoTile stream={p3.stream} isCameraOn={!p3.isCamOff} isMicOn={!p3.isMicOff} isHandRaised={p3.isHandRaised||false} isFirstHand={p3.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p3.volumeLevel} profileUrl={p3.avatar} name={p3.name} onTogglePin={() => togglePin(p3.id)} onDoubleClick={() => togglePin(p3.id)} className="w-full h-full" /></div>
               <div className="w-1/2 h-full min-h-0 relative">
                   <VideoTile stream={p4.stream} isCameraOn={!p4.isCamOff} isMicOn={!p4.isMicOff} isHandRaised={p4.isHandRaised||false} isFirstHand={p4.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p4.volumeLevel} profileUrl={p4.avatar} name={p4.name} onTogglePin={() => togglePin(p4.id)} onDoubleClick={() => togglePin(p4.id)} className="w-full h-full" />
-                   <Link href={participantsUrl} className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white/90 hover:bg-black/40 transition-colors rounded-lg cursor-pointer">
+                   <Link href={participantsUrl} className="absolute inset-0 bg-[#223D4A] rounded-lg flex flex-col items-center justify-center text-white/80 hover:bg-[#2c4c5c] transition-colors cursor-pointer">
                       <Users className="h-10 w-10" />
                       <p className="font-bold text-xl mt-2">+{othersCount} more</p>
                     </Link>
@@ -568,7 +589,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       <footer className="p-2 sm:p-4 bg-background/80 backdrop-blur-sm border-t border-border shrink-0 relative z-10">
         <div className="flex items-center justify-center gap-2 sm:gap-4">
             <Button onClick={toggleMic} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
-            <Button onClick={toggleCamera} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
+            <Button onClick={() => toggleCamera()} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleShareClick} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm-w-14", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-white")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <ScreenShare className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
             <AlertDialog>
