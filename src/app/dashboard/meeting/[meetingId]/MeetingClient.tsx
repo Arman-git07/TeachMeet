@@ -530,7 +530,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               <div className="w-1/2 h-full min-h-0"><VideoTile stream={p3.stream} isCameraOn={!p3.isCamOff} isMicOn={!p3.isMicOff} isHandRaised={p3.isHandRaised||false} isFirstHand={p3.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p3.volumeLevel} profileUrl={p3.avatar} name={p3.name} onTogglePin={() => togglePin(p3.id)} onDoubleClick={() => togglePin(p3.id)} className="w-full h-full" /></div>
               <div className="w-1/2 h-full min-h-0 relative">
                   <VideoTile stream={p4.stream} isCameraOn={!p4.isCamOff} isMicOn={!p4.isMicOff} isHandRaised={p4.isHandRaised||false} isFirstHand={p4.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p4.volumeLevel} profileUrl={p4.avatar} name={p4.name} onTogglePin={() => togglePin(p4.id)} onDoubleClick={() => togglePin(p4.id)} className="w-full h-full" />
-                   <Link href={participantsUrl} className="absolute inset-0 bg-[#223D4A]/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-[#2c4c5c]/80 transition-colors cursor-pointer">
+                   <Link href={participantsUrl} className="absolute inset-0 bg-black/70 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/60 transition-colors cursor-pointer">
                       <Users className="h-10 w-10" />
                       <p className="font-bold text-xl mt-2">+{othersCount} more</p>
                     </Link>
