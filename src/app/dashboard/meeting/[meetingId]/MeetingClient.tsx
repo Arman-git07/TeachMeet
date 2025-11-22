@@ -350,7 +350,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://placehold.co/128x128.png?text=${(data.name || 'G').charAt(0)}`,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: !data.isCameraOn,
-          isMicOn: !data.isMicOn,
+          isMicOff: !data.isMicOn,
           stream: remoteStream, volumeLevel: volumeLevels.get(id) ?? 0,
         };
       });

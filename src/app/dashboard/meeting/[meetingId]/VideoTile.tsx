@@ -69,11 +69,14 @@ const VideoTile: React.FC<Props> = ({
     if (!stream) videoEl.srcObject = null;
   }, [stream]);
 
+  const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
+
   return (
     <div
       onDoubleClick={onDoubleClick}
       className={cn(
-        "relative bg-black rounded-lg overflow-hidden",
+        "relative bg-black rounded-lg overflow-hidden transition-all duration-300",
+        isSpeaking ? "ring-4 ring-primary ring-offset-2 ring-offset-background" : "ring-0",
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : ""
       )}
@@ -118,7 +121,10 @@ const VideoTile: React.FC<Props> = ({
         {/* Avatar fallback */}
         {(!isCameraOn || !stream) && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <Avatar className="w-28 h-28 border-4 border-background shadow-lg">
+            <Avatar className={cn(
+                "w-28 h-28 border-4 border-background shadow-lg transition-all duration-300",
+                isSpeaking ? "ring-4 ring-primary ring-offset-2 ring-offset-background" : ""
+              )}>
               <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
               <AvatarFallback className="text-5xl">
                 {name?.charAt(0) ?? "U"}
