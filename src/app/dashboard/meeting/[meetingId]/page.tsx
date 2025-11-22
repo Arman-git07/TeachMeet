@@ -73,13 +73,10 @@ export default function MeetingPage() {
   
   useEffect(() => {
     setHeaderContent(
-      <div onClick={() => setShowHeaderAsId(prev => !prev)} className="cursor-pointer group">
-        <span className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+      <div onClick={() => setShowHeaderAsId(prev => !prev)} className="cursor-pointer">
+        <span className="text-sm font-medium truncate">
           {showHeaderAsId ? meetingId : topic}
         </span>
-        <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-          Click to show {showHeaderAsId ? 'topic' : 'Meeting ID'}
-        </p>
       </div>
     );
     
