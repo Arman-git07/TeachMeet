@@ -75,7 +75,7 @@ export default function MeetingPage() {
     setHeaderContent(
       <div onClick={() => setShowHeaderAsId(prev => !prev)} className="cursor-pointer">
         <span className="text-sm font-medium truncate">
-          {showHeaderAsId ? meetingId : topic}
+          {showHeaderAsId ? meetingId.replace('meeting-', '') : topic}
         </span>
       </div>
     );
