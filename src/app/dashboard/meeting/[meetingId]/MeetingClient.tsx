@@ -367,7 +367,23 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     }
   }, [user, meetingId]);
 
-  const toggleMic = useCallback(() => { if (!localStream) return; const nextState = !micOn; localStream.getAudioTracks().forEach(track => (track.enabled = nextState)); setMicOn(nextState); updateMyStatus({ isMicOn: nextState }); setVolumeLevels(prev => { const next = new Map(prev); next.set(userId, nextState ? (next.get(userId) ?? 0) : 0); return next; }); }, [localStream, micOn, updateMyStatus, userId]);
+  const toggleMic = useCallback(() => {
+    if (!localStream) return;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+  
+    const newState = !micOn;
+    audioTrack.enabled = newState;
+    setMicOn(newState);
+    
+    updateMyStatus({ isMicOn: newState });
+    setVolumeLevels(prev => {
+      const next = new Map(prev);
+      next.set(userId, newState ? (next.get(userId) ?? 0) : 0);
+      return next;
+    });
+  }, [localStream, micOn, updateMyStatus, userId]);
+
   const toggleCamera = useCallback((forceState?: boolean) => {
     if (!localStream) return;
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
