@@ -139,7 +139,11 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const onModalConfirm = async (mode: ShareMode) => {
     setIsScreenShareModalOpen(false);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
-      alert("Your browser does not support screen sharing or this is not a secure context (HTTPS).");
+      toast({
+        variant: "destructive",
+        title: "Screen Share Not Supported",
+        description: "Your browser does not support screen sharing or you are not in a secure (HTTPS) environment.",
+      });
       return;
     }
     if (!screenShareHelper) return;
@@ -539,15 +543,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           <div className="w-full h-full flex flex-col gap-2">
             {/* Top Row */}
             <div className="w-full h-1/2 flex gap-2">
-              <div className="w-1/2 h-full min-h-0"><VideoTile stream={p1.stream} isCameraOn={!p1.isCamOff} isMicOn={!p1.isMicOff} isHandRaised={p1.isHandRaised||false} isFirstHand={p1.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p1.volumeLevel} profileUrl={p1.avatar} name={p1.name} onTogglePin={() => togglePin(p1.id)} onDoubleClick={() => togglePin(p1.id)} className="w-full h-full" /></div>
-              <div className="w-1/2 h-full min-h-0"><VideoTile stream={p2.stream} isCameraOn={!p2.isCamOff} isMicOn={!p2.isMicOff} isHandRaised={p2.isHandRaised||false} isFirstHand={p2.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p2.volumeLevel} profileUrl={p2.avatar} name={p2.name} onTogglePin={() => togglePin(p2.id)} onDoubleClick={() => togglePin(p2.id)} className="w-full h-full" /></div>
+              <div className="w-full h-1/2 min-h-0"><VideoTile stream={p1.stream} isCameraOn={!p1.isCamOff} isMicOn={!p1.isMicOff} isHandRaised={p1.isHandRaised||false} isFirstHand={p1.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p1.volumeLevel} profileUrl={p1.avatar} name={p1.name} onTogglePin={() => togglePin(p1.id)} onDoubleClick={() => togglePin(p1.id)} className="w-full h-full" /></div>
+              <div className="w-full h-1/2 min-h-0"><VideoTile stream={p2.stream} isCameraOn={!p2.isCamOff} isMicOn={!p2.isMicOff} isHandRaised={p2.isHandRaised||false} isFirstHand={p2.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p2.volumeLevel} profileUrl={p2.avatar} name={p2.name} onTogglePin={() => togglePin(p2.id)} onDoubleClick={() => togglePin(p2.id)} className="w-full h-full" /></div>
             </div>
             {/* Bottom Row */}
             <div className="w-full h-1/2 flex gap-2">
-              <div className="w-1/2 h-full min-h-0"><VideoTile stream={p3.stream} isCameraOn={!p3.isCamOff} isMicOn={!p3.isMicOff} isHandRaised={p3.isHandRaised||false} isFirstHand={p3.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p3.volumeLevel} profileUrl={p3.avatar} name={p3.name} onTogglePin={() => togglePin(p3.id)} onDoubleClick={() => togglePin(p3.id)} className="w-full h-full" /></div>
-              <div className="w-1/2 h-full min-h-0 relative">
+              <div className="w-full h-1/2 min-h-0"><VideoTile stream={p3.stream} isCameraOn={!p3.isCamOff} isMicOn={!p3.isMicOff} isHandRaised={p3.isHandRaised||false} isFirstHand={p3.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p3.volumeLevel} profileUrl={p3.avatar} name={p3.name} onTogglePin={() => togglePin(p3.id)} onDoubleClick={() => togglePin(p3.id)} className="w-full h-full" /></div>
+              <div className="w-full h-1/2 min-h-0 relative">
                   <VideoTile stream={p4.stream} isCameraOn={!p4.isCamOff} isMicOn={!p4.isMicOff} isHandRaised={p4.isHandRaised||false} isFirstHand={p4.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p4.volumeLevel} profileUrl={p4.avatar} name={p4.name} onTogglePin={() => togglePin(p4.id)} onDoubleClick={() => togglePin(p4.id)} className="w-full h-full" />
-                   <Link href={participantsUrl} className="absolute inset-0 bg-black/70 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/60 transition-colors cursor-pointer">
+                   <Link href={participantsUrl} className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer">
                       <Users className="h-10 w-10" />
                       <p className="font-bold text-xl mt-2">+{othersCount} more</p>
                     </Link>
