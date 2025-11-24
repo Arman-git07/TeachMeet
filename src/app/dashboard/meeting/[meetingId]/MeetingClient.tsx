@@ -354,7 +354,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://placehold.co/128x128.png?text=${(data.name || 'G').charAt(0)}`,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: !data.isCameraOn,
-          isMicOff: !data.isMicOn,
+          isMicOn: !data.isMicOn,
           stream: remoteStream, volumeLevel: volumeLevels.get(id) ?? 0,
         };
       });
@@ -470,27 +470,12 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     if (count === 4 && localParticipant && remoteParticipants.length === 3) {
       return (
         <div className="w-full h-full relative" ref={mainContainerRef}>
-          <div className="w-full h-full flex flex-col gap-2">
-            <div className="w-full h-1/2 flex gap-2">
-              <div className="w-1/2 h-full min-h-0">
-                  <VideoTile stream={remoteParticipants[0].stream} isCameraOn={!remoteParticipants[0].isCamOff} isMicOn={!remoteParticipants[0].isMicOff} isHandRaised={remoteParticipants[0].isHandRaised || false} isFirstHand={remoteParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[0].volumeLevel} profileUrl={remoteParticipants[0].avatar} name={remoteParticipants[0].name} isScreenSharing={remoteParticipants[0].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[0].id)} onDoubleClick={() => togglePin(remoteParticipants[0].id)} className="w-full h-full" />
-              </div>
-              <div className="w-1/2 h-full min-h-0">
-                  <VideoTile stream={remoteParticipants[1].stream} isCameraOn={!remoteParticipants[1].isCamOff} isMicOn={!remoteParticipants[1].isMicOff} isHandRaised={remoteParticipants[1].isHandRaised || false} isFirstHand={remoteParticipants[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[1].volumeLevel} profileUrl={remoteParticipants[1].avatar} name={remoteParticipants[1].name} isScreenSharing={remoteParticipants[1].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[1].id)} onDoubleClick={() => togglePin(remoteParticipants[1].id)} className="w-full h-full" />
-              </div>
-            </div>
-            <div className="w-full h-1/2 min-h-0">
-              <VideoTile stream={remoteParticipants[2].stream} isCameraOn={!remoteParticipants[2].isCamOff} isMicOn={!remoteParticipants[2].isMicOff} isHandRaised={remoteParticipants[2].isHandRaised || false} isFirstHand={remoteParticipants[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[2].volumeLevel} profileUrl={remoteParticipants[2].avatar} name={remoteParticipants[2].name} isScreenSharing={remoteParticipants[2].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[2].id)} onDoubleClick={() => togglePin(remoteParticipants[2].id)} className="w-full h-full" />
-            </div>
+          <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="min-h-0"><VideoTile stream={remoteParticipants[0].stream} isCameraOn={!remoteParticipants[0].isCamOff} isMicOn={!remoteParticipants[0].isMicOff} isHandRaised={remoteParticipants[0].isHandRaised || false} isFirstHand={remoteParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[0].volumeLevel} profileUrl={remoteParticipants[0].avatar} name={remoteParticipants[0].name} isScreenSharing={remoteParticipants[0].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[0].id)} onDoubleClick={() => togglePin(remoteParticipants[0].id)} className="w-full h-full" /></div>
+              <div className="min-h-0"><VideoTile stream={remoteParticipants[1].stream} isCameraOn={!remoteParticipants[1].isCamOff} isMicOn={!remoteParticipants[1].isMicOff} isHandRaised={remoteParticipants[1].isHandRaised || false} isFirstHand={remoteParticipants[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[1].volumeLevel} profileUrl={remoteParticipants[1].avatar} name={remoteParticipants[1].name} isScreenSharing={remoteParticipants[1].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[1].id)} onDoubleClick={() => togglePin(remoteParticipants[1].id)} className="w-full h-full" /></div>
+              <div className="min-h-0"><VideoTile stream={remoteParticipants[2].stream} isCameraOn={!remoteParticipants[2].isCamOff} isMicOn={!remoteParticipants[2].isMicOff} isHandRaised={remoteParticipants[2].isHandRaised || false} isFirstHand={remoteParticipants[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[2].volumeLevel} profileUrl={remoteParticipants[2].avatar} name={remoteParticipants[2].name} isScreenSharing={remoteParticipants[2].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[2].id)} onDoubleClick={() => togglePin(remoteParticipants[2].id)} className="w-full h-full" /></div>
+              <div className="min-h-0"><VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} className="w-full h-full" draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} /></div>
           </div>
-          <motion.div
-            drag
-            dragConstraints={mainContainerRef}
-            dragMomentum={false}
-            className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
-          >
-            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} className="w-full h-full" onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
-          </motion.div>
         </div>
       );
     }
@@ -498,32 +483,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     if (count === 5 && localParticipant && remoteParticipants.length === 4) {
       return (
         <div className="w-full h-full relative" ref={mainContainerRef}>
-          <div className="w-full h-full flex flex-col gap-2">
-            {/* Top Row */}
-            <div className="w-full h-1/2 flex gap-2">
-              <div className="w-1/2 h-full min-h-0">
-                  <VideoTile stream={remoteParticipants[0].stream} isCameraOn={!remoteParticipants[0].isCamOff} isMicOn={!remoteParticipants[0].isMicOff} isHandRaised={remoteParticipants[0].isHandRaised || false} isFirstHand={remoteParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[0].volumeLevel} profileUrl={remoteParticipants[0].avatar} name={remoteParticipants[0].name} isScreenSharing={remoteParticipants[0].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[0].id)} onDoubleClick={() => togglePin(remoteParticipants[0].id)} className="w-full h-full" />
-              </div>
-              <div className="w-1/2 h-full min-h-0">
-                  <VideoTile stream={remoteParticipants[1].stream} isCameraOn={!remoteParticipants[1].isCamOff} isMicOn={!remoteParticipants[1].isMicOff} isHandRaised={remoteParticipants[1].isHandRaised || false} isFirstHand={remoteParticipants[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[1].volumeLevel} profileUrl={remoteParticipants[1].avatar} name={remoteParticipants[1].name} isScreenSharing={remoteParticipants[1].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[1].id)} onDoubleClick={() => togglePin(remoteParticipants[1].id)} className="w-full h-full" />
-              </div>
-            </div>
-            {/* Bottom Row */}
-            <div className="w-full h-1/2 flex gap-2">
-              <div className="w-1/2 h-full min-h-0">
-                  <VideoTile stream={remoteParticipants[2].stream} isCameraOn={!remoteParticipants[2].isCamOff} isMicOn={!remoteParticipants[2].isMicOff} isHandRaised={remoteParticipants[2].isHandRaised || false} isFirstHand={remoteParticipants[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[2].volumeLevel} profileUrl={remoteParticipants[2].avatar} name={remoteParticipants[2].name} isScreenSharing={remoteParticipants[2].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[2].id)} onDoubleClick={() => togglePin(remoteParticipants[2].id)} className="w-full h-full" />
-              </div>
-              <div className="w-1/2 h-full min-h-0">
-                  <VideoTile stream={remoteParticipants[3].stream} isCameraOn={!remoteParticipants[3].isCamOff} isMicOn={!remoteParticipants[3].isMicOff} isHandRaised={remoteParticipants[3].isHandRaised || false} isFirstHand={remoteParticipants[3].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[3].volumeLevel} profileUrl={remoteParticipants[3].avatar} name={remoteParticipants[3].name} isScreenSharing={remoteParticipants[3].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[3].id)} onDoubleClick={() => togglePin(remoteParticipants[3].id)} className="w-full h-full" />
-              </div>
-            </div>
+          <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="min-h-0"><VideoTile stream={remoteParticipants[0].stream} isCameraOn={!remoteParticipants[0].isCamOff} isMicOn={!remoteParticipants[0].isMicOff} isHandRaised={remoteParticipants[0].isHandRaised || false} isFirstHand={remoteParticipants[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[0].volumeLevel} profileUrl={remoteParticipants[0].avatar} name={remoteParticipants[0].name} isScreenSharing={remoteParticipants[0].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[0].id)} onDoubleClick={() => togglePin(remoteParticipants[0].id)} className="w-full h-full" /></div>
+              <div className="min-h-0"><VideoTile stream={remoteParticipants[1].stream} isCameraOn={!remoteParticipants[1].isCamOff} isMicOn={!remoteParticipants[1].isMicOff} isHandRaised={remoteParticipants[1].isHandRaised || false} isFirstHand={remoteParticipants[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[1].volumeLevel} profileUrl={remoteParticipants[1].avatar} name={remoteParticipants[1].name} isScreenSharing={remoteParticipants[1].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[1].id)} onDoubleClick={() => togglePin(remoteParticipants[1].id)} className="w-full h-full" /></div>
+              <div className="min-h-0"><VideoTile stream={remoteParticipants[2].stream} isCameraOn={!remoteParticipants[2].isCamOff} isMicOn={!remoteParticipants[2].isMicOff} isHandRaised={remoteParticipants[2].isHandRaised || false} isFirstHand={remoteParticipants[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[2].volumeLevel} profileUrl={remoteParticipants[2].avatar} name={remoteParticipants[2].name} isScreenSharing={remoteParticipants[2].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[2].id)} onDoubleClick={() => togglePin(remoteParticipants[2].id)} className="w-full h-full" /></div>
+              <div className="min-h-0"><VideoTile stream={remoteParticipants[3].stream} isCameraOn={!remoteParticipants[3].isCamOff} isMicOn={!remoteParticipants[3].isMicOff} isHandRaised={remoteParticipants[3].isHandRaised || false} isFirstHand={remoteParticipants[3].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[3].volumeLevel} profileUrl={remoteParticipants[3].avatar} name={remoteParticipants[3].name} isScreenSharing={remoteParticipants[3].isScreenSharing} onTogglePin={() => togglePin(remoteParticipants[3].id)} onDoubleClick={() => togglePin(remoteParticipants[3].id)} className="w-full h-full" /></div>
           </div>
-          <motion.div
-            drag
-            dragConstraints={mainContainerRef}
-            dragMomentum={false}
-            className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
-          >
+          <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing">
             <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} className="w-full h-full" onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
           </motion.div>
         </div>
@@ -535,42 +501,30 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const p2 = remoteParticipants[1];
       const p3 = remoteParticipants[2];
       const p4 = remoteParticipants[3]; // The fifth person overall
-      const othersCount = count - 5; // Total participants - 4 remotes - 1 local
+      const othersCount = count - 5; 
       const participantsUrl = `/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`;
 
       return (
         <div className="w-full h-full relative" ref={mainContainerRef}>
-          <div className="w-full h-full flex flex-col gap-2">
-            {/* Top Row */}
-            <div className="w-full h-1/2 flex gap-2">
-              <div className="w-full h-1/2 min-h-0"><VideoTile stream={p1.stream} isCameraOn={!p1.isCamOff} isMicOn={!p1.isMicOff} isHandRaised={p1.isHandRaised||false} isFirstHand={p1.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p1.volumeLevel} profileUrl={p1.avatar} name={p1.name} onTogglePin={() => togglePin(p1.id)} onDoubleClick={() => togglePin(p1.id)} className="w-full h-full" /></div>
-              <div className="w-full h-1/2 min-h-0"><VideoTile stream={p2.stream} isCameraOn={!p2.isCamOff} isMicOn={!p2.isMicOff} isHandRaised={p2.isHandRaised||false} isFirstHand={p2.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p2.volumeLevel} profileUrl={p2.avatar} name={p2.name} onTogglePin={() => togglePin(p2.id)} onDoubleClick={() => togglePin(p2.id)} className="w-full h-full" /></div>
-            </div>
-            {/* Bottom Row */}
-            <div className="w-full h-1/2 flex gap-2">
-              <div className="w-full h-1/2 min-h-0"><VideoTile stream={p3.stream} isCameraOn={!p3.isCamOff} isMicOn={!p3.isMicOff} isHandRaised={p3.isHandRaised||false} isFirstHand={p3.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p3.volumeLevel} profileUrl={p3.avatar} name={p3.name} onTogglePin={() => togglePin(p3.id)} onDoubleClick={() => togglePin(p3.id)} className="w-full h-full" /></div>
-              <div className="w-full h-1/2 min-h-0 relative">
+          <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="min-h-0"><VideoTile stream={p1.stream} isCameraOn={!p1.isCamOff} isMicOn={!p1.isMicOff} isHandRaised={p1.isHandRaised||false} isFirstHand={p1.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p1.volumeLevel} profileUrl={p1.avatar} name={p1.name} onTogglePin={() => togglePin(p1.id)} onDoubleClick={() => togglePin(p1.id)} className="w-full h-full" /></div>
+            <div className="min-h-0"><VideoTile stream={p2.stream} isCameraOn={!p2.isCamOff} isMicOn={!p2.isMicOff} isHandRaised={p2.isHandRaised||false} isFirstHand={p2.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p2.volumeLevel} profileUrl={p2.avatar} name={p2.name} onTogglePin={() => togglePin(p2.id)} onDoubleClick={() => togglePin(p2.id)} className="w-full h-full" /></div>
+            <div className="min-h-0"><VideoTile stream={p3.stream} isCameraOn={!p3.isCamOff} isMicOn={!p3.isMicOff} isHandRaised={p3.isHandRaised||false} isFirstHand={p3.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p3.volumeLevel} profileUrl={p3.avatar} name={p3.name} onTogglePin={() => togglePin(p3.id)} onDoubleClick={() => togglePin(p3.id)} className="w-full h-full" /></div>
+            <div className="min-h-0 relative">
                   <VideoTile stream={p4.stream} isCameraOn={!p4.isCamOff} isMicOn={!p4.isMicOff} isHandRaised={p4.isHandRaised||false} isFirstHand={p4.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p4.volumeLevel} profileUrl={p4.avatar} name={p4.name} onTogglePin={() => togglePin(p4.id)} onDoubleClick={() => togglePin(p4.id)} className="w-full h-full" />
-                   <Link href={participantsUrl} className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer">
+                  <Link href={participantsUrl} className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer">
                       <Users className="h-10 w-10" />
                       <p className="font-bold text-xl mt-2">+{othersCount} more</p>
-                    </Link>
-              </div>
+                  </Link>
             </div>
           </div>
-          <motion.div
-            drag
-            dragConstraints={mainContainerRef}
-            dragMomentum={false}
-            className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
-          >
+          <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing">
             <VideoTile stream={localParticipant?.stream} isCameraOn={!localParticipant?.isCamOff} isMicOn={!localParticipant?.isMicOff} isHandRaised={localParticipant?.isHandRaised || false} isFirstHand={localParticipant?.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant?.volumeLevel} isLocal={true} profileUrl={localParticipant?.avatar} name={localParticipant?.name} isScreenSharing={localParticipant?.isScreenSharing} className="w-full h-full" onTogglePin={() => togglePin(localParticipant!.id)} onDoubleClick={() => togglePin(localParticipant!.id)} draggable={true} onStopShare={isSharingScreen && localParticipant?.id === userId ? handleStopSharing : undefined} />
           </motion.div>
         </div>
       );
     }
 
-    // Fallback for > 2 participants, which is now covered by specific cases up to 6+
     if (count > 2) {
         const gridCols = Math.ceil(Math.sqrt(allParticipants.length));
         return (
