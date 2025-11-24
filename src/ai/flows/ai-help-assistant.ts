@@ -25,7 +25,7 @@ export type AiHelpAssistantOutput = z.infer<typeof AiHelpAssistantOutputSchema>;
 export async function aiHelpAssistantFlow(
   input: AiHelpAssistantInput
 ): Promise<AiHelpAssistantOutput> {
-  const llmResponse = await ai.generate({
+  const llmResponse = await ai().generate({
     prompt: input.question,
     model: 'googleai/gemini-pro',
     config: {

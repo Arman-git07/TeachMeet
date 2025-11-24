@@ -14,8 +14,6 @@ const nextConfig = {
   // },
   experimental: {
     optimizePackageImports: [
-      '@genkit-ai/flow',
-      '@genkit-ai/googleai',
       '@radix-ui/react-accordion',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-avatar',
@@ -36,10 +34,8 @@ const nextConfig = {
       '@radix-ui/react-tabs',
       '@radix-ui/react-toast',
       '@radix-ui/react-tooltip',
-      'firebase/app',
       'firebase/auth',
       'firebase/firestore',
-      'firebase/messaging',
       'firebase/storage',
       'lucide-react',
       'recharts',

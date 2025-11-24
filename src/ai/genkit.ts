@@ -1,5 +1,5 @@
 
-import {genkit} from 'genkit';
+import {genkit, type Genkit} from 'genkit';
 import {googleAI as genkitGoogleAI} from '@genkit-ai/googleai';
 
 let apiKeyFound = false;
@@ -40,7 +40,15 @@ if (!apiKeyFound) {
 // Create an instance of the Google AI plugin.
 export const googleAI = genkitGoogleAI();
 
-// Configure Genkit with the Google AI plugin.
-export const ai = genkit({
-  plugins: [googleAI],
-});
+let aiInstance: Genkit;
+
+function getAiInstance() {
+    if (!aiInstance) {
+        aiInstance = genkit({
+            plugins: [googleAI],
+        });
+    }
+    return aiInstance;
+}
+
+export { getAiInstance as ai };
