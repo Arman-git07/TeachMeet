@@ -472,46 +472,32 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
     
-    if (count === 4 && localParticipant) {
-      const displayParticipants = allParticipants.sort((a, b) => (a.isLocal ? 1 : -1)); // Put local user last if needed
+    if (count >= 4 && localParticipant) {
       return (
-        <div className="w-full h-full relative grid grid-cols-2 grid-rows-2 gap-2" ref={mainContainerRef}>
-          {displayParticipants.map((p) => (
-            <div key={p.id} className="min-h-0">
-              <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined} />
+        <div className="w-full h-full relative" ref={mainContainerRef}>
+          <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2">
+            {remoteParticipants.slice(0, 3).map((p) => (
+              <div key={p.id} className="min-h-0">
+                <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised||false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} profileUrl={p.avatar} name={p.name} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" />
+              </div>
+            ))}
+            <div className="min-h-0 relative">
+              {allParticipants.length > 4 ? (
+                <Link href={`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`} className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer z-20">
+                  <Users className="h-10 w-10" />
+                  <p className="font-bold text-xl mt-2">+{allParticipants.length - 4} more</p>
+                </Link>
+              ) : null}
+              {remoteParticipants[3] && (
+                 <VideoTile stream={remoteParticipants[3].stream} isCameraOn={!remoteParticipants[3].isCamOff} isMicOn={!remoteParticipants[3].isMicOff} isHandRaised={remoteParticipants[3].isHandRaised||false} isFirstHand={remoteParticipants[3].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remoteParticipants[3].volumeLevel} profileUrl={remoteParticipants[3].avatar} name={remoteParticipants[3].name} onTogglePin={() => togglePin(remoteParticipants[3].id)} onDoubleClick={() => togglePin(remoteParticipants[3].id)} className="w-full h-full" />
+              )}
             </div>
-          ))}
+          </div>
+          <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
+            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} className="w-full h-full" onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
+          </motion.div>
         </div>
       );
-    }
-
-    if (count >= 5 && localParticipant) {
-        const remoteTiles = remoteParticipants.slice(0, 3);
-        const othersCount = allParticipants.length - 4;
-        const p4 = remoteParticipants[3];
-        const participantsUrl = `/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`;
-
-        return (
-          <div className="w-full h-full relative" ref={mainContainerRef}>
-            <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2">
-                {remoteTiles.map(p => (
-                  <div key={p.id} className="min-h-0">
-                    <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised||false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} profileUrl={p.avatar} name={p.name} onTogglePin={() => togglePin(p.id)} onDoubleClick={() => togglePin(p.id)} className="w-full h-full" />
-                  </div>
-                ))}
-                <div className="min-h-0 relative">
-                    <VideoTile stream={p4.stream} isCameraOn={!p4.isCamOff} isMicOn={!p4.isMicOff} isHandRaised={p4.isHandRaised||false} isFirstHand={p4.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p4.volumeLevel} profileUrl={p4.avatar} name={p4.name} onTogglePin={() => togglePin(p4.id)} onDoubleClick={() => togglePin(p4.id)} className="w-full h-full" />
-                    <Link href={participantsUrl} className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer">
-                        <Users className="h-10 w-10" />
-                        <p className="font-bold text-xl mt-2">+{othersCount} more</p>
-                    </Link>
-              </div>
-            </div>
-            <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing">
-              <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} className="w-full h-full" onTogglePin={() => togglePin(localParticipant.id)} onDoubleClick={() => togglePin(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
-            </motion.div>
-          </div>
-        );
     }
     
     // Fallback for smaller numbers, but the logic for 4+ covers most grid cases.
