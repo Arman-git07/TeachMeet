@@ -6,14 +6,12 @@ import { cn } from "@/lib/utils";
 
 interface HandRaiseIconProps {
   isRaised: boolean; // whether participant raised hand
-  totalRaisedHands: number; // total raised hands in room
   onClick?: () => void;
   isFirst?: boolean;
 }
 
 const HandRaiseIcon: React.FC<HandRaiseIconProps> = ({
   isRaised,
-  totalRaisedHands,
   isFirst,
   onClick,
 }) => {
@@ -33,6 +31,9 @@ const HandRaiseIcon: React.FC<HandRaiseIconProps> = ({
     return null; // Don't render anything if hand is not raised
   }
 
+  // Determine if the icon should be filled. It's filled if the hand is raised AND it's NOT the first one.
+  const shouldBeFilled = isRaised && !isFirst;
+
   return (
     <div
       onClick={onClick}
@@ -51,7 +52,7 @@ const HandRaiseIcon: React.FC<HandRaiseIconProps> = ({
     >
       <Hand
         className="w-full h-full transition-colors duration-300"
-        fill={totalRaisedHands > 1 ? green : "none"}
+        fill={shouldBeFilled ? green : "none"}
         stroke={green}
         strokeWidth={2}
       />
