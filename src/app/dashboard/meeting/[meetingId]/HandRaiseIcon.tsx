@@ -54,7 +54,7 @@ const HandRaiseIcon: React.FC<HandRaiseIconProps> = ({
         className="w-full h-full transition-colors duration-300"
         fill={shouldBeFilled ? green : "none"}
         stroke={green}
-        strokeWidth={2}
+        strokeWidth={shouldBeFilled ? 0 : 2}
       />
       {isFirst && (
          <span
