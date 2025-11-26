@@ -56,16 +56,6 @@ const HandRaiseIcon: React.FC<HandRaiseIconProps> = ({
         stroke={green}
         strokeWidth={shouldBeFilled ? 0 : 2}
       />
-      {isFirst && (
-         <span
-          className="absolute -top-1 -right-1 text-yellow-400 text-xs font-bold"
-          style={{
-            textShadow: "0 0 6px rgba(255,215,0,0.7)",
-          }}
-        >
-          ⭐
-        </span>
-      )}
     </div>
   );
 };
