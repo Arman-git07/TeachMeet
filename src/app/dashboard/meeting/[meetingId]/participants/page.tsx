@@ -53,13 +53,17 @@ const ParticipantItem = React.memo(({
   isCurrentUserHost, 
   isThisParticipantTheHost,
   onRemoveClick,
-  onToggleCamera
+  onToggleCamera,
+  meetingId,
+  topic
 }: { 
   participant: Participant, 
   isCurrentUserHost: boolean,
   isThisParticipantTheHost: boolean,
   onRemoveClick: (participant: Participant) => void;
   onToggleCamera: (participant: Participant) => void;
+  meetingId: string;
+  topic: string | null;
 }) => {
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
@@ -71,6 +75,8 @@ const ParticipantItem = React.memo(({
       duration: 3000,
     });
   };
+  
+  const privateChatLink = `/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic || '')}&privateWith=${participant.id}&privateWithName=${encodeURIComponent(participant.name)}`;
 
   return (
     <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
@@ -104,9 +110,11 @@ const ParticipantItem = React.memo(({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg">
-              <DropdownMenuItem onSelect={() => handleActionClick('Chat Privately with', participant.name)} className="cursor-pointer">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                <span>Chat Privately</span>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href={privateChatLink}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  <span>Chat Privately</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => handleActionClick('Pin', participant.name)} className="cursor-pointer">
                 <Pin className="mr-2 h-4 w-4" />
@@ -308,6 +316,8 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                       isThisParticipantTheHost={participant.id === meetingHostId}
                       onRemoveClick={() => setParticipantToRemove(participant)}
                       onToggleCamera={handleToggleCamera}
+                      meetingId={meetingId}
+                      topic={topicFromParams}
                     />
                   ))}
                 </div>
