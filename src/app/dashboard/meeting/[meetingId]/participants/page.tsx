@@ -55,7 +55,8 @@ const ParticipantItem = React.memo(({
   onRemoveClick,
   onToggleCamera,
   meetingId,
-  topic
+  topic,
+  pinnedUserId
 }: { 
   participant: Participant, 
   isCurrentUserHost: boolean,
@@ -64,9 +65,11 @@ const ParticipantItem = React.memo(({
   onToggleCamera: (participant: Participant) => void;
   meetingId: string;
   topic: string | null;
+  pinnedUserId: string | null;
 }) => {
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
+  const isPinned = participant.id === pinnedUserId;
 
   const handleActionClick = (action: string, participantName: string) => {
     toast({
@@ -77,7 +80,13 @@ const ParticipantItem = React.memo(({
   };
   
   const privateChatLink = `/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic || '')}&privateWith=${participant.id}&privateWithName=${encodeURIComponent(participant.name)}`;
-  const pinLink = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}&pin=${participant.id}`;
+  
+  // Create the base URL and then decide whether to add or remove the 'pin' parameter
+  const pinUrl = new URLSearchParams(topic ? { topic } : {});
+  if (!isPinned) {
+      pinUrl.set('pin', participant.id);
+  }
+  const pinLink = `/dashboard/meeting/${meetingId}?${pinUrl.toString()}`;
 
   return (
     <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
@@ -120,7 +129,7 @@ const ParticipantItem = React.memo(({
               <DropdownMenuItem asChild className="cursor-pointer">
                  <Link href={pinLink}>
                     <Pin className="mr-2 h-4 w-4" />
-                    <span>Pin User</span>
+                    <span>{isPinned ? "Unpin User" : "Pin User"}</span>
                  </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -162,6 +171,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const router = useRouter();
   const searchParams = useSearchParams();
   const topicFromParams = searchParams.get('topic');
+  const pinnedUserId = searchParams.get('pin');
   const displayTopic = topicFromParams || `Meeting Participants`;
   const { toast } = useToast();
 
@@ -321,6 +331,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                       onToggleCamera={handleToggleCamera}
                       meetingId={meetingId}
                       topic={topicFromParams}
+                      pinnedUserId={pinnedUserId}
                     />
                   ))}
                 </div>
@@ -350,3 +361,5 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     </>
   );
 }
+
+    
