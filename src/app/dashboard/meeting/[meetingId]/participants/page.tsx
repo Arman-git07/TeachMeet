@@ -81,7 +81,6 @@ const ParticipantItem = React.memo(({
   
   const privateChatLink = `/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic || '')}&privateWith=${participant.id}&privateWithName=${encodeURIComponent(participant.name)}`;
   
-  // Create the base URL and then decide whether to add or remove the 'pin' parameter
   const pinUrl = new URLSearchParams(topic ? { topic } : {});
   if (!isPinned) {
       pinUrl.set('pin', participant.id);
