@@ -8,8 +8,6 @@ import {
   VideoOff,
   Video,
   ScreenShare,
-  Maximize2,
-  Minimize2,
   ScreenShareOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,8 +27,6 @@ type Props = {
   className?: string;
   isScreenSharing?: boolean;
   name?: string;
-  isPinned?: boolean;
-  onTogglePin?: () => void;
   onDoubleClick?: () => void;
   draggable?: boolean;
   volumeLevel?: number;
@@ -49,8 +45,6 @@ const VideoTile: React.FC<Props> = ({
   className = "",
   isScreenSharing = false,
   name = "User",
-  isPinned = false,
-  onTogglePin,
   onDoubleClick,
   draggable = false,
   volumeLevel = 0,
@@ -78,14 +72,14 @@ const VideoTile: React.FC<Props> = ({
         "relative bg-black rounded-lg overflow-hidden transition-all duration-300",
         isSpeaking ? "ring-4 ring-primary ring-offset-2 ring-offset-background" : "ring-0",
         className,
-        draggable ? "cursor-grab active:cursor-grabbing" : ""
+        draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       )}
       role="group"
+      title={`Double-click to pin/unpin ${name}`}
     >
       <div className="absolute top-2 left-2 z-30">
         <HandRaiseIcon
           isRaised={isHandRaised}
-          totalRaisedHands={raisedCount}
           isFirst={isFirstHand}
         />
       </div>
@@ -162,27 +156,6 @@ const VideoTile: React.FC<Props> = ({
           )}
           {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
         </div>
-
-        {/* Right-aligned info: Pin button */}
-        {onTogglePin && (
-          <div className="pointer-events-auto">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePin?.();
-              }}
-              aria-label={isPinned ? "Unpin participant" : "Pin participant"}
-              className="p-1 rounded-md bg-transparent hover:bg-black/70 text-white"
-              title={isPinned ? "Unpin (restore grid)" : "Pin (fullscreen)"}
-            >
-              {isPinned ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
