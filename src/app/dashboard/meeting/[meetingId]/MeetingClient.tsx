@@ -6,7 +6,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
-import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Maximize, Pin } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
@@ -150,7 +150,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     if (!screenShareHelper) return;
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       await screenShareHelper.startSharingWithStream(mode, stream);
       setIsSharingScreen(true);
       updateMyStatus({ isScreenSharing: true });
@@ -257,12 +257,17 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       return;
     }
     if (!audioContextRef.current) {
-        const audioContext = new AudioContext();
-        analyserRef.current = audioContext.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        sourceRef.current = audioContext.createMediaStreamSource(localStream);
-        sourceRef.current.connect(analyserRef.current);
-        audioContextRef.current = audioContext;
+        try {
+          const audioContext = new AudioContext();
+          analyserRef.current = audioContext.createAnalyser();
+          analyserRef.current.fftSize = 256;
+          sourceRef.current = audioContext.createMediaStreamSource(localStream);
+          sourceRef.current.connect(analyserRef.current);
+          audioContextRef.current = audioContext;
+        } catch(e) {
+            console.error("Could not create AudioContext for local stream", e);
+            return;
+        }
     }
     const analyser = analyserRef.current!;
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
