@@ -361,5 +361,3 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     </>
   );
 }
-
-    
