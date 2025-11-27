@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +9,7 @@ import {
   ScreenShare,
   ScreenShareOff,
   Pin,
+  Maximize,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HandRaiseIcon from "./HandRaiseIcon";
@@ -54,6 +54,7 @@ const VideoTile: React.FC<Props> = ({
   isPinned = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const tileRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -68,8 +69,21 @@ const VideoTile: React.FC<Props> = ({
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
 
+  const handleFullscreen = () => {
+    if (tileRef.current) {
+      if (!document.fullscreenElement) {
+        tileRef.current.requestFullscreen().catch(err => {
+          alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    }
+  };
+
   return (
     <div
+      ref={tileRef}
       onDoubleClick={onDoubleClick}
       className={cn(
         "relative bg-black rounded-lg overflow-hidden transition-all duration-300",
@@ -159,6 +173,19 @@ const VideoTile: React.FC<Props> = ({
             <MicOff className="h-4 w-4 text-red-400" />
           )}
           {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
+        </div>
+        
+        {/* Right-aligned info: Fullscreen button */}
+        <div className="pointer-events-auto">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleFullscreen}
+            className="h-8 w-8 rounded-full text-white/80 hover:bg-black/50 hover:text-white"
+            title="Toggle Fullscreen"
+          >
+            <Maximize className="h-5 w-5" />
+          </Button>
         </div>
       </div>
     </div>
