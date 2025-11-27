@@ -53,9 +53,10 @@ type Props = {
   initialMicOn: boolean;
   onLeave: () => void;
   topic: string;
+  initialPinnedId?: string | null;
 };
 
-export default function MeetingClient({ meetingId, userId, initialCamOn, initialMicOn, onLeave, topic }: Props) {
+export default function MeetingClient({ meetingId, userId, initialCamOn, initialMicOn, onLeave, topic, initialPinnedId }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -84,7 +85,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const remoteAnalysersRef = useRef<Map<string, { analyser: AnalyserNode; rafId: number | null; dataArray: Uint8Array }>>(new Map());
   const lastRemoteUpdateRef = useRef<number>(0);
 
-  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [pinnedId, setPinnedId] = useState<string | null>(initialPinnedId || null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

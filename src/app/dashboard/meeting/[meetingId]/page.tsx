@@ -24,6 +24,7 @@ export default function MeetingPage() {
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
+  const initialPinnedId = searchParams.get('pin') || null;
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
@@ -150,6 +151,7 @@ export default function MeetingPage() {
           initialMicOn={searchParams.get('mic') !== 'false'}
           onLeave={handleLeave}
           topic={topic}
+          initialPinnedId={initialPinnedId}
         />
       )}
     </div>

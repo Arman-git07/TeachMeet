@@ -77,6 +77,7 @@ const ParticipantItem = React.memo(({
   };
   
   const privateChatLink = `/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic || '')}&privateWith=${participant.id}&privateWithName=${encodeURIComponent(participant.name)}`;
+  const pinLink = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}&pin=${participant.id}`;
 
   return (
     <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
@@ -116,9 +117,11 @@ const ParticipantItem = React.memo(({
                   <span>Chat Privately</span>
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleActionClick('Pin', participant.name)} className="cursor-pointer">
-                <Pin className="mr-2 h-4 w-4" />
-                <span>Pin User</span>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                 <Link href={pinLink}>
+                    <Pin className="mr-2 h-4 w-4" />
+                    <span>Pin User</span>
+                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {isCurrentUserHost && !isThisParticipantTheHost && (
