@@ -9,6 +9,7 @@ import {
   Video,
   ScreenShare,
   ScreenShareOff,
+  Pin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HandRaiseIcon from "./HandRaiseIcon";
@@ -31,6 +32,7 @@ type Props = {
   draggable?: boolean;
   volumeLevel?: number;
   onStopShare?: () => void;
+  isPinned?: boolean;
 };
 
 const VideoTile: React.FC<Props> = ({
@@ -49,6 +51,7 @@ const VideoTile: React.FC<Props> = ({
   draggable = false,
   volumeLevel = 0,
   onStopShare,
+  isPinned = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -77,7 +80,8 @@ const VideoTile: React.FC<Props> = ({
       role="group"
       title={`Double-click to pin/unpin ${name}`}
     >
-      <div className="absolute top-2 left-2 z-30">
+      <div className="absolute top-2 left-2 z-30 flex items-center gap-1">
+        {isPinned && <Pin className="h-5 w-5 text-white/90" style={{ filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.5))" }} />}
         <HandRaiseIcon
           isRaised={isHandRaised}
           isFirst={isFirstHand}
