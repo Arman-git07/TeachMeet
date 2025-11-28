@@ -376,7 +376,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     // Reorder based on pinnedId
     if (pinnedId) {
         const pinnedIndex = all.findIndex(p => p.id === pinnedId);
-        if (pinnedIndex > 0) { // Don't reorder if local user is pinned (they are handled separately)
+        if (pinnedIndex > -1) {
             const [pinnedItem] = all.splice(pinnedIndex, 1);
             all.unshift(pinnedItem);
         }
@@ -390,7 +390,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const firstHandRaised = all.filter(p => p.isHandRaised && p.handRaisedAt).sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
     const raisedCount = all.filter(p => p.isHandRaised).length;
     return { allParticipants: all, localParticipant: self, remoteParticipants: remoteOnly, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isScreenSharing, pinnedId]);
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (user && meetingId) {
@@ -498,7 +498,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         <div className="w-full h-full flex flex-col gap-2 relative" ref={mainContainerRef}>
           <div className="flex-1 flex gap-2 min-h-0">
             <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} className="w-full h-full" /></div>
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOn} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} className="w-full h-full" /></div>
+            <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} className="w-full h-full" /></div>
           </div>
           <div className="flex-1 flex gap-2 min-h-0">
             <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} className="w-full h-full" /></div>
@@ -521,7 +521,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
               )}
               <Link href={`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`} className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/50 transition-colors cursor-pointer z-20">
                   <Users className="h-10 w-10" />
-                  <p className="font-bold text-xl mt-2">+{remotes.length - 3} more</p>
+                  <p className="font-bold text-xl mt-2">+{allParticipants.length - 5} more</p>
               </Link>
             </div>
           </div>
