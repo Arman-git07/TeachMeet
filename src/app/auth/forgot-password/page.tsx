@@ -19,12 +19,13 @@ import { useToast } from '@/hooks/use-toast';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
+import AuthLayout from '../layout';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
 });
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordForm() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
@@ -97,3 +98,10 @@ export default function ForgotPasswordPage() {
   );
 }
 
+export default function ForgotPasswordPage() {
+    return (
+        <AuthLayout>
+            <ForgotPasswordForm />
+        </AuthLayout>
+    )
+}

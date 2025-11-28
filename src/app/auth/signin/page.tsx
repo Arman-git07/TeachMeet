@@ -21,13 +21,14 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import AuthLayout from '../layout';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(1, { message: 'Password is required.' }),
 });
 
-export default function SignInPage() {
+function SignInForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -161,4 +162,12 @@ export default function SignInPage() {
       </Form>
     </>
   );
+}
+
+export default function SignInPage() {
+    return (
+        <AuthLayout>
+            <SignInForm />
+        </AuthLayout>
+    )
 }

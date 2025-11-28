@@ -1,4 +1,7 @@
+// src/app/layout.tsx
+'use client';
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
@@ -15,6 +18,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const isAuthPage = pathname.startsWith('/auth');
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -26,9 +32,15 @@ export default function RootLayout({
         geistMonoFont.variable
       )}>
         <Providers>
-          <AppShell>
-            {children}
-          </AppShell>
+          {isAuthPage ? (
+            // Render auth pages without the main app shell (sidebar)
+            children
+          ) : (
+            // Render all other pages with the main app shell
+            <AppShell>
+              {children}
+            </AppShell>
+          )}
         </Providers>
         <Toaster />
       </body>
