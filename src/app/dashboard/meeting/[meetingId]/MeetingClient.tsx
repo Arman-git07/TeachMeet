@@ -498,15 +498,31 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         <div className="w-full h-full flex flex-col gap-2 relative" ref={mainContainerRef}>
           <div className="flex-1 flex gap-2 min-h-0">
             <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} className="w-full h-full" /></div>
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} className="w-full h-full" /></div>
+            <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOn} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} className="w-full h-full" /></div>
           </div>
           <div className="flex-1 flex gap-2 min-h-0">
             <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} className="w-full h-full" /></div>
             <div className="flex-1 min-w-0 relative">
-              <Link href={`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`} className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/70 transition-colors cursor-pointer z-20">
+              {remotes[3] && (
+                <VideoTile
+                  stream={remotes[3].stream}
+                  isCameraOn={!remotes[3].isCamOff}
+                  isMicOn={!remotes[3].isMicOn}
+                  isHandRaised={remotes[3].isHandRaised || false}
+                  isFirstHand={remotes[3].id === firstHandRaisedId}
+                  raisedCount={raisedCount}
+                  volumeLevel={remotes[3].volumeLevel}
+                  profileUrl={remotes[3].avatar}
+                  name={remotes[3].name}
+                  isPinned={remotes[3].id === pinnedId}
+                  onDoubleClick={() => togglePin(remotes[3].id)}
+                  className="w-full h-full"
+                />
+              )}
+              <Link href={`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`} className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/50 transition-colors cursor-pointer z-20">
                   <Users className="h-10 w-10" />
                   <p className="font-bold text-xl mt-2">+{remotes.length - 3} more</p>
-                </Link>
+              </Link>
             </div>
           </div>
           <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
