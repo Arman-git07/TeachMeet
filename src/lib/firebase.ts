@@ -33,9 +33,7 @@ if (
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize services
-const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence,
-});
+const auth = getAuth(app);
 
 const db = getFirestore(app);
 
