@@ -23,6 +23,7 @@ import {
   UserX,
   Loader2,
   CameraOff,
+  Hand,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -45,7 +46,8 @@ interface Participant {
   photoURL?: string;
   isMicOn?: boolean;
   isCameraOn?: boolean;
-  role: 'host' | 'participant'; // Assuming role is available
+  isHandRaised?: boolean;
+  role: 'host' | 'participant';
 }
 
 const ParticipantItem = React.memo(({
@@ -54,6 +56,7 @@ const ParticipantItem = React.memo(({
   isThisParticipantTheHost,
   onRemoveClick,
   onToggleCamera,
+  onLowerHand,
   meetingId,
   topic,
   pinnedUserId
@@ -63,6 +66,7 @@ const ParticipantItem = React.memo(({
   isThisParticipantTheHost: boolean,
   onRemoveClick: (participant: Participant) => void;
   onToggleCamera: (participant: Participant) => void;
+  onLowerHand: (participant: Participant) => void;
   meetingId: string;
   topic: string | null;
   pinnedUserId: string | null;
@@ -95,9 +99,10 @@ const ParticipantItem = React.memo(({
           <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
         </Avatar>
         <div>
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
             {participant.name} {isMe && "(You)"}
-            {isThisParticipantTheHost && <ShieldCheck className="inline-block ml-1.5 h-4 w-4 text-primary" title="Host" />}
+            {isThisParticipantTheHost && <ShieldCheck className="inline-block h-4 w-4 text-primary" title="Host" />}
+            {participant.isHandRaised && <Hand className="inline-block h-4 w-4 text-yellow-500" title="Hand Raised" />}
           </p>
           <p className="text-xs text-muted-foreground">
             {participant.isMicOn ? "Unmuted" : "Muted"} | {participant.isCameraOn ? "Camera On" : "Camera Off"}
@@ -134,6 +139,15 @@ const ParticipantItem = React.memo(({
               <DropdownMenuSeparator />
               {isCurrentUserHost && !isThisParticipantTheHost && (
                 <>
+                  {participant.isHandRaised && (
+                     <DropdownMenuItem
+                        onSelect={() => onLowerHand(participant)}
+                        className="cursor-pointer"
+                      >
+                        <Hand className="mr-2 h-4 w-4" />
+                        <span>Lower Hand</span>
+                      </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onSelect={() => onToggleCamera(participant)}
                     className="cursor-pointer"
@@ -216,6 +230,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
           photoURL: data.photoURL,
           isMicOn: data.isMicOn,
           isCameraOn: data.isCameraOn,
+          isHandRaised: data.isHandRaised,
           role: data.isHost ? 'host' : 'participant',
         });
       });
@@ -264,6 +279,18 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     } catch (error) {
       console.error('Failed to turn off camera:', error);
       toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not turn off the camera.' });
+    }
+  };
+
+  const handleLowerHand = async (participant: Participant) => {
+    if (!isCurrentUserTheHost) return;
+    try {
+        const participantRef = doc(db, 'meetings', meetingId, 'participants', participant.id);
+        await updateDoc(participantRef, { isHandRaised: false, handRaisedAt: null });
+        toast({ title: 'Hand Lowered', description: `Lowered ${participant.name}'s hand.` });
+    } catch (error) {
+        console.error("Failed to lower hand:", error);
+        toast({ variant: 'destructive', title: 'Action Failed', description: 'Could not lower the hand.' });
     }
   };
 
@@ -328,6 +355,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                       isThisParticipantTheHost={participant.id === meetingHostId}
                       onRemoveClick={() => setParticipantToRemove(participant)}
                       onToggleCamera={handleToggleCamera}
+                      onLowerHand={handleLowerHand}
                       meetingId={meetingId}
                       topic={topicFromParams}
                       pinnedUserId={pinnedUserId}
