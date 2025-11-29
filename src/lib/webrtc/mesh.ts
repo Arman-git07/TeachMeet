@@ -21,7 +21,7 @@ export class MeshRTC {
   public socketId: string | null = null;
   public removeTrack?: (track: MediaStreamTrack) => void;
 
-  // --- FIX: Add queue and ready flag ---
+  // FIX: Add queue and ready flag to prevent race conditions
   private _ready = false; 
   private _pendingSignals: Array<() => void> = []; 
 
@@ -49,7 +49,7 @@ export class MeshRTC {
     this.localStream = localStream;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
     
-    // --- FIX: Mark as ready and flush the signal queue ---
+    // FIX: Mark as ready and flush the signal queue
     this._ready = true;
     if (this._pendingSignals.length > 0) {
       console.log("[mesh] init(): processing", this._pendingSignals.length, "queued signals");
@@ -66,7 +66,7 @@ export class MeshRTC {
         this.socket.emit("join-room", this.roomId, this.socket.id);
     });
 
-    // --- FIX: Wrap all event handlers to queue if not ready ---
+    // FIX: Wrap all event handlers to queue if not ready
     this.socket.on("user-joined", (remoteId: string) => {
       const handler = () => this._handleUserJoined(remoteId);
       if (!this._ready) {
@@ -126,8 +126,7 @@ export class MeshRTC {
         this.localStream.getTracks().forEach(track => {
           if (!existing.includes(track.kind)) {
             try {
-              const toAdd = (typeof (track as any).clone === "function") ? (track as any).clone() : track;
-              pc.addTrack(toAdd, this.localStream as MediaStream);
+              pc.addTrack(track, this.localStream as MediaStream);
               console.log(`[mesh] _handleOffer: attached local ${track.kind} track to pc for ${fromId}`);
             } catch (e) {
               console.warn("[mesh] _handleOffer: addTrack failed", e);
@@ -238,8 +237,7 @@ export class MeshRTC {
     if (this.localStream) {
       try {
         this.localStream.getTracks().forEach(track => {
-          const t = typeof (track as any).clone === "function" ? (track as any).clone() : track;
-          try { pc.addTrack(t, this.localStream as MediaStream); } catch (e) { console.warn("[mesh] addTrack to pc failed", e); }
+          try { pc.addTrack(track, this.localStream as MediaStream); } catch (e) { console.warn("[mesh] addTrack to pc failed", e); }
         });
         console.log("[mesh] Attaching local tracks to new pc for", remoteId, this.localStream.getTracks().map(t => t.kind));
       } catch (err) {
@@ -273,8 +271,7 @@ export class MeshRTC {
 
     for (const [id, entry] of this.peers.entries()) {
       try {
-        const t = typeof (track as any).clone === "function" ? (track as any).clone() : track;
-        entry.pc.addTrack(t, this.localStream as MediaStream);
+        entry.pc.addTrack(track, this.localStream as MediaStream);
         try {
           const offer = await entry.pc.createOffer();
           await entry.pc.setLocalDescription(offer);
