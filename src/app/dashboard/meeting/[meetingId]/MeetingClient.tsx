@@ -61,8 +61,22 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const { toast } = useToast();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [camOn, setCamOn] = useState(initialCamOn);
-  const [micOn, setMicOn] = useState(initialMicOn);
+  
+  const [camOn, setCamOn] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedState = localStorage.getItem('teachmeet-cam-state');
+      if (savedState !== null) return savedState === 'true';
+    }
+    return initialCamOn;
+  });
+  const [micOn, setMicOn] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedState = localStorage.getItem('teachmeet-mic-state');
+      if (savedState !== null) return savedState === 'true';
+    }
+    return initialMicOn;
+  });
+
   const [loadingMedia, setLoadingMedia] = useState(true);
 
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
@@ -188,9 +202,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        stream.getVideoTracks().forEach(track => { track.enabled = initialCamOn; });
-        stream.getAudioTracks().forEach(track => { track.enabled = initialMicOn; });
-        setLocalStream(stream); setCamOn(initialCamOn); setMicOn(initialMicOn);
+        stream.getVideoTracks().forEach(track => { track.enabled = camOn; });
+        stream.getAudioTracks().forEach(track => { track.enabled = micOn; });
+        setLocalStream(stream);
       } catch (err) { console.error("Media init error:", err); toast({ variant: "destructive", title: "Media Error" }); } 
       finally { if (mounted) setLoadingMedia(false); }
     };
@@ -204,7 +218,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       remoteAnalysersRef.current.clear();
       screenShareHelper?.stopSharing();
     };
-  }, [initialCamOn, initialMicOn, toast, screenShareHelper]);
+  }, [toast, screenShareHelper, camOn, micOn]);
 
   const previousRaisedHands = useRef<Set<string>>(new Set());
   const firstParticipantsSnapshot = useRef(true);
@@ -343,15 +357,18 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     name: user.displayName || 'Anonymous',
                     photoURL: user.photoURL || '',
                     isHost: isHost,
-                    isCameraOn: initialCamOn,
-                    isMicOn: initialMicOn,
+                    isCameraOn: camOn,
+                    isMicOn: micOn,
                     joinedAt: serverTimestamp(),
                 });
+            } else {
+              // If doc exists, update the on/off state in case of refresh
+              await updateDoc(participantRef, { isCameraOn: camOn, isMicOn: micOn });
             }
         }
     };
     addSelfToParticipants();
-  }, [user, meetingId, isHost, isLoadingRole, initialCamOn, initialMicOn]);
+  }, [user, meetingId, isHost, isLoadingRole, camOn, micOn]);
 
   const { allParticipants, localParticipant, remoteParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
@@ -413,6 +430,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const newState = !micOn;
     audioTrack.enabled = newState;
     setMicOn(newState);
+    localStorage.setItem('teachmeet-mic-state', String(newState));
     
     updateMyStatus({ isMicOn: newState });
     setVolumeLevels(prev => {
@@ -427,8 +445,10 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
     localStream.getVideoTracks().forEach(track => { track.enabled = nextState; });
     setCamOn(nextState);
+    localStorage.setItem('teachmeet-cam-state', String(nextState));
     updateMyStatus({ isCameraOn: nextState });
   }, [localStream, camOn, updateMyStatus]);
+
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   
   const togglePin = useCallback((id: string) => { 
@@ -467,7 +487,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const remote = remotes[0];
       return (
         <div className="w-full h-full relative" ref={mainContainerRef}>
-            <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOn} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} isPinned={remote.id === pinnedId} onDoubleClick={() => togglePin(remote.id)} className="w-full h-full" />
+            <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} isPinned={remote.id === pinnedId} onDoubleClick={() => togglePin(remote.id)} className="w-full h-full" />
             <motion.div
               drag
               dragConstraints={mainContainerRef}
@@ -546,7 +566,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
                     {remotes.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
-                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
+                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
                         </div>
                     ))}
                 </div>
