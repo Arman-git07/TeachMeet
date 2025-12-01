@@ -33,7 +33,10 @@ if (
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize services
-const auth = getAuth(app);
+// Explicitly set browserLocalPersistence to ensure "remember me" functionality
+const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence,
+});
 
 const db = getFirestore(app);
 
