@@ -135,7 +135,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return () => off();
   }, [screenShareHelper]);
 
-  const handleShareClick = () => { setIsScreenShareModalOpen(true); };
+  const handleShareClick = () => {
+    if (isSharingScreen) {
+      handleStopSharing();
+    } else {
+      setIsScreenShareModalOpen(true);
+    }
+  };
 
   const onModalConfirm = async (mode: ShareMode) => {
     setIsScreenShareModalOpen(false);
@@ -540,7 +546,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
                     {remotes.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
-                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
+                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
                         </div>
                     ))}
                 </div>
