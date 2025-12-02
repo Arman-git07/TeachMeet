@@ -4,10 +4,6 @@ import { initializeAuth, browserLocalPersistence, getAuth } from 'firebase/auth'
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFirestore, Firestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
-import { errorEmitter } from '@/firebase/error-emitter'; // Emitter for centralized error handling
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors'; // Error types
-import { onSnapshot, doc, setDoc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
-
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -32,16 +28,15 @@ if (
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize services
-// Explicitly set browserLocalPersistence to ensure "remember me" functionality
-const auth = initializeAuth(app, {
+// 🔥 FINAL FIX — AUTH INITIALIZED ONLY ONCE WITH FULL PERSISTENCE
+// This single instance is exported and used throughout the app.
+export const auth = initializeAuth(app, {
   persistence: browserLocalPersistence,
 });
 
 const db = getFirestore(app);
 
 // Enable offline persistence for Firestore.
-// This must be done after getting the Firestore instance.
 if (typeof window !== 'undefined') {
   try {
     enableIndexedDbPersistence(db)
@@ -70,5 +65,4 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     }
 }
 
-
-export { app, auth, storage, db, messaging };
+export { app, storage, db, messaging };
