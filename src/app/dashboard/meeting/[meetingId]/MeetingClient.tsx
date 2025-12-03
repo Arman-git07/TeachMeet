@@ -65,7 +65,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [camOn, setCamOn] = useState(initialCamOn);
   const [micOn, setMicOn] = useState(initialMicOn);
   
-  // FIX: Defer reading from localStorage until component mounts on the client
+  // Defer reading from localStorage until component mounts on the client
   useEffect(() => {
     const savedCamState = localStorage.getItem('teachmeet-cam-state');
     if (savedCamState !== null) {
@@ -117,7 +117,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   const rtc = useMemo(() => {
     if (!userId || !meetingId) return null;
-    return new MeshRTC({
+    const mesh = new MeshRTC({
       roomId: meetingId,
       userId,
       onRemoteStream: (remoteSocketId, stream) => {
@@ -136,6 +136,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setPinnedId(prev => prev === socketId ? null : prev);
       },
     });
+    return mesh;
   }, [meetingId, userId]);
 
   const screenShareHelper = useMemo(() => {
@@ -202,8 +203,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        stream.getVideoTracks().forEach(track => { track.enabled = camOn; });
-        stream.getAudioTracks().forEach(track => { track.enabled = micOn; });
+        stream.getVideoTracks().forEach(track => { track.enabled = initialCamOn; });
+        stream.getAudioTracks().forEach(track => { track.enabled = initialMicOn; });
         setLocalStream(stream);
       } catch (err) { console.error("Media init error:", err); toast({ variant: "destructive", title: "Media Error" }); } 
       finally { if (mounted) setLoadingMedia(false); }
@@ -218,7 +219,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       remoteAnalysersRef.current.clear();
       screenShareHelper?.stopSharing();
     };
-  }, [toast, screenShareHelper, camOn, micOn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast, screenShareHelper]);
 
   const previousRaisedHands = useRef<Set<string>>(new Set());
   const firstParticipantsSnapshot = useRef(true);
@@ -266,7 +268,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       setLiveParticipants(newParticipants);
     });
     return () => unsubscribe();
-  }, [meetingId, userId, camOn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetingId, userId]);
 
   useEffect(() => { if (localStream && rtc) { rtc.init(localStream); } return () => rtc?.leave(); }, [rtc, localStream]);
 
@@ -388,7 +391,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://placehold.co/128x128.png?text=${(data.name || 'G').charAt(0)}`,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: !data.isCameraOn,
-          isMicOn: !data.isMicOn,
+          isMicOff: !data.isMicOn,
           stream: remoteStream, volumeLevel: volumeLevels.get(id) ?? 0,
         };
       });
