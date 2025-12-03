@@ -1,4 +1,6 @@
 
+'use server';
+
 import {genkit, type Genkit} from 'genkit';
 import {googleAI as genkitGoogleAI} from '@genkit-ai/googleai';
 
@@ -40,15 +42,9 @@ if (!apiKeyFound) {
 // Create an instance of the Google AI plugin.
 export const googleAI = genkitGoogleAI;
 
-let aiInstance: Genkit;
+// Create a single, global instance of the Genkit AI object.
+// This is the correct approach to avoid re-initialization issues.
+export const ai: Genkit = genkit({
+    plugins: [googleAI()],
+});
 
-function getAiInstance() {
-    if (!aiInstance) {
-        aiInstance = genkit({
-            plugins: [googleAI()],
-        });
-    }
-    return aiInstance;
-}
-
-export { getAiInstance as ai };

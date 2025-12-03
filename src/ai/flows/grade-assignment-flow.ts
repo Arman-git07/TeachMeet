@@ -32,14 +32,14 @@ const GradeAssignmentOutputSchema = z.object({
 export type GradeAssignmentOutput = z.infer<typeof GradeAssignmentOutputSchema>;
 
 
-const gradeAssignmentFlow = ai().defineFlow(
+const gradeAssignmentFlow = ai.defineFlow(
   {
     name: 'gradeAssignmentFlow',
     inputSchema: GradeAssignmentInputSchema,
     outputSchema: GradeAssignmentOutputSchema,
   },
   async input => {
-    const prompt = ai().definePrompt({
+    const prompt = ai.definePrompt({
       name: 'gradeAssignmentPrompt',
       inputSchema: GradeAssignmentInputSchema,
       outputSchema: GradeAssignmentOutputSchema,

@@ -26,14 +26,14 @@ const RecognizeShapeOutputSchema = z.object({
 });
 export type RecognizeShapeOutput = z.infer<typeof RecognizeShapeOutputSchema>;
 
-const recognizeShapeFlow = ai().defineFlow(
+const recognizeShapeFlow = ai.defineFlow(
   {
     name: 'recognizeShapeFlow',
     inputSchema: RecognizeShapeInputSchema,
     outputSchema: RecognizeShapeOutputSchema,
   },
   async (input) => {
-    const { media } = await ai().generate({
+    const { media } = await ai.generate({
       model: 'googleai/gemini-pro-vision',
       prompt: [
         { media: { url: input.drawingDataUri } },
