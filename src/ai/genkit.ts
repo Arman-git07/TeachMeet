@@ -47,4 +47,3 @@ export const googleAI = genkitGoogleAI;
 export const ai: Genkit = genkit({
     plugins: [googleAI()],
 });
-
