@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
 
 const GradeAssignmentInputSchema = z.object({
   teacherAssignmentDataUri: z
@@ -41,8 +41,8 @@ const gradeAssignmentFlow = ai().defineFlow(
   async input => {
     const prompt = ai().definePrompt({
       name: 'gradeAssignmentPrompt',
-      input: { schema: GradeAssignmentInputSchema },
-      output: { schema: GradeAssignmentOutputSchema },
+      inputSchema: GradeAssignmentInputSchema,
+      outputSchema: GradeAssignmentOutputSchema,
       prompt: `You are an expert teaching assistant responsible for grading student assignments.
 
 Your task is to analyze the student's submission by comparing it against the teacher's provided assignment or answer key.

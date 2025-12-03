@@ -38,14 +38,14 @@ if (!apiKeyFound) {
 }
 
 // Create an instance of the Google AI plugin.
-export const googleAI = genkitGoogleAI();
+export const googleAI = genkitGoogleAI;
 
 let aiInstance: Genkit;
 
 function getAiInstance() {
     if (!aiInstance) {
         aiInstance = genkit({
-            plugins: [googleAI],
+            plugins: [googleAI()],
         });
     }
     return aiInstance;
