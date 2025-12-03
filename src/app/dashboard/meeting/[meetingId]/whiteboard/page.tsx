@@ -71,7 +71,7 @@ type OperationState =
   | { type: 'idle' }
   | { type: 'drawing'; currentPath: Point[] }
   | { type: 'shaping'; startPoint: Point, currentPoint: Point }
-  | { type: 'texting'; position: Point }
+  | { type: 'texting'; position: Point; isEditing: boolean } // Added isEditing flag
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
 
@@ -448,35 +448,32 @@ export default function WhiteboardPage() {
 
   const finalizeLiveText = useCallback(() => {
     const opState = operationStateRef.current;
-    if (opState.type !== 'texting') return;
+    if (opState.type !== 'texting' || !opState.isEditing) return;
+
     const textInput = liveTextInputRef.current;
-    if (!textInput || !textInput.value.trim()) {
-      if (textInput) textInput.style.display = 'none';
-      operationStateRef.current = { type: 'idle' };
-      return;
+    if (!textInput) return;
+    
+    if (textInput.value.trim()) {
+        const tempCtx = tempCanvasRef.current!.getContext('2d')!;
+        const font = getFontString();
+        tempCtx.font = font;
+        const lines = textInput.value.split('\n');
+        const textMetrics = lines.map(line => tempCtx.measureText(line));
+        const maxWidth = Math.max(...textMetrics.map(m => m.width));
+        const totalHeight = lines.length * (fontSize * 1.2);
+        
+        const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
+        
+        setPages(currentPages => {
+            const newPages = [...currentPages];
+            const currentPage = newPages[currentPageIndex];
+            const newElements = [...currentPage.elements, newTextElement];
+            const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+            newPages[currentPageIndex] = updatedPage;
+            pushToHistory(currentPageIndex, updatedPage);
+            return newPages;
+        });
     }
-    
-    const tempCtx = tempCanvasRef.current?.getContext('2d');
-    if(!tempCtx) return;
-    
-    const font = getFontString();
-    tempCtx.font = font;
-    const lines = textInput.value.split('\n');
-    const textMetrics = lines.map(line => tempCtx.measureText(line));
-    const maxWidth = Math.max(...textMetrics.map(m => m.width));
-    const totalHeight = lines.length * (fontSize * 1.2);
-    
-    const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
-    
-    setPages(currentPages => {
-        const newPages = [...currentPages];
-        const currentPage = newPages[currentPageIndex];
-        const newElements = [...currentPage.elements, newTextElement];
-        const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
-        newPages[currentPageIndex] = updatedPage;
-        pushToHistory(currentPageIndex, updatedPage);
-        return newPages;
-    });
 
     textInput.value = '';
     textInput.style.display = 'none';
@@ -506,12 +503,17 @@ export default function WhiteboardPage() {
 
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
-    const pos = getPointerPosition(event);
+    
+    // If the text tool is active and we click the text area, do nothing.
+    if (activeTool === 'text' && event.target === liveTextInputRef.current) {
+        return;
+    }
 
     finalizeLiveText();
     setIsDrawPanelVisible(false);
     setIsTextPanelVisible(false);
 
+    const pos = getPointerPosition(event);
     const currentPage = pages[currentPageIndex];
 
     if (activeTool === 'select' || activeTool === 'lasso') {
@@ -581,17 +583,19 @@ export default function WhiteboardPage() {
             operationStateRef.current = { type: 'shaping', startPoint: pos, currentPoint: pos };
             break;
         case 'text':
-            operationStateRef.current = { type: 'texting', position: pos };
+            operationStateRef.current = { type: 'texting', position: pos, isEditing: true };
             if (liveTextInputRef.current) {
-                liveTextInputRef.current.style.top = `${pos.y}px`;
-                liveTextInputRef.current.style.left = `${pos.x}px`;
-                liveTextInputRef.current.style.display = 'block';
-                liveTextInputRef.current.style.color = selectedColor;
-                liveTextInputRef.current.style.font = getFontString();
-                liveTextInputRef.current.style.lineHeight = `${fontSize * 1.2}px`;
-                liveTextInputRef.current.style.height = 'auto';
-                liveTextInputRef.current.style.width = 'auto';
-                liveTextInputRef.current.focus();
+                const input = liveTextInputRef.current;
+                input.style.top = `${pos.y}px`;
+                input.style.left = `${pos.x}px`;
+                input.style.display = 'block';
+                input.style.color = selectedColor;
+                input.style.font = getFontString();
+                input.style.lineHeight = `${fontSize * 1.2}px`;
+                input.style.height = 'auto'; // Reset height
+                input.style.width = 'auto'; // Reset width
+                input.style.minWidth = '50px';
+                setTimeout(() => input.focus(), 0);
             }
             break;
         case 'erase':
@@ -636,6 +640,11 @@ export default function WhiteboardPage() {
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
     
+    // Don't finalize text on pointer up, only on blur (handled by finalizeLiveText)
+    if (opState.type === 'texting' && opState.isEditing) {
+        return;
+    }
+
     if (opState.type === 'drawing' && opState.currentPath.length > 1) {
         const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
         setPages(currentPages => {
