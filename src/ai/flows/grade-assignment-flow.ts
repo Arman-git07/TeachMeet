@@ -31,19 +31,11 @@ const GradeAssignmentOutputSchema = z.object({
 });
 export type GradeAssignmentOutput = z.infer<typeof GradeAssignmentOutputSchema>;
 
-
-const gradeAssignmentFlow = ai.defineFlow(
-  {
-    name: 'gradeAssignmentFlow',
-    inputSchema: GradeAssignmentInputSchema,
-    outputSchema: GradeAssignmentOutputSchema,
-  },
-  async input => {
-    const prompt = ai.definePrompt({
-      name: 'gradeAssignmentPrompt',
-      inputSchema: GradeAssignmentInputSchema,
-      outputSchema: GradeAssignmentOutputSchema,
-      prompt: `You are an expert teaching assistant responsible for grading student assignments.
+const gradeAssignmentPrompt = ai.definePrompt({
+  name: 'gradeAssignmentPrompt',
+  inputSchema: GradeAssignmentInputSchema,
+  outputSchema: GradeAssignmentOutputSchema,
+  prompt: `You are an expert teaching assistant responsible for grading student assignments.
 
 Your task is to analyze the student's submission by comparing it against the teacher's provided assignment or answer key.
 
@@ -57,7 +49,15 @@ Teacher's Assignment/Key:
 Student's Submission:
 {{media url=studentSubmissionDataUri}}`,
 });
-    const response = await prompt(input);
+
+const gradeAssignmentFlow = ai.defineFlow(
+  {
+    name: 'gradeAssignmentFlow',
+    inputSchema: GradeAssignmentInputSchema,
+    outputSchema: GradeAssignmentOutputSchema,
+  },
+  async input => {
+    const response = await gradeAssignmentPrompt(input);
     return response.output!;
   }
 );

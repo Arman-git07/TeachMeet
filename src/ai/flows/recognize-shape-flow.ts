@@ -26,34 +26,23 @@ const RecognizeShapeOutputSchema = z.object({
 });
 export type RecognizeShapeOutput = z.infer<typeof RecognizeShapeOutputSchema>;
 
-const recognizeShapeFlow = ai.defineFlow(
-  {
-    name: 'recognizeShapeFlow',
-    inputSchema: RecognizeShapeInputSchema,
-    outputSchema: RecognizeShapeOutputSchema,
-  },
-  async (input) => {
-    const { media } = await ai.generate({
-      model: 'googleai/gemini-pro-vision',
-      prompt: [
-        { media: { url: input.drawingDataUri } },
-        { text: `You are a graphic design assistant. Your task is to transform a user's rough drawing into a professional, clean, and high-quality graphic. The output MUST be a black line drawing on a fully transparent PNG background. It should look like a polished vector icon with smooth, clean lines. Do not add color, shading, or background fill. Use the user's optional hint to improve accuracy. User hint: "${input.prompt || 'No hint provided.'}" The user's drawing is provided as an image input.` },
-      ],
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'],
-      },
-    });
-
-    if (!media || !media.url) {
-      throw new Error('Image generation failed to produce an output.');
-    }
-    
-    return {
-      refinedImageUri: media.url,
-    };
-  }
-);
-
 export async function recognizeShape(input: RecognizeShapeInput): Promise<RecognizeShapeOutput> {
-  return recognizeShapeFlow(input);
+  const { media } = await ai.generate({
+    model: 'googleai/gemini-pro-vision',
+    prompt: [
+      { media: { url: input.drawingDataUri } },
+      { text: `You are a graphic design assistant. Your task is to transform a user's rough drawing into a professional, clean, and high-quality graphic. The output MUST be a black line drawing on a fully transparent PNG background. It should look like a polished vector icon with smooth, clean lines. Do not add color, shading, or background fill. Use the user's optional hint to improve accuracy. User hint: "${input.prompt || 'No hint provided.'}" The user's drawing is provided as an image input.` },
+    ],
+    config: {
+      responseModalities: ['TEXT', 'IMAGE'],
+    },
+  });
+
+  if (!media || !media.url) {
+    throw new Error('Image generation failed to produce an output.');
+  }
+  
+  return {
+    refinedImageUri: media.url,
+  };
 }
