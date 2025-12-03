@@ -48,6 +48,7 @@ import jsPDF from 'jspdf';
 import { auth, storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { io, Socket } from "socket.io-client";
 
 
 // --- Type Definitions ---
@@ -169,6 +170,8 @@ export default function WhiteboardPage() {
   const meetingId = params.meetingId as string;
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { toast } = useToast();
+  
+  const socketRef = useRef<Socket | null>(null);
 
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const tempCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1125,6 +1128,36 @@ export default function WhiteboardPage() {
     pagesHistoryRef.current = [[newInitialPage]];
     pagesHistoryStepRef.current = [0];
 
+    // --- Socket.IO Connection ---
+    if (meetingId) {
+      const whiteboardRoomId = `whiteboard-${meetingId}`;
+      const socket = io({
+        path: "/api/socketio",
+      });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('[Whiteboard] Connected to socket server with ID:', socket.id);
+        socket.emit('join-room', whiteboardRoomId, socket.id);
+        toast({ title: "Whiteboard Connected", description: "Real-time collaboration is now active." });
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('[Whiteboard] Socket connection error:', err.message);
+        toast({ variant: 'destructive', title: "Connection Error", description: "Could not connect to the real-time whiteboard service." });
+      });
+
+      // TODO: Add listeners for drawing events from other users
+      // e.g., socket.on('draw-event', (data) => { ... });
+
+      return () => {
+        console.log('[Whiteboard] Disconnecting socket...');
+        socket.disconnect();
+      };
+    }
+  }, [meetingId, toast]);
+
+  useEffect(() => {
     setHeaderContent(
         <div className="flex items-center gap-3">
           <Brush className="h-7 w-7 text-primary" />
