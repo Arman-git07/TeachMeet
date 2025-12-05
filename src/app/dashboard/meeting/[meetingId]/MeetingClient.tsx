@@ -475,8 +475,36 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       const otherTiles = allParticipants.filter(p => p.id !== screenSharingParticipant.id);
       return (
         <div className="w-full h-full flex flex-col md:flex-row gap-2">
-          <div className="flex-1 min-h-0"><div className="w-full h-full relative"><VideoTile stream={screenSharingParticipant.stream} isCameraOn={!screenSharingParticipant.isCamOff} isMicOn={!screenSharingParticipant.isMicOff} name={screenSharingParticipant.name + "'s Screen" || 'Screen Share'} isScreenSharing={true} onDoubleClick={() => togglePin(screenSharingParticipant.id)} className="w-full h-full" onStopShare={isSharingScreen && screenSharingParticipant.id === userId ? handleStopSharing : undefined} isPinned={screenSharingParticipant.id === pinnedId} /></div></div>
-          {otherTiles.length > 0 && (<div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">{otherTiles.map(p => (<div key={p.id} className="aspect-[9/16] md:h-32 md:aspect-auto"><VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/></div>))}</div>)}
+          <div className="flex-1 min-h-0">
+            <div className="w-full h-full relative">
+                <VideoTile 
+                    stream={screenSharingParticipant.stream} 
+                    isCameraOn={!screenSharingParticipant.isCamOff} 
+                    isMicOn={!screenSharingParticipant.isMicOff} 
+                    name={screenSharingParticipant.name + "'s Screen"}
+                    isScreenSharing={true}
+                    onDoubleClick={() => togglePin(screenSharingParticipant.id)} 
+                    className="w-full h-full"
+                    onStopShare={isSharingScreen && screenSharingParticipant.id === userId ? handleStopSharing : undefined}
+                    isPinned={screenSharingParticipant.id === pinnedId}
+                />
+            </div>
+          </div>
+          {otherTiles.length > 0 && (
+            <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
+              {otherTiles.map(p => (
+                <div key={p.id} className="aspect-[9/16] md:h-32 md:aspect-auto">
+                  <VideoTile
+                    stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                    isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} 
+                    volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} 
+                    isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)}
+                    onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }

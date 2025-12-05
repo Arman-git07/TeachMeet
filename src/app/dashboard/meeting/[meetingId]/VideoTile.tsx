@@ -127,12 +127,12 @@ const VideoTile: React.FC<Props> = ({
           muted={isLocal}
           className={cn(
             "w-full h-full object-cover transition-opacity duration-200 rounded-lg z-0",
-            isCameraOn && stream ? "opacity-100" : "opacity-0"
+            (isCameraOn || isScreenSharing) && stream ? "opacity-100" : "opacity-0"
           )}
         />
 
         {/* Avatar fallback */}
-        {(!isCameraOn || !stream) && (
+        {(!isCameraOn && !isScreenSharing || !stream) && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <Avatar className={cn(
                 "w-28 h-28 border-4 border-background shadow-lg transition-all duration-300",
