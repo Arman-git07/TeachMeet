@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth";
@@ -66,11 +66,48 @@ export default function MeetingPage() {
 
   const constructUrl = (page: string) => {
     let url = `/dashboard/meeting/${meetingId}/${page}`;
-    if (topic) {
-        url += `?topic=${encodeURIComponent(topic || '')}`;
+    const topicParam = topic || '';
+    if (topicParam) {
+        url += `?topic=${encodeURIComponent(topicParam)}`;
     }
     return url;
   };
+
+  const memoizedMeetingActions = useCallback(() => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="rounded-full">
+          <MoreVertical className="h-5 w-5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="rounded-xl w-56">
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href={constructUrl('whiteboard')}>
+            <Brush className="mr-2 h-4 w-4" />
+            <span>Whiteboard</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer">
+           <Link href={constructUrl('chat')}>
+            <MessageSquare className="mr-2 h-4 w-4" />
+            <span>Chat</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer">
+           <Link href={constructUrl('participants')}>
+            <Users className="mr-2 h-4 w-4" />
+            <span>Participants</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`}>
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Meeting Settings</span>
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ), [meetingId, topic]);
   
   useEffect(() => {
     setHeaderContent(
@@ -81,49 +118,13 @@ export default function MeetingPage() {
       </div>
     );
     
-    const MeetingActions = () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <MoreVertical className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="rounded-xl w-56">
-          <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href={constructUrl('whiteboard')}>
-              <Brush className="mr-2 h-4 w-4" />
-              <span>Whiteboard</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild className="cursor-pointer">
-             <Link href={constructUrl('chat')}>
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span>Chat</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild className="cursor-pointer">
-             <Link href={constructUrl('participants')}>
-              <Users className="mr-2 h-4 w-4" />
-              <span>Participants</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Meeting Settings</span>
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-
-    setHeaderAction(<MeetingActions />);
+    setHeaderAction(memoizedMeetingActions());
 
     return () => {
       setHeaderContent(null);
       setHeaderAction(null);
     };
-  }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId]);
+  }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId, memoizedMeetingActions]);
 
   const handleLeave = async () => {
     if (user && meetingId) {
