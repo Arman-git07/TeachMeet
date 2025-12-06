@@ -1233,47 +1233,51 @@ export default function WhiteboardPage() {
 
 
   useEffect(() => {
-    setHeaderContent(
-        <div className="flex items-center gap-3">
-          <Brush className="h-7 w-7 text-primary" />
-          <h1 className="text-xl font-semibold truncate">Whiteboard</h1>
-        </div>
-    );
-    setHeaderAction(
-        <div className="flex items-center gap-2">
-            {meetingId && (
-              <Button asChild variant="outline" size="sm" className="rounded-lg">
-                <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <MoreVertical className="h-5 w-5" />
+    const renderHeader = () => {
+      setHeaderContent(
+          <div className="flex items-center gap-3">
+            <Brush className="h-7 w-7 text-primary" />
+            <h1 className="text-xl font-semibold truncate">Whiteboard</h1>
+          </div>
+      );
+      setHeaderAction(
+          <div className="flex items-center gap-2">
+              {meetingId && (
+                <Button asChild variant="outline" size="sm" className="rounded-lg">
+                  <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Link>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-xl">
-                <DropdownMenuItem
-                    onSelect={() => setIsScreenshotDialogOpen(true)}
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-xl">
+                  <DropdownMenuItem
+                      onSelect={() => setIsScreenshotDialogOpen(true)}
+                      className="cursor-pointer"
+                    >
+                      <Camera className="mr-2 h-4 w-4" />
+                      <span>Screenshot</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)}
                     className="cursor-pointer"
                   >
-                    <Camera className="mr-2 h-4 w-4" />
-                    <span>Screenshot</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)}
-                  className="cursor-pointer"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Whiteboard Settings</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
-    );
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Whiteboard Settings</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+          </div>
+      );
+    };
+
+    renderHeader();
 
     return () => {
         setHeaderContent(null);
