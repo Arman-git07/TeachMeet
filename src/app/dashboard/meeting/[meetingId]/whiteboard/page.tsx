@@ -509,7 +509,10 @@ export default function WhiteboardPage() {
         return;
     }
 
-    finalizeLiveText();
+    if (operationStateRef.current.type === 'texting' && operationStateRef.current.isEditing) {
+      finalizeLiveText();
+    }
+    
     setIsDrawPanelVisible(false);
     setIsTextPanelVisible(false);
 
@@ -578,6 +581,7 @@ export default function WhiteboardPage() {
     switch(activeTool) {
         case 'draw':
             operationStateRef.current = { type: 'drawing', currentPath: [pos] };
+            socketRef.current?.emit('draw', { type: 'start', point: pos, tool: activeTool, color: selectedColor, lineWidth });
             break;
         case 'shape':
             operationStateRef.current = { type: 'shaping', startPoint: pos, currentPoint: pos };
@@ -611,6 +615,7 @@ export default function WhiteboardPage() {
     if (opState.type === 'drawing') {
         opState.currentPath.push(pos);
         redrawTempCanvas();
+        socketRef.current?.emit('draw', { type: 'move', point: pos });
     } else if (opState.type === 'shaping') {
         opState.currentPoint = pos;
         redrawTempCanvas();
@@ -640,12 +645,8 @@ export default function WhiteboardPage() {
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
     
-    // Don't finalize text on pointer up, only on blur (handled by finalizeLiveText)
-    if (opState.type === 'texting' && opState.isEditing) {
-        return;
-    }
-
     if (opState.type === 'drawing' && opState.currentPath.length > 1) {
+        socketRef.current?.emit('draw', { type: 'end' });
         const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
         setPages(currentPages => {
             const newPages = [...currentPages];
@@ -1146,7 +1147,6 @@ export default function WhiteboardPage() {
       socketRef.current = socket;
 
       socket.on('connect', () => {
-        console.log('[Whiteboard] Connected to socket server with ID:', socket.id);
         socket.emit('join-room', whiteboardRoomId, socket.id);
         toast({ title: "Whiteboard Connected", description: "Real-time collaboration is now active." });
       });
@@ -1155,16 +1155,33 @@ export default function WhiteboardPage() {
         console.error('[Whiteboard] Socket connection error:', err.message);
         toast({ variant: 'destructive', title: "Connection Error", description: "Could not connect to the real-time whiteboard service." });
       });
+      
+      socket.on('draw-event', (data) => {
+        const tempCtx = tempCanvasRef.current?.getContext('2d');
+        if (!tempCtx) return;
 
-      // TODO: Add listeners for drawing events from other users
-      // e.g., socket.on('draw-event', (data) => { ... });
+        if (data.type === 'start') {
+            tempCtx.strokeStyle = data.color;
+            tempCtx.lineWidth = data.lineWidth;
+            tempCtx.beginPath();
+            tempCtx.moveTo(data.point.x, data.point.y);
+        } else if (data.type === 'move') {
+            tempCtx.lineTo(data.point.x, data.point.y);
+            tempCtx.stroke();
+        } else if (data.type === 'end') {
+            tempCtx.closePath();
+            // Redraw main canvas to persist the drawing from other users
+            redrawMainCanvas();
+        }
+      });
+
 
       return () => {
         console.log('[Whiteboard] Disconnecting socket...');
         socket.disconnect();
       };
     }
-  }, [meetingId, toast]);
+  }, [meetingId, toast, redrawMainCanvas]);
 
   useEffect(() => {
     setHeaderContent(

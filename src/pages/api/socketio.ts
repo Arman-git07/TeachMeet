@@ -3,12 +3,6 @@ import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer } from "socket.io";
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 const rooms = new Map<string, Set<string>>(); // roomId -> Set of userIds
 
 export default function handler(
@@ -43,6 +37,14 @@ export default function handler(
         // Notify all others in the room
         socket.to(roomId).emit("user-joined", userId);
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
+      });
+      
+      socket.on('draw', (data) => {
+        // @ts-ignore
+        const { roomId } = socket.data || {};
+        if (roomId) {
+          socket.to(roomId).emit('draw-event', data);
+        }
       });
 
       socket.on("offer", (remoteId: string, offer: any) => {
