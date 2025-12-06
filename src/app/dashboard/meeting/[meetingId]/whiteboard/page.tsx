@@ -24,7 +24,7 @@ import {
   DialogTitle as ShadDialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -47,8 +47,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import jsPDF from 'jspdf';
 import { auth, storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { io, Socket } from "socket.io-client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 
 
 // --- Type Definitions ---
@@ -74,6 +76,13 @@ type OperationState =
   | { type: 'texting'; position: Point; isEditing: boolean } // Added isEditing flag
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
+
+interface Participant {
+  id: string;
+  name: string;
+  photoURL?: string;
+  isHost?: boolean;
+}
 
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
@@ -205,6 +214,12 @@ export default function WhiteboardPage() {
 
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
+
+  const [isCollaborateDialogOpen, setIsCollaborateDialogOpen] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
+  const [canIDraw, setCanIDraw] = useState(false);
+  const isHost = useRef(false);
 
 
   useEffect(() => {
@@ -508,6 +523,14 @@ export default function WhiteboardPage() {
     if (activeTool === 'text' && event.target === liveTextInputRef.current) {
         return;
     }
+    
+    if (!canIDraw) {
+        if (activeTool !== 'select' && activeTool !== 'lasso') {
+            toast({ variant: 'destructive', title: "Permission Denied", description: "You do not have permission to draw on the whiteboard." });
+            return;
+        }
+    }
+
 
     if (operationStateRef.current.type === 'texting' && operationStateRef.current.isEditing) {
       finalizeLiveText();
@@ -605,7 +628,7 @@ export default function WhiteboardPage() {
         case 'erase':
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily]);
+  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily, canIDraw, toast]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
@@ -730,7 +753,7 @@ export default function WhiteboardPage() {
         setTempDragPreview([]);
     }
     
-    if (activeTool === 'erase' && opState.type === 'idle') {
+    if (activeTool === 'erase' && opState.type === 'idle' && canIDraw) {
          let elementToDeleteId: string | null = null;
          const pos = getPointerPosition(event);
          const currentPageElements = pages[currentPageIndex].elements;
@@ -771,7 +794,7 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
 
-  }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
+  }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape, canIDraw]);
 
   const handleClearPage = () => { 
     const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
@@ -896,7 +919,7 @@ export default function WhiteboardPage() {
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
-      toast({ id: recognitionToastId, variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
       setRefinePrompt(''); // Also clear prompt on error
       return;
     }
@@ -960,16 +983,15 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        toast({ id: recognitionToastId, title: "Shape Refined!", description: "Your drawing has been transformed." });
+        toast.update(recognitionToastId, { title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
-        toast({ id: recognitionToastId, variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        toast.update(recognitionToastId, { variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
-      toast({
-        id: recognitionToastId,
+      toast.update(recognitionToastId, {
         variant: "destructive",
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
@@ -1034,11 +1056,11 @@ export default function WhiteboardPage() {
           createdAt: serverTimestamp(),
       });
       
-      toast({ id: toastId, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+      toast.update(toastId, { title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
 
     } catch (error) {
       console.error("Failed to save screenshot:", error);
-      toast({ id: toastId, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      toast.update(toastId, { variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
     } finally {
       setIsProcessing(false);
     }
@@ -1061,7 +1083,7 @@ export default function WhiteboardPage() {
     const offscreenCanvas = document.createElement('canvas');
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) {
-        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
+        toast.update(exportToastId, { variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
         setIsProcessing(false);
         return;
     }
@@ -1070,7 +1092,7 @@ export default function WhiteboardPage() {
     offscreenCanvas.height = mainCanvas.height;
     const offscreenCtx = offscreenCanvas.getContext('2d');
     if (!offscreenCtx) {
-        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
+        toast.update(exportToastId, { variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
         setIsProcessing(false);
         return;
     }
@@ -1083,7 +1105,7 @@ export default function WhiteboardPage() {
 
     try {
         for (let i = 0; i < pages.length; i++) {
-            toast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            toast.update(exportToastId, { title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
@@ -1121,16 +1143,15 @@ export default function WhiteboardPage() {
             createdAt: serverTimestamp(),
         });
 
-        toast({ id: exportToastId, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
+        toast.update(exportToastId, { title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
         
     } catch (error) {
         console.error("PDF Export or Upload Failed:", error);
-        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+        toast.update(exportToastId, { variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
         setIsProcessing(false);
     }
 };
-
 
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
@@ -1157,21 +1178,23 @@ export default function WhiteboardPage() {
       });
       
       socket.on('draw-event', (data) => {
-        const tempCtx = tempCanvasRef.current?.getContext('2d');
-        if (!tempCtx) return;
+        // This is where incoming draw events from others are handled.
+        // For now, we are just logging it. In a full implementation, you'd draw this on the canvas.
+        console.log('Received draw event:', data);
+      });
+      
+      socket.on('initial-state', ({ elements, permissions, hostId: receivedHostId }) => {
+        // Handle initial state from server
+        console.log('Received initial state');
+        isHost.current = auth.currentUser?.uid === receivedHostId;
+        setCanIDraw(isHost.current);
+        setDrawingPermissions(permissions || {});
+      });
 
-        if (data.type === 'start') {
-            tempCtx.strokeStyle = data.color;
-            tempCtx.lineWidth = data.lineWidth;
-            tempCtx.beginPath();
-            tempCtx.moveTo(data.point.x, data.point.y);
-        } else if (data.type === 'move') {
-            tempCtx.lineTo(data.point.x, data.point.y);
-            tempCtx.stroke();
-        } else if (data.type === 'end') {
-            tempCtx.closePath();
-            // Redraw main canvas to persist the drawing from other users
-            redrawMainCanvas();
+      socket.on('permission-update', (newPermissions) => {
+        setDrawingPermissions(newPermissions);
+        if (auth.currentUser) {
+          setCanIDraw(isHost.current || newPermissions[auth.currentUser.uid]);
         }
       });
 
@@ -1182,6 +1205,32 @@ export default function WhiteboardPage() {
       };
     }
   }, [meetingId, toast, redrawMainCanvas]);
+  
+  // Fetch participants
+  useEffect(() => {
+    if (!meetingId) return;
+    const unsub = onSnapshot(collection(db, "meetings", meetingId, "participants"), (snapshot) => {
+      const fetchedParticipants: Participant[] = [];
+      snapshot.forEach((doc) => {
+        fetchedParticipants.push({ id: doc.id, ...doc.data() } as Participant);
+      });
+      setParticipants(fetchedParticipants);
+
+      const currentUserId = auth.currentUser?.uid;
+      const host = fetchedParticipants.find(p => p.isHost);
+      if (currentUserId === host?.id) {
+          isHost.current = true;
+          setCanIDraw(true);
+      }
+    });
+
+    return () => unsub();
+  }, [meetingId]);
+
+  const handlePermissionChange = (participantId: string, canDraw: boolean) => {
+    socketRef.current?.emit('set-permission', { participantId, canDraw });
+  };
+
 
   useEffect(() => {
     setHeaderContent(
@@ -1392,6 +1441,36 @@ export default function WhiteboardPage() {
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
              
+             {isHost.current && (
+                <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
+                    <DialogTrigger asChild>
+                        <ToolButton icon={Users} label="Collaborate" />
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <ShadDialogTitle>Manage Collaboration</ShadDialogTitle>
+                            <DialogDescription>Allow other participants to draw on the whiteboard.</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="max-h-64 my-4">
+                            <div className="space-y-3 pr-4">
+                                {participants.filter(p => !p.isHost).map(p => (
+                                    <div key={p.id} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} /><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
+                                            <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
+                                        </div>
+                                        <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                        <DialogFooter>
+                            <DialogClose asChild><Button>Done</Button></DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+
              <Popover open={isPagesPopoverOpen} onOpenChange={setIsPagesPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label={`Pages (${currentPageIndex + 1}/${pages.length})`}>
@@ -1446,10 +1525,7 @@ export default function WhiteboardPage() {
 
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear Page">
-                        <Trash2 className="h-5 w-5 mb-0.5" />
-                        <span className="text-[10px] leading-tight">Clear</span>
-                    </Button>
+                    <ToolButton icon={Trash2} label="Clear" />
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Clear this page?</AlertDialogTitle><AlertDialogDescription>This will clear the current page. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearPage} className="rounded-lg">Clear Page</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
              </AlertDialog>
@@ -1459,7 +1535,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow flex items-center justify-center relative p-0">
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1, backgroundColor: bgColor }} />
                 <canvas 
                     ref={tempCanvasRef} 
                     onPointerDown={handlePointerDown} 

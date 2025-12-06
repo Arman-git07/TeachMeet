@@ -3,7 +3,13 @@ import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer } from "socket.io";
 
-const rooms = new Map<string, Set<string>>(); // roomId -> Set of userIds
+// Store room state in memory
+interface RoomState {
+  hostId: string | null;
+  permissions: Record<string, boolean>; // userId -> canDraw
+  elements: any[]; // Store whiteboard elements
+}
+const rooms = new Map<string, RoomState>();
 
 export default function handler(
   req: NextApiRequest,
@@ -30,28 +36,49 @@ export default function handler(
         socket.data = { roomId, userId };
 
         if (!rooms.has(roomId)) {
-          rooms.set(roomId, new Set());
+          rooms.set(roomId, {
+            hostId: userId, // First user to join is host
+            permissions: { [userId]: true },
+            elements: [],
+          });
+          console.log(`Room ${roomId} created. Host is ${userId}`);
         }
-        rooms.get(roomId)!.add(userId);
+        
+        const roomState = rooms.get(roomId)!;
+        socket.emit('initial-state', roomState);
 
-        // Notify all others in the room
         socket.to(roomId).emit("user-joined", userId);
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
       socket.on('draw', (data) => {
         // @ts-ignore
-        const { roomId } = socket.data || {};
-        if (roomId) {
-          socket.to(roomId).emit('draw-event', data);
+        const { roomId, userId } = socket.data || {};
+        if (roomId && userId) {
+            const roomState = rooms.get(roomId);
+            if (roomState && roomState.permissions[userId]) {
+                socket.to(roomId).emit('draw-event', data);
+            }
         }
       });
+      
+      socket.on('set-permission', ({ participantId, canDraw }) => {
+        // @ts-ignore
+        const { roomId, userId } = socket.data || {};
+        if (roomId && userId) {
+          const roomState = rooms.get(roomId);
+          if (roomState && roomState.hostId === userId) { // Only host can set permissions
+            roomState.permissions[participantId] = canDraw;
+            io.to(roomId).emit('permission-update', roomState.permissions);
+          }
+        }
+      });
+
 
       socket.on("offer", (remoteId: string, offer: any) => {
         // @ts-ignore
         const { userId } = socket.data || {};
         if (!userId) return;
-        // Forward offer to the specific user (remoteId) from the sender (userId)
         io.to(remoteId).emit("offer", userId, offer);
       });
       
@@ -72,9 +99,22 @@ export default function handler(
       socket.on("disconnect", () => {
         // @ts-ignore
         const { roomId, userId } = socket.data || {};
-        if (roomId && userId && rooms.has(roomId)) {
-          rooms.get(roomId)!.delete(userId);
+        if (roomId && userId) {
           socket.to(roomId).emit("user-left", userId);
+          const roomState = rooms.get(roomId);
+          if (roomState) {
+            delete roomState.permissions[userId];
+            // If host leaves, a new host could be elected, but for now we just remove them
+            if (roomState.hostId === userId) {
+                // Simple logic: make the next person host, or clear if empty
+                const otherUsers = Object.keys(roomState.permissions).filter(id => id !== userId);
+                roomState.hostId = otherUsers[0] || null;
+                if(roomState.hostId) {
+                  roomState.permissions[roomState.hostId] = true;
+                }
+            }
+             io.to(roomId).emit('permission-update', roomState.permissions);
+          }
         }
         console.log("Disconnected:", socket.id);
       });
