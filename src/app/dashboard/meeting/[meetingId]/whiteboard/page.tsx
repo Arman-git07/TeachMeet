@@ -77,13 +77,6 @@ type OperationState =
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
 
-interface Participant {
-  id: string;
-  name: string;
-  photoURL?: string;
-  isHost?: boolean;
-}
-
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
 const ERASER_THRESHOLD = 15;
@@ -215,9 +208,6 @@ export default function WhiteboardPage() {
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
 
-  const [isCollaborateDialogOpen, setIsCollaborateDialogOpen] = useState(false);
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
   const [canIDraw, setCanIDraw] = useState(false);
   const isHost = useRef(false);
 
@@ -1188,11 +1178,9 @@ export default function WhiteboardPage() {
         console.log('Received initial state');
         isHost.current = auth.currentUser?.uid === receivedHostId;
         setCanIDraw(isHost.current);
-        setDrawingPermissions(permissions || {});
       });
 
       socket.on('permission-update', (newPermissions) => {
-        setDrawingPermissions(newPermissions);
         if (auth.currentUser) {
           setCanIDraw(isHost.current || newPermissions[auth.currentUser.uid]);
         }
@@ -1206,84 +1194,50 @@ export default function WhiteboardPage() {
     }
   }, [meetingId, toast, redrawMainCanvas]);
   
-  // Fetch participants
+  const memoizedHeaderAction = useCallback(() => (
+    <div className="flex items-center gap-2">
+      {meetingId && (
+        <Button asChild variant="outline" size="sm" className="rounded-lg">
+          <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Link>
+        </Button>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <MoreVertical className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="rounded-xl">
+          <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
+            <Camera className="mr-2 h-4 w-4" />
+            <span>Screenshot</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Whiteboard Settings</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  ), [meetingId, router, topic]);
+
   useEffect(() => {
-    if (!meetingId) return;
-    const unsub = onSnapshot(collection(db, "meetings", meetingId, "participants"), (snapshot) => {
-      const fetchedParticipants: Participant[] = [];
-      snapshot.forEach((doc) => {
-        fetchedParticipants.push({ id: doc.id, ...doc.data() } as Participant);
-      });
-      setParticipants(fetchedParticipants);
-
-      const currentUserId = auth.currentUser?.uid;
-      const host = fetchedParticipants.find(p => p.isHost);
-      if (currentUserId === host?.id) {
-          isHost.current = true;
-          setCanIDraw(true);
-      }
-    });
-
-    return () => unsub();
-  }, [meetingId]);
-
-  const handlePermissionChange = (participantId: string, canDraw: boolean) => {
-    socketRef.current?.emit('set-permission', { participantId, canDraw });
-  };
-
-
-  useEffect(() => {
-    const renderHeader = () => {
-      setHeaderContent(
-          <div className="flex items-center gap-3">
-            <Brush className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold truncate">Whiteboard</h1>
-          </div>
-      );
-      setHeaderAction(
-          <div className="flex items-center gap-2">
-              {meetingId && (
-                <Button asChild variant="outline" size="sm" className="rounded-lg">
-                  <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
-                  </Link>
-                </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <MoreVertical className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="rounded-xl">
-                  <DropdownMenuItem
-                      onSelect={() => setIsScreenshotDialogOpen(true)}
-                      className="cursor-pointer"
-                    >
-                      <Camera className="mr-2 h-4 w-4" />
-                      <span>Screenshot</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)}
-                    className="cursor-pointer"
-                  >
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Whiteboard Settings</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-          </div>
-      );
-    };
-
-    renderHeader();
+    setHeaderContent(
+        <div className="flex items-center gap-3">
+          <Brush className="h-7 w-7 text-primary" />
+          <h1 className="text-xl font-semibold truncate">Whiteboard</h1>
+        </div>
+    );
+    setHeaderAction(memoizedHeaderAction());
 
     return () => {
         setHeaderContent(null);
         setHeaderAction(null);
     };
-  }, [setHeaderContent, setHeaderAction, meetingId, router, topic]);
+  }, [setHeaderContent, setHeaderAction, memoizedHeaderAction]);
 
 
   return (
@@ -1445,36 +1399,6 @@ export default function WhiteboardPage() {
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
              
-             {isHost.current && (
-                <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
-                    <DialogTrigger asChild>
-                        <ToolButton icon={Users} label="Collaborate" />
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <ShadDialogTitle>Manage Collaboration</ShadDialogTitle>
-                            <DialogDescription>Allow other participants to draw on the whiteboard.</DialogDescription>
-                        </DialogHeader>
-                        <ScrollArea className="max-h-64 my-4">
-                            <div className="space-y-3 pr-4">
-                                {participants.filter(p => !p.isHost).map(p => (
-                                    <div key={p.id} className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} /><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
-                                            <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
-                                        </div>
-                                        <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
-                                    </div>
-                                ))}
-                            </div>
-                        </ScrollArea>
-                        <DialogFooter>
-                            <DialogClose asChild><Button>Done</Button></DialogClose>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
-
              <Popover open={isPagesPopoverOpen} onOpenChange={setIsPagesPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label={`Pages (${currentPageIndex + 1}/${pages.length})`}>
