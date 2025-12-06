@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { io, Socket } from "socket.io";
+import { io, Socket } from "socket.io-client";
 
 
 // --- Type Definitions for this page ---
@@ -47,7 +47,7 @@ export default function MeetingPage() {
   const [isCollaborateDialogOpen, setIsCollaborateDialogOpen] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = React.useRef<Socket | null>(null);
 
   useEffect(() => {
     if (authLoading || !meetingId) return;
@@ -86,6 +86,7 @@ export default function MeetingPage() {
 
   // --- Logic for Collaboration Dialog ---
   useEffect(() => {
+      if (!meetingId || !user?.uid) return;
       const whiteboardRoomId = `whiteboard-${meetingId}`;
       const socket = io({ path: "/api/socketio" });
       socketRef.current = socket;
@@ -196,22 +197,21 @@ export default function MeetingPage() {
     </Dialog>
   ), [meetingId, topic, isHost, isCollaborateDialogOpen, participants, drawingPermissions]);
   
-  useEffect(() => {
-    setHeaderContent(
-      <div onClick={() => setShowHeaderAsId(prev => !prev)} className="cursor-pointer">
-        <span className="text-sm font-medium truncate">
-          {showHeaderAsId ? meetingId.replace('meeting-', '') : topic}
-        </span>
-      </div>
-    );
-    
-    setHeaderAction(memoizedMeetingActions());
+    useEffect(() => {
+        setHeaderContent(
+            <div onClick={() => setShowHeaderAsId(prev => !prev)} className="cursor-pointer">
+                <span className="text-sm font-medium truncate">
+                {showHeaderAsId ? meetingId.replace('meeting-', '') : topic}
+                </span>
+            </div>
+        );
+        setHeaderAction(memoizedMeetingActions());
 
-    return () => {
-      setHeaderContent(null);
-      setHeaderAction(null);
-    };
-  }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId, memoizedMeetingActions]);
+        return () => {
+            setHeaderContent(null);
+            setHeaderAction(null);
+        };
+    }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId, memoizedMeetingActions]);
 
   const handleLeave = async () => {
     if (user && meetingId) {
