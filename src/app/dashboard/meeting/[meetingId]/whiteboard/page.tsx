@@ -24,7 +24,7 @@ import {
   DialogTitle as ShadDialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, Users } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, Users, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -76,6 +76,13 @@ type OperationState =
   | { type: 'texting'; position: Point; isEditing: boolean } // Added isEditing flag
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
+  
+interface Participant {
+  id: string;
+  name: string;
+  photoURL?: string;
+  isHost?: boolean;
+}
 
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
@@ -208,6 +215,9 @@ export default function WhiteboardPage() {
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
 
+  const [isCollaborateDialogOpen, setIsCollaborateDialogOpen] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
   const [canIDraw, setCanIDraw] = useState(false);
   const isHost = useRef(false);
 
@@ -509,7 +519,6 @@ export default function WhiteboardPage() {
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
     
-    // If the text tool is active and we click the text area, do nothing.
     if (activeTool === 'text' && event.target === liveTextInputRef.current) {
         return;
     }
@@ -872,7 +881,6 @@ export default function WhiteboardPage() {
   };
   
   const handleRecognizeShape = async () => {
-    // This will be called by the dialog action, so we close it here.
     setIsRefineDialogOpen(false);
     
     const currentPage = pages[currentPageIndex];
@@ -881,14 +889,14 @@ export default function WhiteboardPage() {
         title: "Nothing to Refine",
         description: "Please select a drawing first using the select tool.",
       });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt('');
       return;
     }
   
     const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
     if (!selectionBox) {
       toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt('');
       return;
     }
   
@@ -910,11 +918,10 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
       toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt('');
       return;
     }
   
-    // Fill with a solid white background, as transparent can be problematic for some models
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, width, height);
   
@@ -987,7 +994,7 @@ export default function WhiteboardPage() {
         description: error instanceof Error ? error.message : "An unknown error occurred.",
       });
     } finally {
-        setRefinePrompt(''); // Reset prompt after use
+        setRefinePrompt('');
     }
   };
 
@@ -1150,7 +1157,7 @@ export default function WhiteboardPage() {
     pagesHistoryStepRef.current = [0];
 
     // --- Socket.IO Connection ---
-    if (meetingId) {
+    if (meetingId && auth.currentUser) {
       const whiteboardRoomId = `whiteboard-${meetingId}`;
       const socket = io({
         path: "/api/socketio",
@@ -1158,7 +1165,7 @@ export default function WhiteboardPage() {
       socketRef.current = socket;
 
       socket.on('connect', () => {
-        socket.emit('join-room', whiteboardRoomId, socket.id);
+        socket.emit('join-room', whiteboardRoomId, auth.currentUser?.uid);
         toast({ title: "Whiteboard Connected", description: "Real-time collaboration is now active." });
       });
 
@@ -1168,31 +1175,41 @@ export default function WhiteboardPage() {
       });
       
       socket.on('draw-event', (data) => {
-        // This is where incoming draw events from others are handled.
-        // For now, we are just logging it. In a full implementation, you'd draw this on the canvas.
         console.log('Received draw event:', data);
       });
       
-      socket.on('initial-state', ({ elements, permissions, hostId: receivedHostId }) => {
-        // Handle initial state from server
-        console.log('Received initial state');
+      socket.on('initial-state', ({ permissions, hostId: receivedHostId }) => {
         isHost.current = auth.currentUser?.uid === receivedHostId;
-        setCanIDraw(isHost.current);
+        setDrawingPermissions(permissions || {});
+        setCanIDraw(isHost.current || permissions[auth.currentUser!.uid]);
       });
 
       socket.on('permission-update', (newPermissions) => {
         if (auth.currentUser) {
+          setDrawingPermissions(newPermissions);
           setCanIDraw(isHost.current || newPermissions[auth.currentUser.uid]);
         }
       });
-
+      
+      const unsubParticipants = onSnapshot(collection(db, "meetings", meetingId, "participants"), (snapshot) => {
+          const fetchedParticipants: Participant[] = [];
+          snapshot.forEach((doc) => {
+              fetchedParticipants.push({ id: doc.id, ...doc.data() } as Participant);
+          });
+          setParticipants(fetchedParticipants);
+      });
 
       return () => {
         console.log('[Whiteboard] Disconnecting socket...');
         socket.disconnect();
+        unsubParticipants();
       };
     }
-  }, [meetingId, toast, redrawMainCanvas]);
+  }, [meetingId, toast, auth.currentUser]);
+  
+  const handlePermissionChange = (participantId: string, canDraw: boolean) => {
+    socketRef.current?.emit('set-permission', { participantId, canDraw });
+  };
   
   const memoizedHeaderAction = useCallback(() => (
     <div className="flex items-center gap-2">
@@ -1204,25 +1221,57 @@ export default function WhiteboardPage() {
           </Link>
         </Button>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <MoreVertical className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="rounded-xl">
-          <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
-            <Camera className="mr-2 h-4 w-4" />
-            <span>Screenshot</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Whiteboard Settings</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full">
+                <MoreVertical className="h-5 w-5" />
+            </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl">
+                {isHost.current && (
+                    <DialogTrigger asChild>
+                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
+                            <UserCheck className="mr-2 h-4 w-4" />
+                            <span>Collaborate</span>
+                        </DropdownMenuItem>
+                    </DialogTrigger>
+                )}
+                <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
+                <Camera className="mr-2 h-4 w-4" />
+                <span>Screenshot</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Whiteboard Settings</span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Manage Whiteboard Collaboration</DialogTitle>
+                <DialogDescription>Allow other participants to draw on the shared whiteboard.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-64 my-4">
+                <div className="space-y-3 pr-4">
+                    {participants.filter(p => !p.isHost).map(p => (
+                        <div key={p.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} /><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
+                                <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
+                            </div>
+                            <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+            <DialogFooter>
+                <DialogClose asChild><Button>Done</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  ), [meetingId, router, topic]);
+  ), [meetingId, router, topic, isCollaborateDialogOpen, participants, drawingPermissions, handlePermissionChange]);
 
   useEffect(() => {
     setHeaderContent(
