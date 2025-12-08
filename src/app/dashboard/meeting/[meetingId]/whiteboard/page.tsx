@@ -1595,3 +1595,4 @@ export default function WhiteboardPage() {
     </>
   );
 }
+
