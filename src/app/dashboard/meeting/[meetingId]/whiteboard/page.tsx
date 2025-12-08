@@ -51,6 +51,7 @@ import { collection, addDoc, serverTimestamp, onSnapshot } from 'firebase/firest
 import { io, Socket } from "socket.io-client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
+import { DialogTitle } from "@/components/ui/dialog";
 
 
 // --- Type Definitions ---
@@ -1150,6 +1151,68 @@ export default function WhiteboardPage() {
     }
 };
 
+  const memoizedHeaderAction = useCallback(() => (
+    <div className="flex items-center gap-2">
+      {meetingId && (
+        <Button asChild variant="outline" size="sm" className="rounded-lg">
+          <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Link>
+        </Button>
+      )}
+      <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full">
+                <MoreVertical className="h-5 w-5" />
+            </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl">
+                {isHost.current && (
+                    <DialogTrigger asChild>
+                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
+                            <UserCheck className="mr-2 h-4 w-4" />
+                            <span>Collaborate</span>
+                        </DropdownMenuItem>
+                    </DialogTrigger>
+                )}
+                <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
+                <Camera className="mr-2 h-4 w-4" />
+                <span>Screenshot</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Whiteboard Settings</span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Manage Whiteboard Collaboration</DialogTitle>
+                <DialogDescription>Allow other participants to draw on the shared whiteboard.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-64 my-4">
+                <div className="space-y-3 pr-4">
+                    {participants.filter(p => !p.isHost).map(p => (
+                        <div key={p.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} /><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
+                                <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
+                            </div>
+                            <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+            <DialogFooter>
+                <DialogClose asChild><Button>Done</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  ), [meetingId, router, topic, isCollaborateDialogOpen, participants, drawingPermissions]);
+
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
     setPages([newInitialPage]);
@@ -1211,68 +1274,6 @@ export default function WhiteboardPage() {
     socketRef.current?.emit('set-permission', { participantId, canDraw });
   };
   
-  const memoizedHeaderAction = useCallback(() => (
-    <div className="flex items-center gap-2">
-      {meetingId && (
-        <Button asChild variant="outline" size="sm" className="rounded-lg">
-          <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Link>
-        </Button>
-      )}
-      <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-                <MoreVertical className="h-5 w-5" />
-            </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl">
-                {isHost.current && (
-                    <DialogTrigger asChild>
-                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
-                            <UserCheck className="mr-2 h-4 w-4" />
-                            <span>Collaborate</span>
-                        </DropdownMenuItem>
-                    </DialogTrigger>
-                )}
-                <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
-                <Camera className="mr-2 h-4 w-4" />
-                <span>Screenshot</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Whiteboard Settings</span>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Manage Whiteboard Collaboration</DialogTitle>
-                <DialogDescription>Allow other participants to draw on the shared whiteboard.</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-64 my-4">
-                <div className="space-y-3 pr-4">
-                    {participants.filter(p => !p.isHost).map(p => (
-                        <div key={p.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} /><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
-                                <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
-                            </div>
-                            <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
-            <DialogFooter>
-                <DialogClose asChild><Button>Done</Button></DialogClose>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  ), [meetingId, router, topic, isCollaborateDialogOpen, participants, drawingPermissions, handlePermissionChange]);
-
   useEffect(() => {
     setHeaderContent(
         <div className="flex items-center gap-3">
