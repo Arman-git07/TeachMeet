@@ -901,9 +901,7 @@ export default function WhiteboardPage() {
       return;
     }
   
-    const recognitionToastId = `recognize-${Date.now()}`;
-    toast({
-      id: recognitionToastId,
+    const { id: toastId, update: updateToast } = toast({
       title: "Refining Shape...",
       description: "The AI is analyzing your drawing. This might take a moment.",
       duration: Infinity,
@@ -918,7 +916,7 @@ export default function WhiteboardPage() {
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
-      toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      updateToast({ variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
       setRefinePrompt('');
       return;
     }
@@ -981,15 +979,15 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        toast.update(recognitionToastId, { title: "Shape Refined!", description: "Your drawing has been transformed." });
+        updateToast({ title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
-        toast.update(recognitionToastId, { variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        updateToast({ variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
-      toast.update(recognitionToastId, {
+      updateToast({
         variant: "destructive",
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
@@ -1027,8 +1025,7 @@ export default function WhiteboardPage() {
     setIsScreenshotDialogOpen(false);
     if (isProcessing) return;
     setIsProcessing(true);
-    const toastId = `screenshot-save-${Date.now()}`;
-    toast({ id: toastId, title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
+    const { id: toastId, update: updateToast } = toast({ title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
     
     try {
       const blob = await getCanvasAsBlob();
@@ -1054,11 +1051,11 @@ export default function WhiteboardPage() {
           createdAt: serverTimestamp(),
       });
       
-      toast.update(toastId, { title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+      updateToast({ title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
 
     } catch (error) {
       console.error("Failed to save screenshot:", error);
-      toast.update(toastId, { variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      updateToast({ variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
     } finally {
       setIsProcessing(false);
     }
@@ -1070,9 +1067,7 @@ export default function WhiteboardPage() {
     setIsProcessing(true);
     setIsPagesPopoverOpen(false);
 
-    const exportToastId = `export-${Date.now()}`;
-    toast({
-        id: exportToastId,
+    const { id: exportToastId, update: updateExportToast } = toast({
         title: "Exporting to PDF...",
         description: "Please wait while your whiteboard is being converted.",
         duration: Infinity
@@ -1081,7 +1076,7 @@ export default function WhiteboardPage() {
     const offscreenCanvas = document.createElement('canvas');
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) {
-        toast.update(exportToastId, { variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
+        updateExportToast({ variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
         setIsProcessing(false);
         return;
     }
@@ -1090,7 +1085,7 @@ export default function WhiteboardPage() {
     offscreenCanvas.height = mainCanvas.height;
     const offscreenCtx = offscreenCanvas.getContext('2d');
     if (!offscreenCtx) {
-        toast.update(exportToastId, { variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
+        updateExportToast({ variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
         setIsProcessing(false);
         return;
     }
@@ -1103,7 +1098,7 @@ export default function WhiteboardPage() {
 
     try {
         for (let i = 0; i < pages.length; i++) {
-            toast.update(exportToastId, { title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            updateExportToast({ title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
@@ -1141,11 +1136,11 @@ export default function WhiteboardPage() {
             createdAt: serverTimestamp(),
         });
 
-        toast.update(exportToastId, { title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
+        updateExportToast({ title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
         
     } catch (error) {
         console.error("PDF Export or Upload Failed:", error);
-        toast.update(exportToastId, { variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+        updateExportToast({ variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
         setIsProcessing(false);
     }
