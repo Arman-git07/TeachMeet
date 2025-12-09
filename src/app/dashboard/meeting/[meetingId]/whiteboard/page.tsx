@@ -901,7 +901,7 @@ export default function WhiteboardPage() {
       return;
     }
   
-    const { id: toastId, update: updateToast } = toast({
+    const recognitionToast = toast({
       title: "Refining Shape...",
       description: "The AI is analyzing your drawing. This might take a moment.",
       duration: Infinity,
@@ -916,7 +916,7 @@ export default function WhiteboardPage() {
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
-      updateToast({ variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      recognitionToast.update({ variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
       setRefinePrompt('');
       return;
     }
@@ -979,15 +979,15 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        updateToast({ title: "Shape Refined!", description: "Your drawing has been transformed." });
+        recognitionToast.update({ title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
-        updateToast({ variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        recognitionToast.update({ variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
-      updateToast({
+      recognitionToast.update({
         variant: "destructive",
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
@@ -1025,7 +1025,8 @@ export default function WhiteboardPage() {
     setIsScreenshotDialogOpen(false);
     if (isProcessing) return;
     setIsProcessing(true);
-    const { id: toastId, update: updateToast } = toast({ title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
+    
+    const { id: toastId, update } = toast({ title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
     
     try {
       const blob = await getCanvasAsBlob();
@@ -1051,11 +1052,11 @@ export default function WhiteboardPage() {
           createdAt: serverTimestamp(),
       });
       
-      updateToast({ title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+      update({ id: toastId, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
 
     } catch (error) {
       console.error("Failed to save screenshot:", error);
-      updateToast({ variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      update({ id: toastId, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
     } finally {
       setIsProcessing(false);
     }
@@ -1076,7 +1077,7 @@ export default function WhiteboardPage() {
     const offscreenCanvas = document.createElement('canvas');
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) {
-        updateExportToast({ variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
+        updateExportToast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
         setIsProcessing(false);
         return;
     }
@@ -1085,7 +1086,7 @@ export default function WhiteboardPage() {
     offscreenCanvas.height = mainCanvas.height;
     const offscreenCtx = offscreenCanvas.getContext('2d');
     if (!offscreenCtx) {
-        updateExportToast({ variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
+        updateExportToast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
         setIsProcessing(false);
         return;
     }
@@ -1098,7 +1099,7 @@ export default function WhiteboardPage() {
 
     try {
         for (let i = 0; i < pages.length; i++) {
-            updateExportToast({ title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            updateExportToast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
@@ -1136,11 +1137,11 @@ export default function WhiteboardPage() {
             createdAt: serverTimestamp(),
         });
 
-        updateExportToast({ title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
+        updateExportToast({ id: exportToastId, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
         
     } catch (error) {
         console.error("PDF Export or Upload Failed:", error);
-        updateExportToast({ variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+        updateExportToast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
         setIsProcessing(false);
     }
@@ -1164,14 +1165,14 @@ export default function WhiteboardPage() {
             </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl">
-                {isHost.current && (
-                    <DialogTrigger asChild>
-                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
-                            <UserCheck className="mr-2 h-4 w-4" />
-                            <span>Collaborate</span>
-                        </DropdownMenuItem>
-                    </DialogTrigger>
-                )}
+                
+                <DialogTrigger asChild>
+                    <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        <span>Collaborate</span>
+                    </DropdownMenuItem>
+                </DialogTrigger>
+                
                 <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
                 <Camera className="mr-2 h-4 w-4" />
                 <span>Screenshot</span>
@@ -1590,4 +1591,3 @@ export default function WhiteboardPage() {
     </>
   );
 }
-
