@@ -24,7 +24,7 @@ import {
   DialogTitle as ShadDialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, Users, UserCheck } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -1267,6 +1267,7 @@ export default function WhiteboardPage() {
   }, [meetingId, toast, auth.currentUser]);
   
   const handlePermissionChange = (participantId: string, canDraw: boolean) => {
+    setDrawingPermissions(prev => ({...prev, [participantId]: canDraw }));
     socketRef.current?.emit('set-permission', { participantId, canDraw });
   };
   
