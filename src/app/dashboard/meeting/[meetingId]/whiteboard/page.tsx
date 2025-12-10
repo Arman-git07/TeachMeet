@@ -524,7 +524,7 @@ export default function WhiteboardPage() {
         return;
     }
     
-    if (!canIDraw) {
+    if (!canIDraw) { // <--- THIS IS THE CHECK
         if (activeTool !== 'select' && activeTool !== 'lasso') {
             toast({ variant: 'destructive', title: "Permission Denied", description: "You do not have permission to draw on the whiteboard." });
             return;
@@ -1026,7 +1026,7 @@ export default function WhiteboardPage() {
     if (isProcessing) return;
     setIsProcessing(true);
     
-    const { id: toastId, update } = toast({ title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
+    const toastResult = toast({ title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
     
     try {
       const blob = await getCanvasAsBlob();
@@ -1052,11 +1052,11 @@ export default function WhiteboardPage() {
           createdAt: serverTimestamp(),
       });
       
-      update({ id: toastId, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+      toastResult.update({ id: toastResult.id, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
 
     } catch (error) {
       console.error("Failed to save screenshot:", error);
-      update({ id: toastId, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      toastResult.update({ id: toastResult.id, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
     } finally {
       setIsProcessing(false);
     }
@@ -1068,7 +1068,7 @@ export default function WhiteboardPage() {
     setIsProcessing(true);
     setIsPagesPopoverOpen(false);
 
-    const { id: exportToastId, update: updateExportToast } = toast({
+    const exportToast = toast({
         title: "Exporting to PDF...",
         description: "Please wait while your whiteboard is being converted.",
         duration: Infinity
@@ -1077,7 +1077,7 @@ export default function WhiteboardPage() {
     const offscreenCanvas = document.createElement('canvas');
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) {
-        updateExportToast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
+        exportToast.update({ id: exportToast.id, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
         setIsProcessing(false);
         return;
     }
@@ -1086,7 +1086,7 @@ export default function WhiteboardPage() {
     offscreenCanvas.height = mainCanvas.height;
     const offscreenCtx = offscreenCanvas.getContext('2d');
     if (!offscreenCtx) {
-        updateExportToast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
+        exportToast.update({ id: exportToast.id, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
         setIsProcessing(false);
         return;
     }
@@ -1099,7 +1099,7 @@ export default function WhiteboardPage() {
 
     try {
         for (let i = 0; i < pages.length; i++) {
-            updateExportToast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            exportToast.update({ id: exportToast.id, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
@@ -1137,11 +1137,11 @@ export default function WhiteboardPage() {
             createdAt: serverTimestamp(),
         });
 
-        updateExportToast({ id: exportToastId, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
+        exportToast.update({ id: exportToast.id, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
         
     } catch (error) {
         console.error("PDF Export or Upload Failed:", error);
-        updateExportToast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+        exportToast.update({ id: exportToast.id, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
         setIsProcessing(false);
     }
@@ -1185,7 +1185,7 @@ export default function WhiteboardPage() {
         </DropdownMenu>
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Manage Whiteboard Collaboration</DialogTitle>
+                <ShadDialogTitle>Manage Whiteboard Collaboration</ShadDialogTitle>
                 <DialogDescription>Allow other participants to draw on the shared whiteboard.</DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-64 my-4">
@@ -1240,13 +1240,15 @@ export default function WhiteboardPage() {
       socket.on('initial-state', ({ permissions, hostId: receivedHostId }) => {
         isHost.current = auth.currentUser?.uid === receivedHostId;
         setDrawingPermissions(permissions || {});
-        setCanIDraw(isHost.current || permissions[auth.currentUser!.uid]);
+        if(auth.currentUser) {
+            setCanIDraw(isHost.current || !!permissions[auth.currentUser.uid]);
+        }
       });
 
       socket.on('permission-update', (newPermissions) => {
         if (auth.currentUser) {
           setDrawingPermissions(newPermissions);
-          setCanIDraw(isHost.current || newPermissions[auth.currentUser.uid]);
+          setCanIDraw(isHost.current || !!newPermissions[auth.currentUser.uid]);
         }
       });
       
@@ -1264,7 +1266,7 @@ export default function WhiteboardPage() {
         unsubParticipants();
       };
     }
-  }, [meetingId, toast, auth.currentUser]);
+  }, [meetingId, toast]);
   
   const handlePermissionChange = (participantId: string, canDraw: boolean) => {
     setDrawingPermissions(prev => ({...prev, [participantId]: canDraw }));
@@ -1369,7 +1371,7 @@ export default function WhiteboardPage() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Refine Your Drawing</AlertDialogTitle>
+                  <ShadDialogTitle>Refine Your Drawing</ShadDialogTitle>
                   <AlertDialogDescription>
                     Optionally, tell the AI what you drew to get a better result.
                   </AlertDialogDescription>
