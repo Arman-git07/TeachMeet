@@ -33,7 +33,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest));
       setRequests(pendingReqs);
 
-      // Play sound only once per request
+      // Play sound only once per new request
       pendingReqs.forEach((req) => {
         if (!playedSoundRef.current[req.id]) {
           try {
