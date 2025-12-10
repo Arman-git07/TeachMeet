@@ -14,17 +14,23 @@ interface JoinRequest {
   userId: string;
   userName: string;
   userPhotoURL?: string;
-  meetingId?: string; // Add this to the interface
+  meetingId?: string;
 }
 
 export default function HostJoinRequestNotification({ meetingId }: { meetingId: string }) {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const { toast } = useToast();
   const playedSoundRef = useRef<Record<string, boolean>>({});
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { user } = useAuth();
   const hostId = user?.uid;
 
-  // 🔹 Listen for pending join requests
+  useEffect(() => {
+    // Preload the audio element for faster playback
+    audioRef.current = new Audio("/sounds/join-request.mp3");
+    audioRef.current.volume = 0.75; // Increased volume
+  }, []);
+
   useEffect(() => {
     if (!meetingId) return;
     const q = query(collection(db, "meetings", meetingId, "joinRequests"), where("status", "==", "pending"));
@@ -33,15 +39,12 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest));
       setRequests(pendingReqs);
 
-      // Play sound only once per new request
       pendingReqs.forEach((req) => {
         if (!playedSoundRef.current[req.id]) {
-          try {
-            const audio = new Audio("/sounds/join-request.mp3");
-            audio.volume = 0.45;
-            audio.play().catch(() => {});
-          } catch (e) {
-            console.warn("Sound playback failed:", e);
+          if (audioRef.current) {
+            audioRef.current.play().catch(error => {
+              console.warn("Audio playback failed. This can happen if the user hasn't interacted with the page yet.", error);
+            });
           }
           playedSoundRef.current[req.id] = true;
         }
@@ -51,7 +54,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     return () => unsub();
   }, [meetingId]);
 
-  // 🔹 Approve request
   const handleApprove = async (req: JoinRequest) => {
     try {
       const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
@@ -59,15 +61,13 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
       const batch = writeBatch(db);
 
-      // Create participant document
       batch.set(participantRef, {
         name: req.userName || "Guest",
         photoURL: req.userPhotoURL || "",
         joinedAt: serverTimestamp(),
-        isHost: false, // Approved users are not hosts
+        isHost: false,
       });
 
-      // Update join request status to 'approved'
       batch.update(joinRequestRef, {
         status: "approved",
         approvedAt: serverTimestamp(),
@@ -91,7 +91,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     }
   };
 
-  // 🔹 Deny request
   const handleDeny = async (req: JoinRequest) => {
     try {
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
