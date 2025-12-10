@@ -524,7 +524,7 @@ export default function WhiteboardPage() {
         return;
     }
     
-    if (!canIDraw) { // <--- THIS IS THE CHECK
+    if (!canIDraw) { 
         if (activeTool !== 'select' && activeTool !== 'lasso') {
             toast({ variant: 'destructive', title: "Permission Denied", description: "You do not have permission to draw on the whiteboard." });
             return;
@@ -1193,7 +1193,7 @@ export default function WhiteboardPage() {
                     {participants.filter(p => !p.isHost).map(p => (
                         <div key={p.id} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} /><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
+                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
                                 <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
                             </div>
                             <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
@@ -1241,7 +1241,7 @@ export default function WhiteboardPage() {
         isHost.current = auth.currentUser?.uid === receivedHostId;
         setDrawingPermissions(permissions || {});
         if(auth.currentUser) {
-            setCanIDraw(isHost.current || !!permissions[auth.currentUser.uid]);
+            setCanIDraw(!!permissions[auth.currentUser.uid]);
         }
       });
 
