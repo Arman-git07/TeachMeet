@@ -51,7 +51,6 @@ import { collection, addDoc, serverTimestamp, onSnapshot } from 'firebase/firest
 import { io, Socket } from "socket.io-client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
-import { DialogTitle } from "@/components/ui/dialog";
 
 
 // --- Type Definitions ---
@@ -220,7 +219,6 @@ export default function WhiteboardPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
   const [canIDraw, setCanIDraw] = useState(false);
-  const isHost = useRef(false);
 
 
   useEffect(() => {
@@ -916,7 +914,7 @@ export default function WhiteboardPage() {
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
-      recognitionToast.update({ variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      recognitionToast.update({ id: recognitionToast.id, variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
       setRefinePrompt('');
       return;
     }
@@ -979,15 +977,16 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        recognitionToast.update({ title: "Shape Refined!", description: "Your drawing has been transformed." });
+        recognitionToast.update({ id: recognitionToast.id, title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
-        recognitionToast.update({ variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        recognitionToast.update({ id: recognitionToast.id, variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
       recognitionToast.update({
+        id: recognitionToast.id,
         variant: "destructive",
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
@@ -1157,58 +1156,32 @@ export default function WhiteboardPage() {
           </Link>
         </Button>
       )}
-      <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-                <MoreVertical className="h-5 w-5" />
-            </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl">
-                
-                <DialogTrigger asChild>
-                    <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        <span>Collaborate</span>
-                    </DropdownMenuItem>
-                </DialogTrigger>
-                
-                <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
-                <Camera className="mr-2 h-4 w-4" />
-                <span>Screenshot</span>
+      <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="rounded-full">
+              <MoreVertical className="h-5 w-5" />
+          </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+              <DialogTrigger asChild>
+                <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
+                    <UserCheck className="mr-2 h-4 w-4" />
+                    <span>Collaborate</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Whiteboard Settings</span>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-        <DialogContent>
-            <DialogHeader>
-                <ShadDialogTitle>Manage Whiteboard Collaboration</ShadDialogTitle>
-                <DialogDescription>Allow other participants to draw on the shared whiteboard.</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-64 my-4">
-                <div className="space-y-3 pr-4">
-                    {participants.filter(p => !p.isHost).map(p => (
-                        <div key={p.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
-                                <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
-                            </div>
-                            <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
-            <DialogFooter>
-                <DialogClose asChild><Button>Done</Button></DialogClose>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </DialogTrigger>
+              <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
+              <Camera className="mr-2 h-4 w-4" />
+              <span>Screenshot</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Whiteboard Settings</span>
+              </DropdownMenuItem>
+          </DropdownMenuContent>
+      </DropdownMenu>
     </div>
-  ), [meetingId, router, topic, isCollaborateDialogOpen, participants, drawingPermissions]);
-
+  ), [meetingId, router, topic]);
+  
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
     setPages([newInitialPage]);
@@ -1237,10 +1210,9 @@ export default function WhiteboardPage() {
         console.log('Received draw event:', data);
       });
       
-      socket.on('initial-state', ({ permissions, hostId: receivedHostId }) => {
-        isHost.current = auth.currentUser?.uid === receivedHostId;
-        setDrawingPermissions(permissions || {});
-        if(auth.currentUser) {
+      socket.on('initial-state', ({ permissions }) => {
+        if (auth.currentUser) {
+            setDrawingPermissions(permissions || {});
             setCanIDraw(!!permissions[auth.currentUser.uid]);
         }
       });
@@ -1248,7 +1220,7 @@ export default function WhiteboardPage() {
       socket.on('permission-update', (newPermissions) => {
         if (auth.currentUser) {
           setDrawingPermissions(newPermissions);
-          setCanIDraw(isHost.current || !!newPermissions[auth.currentUser.uid]);
+          setCanIDraw(!!newPermissions[auth.currentUser.uid]);
         }
       });
       
@@ -1291,6 +1263,31 @@ export default function WhiteboardPage() {
 
   return (
     <>
+      <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
+        {/* The trigger is now inside the dropdown in the header, so this Dialog only holds the content */}
+        <DialogContent>
+            <DialogHeader>
+                <ShadDialogTitle>Manage Whiteboard Collaboration</ShadDialogTitle>
+                <DialogDescription>Allow other participants to draw on the shared whiteboard.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-64 my-4">
+                <div className="space-y-3 pr-4">
+                    {participants.filter(p => p.id !== auth.currentUser?.uid).map(p => (
+                        <div key={p.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
+                                <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
+                            </div>
+                            <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+            <DialogFooter>
+                <DialogClose asChild><Button>Done</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <textarea
         ref={liveTextInputRef}
         onBlur={finalizeLiveText}
