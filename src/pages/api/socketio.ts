@@ -38,15 +38,22 @@ export default function handler(
         if (!rooms.has(roomId)) {
           rooms.set(roomId, {
             hostId: userId, // First user to join is host
-            permissions: { [userId]: true },
+            permissions: { [userId]: true }, // Grant permission to the creator
             elements: [],
           });
           console.log(`Room ${roomId} created. Host is ${userId}`);
+        } else {
+          // If room exists, grant permission to the joining user by default
+          const roomState = rooms.get(roomId)!;
+          if (!roomState.permissions[userId]) {
+            roomState.permissions[userId] = true;
+          }
         }
         
         const roomState = rooms.get(roomId)!;
+        // Emit the initial state to the user who just joined
         socket.emit('initial-state', roomState);
-
+        // Inform others in the room that a user has joined
         socket.to(roomId).emit("user-joined", userId);
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
@@ -56,6 +63,7 @@ export default function handler(
         const { roomId, userId } = socket.data || {};
         if (roomId && userId) {
             const roomState = rooms.get(roomId);
+            // Check if user has permission before broadcasting
             if (roomState && roomState.permissions[userId]) {
                 socket.to(roomId).emit('draw-event', data);
             }
@@ -67,7 +75,8 @@ export default function handler(
         const { roomId, userId } = socket.data || {};
         if (roomId && userId) {
           const roomState = rooms.get(roomId);
-          if (roomState && roomState.hostId === userId) { // Only host can set permissions
+          // Allow anyone with drawing permission to grant it to others
+          if (roomState && roomState.permissions[userId]) {
             roomState.permissions[participantId] = canDraw;
             io.to(roomId).emit('permission-update', roomState.permissions);
           }
@@ -79,21 +88,21 @@ export default function handler(
         // @ts-ignore
         const { userId } = socket.data || {};
         if (!userId) return;
-        io.to(remoteId).emit("offer", userId, offer);
+        io.to(remoteId).emit("offer", socket.id, offer);
       });
       
       socket.on("answer", (remoteId: string, answer: any) => {
         // @ts-ignore
         const { userId } = socket.data || {};
         if (!userId) return;
-        io.to(remoteId).emit("answer", userId, answer);
+        io.to(remoteId).emit("answer", socket.id, answer);
       });
 
       socket.on("ice-candidate", (remoteId: string, candidate: any) => {
         // @ts-ignore
         const { userId } = socket.data || {};
         if (!userId) return;
-        io.to(remoteId).emit("ice-candidate", userId, candidate);
+        io.to(remoteId).emit("ice-candidate", socket.id, candidate);
       });
 
       socket.on("disconnect", () => {
@@ -108,9 +117,10 @@ export default function handler(
             if (roomState.hostId === userId) {
                 // Simple logic: make the next person host, or clear if empty
                 const otherUsers = Object.keys(roomState.permissions).filter(id => id !== userId);
-                roomState.hostId = otherUsers[0] || null;
-                if(roomState.hostId) {
-                  roomState.permissions[roomState.hostId] = true;
+                const newHost = otherUsers[0] || null;
+                roomState.hostId = newHost;
+                if(newHost) {
+                  roomState.permissions[newHost] = true;
                 }
             }
              io.to(roomId).emit('permission-update', roomState.permissions);
