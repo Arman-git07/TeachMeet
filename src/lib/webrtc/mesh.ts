@@ -21,7 +21,6 @@ export class MeshRTC {
   public socketId: string | null = null;
   public removeTrack?: (track: MediaStreamTrack) => void;
 
-  // FIX: Add queue and ready flag to prevent race conditions
   private _ready = false; 
   private _pendingSignals: Array<() => void> = []; 
 
@@ -49,7 +48,6 @@ export class MeshRTC {
     this.localStream = localStream;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
     
-    // FIX: Mark as ready and flush the signal queue
     this._ready = true;
     if (this._pendingSignals.length > 0) {
       console.log("[mesh] init(): processing", this._pendingSignals.length, "queued signals");
@@ -66,7 +64,6 @@ export class MeshRTC {
         this.socket.emit("join-room", this.roomId, this.socket.id);
     });
 
-    // FIX: Wrap all event handlers to queue if not ready
     this.socket.on("user-joined", (remoteId: string) => {
       const handler = () => this._handleUserJoined(remoteId);
       if (!this._ready) {

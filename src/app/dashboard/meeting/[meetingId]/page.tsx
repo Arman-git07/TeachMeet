@@ -13,10 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 
 // --- Type Definitions for this page ---
@@ -32,6 +29,7 @@ export default function MeetingPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { toast } = useToast();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user, loading: authLoading } = useAuth();
   
@@ -52,31 +50,38 @@ export default function MeetingPage() {
       return;
     }
     
-    const checkHost = async () => {
-      setLoading(true);
-      try {
-        const meetingRef = doc(db, "meetings", meetingId);
-        const snap = await getDoc(meetingRef);
-
+    // Set up a real-time listener for the meeting document
+    const meetingRef = doc(db, "meetings", meetingId);
+    const unsubscribe = onSnapshot(meetingRef, (snap) => {
         if (snap.exists()) {
-          const data = snap.data();
-          if (data.hostId === user.uid) {
-            setIsHost(true);
-          }
-        } else {
-          // If meeting doesn't exist, they can't be the host.
-          setIsHost(false);
-        }
-      } catch (err) {
-        console.error("Error verifying host:", err);
-        setIsHost(false); // Default to false on error
-      } finally {
-        setLoading(false);
-      }
-    };
+            const data = snap.data();
+            // Check if user is host
+            if (data.hostId === user.uid) {
+                setIsHost(true);
+            }
+            
+            // Check if meeting has ended
+            if (data.status === 'ended') {
+                toast({ title: "Meeting Ended", description: "The host has ended the meeting." });
+                router.replace("/");
+                return; // Stop further processing
+            }
 
-    checkHost();
-  }, [meetingId, user, authLoading, router, searchParams]);
+            setLoading(false);
+        } else {
+            // Meeting document doesn't exist
+            toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting may have been deleted or never existed." });
+            router.replace("/");
+        }
+    }, (error) => {
+        console.error("Error listening to meeting document:", error);
+        toast({ variant: "destructive", title: "Connection Error", description: "Could not sync with the meeting." });
+        router.replace("/");
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+
+  }, [meetingId, user, authLoading, router, searchParams, toast]);
 
 
   const constructUrl = (page: string) => {
@@ -122,7 +127,7 @@ export default function MeetingPage() {
         </DropdownMenuItem>
     </DropdownMenuContent>
     </DropdownMenu>
-  ), [meetingId, topic, isHost]);
+  ), [meetingId, topic]);
   
     useEffect(() => {
         setHeaderContent(
@@ -147,7 +152,7 @@ export default function MeetingPage() {
       try {
         const meetingRef = doc(db, "meetings", meetingId);
         await updateDoc(meetingRef, { status: 'ended' });
-        // The onSnapshot listener in MeetingClient on the meeting doc will handle redirection for all users.
+        // The onSnapshot listener will handle redirection for all users.
       } catch (error) {
         console.error("Error ending meeting for all:", error);
       }
