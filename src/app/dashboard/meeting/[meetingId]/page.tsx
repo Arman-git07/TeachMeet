@@ -6,7 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import MeetingClient from "./MeetingClient";
-import { doc, getDoc, deleteDoc, onSnapshot, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, onSnapshot, collection, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -140,17 +140,28 @@ export default function MeetingPage() {
         };
     }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId, memoizedMeetingActions]);
 
-  const handleLeave = async () => {
-    if (user && meetingId) {
-        const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        try {
-          // If the user is the host, we might want to end the meeting for everyone
-          // For now, we just remove the participant
-          await deleteDoc(participantRef);
-        } catch (error) {
-           console.error("Error removing participant on leave:", error);
-        }
+  const handleLeave = async (endForAll = false) => {
+    if (!meetingId) return;
+  
+    if (isHost && endForAll) {
+      try {
+        const meetingRef = doc(db, "meetings", meetingId);
+        await updateDoc(meetingRef, { status: 'ended' });
+        // The onSnapshot listener in MeetingClient on the meeting doc will handle redirection for all users.
+      } catch (error) {
+        console.error("Error ending meeting for all:", error);
+      }
+    } else if (user) {
+      // Logic for a single user (host or participant) leaving
+      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+      try {
+        await deleteDoc(participantRef);
+      } catch (error) {
+        console.error("Error removing participant on leave:", error);
+      }
     }
+  
+    // Always redirect the current user away from the meeting page
     router.push("/");
   };
   
@@ -172,4 +183,3 @@ export default function MeetingPage() {
     </div>
   );
 }
-

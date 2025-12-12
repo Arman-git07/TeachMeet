@@ -51,7 +51,7 @@ type Props = {
   userId: string;
   initialCamOn: boolean;
   initialMicOn: boolean;
-  onLeave: () => void;
+  onLeave: (endForAll?: boolean) => void;
   topic: string;
   initialPinnedId?: string | null;
 };
@@ -643,16 +643,26 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 <Button className="h-12 sm:h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-4 sm:px-6" aria-label="Leave Meeting"><PhoneOff className="h-5 w-5 sm:h-6 sm:w-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
-                  <AlertDialogHeader>
-                      <AlertDialogTitle>Leave Meeting?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                          Are you sure you want to leave the meeting?
-                      </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={onLeave} className={cn(buttonVariants({variant: "destructive"}))}>Leave</AlertDialogAction>
-                  </AlertDialogFooter>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{isHost ? 'End or Leave Meeting?' : 'Leave Meeting?'}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {isHost 
+                      ? "As the host, you can end the meeting for all participants or just leave yourself."
+                      : "Are you sure you want to leave the meeting?"
+                    }
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  {isHost ? (
+                    <>
+                      <AlertDialogAction onClick={() => onLeave(false)} className={cn(buttonVariants({variant: "outline"}))}>Leave Meeting</AlertDialogAction>
+                      <AlertDialogAction onClick={() => onLeave(true)} className={cn(buttonVariants({variant: "destructive"}))}>End for All</AlertDialogAction>
+                    </>
+                  ) : (
+                    <AlertDialogAction onClick={() => onLeave(false)} className={cn(buttonVariants({variant: "destructive"}))}>Leave</AlertDialogAction>
+                  )}
+                </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
         </div>
