@@ -113,26 +113,13 @@ export class MeshRTC {
       this.peers.set(fromId, entry);
     }
     const pc = entry.pc;
+    
+    // Wait until local stream is attached to this specific peer connection
+    await this.waitForLocalStreamAttachment(pc);
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       console.log("[mesh] setRemoteDescription done for", fromId);
-
-      if (this.localStream) {
-        const existing = pc.getSenders().map(s => s.track?.kind).filter(Boolean);
-        this.localStream.getTracks().forEach(track => {
-          if (!existing.includes(track.kind)) {
-            try {
-              pc.addTrack(track, this.localStream as MediaStream);
-              console.log(`[mesh] _handleOffer: attached local ${track.kind} track to pc for ${fromId}`);
-            } catch (e) {
-              console.warn("[mesh] _handleOffer: addTrack failed", e);
-            }
-          }
-        });
-      } else {
-        console.warn("[mesh] _handleOffer: no localStream when answering offer");
-      }
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -149,20 +136,7 @@ export class MeshRTC {
     const entry = this.createPeerEntry(remoteId, true);
     this.peers.set(remoteId, entry);
 
-    await new Promise(r => setTimeout(r, 200));
-
-    try {
-      if (!entry.pc.localDescription || !entry.pc.localDescription.sdp) {
-        const offer = await entry.pc.createOffer();
-        await entry.pc.setLocalDescription(offer);
-        this.socket?.emit("offer", remoteId, offer);
-        console.log("[mesh] createPeerAndOffer -> explicit offer sent to", remoteId);
-      } else {
-        console.log("[mesh] createPeerAndOffer -> negotiation already handled for", remoteId);
-      }
-    } catch (err) {
-      console.error("[mesh] createPeerAndOffer failed for", remoteId, err);
-    }
+    // No longer need artificial delay, negotiationneeded will fire.
   }
 
   private async _handleAnswer(fromId: string, answer: RTCSessionDescriptionInit) {
@@ -174,11 +148,19 @@ export class MeshRTC {
     } catch (e) { console.error("[mesh] handleAnswer error", e); }
   }
 
-  private _handleIceCandidate(fromId: string, candidate: RTCIceCandidateInit) {
+  private async _handleIceCandidate(fromId: string, candidate: RTCIceCandidateInit) {
     const entry = this.peers.get(fromId);
     if (!entry) { console.warn("[mesh] got ice-candidate but no pc for", fromId); return; }
     try {
-      entry.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => console.warn("[mesh] addIceCandidate failed", err));
+      // Defer adding candidate until remote description is set
+      if (entry.pc.remoteDescription) {
+        await entry.pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } else {
+        // Simple queue for candidates if remote description is not yet set
+        const queue = (entry as any).iceCandidateQueue || [];
+        queue.push(candidate);
+        (entry as any).iceCandidateQueue = queue;
+      }
     } catch (e) { console.error("[mesh] handleIceCandidate error", e); }
   }
 
@@ -190,19 +172,11 @@ export class MeshRTC {
     const entry: PeerEntry = { pc, stream: null, negotiating: false };
 
     pc.addEventListener("track", (ev) => {
-      const kinds = (ev.streams && ev.streams[0]) ? ev.streams[0].getTracks().map(t => t.kind) : (ev.track ? [ev.track.kind] : []);
-      console.log("[mesh] ontrack from", remoteId, "event tracks:", kinds, "ev.streams:", (ev.streams && ev.streams.length));
-      try {
-        if (ev.streams && ev.streams.length > 0) {
-          entry.stream = ev.streams[0];
-        } else {
-          if (ev.track) remoteStream.addTrack(ev.track);
-          entry.stream = remoteStream;
-        }
-        try { this.onRemoteStream?.(remoteId, entry.stream); } catch (e) { console.error("[mesh] onRemoteStream callback error", e); }
-      } catch (e) {
-        console.error("[mesh] track handler error", e);
-      }
+      ev.streams[0].getTracks().forEach(track => {
+        remoteStream.addTrack(track);
+      });
+      entry.stream = remoteStream;
+      try { this.onRemoteStream?.(remoteId, entry.stream); } catch (e) { console.error("[mesh] onRemoteStream callback error", e); }
     });
 
     pc.addEventListener("icecandidate", (ev) => {
@@ -220,6 +194,7 @@ export class MeshRTC {
       if (entry.negotiating || !isInitiator) return;
       entry.negotiating = true;
       try {
+        await this.waitForLocalStreamAttachment(pc);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         this.socket?.emit("offer", remoteId, offer);
@@ -232,19 +207,35 @@ export class MeshRTC {
     });
 
     if (this.localStream) {
-      try {
-        this.localStream.getTracks().forEach(track => {
-          try { pc.addTrack(track, this.localStream as MediaStream); } catch (e) { console.warn("[mesh] addTrack to pc failed", e); }
-        });
-        console.log("[mesh] Attaching local tracks to new pc for", remoteId, this.localStream.getTracks().map(t => t.kind));
-      } catch (err) {
-        console.warn("[mesh] error attaching local tracks to pc:", err);
-      }
+      this.localStream.getTracks().forEach(track => {
+        try { pc.addTrack(track, this.localStream!); } catch (e) { console.warn("[mesh] addTrack to pc failed", e); }
+      });
+      console.log("[mesh] Attaching local tracks to new pc for", remoteId, this.localStream.getTracks().map(t => t.kind));
     }
 
     this.peers.set(remoteId, entry);
     return entry;
   }
+  
+  private async waitForLocalStreamAttachment(pc: RTCPeerConnection, timeout = 2000): Promise<void> {
+    if (pc.getSenders().length > 0 && pc.getSenders().some(s => s.track)) {
+      return Promise.resolve();
+    }
+    const pollInterval = 100;
+    const endTime = Date.now() + timeout;
+    return new Promise((resolve, reject) => {
+      const interval = setInterval(() => {
+        if (pc.getSenders().length > 0 && pc.getSenders().some(s => s.track)) {
+          clearInterval(interval);
+          resolve();
+        } else if (Date.now() > endTime) {
+          clearInterval(interval);
+          reject(new Error("Timeout waiting for local stream attachment to peer connection."));
+        }
+      }, pollInterval);
+    });
+  }
+
 
   public leave() {
     this.peers.forEach(({ pc }) => pc.close());
@@ -263,23 +254,10 @@ export class MeshRTC {
 
   public async addTrack(track: MediaStreamTrack) {
     if (!this.localStream) return;
-    console.log("[mesh] addTrack called, track:", track.kind, "localStreamTrackKinds:", this.localStream?.getTracks().map(t=>t.kind));
-    try { this.localStream.addTrack(track); } catch (e) { console.warn("[mesh] localStream.addTrack failed", e); }
+    this.localStream.addTrack(track);
 
     for (const [id, entry] of this.peers.entries()) {
-      try {
-        entry.pc.addTrack(track, this.localStream as MediaStream);
-        try {
-          const offer = await entry.pc.createOffer();
-          await entry.pc.setLocalDescription(offer);
-          this.socket?.emit("offer", id, offer);
-          console.log("[mesh] addTrack -> renegotiation offer sent to", id);
-        } catch (err) {
-          console.error("[mesh] renegotiation after addTrack failed:", err);
-        }
-      } catch (err) {
-        console.warn("[mesh] addTrack per-peer failed", id, err);
-      }
+        entry.pc.addTrack(track, this.localStream);
     }
   }
 

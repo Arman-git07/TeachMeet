@@ -59,14 +59,16 @@ const VideoTile: React.FC<Props> = ({
 
   useEffect(() => {
     const videoEl = videoRef.current;
-    if (!videoEl) return;
-    if (stream && videoEl.srcObject !== stream) {
-      console.log("[VideoTile] Assigned stream to video element", stream.id, stream.getTracks().map(t => t.kind));
-      videoEl.srcObject = stream;
-      videoEl.play().catch(() => {});
+    if (videoEl) {
+      if (stream && videoEl.srcObject !== stream) {
+        console.log(`[VideoTile ${name}] Assigning new stream:`, stream.id);
+        videoEl.srcObject = stream;
+        videoEl.play().catch(e => console.warn(`[VideoTile ${name}] Autoplay was prevented:`, e));
+      } else if (!stream) {
+        videoEl.srcObject = null;
+      }
     }
-    if (!stream) videoEl.srcObject = null;
-  }, [stream]);
+  }, [stream, name]);
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
 
