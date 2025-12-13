@@ -160,12 +160,11 @@ function PreJoinPageContent() {
      };
   }, [toast]);
   
-  // ---------- REPLACE the existing listener useEffect with this ----------
 useEffect(() => {
   if (!meetingId || isHost) return;
 
   let mounted = true;
-  const auth = getAuth(); // import from firebase/auth at top if not already
+  const auth = getAuth();
   const didRedirectRef = { current: false };
   const unsubRefs: { req?: () => void; part?: () => void } = {};
   let pollHandle: number | null = null;
@@ -177,15 +176,13 @@ useEffect(() => {
   };
 
   const redirectToMeeting = () => {
-    if (didRedirectRef.current) return;
+    if (didRedirectRef.current || !mounted) return;
     didRedirectRef.current = true;
     cleanupAll();
     const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-    // use replace to avoid back navigation to waiting page
     router.replace(destination);
   };
 
-  // Wait for auth to be ready - avoids race where user isn't known yet
   const stopAuth = onAuthStateChanged(auth, async (user) => {
     if (!mounted || !user) return;
     const uid = user.uid;
@@ -193,31 +190,24 @@ useEffect(() => {
     const reqRef = doc(db, "meetings", meetingId, "joinRequests", uid);
     const partRef = doc(db, "meetings", meetingId, "participants", uid);
 
-    // Fast one-time check: maybe host approved before this listener mounted
     try {
       const [reqSnap, partSnap] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
       if (partSnap.exists() || (reqSnap.exists() && (reqSnap.data() as any).status === "approved")) {
         redirectToMeeting();
-        stopAuth(); // stop further auth events - we are done
+        stopAuth(); 
         return;
       }
     } catch (e) {
-      // non-fatal, continue to attach real-time listeners
       console.warn("Prejoin fast-check failed:", e);
     }
 
-    // Real-time listeners (stay active)
     try {
       unsubRefs.req = onSnapshot(reqRef, (snap) => {
         if (!mounted || didRedirectRef.current) return;
-        if (!snap.exists()) return; // ignore deletions unless we haven't accepted yet
-        const data = snap.data() as any;
-        if (data?.status === "approved") {
-          // lock immediately and redirect
+        if (snap.exists() && snap.data()?.status === "approved") {
           redirectToMeeting();
-        } else if (data?.status === "denied") {
-          // you already show toasts elsewhere; optionally show one here
-          // do not auto-navigate on denied
+        } else if (snap.exists() && snap.data()?.status === "denied") {
+            setRequestStatus("denied");
         }
       });
     } catch (e) {
@@ -228,7 +218,6 @@ useEffect(() => {
       unsubRefs.part = onSnapshot(partRef, (snap) => {
         if (!mounted || didRedirectRef.current) return;
         if (snap.exists()) {
-          // participant doc created → approved, redirect
           redirectToMeeting();
         }
       });
@@ -236,25 +225,21 @@ useEffect(() => {
       console.warn("Failed to attach participant listener", e);
     }
 
-    // Fallback polling (covers edge-case race where snapshots didn't fire)
-    let tries = 0;
     pollHandle = window.setInterval(async () => {
       if (!mounted || didRedirectRef.current || tries >= 8) {
         if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
         return;
       }
+      let tries = 0;
       tries++;
       try {
-        const [pSnap, rSnap] = await Promise.all([getDoc(partRef), getDoc(reqRef)]);
-        if (pSnap.exists() || (rSnap.exists() && (rSnap.data() as any).status === "approved")) {
+        const pSnap = await getDoc(partRef);
+        if (pSnap.exists()) {
           redirectToMeeting();
         }
-      } catch (e) {
-        // ignore transient read errors
-      }
+      } catch (e) {}
     }, 1000);
 
-    // Stop auth listener (we only needed it to ensure user is loaded)
     stopAuth();
   });
 
@@ -262,7 +247,6 @@ useEffect(() => {
     mounted = false;
     cleanupAll();
     try { stopAuth(); } catch {}
-    if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
   };
 }, [meetingId, isHost, router, topic, isCameraOn, isMicOn]);
 
@@ -427,7 +411,7 @@ useEffect(() => {
                 </div>
                 )}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
-                <Button variant={isMicOn ? 'default' : 'destructive'} size="icon" className={cn("rounded-full h-12 w-12", isMicOn && "bg-primary hover:bg-primary/90")} onClick={toggleMic}><Mic /></Button>
+                <Button variant={isMicOn ? 'default' : 'destructive'} size="icon" className={cn("rounded-full h-12 w-12", isMicOn && "bg-primary hover:bg-primary/90")} onClick={toggleMic}>{isMicOn ? <Mic /> : <MicOff />}</Button>
                 <Button variant={isCameraOn ? 'default' : 'destructive'} size="icon" className={cn("rounded-full h-12 w-12", isCameraOn && "bg-primary hover:bg-primary/90")} onClick={toggleCamera} disabled={hasCameraPermission === false}>{isCameraOn ? <Video /> : <VideoOff />}</Button>
                 </div>
             </div>
