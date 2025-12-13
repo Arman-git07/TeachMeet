@@ -65,47 +65,45 @@ export function StartMeetingDialogContent() {
   const handleSetupAndJoin = async () => {
     if (loading || !topic.trim() || !user) return;
     setLoading(true);
-
+  
     try {
+      // 1. Create the meeting document in Firestore
       const meetingRef = doc(db, 'meetings', meetingId);
       await setDoc(meetingRef, {
         topic: topic.trim(),
         creatorId: user.uid,
-        hostId: user.uid, 
+        hostId: user.uid,
         creatorName: user.displayName || 'Anonymous Host',
         createdAt: serverTimestamp(),
-        status: 'pending', 
+        status: 'pending',
       }, { merge: true });
+  
+      // 2. Save meeting to localStorage (CRITICAL STEP)
+      const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+      let meetings = storedMeetingsRaw ? JSON.parse(storedMeetingsRaw) : [];
+      if (!Array.isArray(meetings)) meetings = [];
+  
+      const now = Date.now();
+      meetings = meetings.filter(m => m && m.startedAt && (now - m.startedAt < THIRTY_MINUTES_IN_MS));
       
-      // Save meeting to localStorage
-      try {
-        const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-        let meetings = storedMeetingsRaw ? JSON.parse(storedMeetingsRaw) : [];
-        if (!Array.isArray(meetings)) meetings = [];
-
-        const now = Date.now();
-        // Clean up old meetings while we're at it
-        meetings = meetings.filter(m => m && m.startedAt && (now - m.startedAt < THIRTY_MINUTES_IN_MS));
-
-        meetings.unshift({ id: meetingId, title: topic.trim(), startedAt: now });
-        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5))); // Keep last 5
-        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
-      } catch (e) {
-        console.error("Failed to save meeting to localStorage", e);
-      }
-
-
+      meetings.unshift({ id: meetingId, title: topic.trim(), startedAt: now });
+      localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5)));
+  
+      // 3. Dispatch an event to notify other parts of the app (like the homepage)
+      window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+  
+      // 4. Redirect ONLY after all saving is done
       const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}&role=host`;
       router.push(prejoinPath);
-
+  
     } catch (error) {
-      console.error("Failed to create meeting document:", error);
+      console.error("Failed to create meeting:", error);
       toast({
         variant: "destructive",
         title: "Meeting Creation Failed",
-        description: "Could not create the meeting document. Please check your Firestore rules and network connection.",
+        description: "Could not create the meeting. Please check your network and try again.",
       });
-      setLoading(false);
+      setLoading(false); // Only set loading to false on error
     }
   };
 
