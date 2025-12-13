@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Users, MessageSquare, UserCheck, Lock } from "lucide-react";
+import { ArrowLeft, Send, Users, MessageSquare, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ChatMessage {
   id: string;
@@ -22,6 +22,8 @@ interface ChatMessage {
   timestamp: Date;
   isMe: boolean;
 }
+
+const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
 
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -34,13 +36,13 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showMeetingId, setShowMeetingId] = useState(false);
-
+  
+  const { user } = useAuth();
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const isPrivateChat = !!privateWithId;
 
   useEffect(() => {
-    // Show an initial message depending on whether it's a public or private chat
     const initialMessage: ChatMessage = isPrivateChat
       ? { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are only between you and them.`, timestamp: new Date(), isMe: false }
       : { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}".`, timestamp: new Date(), isMe: false };
@@ -56,9 +58,42 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         }
     }
   }, [messages]);
+  
+  const notifyRecipient = (messageText: string) => {
+    if (!isPrivateChat || !user || !privateWithName || !privateWithId) return;
+
+    try {
+        const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+        let activities = rawActivity ? JSON.parse(rawActivity) : [];
+        if (!Array.isArray(activities)) activities = [];
+
+        const newNotification = {
+            id: `privateMsg-${Date.now()}-${privateWithId}`,
+            type: 'privateMessage',
+            title: `New message from ${user.displayName || 'a user'}`,
+            from: user.displayName || 'A user',
+            senderId: user.uid,
+            meetingId: meetingId,
+            meetingTopic: topic,
+            timestamp: Date.now(),
+        };
+        activities.unshift(newNotification);
+
+        localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
+        window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+    } catch (e) {
+        console.error("Failed to create private message notification", e);
+    }
+  };
+
 
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
+    
+    if(isPrivateChat) {
+        notifyRecipient(inputValue);
+    }
+
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       senderName: 'You',
@@ -97,8 +132,6 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           </Button>
         </div>
       </header>
-
-      {/* Tabs are removed as we now handle private/public via URL params */}
       
       <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
@@ -124,13 +157,13 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                           <div
                             className={cn(
                               "max-w-[70%] p-3 rounded-xl shadow",
-                              msg.sender === 'system' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
+                              msg.senderName === 'System' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
                               msg.isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
                             )}
                           >
-                            {!msg.isMe && msg.sender !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                            {!msg.isMe && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
                             <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                            {msg.sender !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                            {msg.senderName !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                           </div>
                           {msg.isMe && (
                             <Avatar className="h-8 w-8 self-start">
