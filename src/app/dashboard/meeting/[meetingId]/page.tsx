@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 
 // --- Type Definitions for this page ---
 interface Participant {
@@ -67,7 +68,17 @@ export default function MeetingPage() {
         
         // Check if meeting has ended for everyone
         if (data.status === 'ended') {
-            toast({ title: "Meeting Ended", description: "The host has ended the meeting." });
+            toast({ title: "Meeting Ended", description: "The host has ended this meeting." });
+            // Clean up localStorage for all users on this event
+            const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+            if (storedMeetingsRaw) {
+                let meetings = JSON.parse(storedMeetingsRaw);
+                if (Array.isArray(meetings)) {
+                    const updatedMeetings = meetings.filter(m => m.id !== meetingId);
+                    localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
+                    window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
+                }
+            }
             router.replace("/");
             return; // Stop further processing
         }
@@ -153,7 +164,7 @@ export default function MeetingPage() {
       try {
         const meetingRef = doc(db, "meetings", meetingId);
         await updateDoc(meetingRef, { status: 'ended' });
-        // The onSnapshot listener will handle redirection for all users.
+        // The onSnapshot listener will handle localStorage cleanup and redirection for all users.
       } catch (error) {
         console.error("Error ending meeting for all:", error);
       }
@@ -162,6 +173,18 @@ export default function MeetingPage() {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
       try {
         await deleteDoc(participantRef);
+        if (isHost) {
+          // If host leaves without ending, remove from their local storage
+           const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+            if (storedMeetingsRaw) {
+                let meetings = JSON.parse(storedMeetingsRaw);
+                if (Array.isArray(meetings)) {
+                    const updatedMeetings = meetings.filter(m => m.id !== meetingId);
+                    localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
+                    window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
+                }
+            }
+        }
       } catch (error) {
         console.error("Error removing participant on leave:", error);
       }

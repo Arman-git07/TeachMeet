@@ -54,7 +54,7 @@ export type ActivityItem = MeetingActivityItem | DocumentActivityItem | Recordin
 const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
 const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
 const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
-const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
+const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
 const itemIcons: Record<ActivityItemType, React.ElementType> = {
   meeting: Video,
@@ -66,7 +66,7 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
 
 // Updated itemLinks to handle meeting re-join logic
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
-  meeting: (id, item) => `/dashboard/meeting/prejoin?meetingId=${id}&topic=${encodeURIComponent(item.title)}`,
+  meeting: (id, item) => `/dashboard/meeting/prejoin?meetingId=${id}&topic=${encodeURIComponent(item.title)}&role=host`,
   document: (id) => `/dashboard/documents`,
   recording: (id) => `/dashboard/recordings`,
   chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
@@ -98,7 +98,7 @@ export default function HomePage() {
         let storedMeetings = JSON.parse(startedMeetingsRaw);
         if (Array.isArray(storedMeetings)) {
           const now = Date.now();
-          const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < THIRTY_MINUTES_IN_MS));
+          const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < TWO_HOURS_IN_MS));
           
           if(validMeetings.length < storedMeetings.length) {
             localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(validMeetings));
