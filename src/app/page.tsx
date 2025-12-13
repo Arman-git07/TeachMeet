@@ -46,6 +46,7 @@ export interface ChatMentionActivityItem extends BaseActivityItem {
 export interface PrivateMessageActivityItem extends BaseActivityItem {
     type: 'privateMessage';
     from: string;
+    senderId: string;
     meetingId: string;
     meetingTopic: string;
 }

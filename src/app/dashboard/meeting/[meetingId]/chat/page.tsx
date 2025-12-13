@@ -88,7 +88,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
 
 
   const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !user) return;
     
     if(isPrivateChat) {
         notifyRecipient(inputValue);
@@ -97,6 +97,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       senderName: 'You',
+      senderAvatar: user.photoURL || undefined,
       text: inputValue,
       timestamp: new Date(),
       isMe: true,
@@ -167,8 +168,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                           </div>
                           {msg.isMe && (
                             <Avatar className="h-8 w-8 self-start">
-                               <AvatarImage src={`https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
-                              <AvatarFallback>Y</AvatarFallback>
+                               <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                              <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
                             </Avatar>
                           )}
                         </div>
