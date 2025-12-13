@@ -39,6 +39,9 @@ import { db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
+
 
 function PreJoinPageContent() {
   const searchParams = useSearchParams();
@@ -97,6 +100,22 @@ function PreJoinPageContent() {
       setMeetingLink(
         `${window.location.origin}/dashboard/join-meeting?meetingId=${finalMeetingId}`
       );
+    }
+
+    // Failsafe: if host lands here and meeting isn't in localStorage, add it.
+    if (isHostRole && typeof window !== 'undefined') {
+        const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+        let meetings = storedMeetingsRaw ? JSON.parse(storedMeetingsRaw) : [];
+        if (!Array.isArray(meetings)) meetings = [];
+
+        const meetingExists = meetings.some((m: any) => m.id === finalMeetingId);
+        if (!meetingExists) {
+            const now = Date.now();
+            meetings = meetings.filter(m => m && m.startedAt && (now - m.startedAt < THIRTY_MINUTES_IN_MS));
+            meetings.unshift({ id: finalMeetingId, title: finalTopic, startedAt: now });
+            localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5)));
+            window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+        }
     }
   }, [searchParams, router, toast]);
 
