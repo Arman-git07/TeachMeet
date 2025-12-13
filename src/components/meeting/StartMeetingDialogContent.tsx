@@ -21,6 +21,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { v4 as uuidv4 } from 'uuid';
 
+const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
+
+
 export function StartMeetingDialogContent() {
   const router = useRouter();
   const { toast } = useToast();
@@ -72,6 +76,24 @@ export function StartMeetingDialogContent() {
         createdAt: serverTimestamp(),
         status: 'pending', 
       }, { merge: true });
+      
+      // Save meeting to localStorage
+      try {
+        const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+        let meetings = storedMeetingsRaw ? JSON.parse(storedMeetingsRaw) : [];
+        if (!Array.isArray(meetings)) meetings = [];
+
+        const now = Date.now();
+        // Clean up old meetings while we're at it
+        meetings = meetings.filter(m => m && m.startedAt && (now - m.startedAt < THIRTY_MINUTES_IN_MS));
+
+        meetings.unshift({ id: meetingId, title: topic.trim(), startedAt: now });
+        localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5))); // Keep last 5
+        window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
+      } catch (e) {
+        console.error("Failed to save meeting to localStorage", e);
+      }
+
 
       const prejoinPath = `/dashboard/meeting/prejoin?meetingId=${meetingId}&topic=${encodeURIComponent(topic.trim())}&role=host`;
       router.push(prejoinPath);
