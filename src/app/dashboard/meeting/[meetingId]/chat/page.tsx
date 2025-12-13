@@ -24,6 +24,7 @@ interface ChatMessage {
 }
 
 const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
+const INCOMING_MESSAGE_KEY = 'teachmeet-incoming-message';
 
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -47,8 +48,28 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       ? { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are only between you and them.`, timestamp: new Date(), isMe: false }
       : { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}".`, timestamp: new Date(), isMe: false };
       
-    setMessages([initialMessage]);
-  }, [isPrivateChat, privateWithName, topic]);
+    const allMessages: ChatMessage[] = [initialMessage];
+
+    // Check for "received" messages in sessionStorage for this chat
+    if (isPrivateChat) {
+      try {
+        const stored = sessionStorage.getItem(`${INCOMING_MESSAGE_KEY}-${privateWithId}`);
+        if(stored) {
+            const incomingMessage: ChatMessage = JSON.parse(stored);
+            // Ensure message is valid and not stale before adding
+            if (incomingMessage && incomingMessage.senderName !== 'You') {
+              allMessages.push(incomingMessage);
+              // Clear it after displaying
+              sessionStorage.removeItem(`${INCOMING_MESSAGE_KEY}-${privateWithId}`);
+            }
+        }
+      } catch(e) {
+          console.error("Failed to parse incoming message from session storage", e);
+      }
+    }
+
+    setMessages(allMessages);
+  }, [isPrivateChat, privateWithName, topic, privateWithId]);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -63,10 +84,6 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     if (!isPrivateChat || !user || !privateWithName || !privateWithId) return;
 
     try {
-        const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-        let activities = rawActivity ? JSON.parse(rawActivity) : [];
-        if (!Array.isArray(activities)) activities = [];
-
         const newNotification = {
             id: `privateMsg-${Date.now()}-${privateWithId}`,
             type: 'privateMessage',
@@ -77,9 +94,28 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
             meetingTopic: topic,
             timestamp: Date.now(),
         };
-        activities.unshift(newNotification);
 
+        const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+        let activities = rawActivity ? JSON.parse(rawActivity) : [];
+        if (!Array.isArray(activities)) activities = [];
+        
+        // Remove any existing notification for this chat to avoid duplicates
+        activities = activities.filter(act => !(act.type === 'privateMessage' && act.meetingId === meetingId && act.senderId === user.uid));
+        
+        activities.unshift(newNotification);
         localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
+
+        // Store the message for the recipient to pick up
+        const simulatedReceivedMessage: ChatMessage = {
+          id: Date.now().toString(),
+          senderName: user.displayName || 'A user',
+          senderAvatar: user.photoURL || undefined,
+          text: messageText,
+          timestamp: new Date(),
+          isMe: false, // For the recipient, this message is not "from them"
+        }
+        sessionStorage.setItem(`${INCOMING_MESSAGE_KEY}-${user.uid}`, JSON.stringify(simulatedReceivedMessage));
+
         window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
     } catch (e) {
         console.error("Failed to create private message notification", e);
@@ -168,8 +204,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                           </div>
                           {msg.isMe && (
                             <Avatar className="h-8 w-8 self-start">
-                               <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt={msg.senderName} data-ai-hint="avatar user"/>
-                              <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                               <AvatarImage src={user?.photoURL || `https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                              <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
                             </Avatar>
                           )}
                         </div>

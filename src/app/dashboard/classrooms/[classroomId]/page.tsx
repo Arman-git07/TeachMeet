@@ -77,7 +77,7 @@ export interface Exam {
   authorId: string;
   storagePath?: string;
 }
-export interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; }
+export interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; requesterId?: string;}
 export interface SubjectTeacher { teacherId: string; name: string; subject: string; availability: string; }
 
 export interface Assignment {
@@ -105,6 +105,17 @@ export interface Submission {
 export type DeletableItem = {
     collectionName: "materials" | "assignments" | "exams" | "announcements";
     item: { id: string; storagePath?: string };
+}
+
+export interface PrivateMessageActivityItem {
+    type: 'privateMessage';
+    id: string;
+    title: string;
+    timestamp: number;
+    from: string;
+    senderId: string;
+    meetingId: string;
+    meetingTopic: string;
 }
 
 export default function ClassroomPage() {

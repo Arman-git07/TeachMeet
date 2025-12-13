@@ -6,7 +6,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
-import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Maximize, Pin } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Maximize, Pin, MessageSquare } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
@@ -17,8 +17,9 @@ import VideoTile from "./VideoTile";
 import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
-import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
+import type { JoinRequest, PrivateMessageActivityItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 
 type Participant = {
@@ -56,9 +57,13 @@ type Props = {
   initialPinnedId?: string | null;
 };
 
+const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
+
+
 export default function MeetingClient({ meetingId, userId, initialCamOn, initialMicOn, onLeave, topic, initialPinnedId }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -101,6 +106,41 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   const [pinnedId, setPinnedId] = useState<string | null>(initialPinnedId || null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
+
+  const [privateMessage, setPrivateMessage] = useState<PrivateMessageActivityItem | null>(null);
+
+
+  useEffect(() => {
+    const handleStorageUpdate = () => {
+      if (!user) return;
+      try {
+        const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+        if (!rawActivity) return;
+        const activities: PrivateMessageActivityItem[] = JSON.parse(rawActivity);
+        const latestPrivateMessage = activities.find(
+          (act): act is PrivateMessageActivityItem =>
+            act.type === 'privateMessage' && act.meetingId === meetingId
+        );
+        if (latestPrivateMessage && latestPrivateMessage.id !== privateMessage?.id) {
+          setPrivateMessage(latestPrivateMessage);
+        }
+      } catch (e) {
+        console.error("Failed to parse activity from localStorage", e);
+      }
+    };
+
+    handleStorageUpdate(); // Check on mount
+    window.addEventListener('teachmeet_activity_updated', handleStorageUpdate);
+    return () => window.removeEventListener('teachmeet_activity_updated', handleStorageUpdate);
+  }, [user, meetingId, privateMessage?.id]);
+
+  const handleNotificationClick = (message: PrivateMessageActivityItem) => {
+    const url = `/dashboard/meeting/${message.meetingId}/chat?topic=${encodeURIComponent(message.meetingTopic)}&privateWith=${message.senderId}&privateWithName=${encodeURIComponent(message.from)}`;
+    router.push(url);
+    // Clear the message after navigating
+    setPrivateMessage(null);
+  };
+
 
   useEffect(() => {
     const fetchMeetingCreator = async () => {
@@ -617,6 +657,22 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1">
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
+
+      {privateMessage && (
+        <div
+          onClick={() => handleNotificationClick(privateMessage)}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-primary/30 px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown cursor-pointer hover:bg-muted/30"
+        >
+          <div className="flex items-center gap-3">
+            <MessageSquare className="h-6 w-6 text-primary" />
+            <div>
+              <p className="font-semibold">New Private Message</p>
+              <p className="text-sm text-muted-foreground">From: {privateMessage.from}</p>
+            </div>
+          </div>
+          <Button size="sm">View</Button>
+        </div>
+      )}
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 

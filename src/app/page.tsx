@@ -27,7 +27,7 @@ export interface MeetingActivityItem extends BaseActivityItem {
   participants?: number;
 }
 
-export interface DocumentActivityItem extends BaseActivityItem {
+export interface DocumentActivityItem extends BaseActivity_Item {
   type: 'document';
   isPrivate: boolean;
 }
@@ -129,9 +129,9 @@ export default function HomePage() {
     }
     
     const latestActivityRaw = localStorage.getItem(LATEST_ACTIVITY_KEY);
-    const otherActivities = latestActivityRaw ? JSON.parse(latestActivityRaw) : [];
+    const otherActivities: ActivityItem[] = latestActivityRaw ? JSON.parse(latestActivityRaw) : [];
 
-    const combined = [...ongoingMeetings, ...otherActivities]
+    const combined = [...ongoingMeetings, ...otherActivities.filter(act => act.type !== 'privateMessage')]
       .filter(item => item && !dismissedItemIds.includes(item.id))
       .sort((a, b) => b.timestamp - a.timestamp);
 
