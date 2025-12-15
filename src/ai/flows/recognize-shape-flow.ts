@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import { z } from 'zod';
+import {z} from 'zod';
 import {retrier} from '@genkit-ai/flow';
 
 const RecognizeShapeInputSchema = z.object({
@@ -50,8 +50,7 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
       config: {
         responseModalities: ['IMAGE'],
       },
-      tools: [], // Explicitly empty tools array
-      retrier: retrier({ // Added retry logic for 429 errors
+      retrier: retrier({ 
         maxAttempts: 3,
         backoff: {
           initialDelay: 1000,

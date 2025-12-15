@@ -159,38 +159,43 @@ export default function MeetingPage() {
 
   const handleLeave = async (endForAll = false) => {
     if (!meetingId) return;
+
+    // Always clean up local storage for the current user
+    try {
+      const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+      if (storedMeetingsRaw) {
+        let meetings = JSON.parse(storedMeetingsRaw);
+        if (Array.isArray(meetings)) {
+          const updatedMeetings = meetings.filter(m => m.id !== meetingId);
+          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
+          window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
+        }
+      }
+    } catch (e) {
+      console.error("Failed to clean up localStorage on leave", e);
+    }
   
     if (isHost && endForAll) {
       try {
+        // This update will trigger the onSnapshot listener for all clients,
+        // leading to cleanup and redirection.
         const meetingRef = doc(db, "meetings", meetingId);
         await updateDoc(meetingRef, { status: 'ended' });
-        // The onSnapshot listener will handle localStorage cleanup and redirection for all users.
       } catch (error) {
         console.error("Error ending meeting for all:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not end meeting for all participants." });
       }
     } else if (user) {
-      // Logic for a single user (host or participant) leaving
+      // Logic for a single user (host or participant) leaving without ending for all.
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
       try {
         await deleteDoc(participantRef);
-        if (isHost) {
-          // If host leaves without ending, remove from their local storage
-           const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-            if (storedMeetingsRaw) {
-                let meetings = JSON.parse(storedMeetingsRaw);
-                if (Array.isArray(meetings)) {
-                    const updatedMeetings = meetings.filter(m => m.id !== meetingId);
-                    localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
-                    window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
-                }
-            }
-        }
       } catch (error) {
         console.error("Error removing participant on leave:", error);
       }
     }
   
-    // Always redirect the current user away from the meeting page
+    // Always redirect the current user away from the meeting page immediately after cleanup.
     router.push("/");
   };
   
