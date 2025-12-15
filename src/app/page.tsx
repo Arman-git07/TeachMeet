@@ -129,9 +129,20 @@ export default function HomePage() {
     }
     
     const latestActivityRaw = localStorage.getItem(LATEST_ACTIVITY_KEY);
-    const otherActivities: ActivityItem[] = latestActivityRaw ? JSON.parse(latestActivityRaw) : [];
-
-    const combined = [...ongoingMeetings, ...otherActivities.filter(act => act.type !== 'privateMessage')]
+    let otherActivities: ActivityItem[] = [];
+    if (latestActivityRaw) {
+        try {
+            const parsed = JSON.parse(latestActivityRaw);
+            if (Array.isArray(parsed)) {
+                otherActivities = parsed;
+            }
+        } catch (e) {
+             console.error("Failed to parse latest activity from localStorage", e);
+             localStorage.removeItem(LATEST_ACTIVITY_KEY);
+        }
+    }
+    
+    const combined = [...ongoingMeetings, ...otherActivities]
       .filter(item => item && !dismissedItemIds.includes(item.id))
       .sort((a, b) => b.timestamp - a.timestamp);
 
@@ -226,7 +237,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
-      <main className="flex-grow flex flex-col items-center justify-start overflow-hidden p-4 relative pt-16 pb-[18rem]">
+      <main className="flex-grow flex flex-col items-center justify-center overflow-hidden p-4 relative pb-[18rem]">
         <div
           className="absolute inset-0 opacity-10"
           style={{
