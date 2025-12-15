@@ -171,7 +171,7 @@ const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false, d
 ));
 ToolButton.displayName = "ToolButton";
 
-export default function WhiteboardPage() {
+function WhiteboardPageComponent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -215,7 +215,6 @@ export default function WhiteboardPage() {
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
 
-  const [isCollaborateDialogOpen, setIsCollaborateDialogOpen] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
   const [canIDraw, setCanIDraw] = useState(false);
@@ -1263,31 +1262,6 @@ export default function WhiteboardPage() {
 
   return (
     <>
-      <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
-        {/* The trigger is now inside the dropdown in the header, so this Dialog only holds the content */}
-        <DialogContent>
-            <DialogHeader>
-                <ShadDialogTitle>Manage Whiteboard Collaboration</ShadDialogTitle>
-                <DialogDescription>Allow other participants to draw on the shared whiteboard.</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-64 my-4">
-                <div className="space-y-3 pr-4">
-                    {participants.filter(p => p.id !== auth.currentUser?.uid).map(p => (
-                        <div key={p.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8"><AvatarImage src={p.photoURL} data-ai-hint="avatar user"/><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
-                                <Label htmlFor={`perm-${p.id}`}>{p.name}</Label>
-                            </div>
-                            <Switch id={`perm-${p.id}`} checked={drawingPermissions[p.id] || false} onCheckedChange={(checked) => handlePermissionChange(p.id, checked)} />
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
-            <DialogFooter>
-                <DialogClose asChild><Button>Done</Button></DialogClose>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <textarea
         ref={liveTextInputRef}
         onBlur={finalizeLiveText}
@@ -1590,4 +1564,13 @@ export default function WhiteboardPage() {
       </Dialog>
     </>
   );
+}
+
+export default function WhiteboardPage() {
+  const [isCollaborateDialogOpen, setIsCollaborateDialogOpen] = useState(false);
+  return (
+    <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
+      <WhiteboardPageComponent />
+    </Dialog>
+  )
 }
