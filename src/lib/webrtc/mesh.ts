@@ -135,8 +135,6 @@ export class MeshRTC {
 
     const entry = this.createPeerEntry(remoteId, true);
     this.peers.set(remoteId, entry);
-
-    // No longer need artificial delay, negotiationneeded will fire.
   }
 
   private async _handleAnswer(fromId: string, answer: RTCSessionDescriptionInit) {
@@ -152,11 +150,9 @@ export class MeshRTC {
     const entry = this.peers.get(fromId);
     if (!entry) { console.warn("[mesh] got ice-candidate but no pc for", fromId); return; }
     try {
-      // Defer adding candidate until remote description is set
       if (entry.pc.remoteDescription) {
         await entry.pc.addIceCandidate(new RTCIceCandidate(candidate));
       } else {
-        // Simple queue for candidates if remote description is not yet set
         const queue = (entry as any).iceCandidateQueue || [];
         queue.push(candidate);
         (entry as any).iceCandidateQueue = queue;
@@ -238,16 +234,20 @@ export class MeshRTC {
 
 
   public leave() {
-    this.peers.forEach(({ pc }) => pc.close());
+    this.peers.forEach(({ pc }) => {
+        try { pc.close(); } catch (e) {}
+    });
     this.peers.clear();
-    this.socket.disconnect();
+    if(this.socket.connected) {
+        this.socket.disconnect();
+    }
     this.localStream?.getTracks().forEach(track => track.stop());
   }
 
   private cleanupPeer(remoteId: string) {
     const entry = this.peers.get(remoteId);
     if (entry) {
-      entry.pc.close();
+      try { entry.pc.close(); } catch (e) {}
       this.peers.delete(remoteId);
     }
   }
