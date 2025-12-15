@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 
 // --- Type Definitions for this page ---
 interface Participant {
@@ -70,6 +70,7 @@ export default function MeetingPage() {
         if (data.status === 'ended') {
             toast({ title: "Meeting Ended", description: "The host has ended this meeting." });
             // Clean up localStorage for all users on this event
+            const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
             const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
             if (storedMeetingsRaw) {
                 let meetings = JSON.parse(storedMeetingsRaw);
@@ -158,10 +159,11 @@ export default function MeetingPage() {
     }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId, memoizedMeetingActions]);
 
   const handleLeave = async (endForAll = false) => {
-    if (!meetingId) return;
+    if (!meetingId || !user) return;
 
     // Always clean up local storage for the current user
     try {
+      const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
       const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
       if (storedMeetingsRaw) {
         let meetings = JSON.parse(storedMeetingsRaw);
@@ -185,7 +187,7 @@ export default function MeetingPage() {
         console.error("Error ending meeting for all:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not end meeting for all participants." });
       }
-    } else if (user) {
+    } else {
       // Logic for a single user (host or participant) leaving without ending for all.
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
       try {

@@ -17,6 +17,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/hooks/useAuth";
 
 
 interface ChatMessage {
@@ -35,7 +36,7 @@ interface Participant {
   photoURL?: string;
 }
 
-const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 export default function ClassroomChatPage() {
   const { classroomId } = useParams() as { classroomId: string };
@@ -43,6 +44,7 @@ export default function ClassroomChatPage() {
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic') || "Classroom Chat";
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -146,26 +148,31 @@ export default function ClassroomChatPage() {
 
   const notifyMentionedUsers = (messageText: string) => {
     const mentions = messageText.match(/@(\w+(\s\w+)*)/g) || [];
-    if (mentions.length === 0) return;
+    if (mentions.length === 0 || !user) return;
 
     try {
-        const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-        let activities = rawActivity ? JSON.parse(rawActivity) : [];
-        if (!Array.isArray(activities)) activities = [];
-
         mentions.forEach(mention => {
             const userName = mention.substring(1);
+            const mentionedUser = participants.find(p => p.name === userName);
+            if (!mentionedUser) return;
+            
+            const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${mentionedUser.id}`;
+            const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+            let activities = rawActivity ? JSON.parse(rawActivity) : [];
+            if (!Array.isArray(activities)) activities = [];
+
             const newNotification = {
               id: `chatMention-${Date.now()}-${userName}`,
               type: 'chatMention',
               title: `You were mentioned in "${topic}"`,
               timestamp: Date.now(),
-              mentionedBy: 'You', // In a real app, this would be the current user's name
+              mentionedBy: user.displayName || 'A user', 
             };
             activities.unshift(newNotification);
+            
+            localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20))); // Keep last 20 activities
         });
 
-        localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20))); // Keep last 20 activities
         window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
     } catch (e) {
         console.error("Failed to update latest activity in localStorage", e);
@@ -173,13 +180,14 @@ export default function ClassroomChatPage() {
   };
 
   const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !user) return;
 
     notifyMentionedUsers(inputValue);
 
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       senderName: 'You', // In a real app, get from auth
+      senderAvatar: user.photoURL || undefined,
       text: inputValue,
       timestamp: new Date(),
       isMe: true,
@@ -220,6 +228,7 @@ export default function ClassroomChatPage() {
         const newMessage: ChatMessage = {
           id: Date.now().toString(),
           senderName: 'You',
+          senderAvatar: user?.photoURL || undefined,
           audioUrl: audioUrl,
           timestamp: new Date(),
           isMe: true,
@@ -301,8 +310,8 @@ export default function ClassroomChatPage() {
                       </div>
                       {msg.isMe && (
                         <Avatar className="h-8 w-8 self-start">
-                           <AvatarImage src={`https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
-                          <AvatarFallback>Y</AvatarFallback>
+                           <AvatarImage src={user?.photoURL || `https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
+                          <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
                         </Avatar>
                       )}
                     </div>

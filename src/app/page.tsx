@@ -51,9 +51,9 @@ export interface AnnouncementActivityItem extends BaseActivityItem {
 export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem;
 
 
-const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
-const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
+const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
+const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
 const itemIcons: Record<ActivityItemType, React.ElementType> = {
@@ -84,8 +84,29 @@ export default function HomePage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   
+  const getStorageKeys = useCallback(() => {
+    if (!user) return { dismissed: null, started: null, latest: null };
+    return {
+        dismissed: `${DISMISSED_ITEMS_KEY_PREFIX}${user.uid}`,
+        started: `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`,
+        latest: `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`,
+    };
+  }, [user]);
+  
   const loadActivities = useCallback(() => {
+    if (!user) {
+        setIsLoading(false);
+        setAllActivity([]);
+        return;
+    }
     setIsLoading(true);
+    
+    const { dismissed: DISMISSED_ITEMS_KEY, started: STARTED_MEETINGS_KEY, latest: LATEST_ACTIVITY_KEY } = getStorageKeys();
+
+    if (!DISMISSED_ITEMS_KEY || !STARTED_MEETINGS_KEY || !LATEST_ACTIVITY_KEY) {
+        setIsLoading(false);
+        return;
+    }
 
     const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
     const dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
@@ -138,11 +159,12 @@ export default function HomePage() {
 
     setAllActivity(combined);
     setIsLoading(false);
-  }, []);
+  }, [user, getStorageKeys]);
 
   useEffect(() => {
     // Only load activities if the user is authenticated.
-    if (authLoading || !isAuthenticated) {
+    if (authLoading) return;
+    if (!isAuthenticated) {
         setIsLoading(false);
         setAllActivity([]);
         return;
@@ -151,9 +173,10 @@ export default function HomePage() {
     loadActivities();
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === STARTED_MEETINGS_KEY || event.key === DISMISSED_ITEMS_KEY || event.key === LATEST_ACTIVITY_KEY) {
-        loadActivities();
-      }
+        const keys = getStorageKeys();
+        if (event.key === keys.started || event.key === keys.dismissed || event.key === keys.latest) {
+            loadActivities();
+        }
     };
     
     // Listen for changes from other tabs
@@ -169,7 +192,7 @@ export default function HomePage() {
       window.removeEventListener('teachmeet_meeting_ended', loadActivities);
       window.removeEventListener('teachmeet_activity_updated', loadActivities);
     };
-  }, [authLoading, isAuthenticated, loadActivities]);
+  }, [authLoading, isAuthenticated, loadActivities, getStorageKeys]);
 
 
   const tmVisibleDuration = 350;
@@ -193,20 +216,22 @@ export default function HomePage() {
   };
 
   const handleDismissItem = (itemIdToDismiss: string) => {
-    const key = DISMISSED_ITEMS_KEY;
-    const dismissedIdsString = localStorage.getItem(key);
+    const { dismissed: DISMISSED_ITEMS_KEY } = getStorageKeys();
+    if (!DISMISSED_ITEMS_KEY) return;
+    
+    const dismissedIdsString = localStorage.getItem(DISMISSED_ITEMS_KEY);
     let dismissedIds: string[] = [];
     try {
         dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
         if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
-      console.error(`Error parsing dismissed items from ${key}:`, e);
+      console.error(`Error parsing dismissed items from ${DISMISSED_ITEMS_KEY}:`, e);
       dismissedIds = [];
     }
 
     if (!dismissedIds.includes(itemIdToDismiss)) {
       dismissedIds.push(itemIdToDismiss);
-      localStorage.setItem(key, JSON.stringify(dismissedIds));
+      localStorage.setItem(DISMISSED_ITEMS_KEY, JSON.stringify(dismissedIds));
     }
 
     setAllActivity(prev => prev.filter(item => item.id !== itemIdToDismiss));

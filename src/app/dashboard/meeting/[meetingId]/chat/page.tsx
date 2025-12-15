@@ -23,7 +23,7 @@ interface ChatMessage {
   isMe: boolean;
 }
 
-const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 const INCOMING_MESSAGE_KEY = 'teachmeet-incoming-message';
 
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
@@ -84,6 +84,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     if (!isPrivateChat || !user || !privateWithName || !privateWithId) return;
 
     try {
+        const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${privateWithId}`;
+        
         const newNotification = {
             id: `privateMsg-${Date.now()}-${privateWithId}`,
             type: 'privateMessage',

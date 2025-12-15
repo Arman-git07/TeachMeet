@@ -39,7 +39,7 @@ import { db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
 
@@ -103,7 +103,8 @@ function PreJoinPageContent() {
     }
 
     // Failsafe: if host lands here and meeting isn't in localStorage, add it.
-    if (isHostRole && typeof window !== 'undefined') {
+    if (isHostRole && typeof window !== 'undefined' && user) {
+        const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
         const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
         let meetings = storedMeetingsRaw ? JSON.parse(storedMeetingsRaw) : [];
         if (!Array.isArray(meetings)) meetings = [];
@@ -117,7 +118,7 @@ function PreJoinPageContent() {
             window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
         }
     }
-  }, [searchParams, router, toast]);
+  }, [searchParams, router, toast, user]);
 
   useEffect(() => {
     let mounted = true;

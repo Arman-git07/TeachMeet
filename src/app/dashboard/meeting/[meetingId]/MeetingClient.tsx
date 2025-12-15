@@ -57,7 +57,7 @@ type Props = {
   initialPinnedId?: string | null;
 };
 
-const LATEST_ACTIVITY_KEY = 'teachmeet-latest-activity';
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 
 export default function MeetingClient({ meetingId, userId, initialCamOn, initialMicOn, onLeave, topic, initialPinnedId }: Props) {
@@ -114,6 +114,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const handleStorageUpdate = () => {
       if (!user) return;
       try {
+        const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
         const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
         if (!rawActivity) return;
         const activities: PrivateMessageActivityItem[] = JSON.parse(rawActivity);
@@ -607,7 +608,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                 <VideoTile
                   stream={remotes[3].stream}
                   isCameraOn={!remotes[3].isCamOff}
-                  isMicOn={!remotes[3].isMicOn}
+                  isMicOn={!remotes[3].isMicOff}
                   isHandRaised={remotes[3].isHandRaised || false}
                   isFirstHand={remotes[3].id === firstHandRaisedId}
                   raisedCount={raisedCount}
