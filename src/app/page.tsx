@@ -81,7 +81,7 @@ export default function HomePage() {
   const [animationLock, setAnimationLock] = useState(false);
 
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   
   const loadActivities = useCallback(() => {
@@ -123,7 +123,7 @@ export default function HomePage() {
         try {
             const parsed = JSON.parse(latestActivityRaw);
             if (Array.isArray(parsed)) {
-                // Filter out private messages
+                // Filter out private messages, they are handled in-meeting
                 otherActivities = parsed.filter(item => item.type !== 'privateMessage');
             }
         } catch (e) {
@@ -141,8 +141,12 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    // We only want to load activities once authentication is resolved.
-    if (authLoading) return;
+    // Only load activities if the user is authenticated.
+    if (authLoading || !isAuthenticated) {
+        setIsLoading(false);
+        setAllActivity([]);
+        return;
+    };
 
     loadActivities();
 
@@ -165,7 +169,7 @@ export default function HomePage() {
       window.removeEventListener('teachmeet_meeting_ended', loadActivities);
       window.removeEventListener('teachmeet_activity_updated', loadActivities);
     };
-  }, [authLoading, loadActivities]);
+  }, [authLoading, isAuthenticated, loadActivities]);
 
 
   const tmVisibleDuration = 350;
@@ -223,6 +227,87 @@ export default function HomePage() {
     }
   };
 
+  const renderActivityContent = () => {
+    if (authLoading || isLoading) {
+      return (
+        <div className="flex justify-center items-center py-4">
+          <Loader2 className="h-6 w-6 animate-spin text-primary"/>
+          <p className="ml-2 text-muted-foreground">Checking for activities...</p>
+        </div>
+      );
+    }
+    
+    if (!isAuthenticated) {
+        return (
+            <div className="text-center py-4 text-muted-foreground">
+                <p className="mb-2">
+                    <Link href="/auth/signin" className="text-accent font-medium hover:underline">Sign in</Link> to see your recent activity.
+                </p>
+                <p className="text-sm">Start a new meeting to get started!</p>
+            </div>
+        );
+    }
+
+    if (allActivity.length > 0) {
+      return (
+        <ul className="space-y-3 text-left">
+          {allActivity.map((item) => {
+            const Icon = itemIcons[item.type];
+            const rawId = item.id;
+            const link = itemLinks[item.type](rawId, item);
+            const isMeeting = item.type === 'meeting';
+
+            const handleClick = (e: React.MouseEvent) => {
+              if (isMeeting) {
+                e.preventDefault();
+                if (!user) {
+                  router.push(`/auth/signin?redirect=${encodeURIComponent(link)}`);
+                } else {
+                  router.push(link);
+                }
+              }
+            };
+
+            return (
+              <li key={item.id} className="flex items-center gap-2">
+                <Link
+                  href={link}
+                  onClick={handleClick}
+                  className="w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow"
+                >
+                  <Icon className="mr-3 h-5 w-5 text-primary/80" />
+                  <span className="truncate flex-grow text-foreground">{getNotificationText(item)}</span>
+                  {item.type === 'meeting' && (item as MeetingActivityItem).participants && (
+                    <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
+                      <UsersIcon className="h-3 w-3 mr-1" />
+                      {(item as MeetingActivityItem).participants}
+                    </span>
+                  )}
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive rounded-full p-2 flex-shrink-0"
+                  onClick={() => handleDismissItem(item.id)}
+                  aria-label="Dismiss item"
+                >
+                  <XCircle className="h-5 w-5" />
+                </Button>
+              </li>
+            )
+          })}
+        </ul>
+      );
+    }
+
+    return (
+      <div className="text-center py-4 text-muted-foreground">
+        <p className="mb-2">No recent activity.</p>
+        <p className="text-sm">Start a new meeting to get started!</p>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
@@ -252,65 +337,7 @@ export default function HomePage() {
               <History className="mr-3 h-6 w-6" />
               Latest Activity
             </h2>
-            {isLoading || authLoading ? (
-                <div className="flex justify-center items-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary"/>
-                  <p className="ml-2 text-muted-foreground">Checking for activities...</p>
-                </div>
-              ) : allActivity.length > 0 ? (
-              <ul className="space-y-3 text-left">
-                {allActivity.map((item) => {
-                  const Icon = itemIcons[item.type];
-                  const rawId = item.id;
-                  const link = itemLinks[item.type](rawId, item);
-                  const isMeeting = item.type === 'meeting';
-
-                  const handleClick = (e: React.MouseEvent) => {
-                    if (isMeeting) {
-                      e.preventDefault();
-                      if (!user) {
-                        router.push(`/auth/signin?redirect=${encodeURIComponent(link)}`);
-                      } else {
-                        router.push(link);
-                      }
-                    }
-                  };
-
-                  return (
-                    <li key={item.id} className="flex items-center gap-2">
-                      <Link
-                        href={link}
-                        onClick={handleClick}
-                        className="w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow"
-                      >
-                        <Icon className="mr-3 h-5 w-5 text-primary/80" />
-                        <span className="truncate flex-grow text-foreground">{getNotificationText(item)}</span>
-                        {item.type === 'meeting' && (item as MeetingActivityItem).participants && (
-                          <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
-                            <UsersIcon className="h-3 w-3 mr-1" />
-                            {(item as MeetingActivityItem).participants}
-                          </span>
-                        )}
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive rounded-full p-2 flex-shrink-0"
-                        onClick={() => handleDismissItem(item.id)}
-                        aria-label="Dismiss item"
-                      >
-                        <XCircle className="h-5 w-5" />
-                      </Button>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <div className="text-center py-4 text-muted-foreground">
-                <p className="mb-2">No recent activity.</p>
-                <p className="text-sm">Start a new meeting to get started!</p>
-              </div>
-            )}
+            {renderActivityContent()}
           </div>
         </div>
       </main>
