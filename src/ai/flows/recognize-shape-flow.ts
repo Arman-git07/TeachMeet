@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import { z } from 'zod';
-import { GenerateContentRequest, GoogleGenerativeAI } from '@google/generative-ai';
+import {retrier} from '@genkit-ai/flow';
 
 const RecognizeShapeInputSchema = z.object({
   drawingDataUri: z
@@ -27,25 +27,9 @@ const RecognizeShapeOutputSchema = z.object({
 });
 export type RecognizeShapeOutput = z.infer<typeof RecognizeShapeOutputSchema>;
 
-// Helper function to convert Data URI to a format the Google AI SDK expects
-function dataUriToGoogleGenerativeAIContent(uri: string) {
-  const [fileInfo, base64] = uri.split(',');
-  const mimeType = fileInfo.split(':')[1].split(';')[0];
-  return {
-    inlineData: {
-      data: base64,
-      mimeType,
-    },
-  };
-}
-
 
 export async function recognizeShape(input: RecognizeShapeInput): Promise<RecognizeShapeOutput> {
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' });
-
-  // Base prompt instructions
-  let textPrompt = `You are a sophisticated graphic design assistant. Your task is to transform a user's rough drawing into a professional, clean, and high-quality graphic.
+  const textPrompt = `You are a sophisticated graphic design assistant. Your task is to transform a user's rough drawing into a professional, clean, and high-quality graphic.
 
   **Instructions:**
   1.  Analyze the provided image and the user's text prompt.
@@ -57,29 +41,31 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
   **User's Prompt:** "${input.prompt || 'No hint provided. Interpret the drawing.'}"
   `;
 
-  const imagePart = dataUriToGoogleGenerativeAIContent(input.drawingDataUri);
-
-  const request: GenerateContentRequest = {
-    contents: [{ role: 'user', parts: [imagePart, { text: textPrompt }] }],
-  };
-
-  const result = await model.generateContent(request);
-  const response = result.response;
+  const { media } = await ai.generate({
+      model: 'googleai/gemini-2.5-flash-image-preview',
+      prompt: [
+        { media: { url: input.drawingDataUri } },
+        { text: textPrompt },
+      ],
+      config: {
+        responseModalities: ['IMAGE'],
+      },
+      tools: [], // Explicitly empty tools array
+      retrier: retrier({ // Added retry logic for 429 errors
+        maxAttempts: 3,
+        backoff: {
+          initialDelay: 1000,
+          maxDelay: 10000,
+          multiplier: 2
+        }
+      })
+  });
   
-  if (!response.candidates?.length || !response.candidates[0].content.parts.length) {
+  if (!media?.url) {
     throw new Error('Image generation failed to produce an output.');
   }
-
-  const imagePartFromResponse = response.candidates[0].content.parts.find(part => part.inlineData);
-
-  if (!imagePartFromResponse || !imagePartFromResponse.inlineData) {
-    throw new Error('No image data found in the AI response.');
-  }
-  
-  const base64Data = imagePartFromResponse.inlineData.data;
-  const mimeType = imagePartFromResponse.inlineData.mimeType;
   
   return {
-    refinedImageUri: `data:${mimeType};base64,${base64Data}`,
+    refinedImageUri: media.url,
   };
 }
