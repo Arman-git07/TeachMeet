@@ -61,9 +61,6 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
 
   const request: GenerateContentRequest = {
     contents: [{ role: 'user', parts: [imagePart, { text: textPrompt }] }],
-    generationConfig: {
-      responseMimeType: "image/png",
-    },
   };
 
   const result = await model.generateContent(request);
@@ -86,4 +83,3 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
     refinedImageUri: `data:${mimeType};base64,${base64Data}`,
   };
 }
-
