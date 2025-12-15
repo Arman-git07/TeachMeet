@@ -16,7 +16,7 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: [
       '@genkit-ai/flow',
-      '@genkit-ai/googleai',
+      '@genkit-ai/google-genai',
       '@radix-ui/react-accordion',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-avatar',
