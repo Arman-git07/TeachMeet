@@ -6,14 +6,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone, MessageSquare } from 'lucide-react';
+import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 
 
-export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement' | 'privateMessage';
+export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement';
 
 interface BaseActivityItem {
   id: string;
@@ -43,21 +43,12 @@ export interface ChatMentionActivityItem extends BaseActivityItem {
     mentionedBy: string;
 }
 
-export interface PrivateMessageActivityItem extends BaseActivityItem {
-    type: 'privateMessage';
-    from: string;
-    senderId: string;
-    meetingId: string;
-    meetingTopic: string;
-}
-
-
 export interface AnnouncementActivityItem extends BaseActivityItem {
     type: 'announcement';
     classroomId: string;
 }
 
-export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem | PrivateMessageActivityItem;
+export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem;
 
 
 const DISMISSED_ITEMS_KEY = 'teachmeet-dismissed-items';
@@ -71,7 +62,6 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   recording: Clapperboard,
   chatMention: AtSign,
   announcement: Megaphone,
-  privateMessage: MessageSquare,
 };
 
 // Updated itemLinks to handle meeting re-join logic
@@ -81,7 +71,6 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   recording: (id) => `/dashboard/recordings`,
   chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
   announcement: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
-  privateMessage: (id, item) => `/dashboard/meeting/${item.meetingId}/chat?topic=${encodeURIComponent(item.meetingTopic)}&privateWith=${item.senderId}&privateWithName=${encodeURIComponent(item.from)}`,
 };
 
 export default function HomePage() {
@@ -134,7 +123,8 @@ export default function HomePage() {
         try {
             const parsed = JSON.parse(latestActivityRaw);
             if (Array.isArray(parsed)) {
-                otherActivities = parsed;
+                // Filter out private messages
+                otherActivities = parsed.filter(item => item.type !== 'privateMessage');
             }
         } catch (e) {
              console.error("Failed to parse latest activity from localStorage", e);
@@ -228,7 +218,6 @@ export default function HomePage() {
       case 'document': return `New Document: ${item.title}`;
       case 'recording': return `New Recording: ${item.title}`;
       case 'chatMention': return `${(item as ChatMentionActivityItem).mentionedBy} mentioned you: "${item.title}"`;
-      case 'privateMessage': return `New private message from ${(item as PrivateMessageActivityItem).from}`;
       case 'announcement': return `New in Classroom: ${item.title}`;
       default: return item.title;
     }
