@@ -69,7 +69,7 @@ const RecordingCard = ({ rec, onDelete, currentUserId }: { rec: Recording; onDel
 export function RecordingsClientUI() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { user: currentUserId } = useAuth();
+  const { user: currentUser } = useAuth();
   
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +81,7 @@ export function RecordingsClientUI() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentUser) {
       setIsLoading(false);
       setRecordings([]);
       return;
@@ -92,7 +92,7 @@ export function RecordingsClientUI() {
     const q = query(recRef, 
       or(
         where("isPrivate", "==", false), 
-        where("uploaderId", "==", currentUserId.uid)
+        where("uploaderId", "==", currentUser.uid)
       ), 
       orderBy("createdAt", "desc")
     );
@@ -110,10 +110,10 @@ export function RecordingsClientUI() {
     );
 
     return () => unsubscribe();
-  }, [currentUserId, toast]);
+  }, [currentUser, toast]);
   
   const handleUploadClick = () => {
-    if (!currentUserId) {
+    if (!currentUser) {
       toast({ variant: "destructive", title: "Authentication Required", description: "Please sign in to upload recordings." });
       return;
     }
@@ -130,12 +130,12 @@ export function RecordingsClientUI() {
     const file = event.target.files?.[0];
     const destination = event.currentTarget.getAttribute('data-destination') as 'private' | 'public' | null;
 
-    if (!file || !destination || !currentUserId) return;
+    if (!file || !destination || !currentUser) return;
 
     const toastId = `upload-rec-${Date.now()}`;
     toast({ id: toastId, title: "Uploading Recording...", description: "Please wait...", duration: Infinity });
 
-    const storagePath = `recordings/${currentUserId.uid}/${destination}/${Date.now()}-${file.name}`;
+    const storagePath = `recordings/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
     const uploadTask = uploadBytesResumable(fileRef, file);
 
@@ -152,7 +152,7 @@ export function RecordingsClientUI() {
             date: new Date().toLocaleDateString(),
             duration: "N/A", 
             size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
-            uploaderId: currentUserId.uid,
+            uploaderId: currentUser.uid,
             isPrivate: destination === 'private',
             downloadURL,
             storagePath,
@@ -220,7 +220,7 @@ export function RecordingsClientUI() {
     }
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {recs.map(rec => <RecordingCard key={rec.id} rec={rec} onDelete={handleOpenDeleteDialog} currentUserId={currentUserId?.uid || null} />)}
+        {recs.map(rec => <RecordingCard key={rec.id} rec={rec} onDelete={handleOpenDeleteDialog} currentUserId={currentUser?.uid || null} />)}
       </div>
     );
   };
