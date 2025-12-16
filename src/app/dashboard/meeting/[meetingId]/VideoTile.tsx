@@ -1,6 +1,6 @@
 
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   MicOff,
@@ -56,6 +56,17 @@ const VideoTile: React.FC<Props> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const tileRef = useRef<HTMLDivElement | null>(null);
+  const [isMirrored, setIsMirrored] = useState(false);
+
+  useEffect(() => {
+    // Only apply mirror setting for the local user's camera feed
+    if (isLocal && !isScreenSharing) {
+      const mirrorSetting = localStorage.getItem('teachmeet-camera-mirror');
+      setIsMirrored(mirrorSetting === 'true');
+    } else {
+      setIsMirrored(false);
+    }
+  }, [isLocal, isScreenSharing]);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -129,7 +140,8 @@ const VideoTile: React.FC<Props> = ({
           muted={isLocal}
           className={cn(
             "w-full h-full object-cover transition-opacity duration-200 rounded-lg z-0",
-            (isCameraOn || isScreenSharing) && stream ? "opacity-100" : "opacity-0"
+            (isCameraOn || isScreenSharing) && stream ? "opacity-100" : "opacity-0",
+            isMirrored && "transform -scale-x-100"
           )}
         />
 
