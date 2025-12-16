@@ -68,6 +68,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         isHost: false,
       });
 
+      // Update the status on the existing request doc instead of deleting
       batch.update(joinRequestRef, {
         status: "approved",
         approvedAt: serverTimestamp(),
@@ -94,6 +95,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const handleDeny = async (req: JoinRequest) => {
     try {
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
+      // Instead of deleting, update the status to 'denied'
       await updateDoc(reqRef, { status: "denied" });
       
       toast({
@@ -145,3 +147,5 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     </>
   );
 }
+
+    

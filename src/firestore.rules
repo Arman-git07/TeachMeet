@@ -1,3 +1,4 @@
+
 /**
  * @description This ruleset enforces a strict authorization model for meetings, join requests, and participants.
  *   It prioritizes security by ensuring only the host can manage a meeting and only authenticated users can request to join.
@@ -36,15 +37,18 @@ service cloud.firestore {
      * @path /meetings/{meetingId}/joinRequests/{requestId}
      * @allow (create) - Authenticated user can create a join request with userId matching request.auth.uid.
      * @allow (get, list) - Only the host of the meeting can list join requests.
-     * @allow (update, delete) - Only the host of the meeting can update or delete join requests.
+     * @allow (update) - Authenticated users can update their own request (to re-request) OR host can update anyone's (to approve/deny).
+     * @allow (delete) - Only the host of the meeting can delete join requests.
      * @deny (create) - Non-authenticated user or mismatched userId cannot create a join request.
-     * @deny (update, delete) - Non-host user cannot update or delete join requests.
-     * @principle Enforces meeting host control over join requests.
+     * @deny (update, delete) - Non-host/non-owner user cannot update or delete join requests.
+     * @principle Enforces meeting host control over join requests while allowing users to re-submit.
      */
     match /meetings/{meetingId}/joinRequests/{requestId} {
       allow get, list: if isSignedIn() && isOwner(meetingId, request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
+      // Host can update any request. User can update their own request.
+      allow update: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
+      allow delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
     }
 
     /**
@@ -58,7 +62,8 @@ service cloud.firestore {
      * @principle Enforces meeting host control over participants.
      */
     match /meetings/{meetingId}/participants/{userId} {
-      allow get, list, create, update, delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
+      allow get, list: if true; // Allow anyone to read participant list
+      allow create, update, delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
     }
 
     function isSignedIn() {
@@ -76,3 +81,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

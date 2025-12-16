@@ -57,7 +57,7 @@ function PreJoinPageContent() {
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
   
-  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "accepted" | "denied">("idle");
+  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "approved" | "denied">("idle");
 
   const [agreed, setAgreed] = useState(false);
   const [mirrorVideo, setMirrorVideo] = useState(true);
@@ -162,92 +162,59 @@ function PreJoinPageContent() {
   }, [toast]);
   
 useEffect(() => {
-  if (!meetingId || isHost) return;
+  if (!meetingId || isHost || !user) return;
 
   let mounted = true;
-  const auth = getAuth();
   const didRedirectRef = { current: false };
   const unsubRefs: { req?: () => void; part?: () => void } = {};
-  let pollHandle: number | null = null;
 
   const cleanupAll = () => {
     try { unsubRefs.req?.(); } catch {}
     try { unsubRefs.part?.(); } catch {}
-    if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
   };
 
   const redirectToMeeting = () => {
     if (didRedirectRef.current || !mounted) return;
     didRedirectRef.current = true;
     cleanupAll();
+    setRequestStatus('approved');
     const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
     router.replace(destination);
   };
+  
+  const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+  const partRef = doc(db, "meetings", meetingId, "participants", user.uid);
 
-  const stopAuth = onAuthStateChanged(auth, async (user) => {
-    if (!mounted || !user) return;
-    const uid = user.uid;
+  // Participant listener
+  unsubRefs.part = onSnapshot(partRef, (snap) => {
+    if (snap.exists()) {
+      redirectToMeeting();
+    }
+  });
 
-    const reqRef = doc(db, "meetings", meetingId, "joinRequests", uid);
-    const partRef = doc(db, "meetings", meetingId, "participants", uid);
-
-    try {
-      const [reqSnap, partSnap] = await Promise.all([getDoc(reqRef), getDoc(partRef)]);
-      if (partSnap.exists() || (reqSnap.exists() && (reqSnap.data() as any).status === "approved")) {
-        redirectToMeeting();
-        stopAuth(); 
-        return;
+  // Join Request listener
+  unsubRefs.req = onSnapshot(reqRef, (snap) => {
+      if (!mounted) return;
+      if (snap.exists()) {
+          const data = snap.data();
+          if (data.status === "approved") {
+              redirectToMeeting();
+          } else if (data.status === "denied") {
+              setRequestStatus("denied");
+          } else if (data.status === "pending") {
+              setRequestStatus("pending");
+          }
+      } else {
+        // If doc doesn't exist, we are idle (can make a request)
+        setRequestStatus("idle");
       }
-    } catch (e) {
-      console.warn("Prejoin fast-check failed:", e);
-    }
-
-    try {
-      unsubRefs.req = onSnapshot(reqRef, (snap) => {
-        if (!mounted || didRedirectRef.current) return;
-        if (snap.exists() && snap.data()?.status === "approved") {
-          redirectToMeeting();
-        } else if (snap.exists() && snap.data()?.status === "denied") {
-            setRequestStatus("denied");
-        }
-      });
-    } catch (e) {
-      console.warn("Failed to attach joinRequest listener", e);
-    }
-
-    try {
-      unsubRefs.part = onSnapshot(partRef, (snap) => {
-        if (!mounted || didRedirectRef.current) return;
-        if (snap.exists()) {
-          redirectToMeeting();
-        }
-      });
-    } catch (e) {
-      console.warn("Failed to attach participant listener", e);
-    }
-
-    pollHandle = window.setInterval(async () => {
-      if (!mounted || didRedirectRef.current) {
-        if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
-        return;
-      }
-      try {
-        const pSnap = await getDoc(partRef);
-        if (pSnap.exists()) {
-          redirectToMeeting();
-        }
-      } catch (e) {}
-    }, 3000);
-
-    stopAuth();
   });
 
   return () => {
     mounted = false;
     cleanupAll();
-    try { stopAuth(); } catch {}
   };
-}, [meetingId, isHost, router, topic, isCameraOn, isMicOn]);
+}, [meetingId, isHost, user, router, topic, isCameraOn, isMicOn]);
 
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user || !isHost) return;
@@ -295,47 +262,35 @@ useEffect(() => {
 
     try {
         const meetingSnap = await getDoc(meetingRef);
-
-        if (!meetingSnap.exists()) {
-            console.warn("AskToJoin: meeting doc not found", { meetingId });
-            setStartError("This meeting does not exist or the host hasn't started it yet.");
-            toast({ variant: "destructive", title: "Meeting not available", description: "The host may not have started the meeting yet." });
+        if (!meetingSnap.exists() || meetingSnap.data().status === 'ended') {
+            setStartError("This meeting does not exist or has already ended.");
+            toast({ variant: "destructive", title: "Meeting not available" });
             return;
         }
 
-        const meetingData = meetingSnap.data() || {};
-        const hostId = meetingData.creatorId || meetingData.hostId || null;
-        if (!hostId) {
-            console.warn("AskToJoin: meeting exists but missing creatorId", { meetingId, meetingData });
-            setStartError("This meeting is not correctly configured. Contact the host.");
-            toast({ variant: "destructive", title: "Meeting invalid", description: "Host information missing." });
-            return;
-        }
-
-        if (user.uid === hostId) {
+        if (user.uid === meetingSnap.data().hostId) {
             toast({ title: "You are the host", description: "Use 'Join Now as Host' to start the meeting." });
             return;
         }
         
-        // If re-requesting after denial, reset the status to pending
+        setRequestStatus("pending");
         await setDoc(reqRef, {
             userId: user.uid,
             userName: user.displayName || "Guest User",
             userPhotoURL: user.photoURL || "",
             status: "pending",
             requestedAt: serverTimestamp()
-        }, { merge: true }); // Use merge to avoid overwriting denial count if implemented later
+        }, { merge: true });
 
-        setRequestStatus("pending");
         toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
 
     } catch (err: any) {
         console.error("AskToJoin: unexpected error:", err);
         if (err?.code === 'permission-denied') {
-            toast({ variant: 'destructive', title: 'Request Failed', description: 'Permission denied. Check Firestore rules.' });
+            toast({ variant: 'destructive', title: 'Request Failed', description: 'Permission denied. Please check your Firestore rules.' });
             setStartError("Permission denied. Contact admin.");
         } else {
-            toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Try again.' });
+            toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Please try again.' });
             setStartError("Could not send join request. Try again.");
         }
         setRequestStatus("idle");
@@ -357,11 +312,11 @@ useEffect(() => {
     // Participant flow
     switch (requestStatus) {
       case 'pending':
-      case 'accepted':
+      case 'approved':
         return (
           <div className="text-center space-y-2">
               <Button disabled className="w-full py-3 text-lg font-semibold rounded-xl bg-primary/20 text-primary-foreground/80 border border-primary/30 cursor-wait"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Waiting for host...</Button>
-              <p className="text-xs text-muted-foreground">{requestStatus === 'accepted' ? 'Approved! Joining now...' : 'Waiting for the host to approve your request.'}</p>
+              <p className="text-xs text-muted-foreground">{requestStatus === 'approved' ? 'Approved! Joining now...' : 'Waiting for the host to approve your request.'}</p>
           </div>
         );
       case 'denied':
@@ -446,3 +401,5 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
+
+    
