@@ -135,8 +135,9 @@ function PreJoinPageContent() {
           videoRef.current.srcObject = stream;
         }
         
-        const desiredMicState = localStorage.getItem('teachmeet-mic-default') !== 'off';
-        const desiredCamState = localStorage.getItem('teachmeet-camera-default') !== 'off';
+        // Use the consistent localStorage keys
+        const desiredMicState = localStorage.getItem('teachmeet-mic-state') !== 'false';
+        const desiredCamState = localStorage.getItem('teachmeet-cam-state') !== 'false';
         
         setIsMicOn(desiredMicState); 
         setIsCameraOn(desiredCamState);
@@ -389,8 +390,8 @@ useEffect(() => {
   };
   
   const handleMirrorToggle = (checked: boolean) => { setMirrorVideo(checked); localStorage.setItem('teachmeet-camera-mirror', String(checked)); };
-  const toggleCamera = () => { if (!localStream) return; const nextState = !isCameraOn; setIsCameraOn(nextState); localStream.getVideoTracks().forEach((track) => track.enabled = nextState); localStorage.setItem('teachmeet-camera-default', nextState ? 'on' : 'off'); };
-  const toggleMic = () => { if (!localStream) return; const nextState = !isMicOn; setIsMicOn(nextState); localStream.getAudioTracks().forEach((track) => track.enabled = nextState); localStorage.setItem('teachmeet-mic-default', nextState ? 'on' : 'off'); };
+  const toggleCamera = () => { if (!localStream) return; const nextState = !isCameraOn; setIsCameraOn(nextState); localStream.getVideoTracks().forEach((track) => track.enabled = nextState); localStorage.setItem('teachmeet-cam-state', nextState ? 'true' : 'false'); };
+  const toggleMic = () => { if (!localStream) return; const nextState = !isMicOn; setIsMicOn(nextState); localStream.getAudioTracks().forEach((track) => track.enabled = nextState); localStorage.setItem('teachmeet-mic-state', nextState ? 'true' : 'false'); };
   const handleCopyToClipboard = (textToCopy: string, type: 'Link' | 'Code') => { navigator.clipboard.writeText(textToCopy).then(() => toast({ title: `${type} Copied!` })).catch(() => toast({ variant: 'destructive', title: 'Copy Failed' })); };
   const videoClassNames = cn('h-full w-full object-cover transition-opacity duration-300 rounded-2xl', mirrorVideo && 'transform -scale-x-100', (hasCameraPermission && isCameraOn) ? 'opacity-100' : 'opacity-0', { 'video-filter-brightclear': applyFilter && videoFilter === 'brightclear' });
 
