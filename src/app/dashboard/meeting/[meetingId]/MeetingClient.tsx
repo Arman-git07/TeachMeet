@@ -70,18 +70,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [camOn, setCamOn] = useState(initialCamOn);
   const [micOn, setMicOn] = useState(initialMicOn);
   
-  // Defer reading from localStorage until component mounts on the client
-  useEffect(() => {
-    const savedCamState = localStorage.getItem('teachmeet-cam-state');
-    if (savedCamState !== null) {
-      setCamOn(savedCamState === 'true');
-    }
-    const savedMicState = localStorage.getItem('teachmeet-mic-state');
-    if (savedMicState !== null) {
-      setMicOn(savedMicState === 'true');
-    }
-  }, []);
-
   const [loadingMedia, setLoadingMedia] = useState(true);
 
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
