@@ -135,7 +135,6 @@ function PreJoinPageContent() {
           videoRef.current.srcObject = stream;
         }
         
-        // Use the consistent localStorage keys
         const desiredMicState = localStorage.getItem('teachmeet-mic-state') !== 'false';
         const desiredCamState = localStorage.getItem('teachmeet-cam-state') !== 'false';
         

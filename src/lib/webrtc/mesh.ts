@@ -114,12 +114,12 @@ export class MeshRTC {
     }
     const pc = entry.pc;
     
-    // Wait until local stream is attached to this specific peer connection
-    await this.waitForLocalStreamAttachment(pc);
-
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       console.log("[mesh] setRemoteDescription done for", fromId);
+
+      // Wait until local stream is attached to this specific peer connection
+      await this.waitForLocalStreamAttachment(pc);
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);

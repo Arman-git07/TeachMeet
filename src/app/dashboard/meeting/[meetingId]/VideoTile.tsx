@@ -72,7 +72,6 @@ const VideoTile: React.FC<Props> = ({
     const videoEl = videoRef.current;
     if (videoEl) {
       if (stream && videoEl.srcObject !== stream) {
-        console.log(`[VideoTile ${name}] Assigning new stream:`, stream.id);
         videoEl.srcObject = stream;
         videoEl.play().catch(e => console.warn(`[VideoTile ${name}] Autoplay was prevented:`, e));
       } else if (!stream) {
