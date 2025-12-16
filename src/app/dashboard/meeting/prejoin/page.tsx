@@ -227,19 +227,17 @@ useEffect(() => {
     }
 
     pollHandle = window.setInterval(async () => {
-      if (!mounted || didRedirectRef.current || tries >= 8) {
+      if (!mounted || didRedirectRef.current) {
         if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
         return;
       }
-      let tries = 0;
-      tries++;
       try {
         const pSnap = await getDoc(partRef);
         if (pSnap.exists()) {
           redirectToMeeting();
         }
       } catch (e) {}
-    }, 1000);
+    }, 3000);
 
     stopAuth();
   });
@@ -319,19 +317,16 @@ useEffect(() => {
             return;
         }
         
-        if (requestStatus === 'denied') {
-             await deleteDoc(reqRef).catch(() => {});
-        }
-
-        setRequestStatus("pending");
+        // If re-requesting after denial, reset the status to pending
         await setDoc(reqRef, {
             userId: user.uid,
             userName: user.displayName || "Guest User",
             userPhotoURL: user.photoURL || "",
             status: "pending",
             requestedAt: serverTimestamp()
-        });
+        }, { merge: true }); // Use merge to avoid overwriting denial count if implemented later
 
+        setRequestStatus("pending");
         toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
 
     } catch (err: any) {

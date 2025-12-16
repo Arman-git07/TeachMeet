@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -94,7 +94,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const handleDeny = async (req: JoinRequest) => {
     try {
       const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
-      await writeBatch(db).update(reqRef, { status: "denied" }).commit();
+      await updateDoc(reqRef, { status: "denied" });
       
       toast({
         variant: "destructive",
