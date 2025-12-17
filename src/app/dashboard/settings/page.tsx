@@ -418,17 +418,17 @@ export default function SettingsPage() {
                     <SelectTrigger id="video-filter" className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger>
                     <SelectContent className="rounded-lg">
                         <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="grayscale">Grayscale</SelectItem>
-                        <SelectItem value="sepia">Sepia</SelectItem>
-                        <SelectItem value="vintage">Vintage</SelectItem>
-                        <SelectItem value="luminous">Luminous</SelectItem>
-                        <SelectItem value="dramatic">Dramatic</SelectItem>
-                        <SelectItem value="goldenhour">Golden Hour</SelectItem>
-                        <SelectItem value="softfocus">Soft Focus</SelectItem>
                         <SelectItem value="brightclear">Bright & Clear</SelectItem>
                         <SelectItem value="naturalglow">Natural Glow</SelectItem>
                         <SelectItem value="radiantskin">Radiant Skin</SelectItem>
                         <SelectItem value="smoothbright">Smooth & Bright</SelectItem>
+                        <SelectItem value="vintage">Vintage</SelectItem>
+                        <SelectItem value="luminous">Luminous</SelectItem>
+                        <SelectItem value="goldenhour">Golden Hour</SelectItem>
+                        <SelectItem value="softfocus">Soft Focus</SelectItem>
+                        <SelectItem value="grayscale">Grayscale</SelectItem>
+                        <SelectItem value="sepia">Sepia</SelectItem>
+                        <SelectItem value="dramatic">Dramatic</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -672,5 +672,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

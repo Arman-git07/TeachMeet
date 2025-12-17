@@ -34,7 +34,7 @@ import { ShareOptionsPanel } from '@/components/common/ShareOptionsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -274,6 +274,7 @@ useEffect(() => {
         }
         
         setRequestStatus("pending");
+        // On re-request, update status back to pending. On first request, create it.
         await setDoc(reqRef, {
             userId: user.uid,
             userName: user.displayName || "Guest User",
@@ -372,7 +373,7 @@ useEffect(() => {
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between"><Label htmlFor="mirror-video" className="flex items-center gap-2 cursor-pointer"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label><Switch id="mirror-video" checked={mirrorVideo} onCheckedChange={handleMirrorToggle}/></div>
                         <div className="flex items-center justify-between"><Label htmlFor="apply-filter" className="flex items-center gap-2 cursor-pointer"><Sparkles className="h-4 w-4" /> Apply Filter</Label><Switch id="apply-filter" checked={applyFilter} onCheckedChange={setApplyFilter}/></div>
-                        <Select value={videoFilter} onValueChange={setVideoFilter} disabled={!applyFilter}><SelectTrigger className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger><SelectContent className="rounded-lg"><SelectItem value="brightclear">Bright & Clear</SelectItem><SelectItem value="vintage">Vintage</SelectItem><SelectItem value="naturalglow">Natural Glow</SelectItem></SelectContent></Select>
+                        <Select value={videoFilter} onValueChange={setVideoFilter} disabled={!applyFilter}><SelectTrigger className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger><SelectContent className="rounded-lg"><SelectItem value="none">None</SelectItem><SelectItem value="brightclear">Bright & Clear</SelectItem><SelectItem value="naturalglow">Natural Glow</SelectItem><SelectItem value="radiantskin">Radiant Skin</SelectItem><SelectItem value="smoothbright">Smooth & Bright</SelectItem><SelectItem value="vintage">Vintage</SelectItem><SelectItem value="luminous">Luminous</SelectItem><SelectItem value="goldenhour">Golden Hour</SelectItem><SelectItem value="softfocus">Soft Focus</SelectItem><SelectItem value="grayscale">Grayscale</SelectItem><SelectItem value="sepia">Sepia</SelectItem><SelectItem value="dramatic">Dramatic</SelectItem></SelectContent></Select>
                         <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg text-sm"><Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic)}`}><Settings className="mr-2 h-4 w-4" /> More A/V Settings...</Link></Button>
                     </CardContent>
                 </Card>
@@ -401,5 +402,3 @@ export default function PreJoinPage() {
         </Suspense>
     )
 }
-
-    
