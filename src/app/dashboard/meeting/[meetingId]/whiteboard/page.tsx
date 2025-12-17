@@ -35,7 +35,6 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { recognizeShape } from "@/ai/flows/recognize-shape-flow";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -931,6 +930,9 @@ function WhiteboardPageComponent() {
     const drawingDataUri = tempCanvas.toDataURL('image/png');
   
     try {
+      // Dynamically import the AI flow only when it's needed.
+      const { recognizeShape } = await import('@/ai/flows/recognize-shape-flow');
+
       const result = await recognizeShape({ drawingDataUri, prompt: refinePrompt });
   
       const newImg = new Image();
@@ -1574,3 +1576,5 @@ export default function WhiteboardPage() {
     </Dialog>
   )
 }
+
+    
