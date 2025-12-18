@@ -7,9 +7,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LinkIcon, Loader2 } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
+
+const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
+
+async function isMeetingEmpty(meetingId: string): Promise<boolean> {
+    const participantsRef = collection(db, 'meetings', meetingId, 'participants');
+    const q = query(participantsRef, limit(1));
+    const snapshot = await getDocs(q);
+    return snapshot.empty;
+}
 
 export function JoinMeetingClient() {
   const [meetingInput, setMeetingInput] = useState('');
@@ -72,7 +81,7 @@ export function JoinMeetingClient() {
         const docSnap = await getDoc(meetingRef);
 
         if (!docSnap.exists()) {
-            toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or may have ended." });
+            toast({ variant: "destructive", title: "Meeting Not Found", description: "This meeting does not exist or may have been deleted." });
             setIsLoading(false);
             return;
         }
@@ -83,6 +92,16 @@ export function JoinMeetingClient() {
             toast({ variant: "destructive", title: "Meeting Has Ended", description: "This meeting is no longer active." });
             setIsLoading(false);
             return;
+        }
+
+        const meetingAge = Date.now() - meetingData.createdAt.toDate().getTime();
+        if (meetingAge > TWO_HOURS_IN_MS) {
+            const isEmpty = await isMeetingEmpty(meetingId);
+            if (isEmpty) {
+                toast({ variant: "destructive", title: "Meeting Expired", description: "This meeting is old and no longer available to join." });
+                setIsLoading(false);
+                return;
+            }
         }
         
         if (user && meetingData.hostId === user.uid) {
