@@ -57,6 +57,10 @@ export default function handler(
         socket.to(roomId).emit("user-joined", userId);
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
+
+      socket.on("public-chat-message", (roomId, message) => {
+        socket.to(roomId).emit("new-public-message", message);
+      });
       
       socket.on('draw', (data) => {
         // @ts-ignore

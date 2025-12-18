@@ -2,74 +2,67 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Users, MessageSquare, Lock } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { io, Socket } from "socket.io-client";
 
 interface ChatMessage {
   id: string;
   senderName: string;
   senderAvatar?: string;
+  senderId?: string;
   text: string;
   timestamp: Date;
   isMe: boolean;
 }
 
-const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
-const INCOMING_MESSAGE_KEY = 'teachmeet-incoming-message';
-
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
-  const router = useRouter();
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic') || "Meeting Chat";
-  const privateWithId = searchParams.get('privateWith');
-  const privateWithName = searchParams.get('privateWithName');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [showMeetingId, setShowMeetingId] = useState(false);
-  
   const { user } = useAuth();
+  const socketRef = useRef<Socket | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
-  
-  const isPrivateChat = !!privateWithId;
 
   useEffect(() => {
-    const initialMessage: ChatMessage = isPrivateChat
-      ? { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are only between you and them.`, timestamp: new Date(), isMe: false }
-      : { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}".`, timestamp: new Date(), isMe: false };
-      
-    const allMessages: ChatMessage[] = [initialMessage];
+    if (!user) return;
 
-    // Check for "received" messages in sessionStorage for this chat
-    if (isPrivateChat) {
-      try {
-        const stored = sessionStorage.getItem(`${INCOMING_MESSAGE_KEY}-${privateWithId}`);
-        if(stored) {
-            const incomingMessage: ChatMessage = JSON.parse(stored);
-            // Ensure message is valid and not stale before adding
-            if (incomingMessage && incomingMessage.senderName !== 'You') {
-              allMessages.push(incomingMessage);
-              // Clear it after displaying
-              sessionStorage.removeItem(`${INCOMING_MESSAGE_KEY}-${privateWithId}`);
-            }
-        }
-      } catch(e) {
-          console.error("Failed to parse incoming message from session storage", e);
-      }
-    }
+    const socket = io({
+      path: "/api/socketio",
+    });
+    socketRef.current = socket;
 
-    setMessages(allMessages);
-  }, [isPrivateChat, privateWithName, topic, privateWithId]);
+    socket.on("connect", () => {
+      socket.emit("join-room", meetingId, user.uid);
+    });
+
+    socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe'>) => {
+      setMessages((prev) => [
+        ...prev,
+        { ...message, timestamp: new Date(message.timestamp), isMe: message.senderId === user.uid },
+      ]);
+    });
+
+    setMessages([
+        { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted.`, timestamp: new Date(), isMe: false }
+    ]);
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [meetingId, user]);
+
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -79,68 +72,25 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         }
     }
   }, [messages]);
-  
-  const notifyRecipient = (messageText: string) => {
-    if (!isPrivateChat || !user || !privateWithName || !privateWithId) return;
-
-    try {
-        const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${privateWithId}`;
-        
-        const newNotification = {
-            id: `privateMsg-${Date.now()}-${privateWithId}`,
-            type: 'privateMessage',
-            title: `New message from ${user.displayName || 'a user'}`,
-            from: user.displayName || 'A user',
-            senderId: user.uid,
-            meetingId: meetingId,
-            meetingTopic: topic,
-            timestamp: Date.now(),
-        };
-
-        const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-        let activities = rawActivity ? JSON.parse(rawActivity) : [];
-        if (!Array.isArray(activities)) activities = [];
-        
-        // Remove any existing notification for this chat to avoid duplicates
-        activities = activities.filter(act => !(act.type === 'privateMessage' && act.meetingId === meetingId && act.senderId === user.uid));
-        
-        activities.unshift(newNotification);
-        localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
-
-        // Store the message for the recipient to pick up
-        const simulatedReceivedMessage: ChatMessage = {
-          id: Date.now().toString(),
-          senderName: user.displayName || 'A user',
-          senderAvatar: user.photoURL || undefined,
-          text: messageText,
-          timestamp: new Date(),
-          isMe: false, // For the recipient, this message is not "from them"
-        }
-        sessionStorage.setItem(`${INCOMING_MESSAGE_KEY}-${user.uid}`, JSON.stringify(simulatedReceivedMessage));
-
-        window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-    } catch (e) {
-        console.error("Failed to create private message notification", e);
-    }
-  };
-
 
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !user) return;
+    if (!inputValue.trim() || !user || !socketRef.current) return;
     
-    if(isPrivateChat) {
-        notifyRecipient(inputValue);
-    }
-
-    const newMessage: ChatMessage = {
+    const message: Omit<ChatMessage, 'isMe'> = {
       id: Date.now().toString(),
-      senderName: 'You',
+      senderId: user.uid,
+      senderName: user.displayName || 'Anonymous',
       senderAvatar: user.photoURL || undefined,
       text: inputValue,
       timestamp: new Date(),
-      isMe: true,
     };
-    setMessages(prev => [...prev, newMessage]);
+
+    // Add message locally immediately for responsiveness
+    setMessages(prev => [...prev, { ...message, isMe: true }]);
+    
+    // Emit to server to broadcast to others
+    socketRef.current.emit('public-chat-message', meetingId, message);
+
     setInputValue("");
   };
   
@@ -153,15 +103,10 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       <header className="flex-none p-3 border-b bg-background shadow-sm">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-             {isPrivateChat ? <Lock className="h-7 w-7 text-accent" /> : <MessageSquare className="h-7 w-7 text-primary" />}
-            <div className="cursor-pointer" onClick={() => setShowMeetingId(prev => !prev)}>
-              <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-                {showMeetingId ? meetingId : (isPrivateChat ? `Chat with ${privateWithName}` : topic)}
+             <MessageSquare className="h-7 w-7 text-primary" />
+             <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
+                {topic}
               </h1>
-              <p className="text-xs text-muted-foreground">
-                 {showMeetingId ? 'Click to show topic' : 'Click to show Meeting ID'}
-              </p>
-            </div>
           </div>
           <Button asChild variant="outline" className="rounded-lg">
             <Link href={backToMeetingLink}>
@@ -177,43 +122,33 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
-                  {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground pt-16">
-                      <MessageSquare className="w-16 h-16 mb-4" />
-                      <p className="text-lg">No messages yet.</p>
-                      <p>Be the first to send a message!</p>
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
+                      {!msg.isMe && (
+                        <Avatar className="h-8 w-8 self-start">
+                          <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                          <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div
+                        className={cn(
+                          "max-w-[70%] p-3 rounded-xl shadow",
+                          msg.senderName === 'System' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
+                          msg.isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
+                        )}
+                      >
+                        {!msg.isMe && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        {msg.senderName !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                      </div>
+                      {msg.isMe && (
+                        <Avatar className="h-8 w-8 self-start">
+                           <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'You'} data-ai-hint="avatar user"/>
+                          <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
+                        </Avatar>
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      {messages.map((msg) => (
-                        <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
-                          {!msg.isMe && (
-                            <Avatar className="h-8 w-8 self-start">
-                              <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
-                              <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                          )}
-                          <div
-                            className={cn(
-                              "max-w-[70%] p-3 rounded-xl shadow",
-                              msg.senderName === 'System' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
-                              msg.isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
-                            )}
-                          >
-                            {!msg.isMe && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
-                            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                            {msg.senderName !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
-                          </div>
-                          {msg.isMe && (
-                            <Avatar className="h-8 w-8 self-start">
-                               <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'You'} data-ai-hint="avatar user"/>
-                              <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
-                            </Avatar>
-                          )}
-                        </div>
-                      ))}
-                    </>
-                  )}
+                  ))}
                 </div>
               </ScrollArea>
           </CardContent>
@@ -228,7 +163,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
               <Textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={isPrivateChat ? `Message ${privateWithName}...` : "Type your message..."}
+                placeholder={"Type your message..."}
                 className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px]"
                 rows={1}
                 onKeyDown={(e) => {
@@ -247,7 +182,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         </Card>
       </main>
        <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-        TeachMeet Chat - Real-time features require backend integration.
+        Public chat messages are not stored.
       </footer>
     </div>
   );
