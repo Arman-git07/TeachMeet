@@ -206,7 +206,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                           </div>
                           {msg.isMe && (
                             <Avatar className="h-8 w-8 self-start">
-                               <AvatarImage src={user?.photoURL || `https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                               <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'You'} data-ai-hint="avatar user"/>
                               <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
                             </Avatar>
                           )}
