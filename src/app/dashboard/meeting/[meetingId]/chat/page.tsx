@@ -20,13 +20,13 @@ interface ChatMessage {
   senderName: string;
   senderAvatar?: string;
   senderId: string;
+  recipientId?: string; // For private messages
   text: string;
   timestamp: Date;
   isMe: boolean;
   isPrivate: boolean;
 }
 
-const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -66,7 +66,6 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     });
 
     socket.on("new-private-message", (message: Omit<ChatMessage, 'isMe' | 'isPrivate'>) => {
-        // Show message only if in the correct private chat tab
         const currentPrivateChatId = activeTab;
         const relevantPartyId = message.senderId === user.uid ? message.recipientId : message.senderId;
 
@@ -77,23 +76,27 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
             ]);
         }
     });
-    
-    if (privateWithId) {
-        setActiveTab(privateWithId);
-        setMessages([
-          { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' }
-        ]);
-    } else {
-        setMessages([
-            { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }
-        ]);
-    }
 
     return () => {
       socket.disconnect();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meetingId, user]);
+  }, [meetingId, user, activeTab]);
+
+  // Effect to handle tab changes and set initial system messages
+  useEffect(() => {
+      if (activeTab === 'public') {
+          setMessages([
+              { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }
+          ]);
+      } else if (activeTab === privateWithId && privateWithName) {
+          setMessages([
+            { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' }
+          ]);
+      } else {
+        // Fallback or clear if tab is unknown
+        setMessages([]);
+      }
+  }, [activeTab, privateWithId, privateWithName, topic]);
 
 
   useEffect(() => {
@@ -119,9 +122,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           timestamp: new Date(),
           isPrivate: true,
       };
-      // Add locally first
-      setMessages(prev => [...prev, { ...privateMessage, isMe: true }]);
-      // Emit to server
+      // No longer add locally first, let the server echo it back to ensure it was sent
       socketRef.current.emit('private-chat-message', meetingId, privateMessage);
 
     } else {
@@ -134,7 +135,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         timestamp: new Date(),
         isPrivate: false,
       };
-      setMessages(prev => [...prev, { ...publicMessage, isMe: true }]);
+      // Let server echo back public messages too for consistency
       socketRef.current.emit('public-chat-message', meetingId, publicMessage);
     }
     setInputValue("");
@@ -149,7 +150,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           <div className="flex items-center gap-3">
              <MessageSquare className="h-7 w-7 text-primary" />
              <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-                {privateWithName ? `Chat with ${privateWithName}` : topic}
+                {privateWithName && activeTab === privateWithId ? `Chat with ${privateWithName}` : topic}
               </h1>
           </div>
           <Button asChild variant="outline" className="rounded-lg">
@@ -220,7 +221,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
               <Textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={privateWithName ? `Private message to ${privateWithName}...` : "Type your message..."}
+                placeholder={privateWithName && activeTab === privateWithId ? `Private message to ${privateWithName}...` : "Type your message..."}
                 className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px]"
                 rows={1}
                 onKeyDown={(e) => {

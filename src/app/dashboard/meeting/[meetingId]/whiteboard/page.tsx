@@ -880,6 +880,15 @@ function WhiteboardPageComponent() {
   const handleRecognizeShape = async () => {
     setIsRefineDialogOpen(false);
     
+    if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+        toast({
+            variant: "destructive",
+            title: "API Key Missing",
+            description: "The GOOGLE_API_KEY is not configured. This feature is disabled.",
+        });
+        return;
+    }
+
     const currentPage = pages[currentPageIndex];
     if (currentPage.selectedElementIds.size === 0) {
       toast({
@@ -1576,5 +1585,3 @@ export default function WhiteboardPage() {
     </Dialog>
   )
 }
-
-    

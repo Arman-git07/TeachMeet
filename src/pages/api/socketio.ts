@@ -12,8 +12,6 @@ interface RoomState {
 }
 const rooms = new Map<string, RoomState>();
 
-const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
-
 
 const getSocketByUserId = (io: IOServer, roomId: string, userId: string): Socket | undefined => {
     const roomState = rooms.get(roomId);
@@ -74,27 +72,15 @@ export default function handler(
 
         if (recipientSocket) {
             recipientSocket.emit("new-private-message", message);
-            // Also send back to sender to confirm
-            socket.emit("new-private-message", message);
-
-             // For notification system, we can emit a separate event or handle here
-            const notificationPayload = {
-              type: 'privateMessage',
-              id: `pm-${Date.now()}`,
-              title: `New message from ${message.senderName}`,
-              timestamp: Date.now(),
-              from: message.senderName,
-              senderId: message.senderId,
-              meetingId: roomId,
-              meetingTopic: message.topic // Assuming topic is passed in message
-            };
-            recipientSocket.emit('notify-activity', 'privateMessage', notificationPayload);
         }
+        // Always send back to sender to confirm it was sent and to display it
+        socket.emit("new-private-message", message);
       });
 
 
       socket.on("public-chat-message", (roomId, message) => {
-        socket.to(roomId).emit("new-public-message", message);
+        // Echo public messages back to everyone in the room, including sender
+        io.to(roomId).emit("new-public-message", message);
       });
       
       socket.on('draw', (data) => {
