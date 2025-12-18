@@ -1,15 +1,27 @@
 
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
-import { Server as IOServer } from "socket.io";
+import { Server as IOServer, Socket } from "socket.io";
 
 // Store room state in memory
 interface RoomState {
   hostId: string | null;
   permissions: Record<string, boolean>; // userId -> canDraw
   elements: any[]; // Store whiteboard elements
+  users: Map<string, { socketId: string, displayName?: string, photoURL?: string }>; // userId -> socketId
 }
 const rooms = new Map<string, RoomState>();
+
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
+
+
+const getSocketByUserId = (io: IOServer, roomId: string, userId: string): Socket | undefined => {
+    const roomState = rooms.get(roomId);
+    const socketId = roomState?.users.get(userId)?.socketId;
+    if (!socketId) return undefined;
+    return io.sockets.sockets.get(socketId);
+};
+
 
 export default function handler(
   req: NextApiRequest,
@@ -29,34 +41,57 @@ export default function handler(
 
     io.on("connection", (socket) => {
       console.log("Socket connected:", socket.id);
+      const { userId, displayName, photoURL } = socket.handshake.query;
 
-      socket.on("join-room", (roomId: string, userId: string) => {
+      socket.on("join-room", (roomId: string, currentUserId: string) => {
         socket.join(roomId);
         // @ts-ignore - extending socket object
-        socket.data = { roomId, userId };
+        socket.data = { roomId, userId: currentUserId, displayName, photoURL };
 
         if (!rooms.has(roomId)) {
           rooms.set(roomId, {
-            hostId: userId, // First user to join is host
-            permissions: { [userId]: true }, // Grant permission to the creator
+            hostId: currentUserId,
+            permissions: { [currentUserId]: true },
             elements: [],
+            users: new Map(),
           });
-          console.log(`Room ${roomId} created. Host is ${userId}`);
-        } else {
-          // If room exists, grant permission to the joining user by default
-          const roomState = rooms.get(roomId)!;
-          if (!roomState.permissions[userId]) {
-            roomState.permissions[userId] = true;
-          }
+          console.log(`Room ${roomId} created. Host is ${currentUserId}`);
         }
         
         const roomState = rooms.get(roomId)!;
-        // Emit the initial state to the user who just joined
-        socket.emit('initial-state', roomState);
-        // Inform others in the room that a user has joined
-        socket.to(roomId).emit("user-joined", userId);
-        console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
+        roomState.users.set(currentUserId, { socketId: socket.id, displayName: displayName as string, photoURL: photoURL as string });
+
+        socket.emit('initial-state', { permissions: roomState.permissions });
+        socket.to(roomId).emit("user-joined", currentUserId);
+        console.log(`${currentUserId} (socket ${socket.id}) joined room ${roomId}`);
       });
+      
+      socket.on("private-chat-message", (roomId: string, message: any) => {
+        const roomState = rooms.get(roomId);
+        if (!roomState) return;
+
+        const recipientSocket = getSocketByUserId(io, roomId, message.recipientId);
+
+        if (recipientSocket) {
+            recipientSocket.emit("new-private-message", message);
+            // Also send back to sender to confirm
+            socket.emit("new-private-message", message);
+
+             // For notification system, we can emit a separate event or handle here
+            const notificationPayload = {
+              type: 'privateMessage',
+              id: `pm-${Date.now()}`,
+              title: `New message from ${message.senderName}`,
+              timestamp: Date.now(),
+              from: message.senderName,
+              senderId: message.senderId,
+              meetingId: roomId,
+              meetingTopic: message.topic // Assuming topic is passed in message
+            };
+            recipientSocket.emit('notify-activity', 'privateMessage', notificationPayload);
+        }
+      });
+
 
       socket.on("public-chat-message", (roomId, message) => {
         socket.to(roomId).emit("new-public-message", message);
@@ -67,7 +102,6 @@ export default function handler(
         const { roomId, userId } = socket.data || {};
         if (roomId && userId) {
             const roomState = rooms.get(roomId);
-            // Check if user has permission before broadcasting
             if (roomState && roomState.permissions[userId]) {
                 socket.to(roomId).emit('draw-event', data);
             }
@@ -79,7 +113,6 @@ export default function handler(
         const { roomId, userId } = socket.data || {};
         if (roomId && userId) {
           const roomState = rooms.get(roomId);
-          // Allow anyone with drawing permission to grant it to others
           if (roomState && roomState.permissions[userId]) {
             roomState.permissions[participantId] = canDraw;
             io.to(roomId).emit('permission-update', roomState.permissions);
@@ -89,23 +122,14 @@ export default function handler(
 
 
       socket.on("offer", (remoteId: string, offer: any) => {
-        // @ts-ignore
-        const { userId } = socket.data || {};
-        if (!userId) return;
         io.to(remoteId).emit("offer", socket.id, offer);
       });
       
       socket.on("answer", (remoteId: string, answer: any) => {
-        // @ts-ignore
-        const { userId } = socket.data || {};
-        if (!userId) return;
         io.to(remoteId).emit("answer", socket.id, answer);
       });
 
       socket.on("ice-candidate", (remoteId: string, candidate: any) => {
-        // @ts-ignore
-        const { userId } = socket.data || {};
-        if (!userId) return;
         io.to(remoteId).emit("ice-candidate", socket.id, candidate);
       });
 
@@ -117,15 +141,13 @@ export default function handler(
           const roomState = rooms.get(roomId);
           if (roomState) {
             delete roomState.permissions[userId];
-            // If host leaves, a new host could be elected, but for now we just remove them
+            roomState.users.delete(userId);
+
             if (roomState.hostId === userId) {
-                // Simple logic: make the next person host, or clear if empty
-                const otherUsers = Object.keys(roomState.permissions).filter(id => id !== userId);
+                const otherUsers = Array.from(roomState.users.keys());
                 const newHost = otherUsers[0] || null;
                 roomState.hostId = newHost;
-                if(newHost) {
-                  roomState.permissions[newHost] = true;
-                }
+                if(newHost) roomState.permissions[newHost] = true;
             }
              io.to(roomId).emit('permission-update', roomState.permissions);
           }

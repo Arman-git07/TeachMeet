@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, MessageSquare } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, User, Users } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -13,33 +13,42 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { io, Socket } from "socket.io-client";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ChatMessage {
   id: string;
   senderName: string;
   senderAvatar?: string;
-  senderId?: string;
+  senderId: string;
   text: string;
   timestamp: Date;
   isMe: boolean;
+  isPrivate: boolean;
 }
+
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic') || "Meeting Chat";
+  const privateWithId = searchParams.get('privateWith');
+  const privateWithName = searchParams.get('privateWithName');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const { user } = useAuth();
   const socketRef = useRef<Socket | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
+  
+  const [activeTab, setActiveTab] = useState(privateWithId ? privateWithId : 'public');
 
   useEffect(() => {
     if (!user) return;
 
     const socket = io({
       path: "/api/socketio",
+      query: { userId: user.uid, displayName: user.displayName, photoURL: user.photoURL || '' },
     });
     socketRef.current = socket;
 
@@ -47,56 +56,91 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       socket.emit("join-room", meetingId, user.uid);
     });
 
-    socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe'>) => {
-      setMessages((prev) => [
-        ...prev,
-        { ...message, timestamp: new Date(message.timestamp), isMe: message.senderId === user.uid },
-      ]);
+    socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe' | 'isPrivate'>) => {
+      if (activeTab === 'public') {
+        setMessages((prev) => [
+          ...prev,
+          { ...message, timestamp: new Date(message.timestamp), isMe: message.senderId === user.uid, isPrivate: false },
+        ]);
+      }
     });
 
-    setMessages([
-        { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted.`, timestamp: new Date(), isMe: false }
-    ]);
+    socket.on("new-private-message", (message: Omit<ChatMessage, 'isMe' | 'isPrivate'>) => {
+        // Show message only if in the correct private chat tab
+        const currentPrivateChatId = activeTab;
+        const relevantPartyId = message.senderId === user.uid ? message.recipientId : message.senderId;
+
+        if (currentPrivateChatId === relevantPartyId) {
+            setMessages((prev) => [
+                ...prev,
+                { ...message, timestamp: new Date(message.timestamp), isMe: message.senderId === user.uid, isPrivate: true },
+            ]);
+        }
+    });
+    
+    if (privateWithId) {
+        setActiveTab(privateWithId);
+        setMessages([
+          { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' }
+        ]);
+    } else {
+        setMessages([
+            { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }
+        ]);
+    }
 
     return () => {
       socket.disconnect();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId, user]);
 
 
   useEffect(() => {
     if (scrollViewportRef.current) {
-        const viewport = scrollViewportRef.current.parentElement;
-        if (viewport) {
-          viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-        }
+        scrollViewportRef.current.scrollTo({ top: scrollViewportRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
 
   const handleSendMessage = () => {
     if (!inputValue.trim() || !user || !socketRef.current) return;
     
-    const message: Omit<ChatMessage, 'isMe'> = {
-      id: Date.now().toString(),
-      senderId: user.uid,
-      senderName: user.displayName || 'Anonymous',
-      senderAvatar: user.photoURL || undefined,
-      text: inputValue,
-      timestamp: new Date(),
-    };
+    const isPrivate = activeTab !== 'public';
 
-    // Add message locally immediately for responsiveness
-    setMessages(prev => [...prev, { ...message, isMe: true }]);
-    
-    // Emit to server to broadcast to others
-    socketRef.current.emit('public-chat-message', meetingId, message);
+    if (isPrivate) {
+      const recipientId = activeTab;
+      const privateMessage = {
+          id: Date.now().toString(),
+          senderId: user.uid,
+          senderName: user.displayName || 'You',
+          senderAvatar: user.photoURL || undefined,
+          recipientId: recipientId,
+          text: inputValue,
+          timestamp: new Date(),
+          isPrivate: true,
+      };
+      // Add locally first
+      setMessages(prev => [...prev, { ...privateMessage, isMe: true }]);
+      // Emit to server
+      socketRef.current.emit('private-chat-message', meetingId, privateMessage);
 
+    } else {
+       const publicMessage = {
+        id: Date.now().toString(),
+        senderId: user.uid,
+        senderName: user.displayName || 'Anonymous',
+        senderAvatar: user.photoURL || undefined,
+        text: inputValue,
+        timestamp: new Date(),
+        isPrivate: false,
+      };
+      setMessages(prev => [...prev, { ...publicMessage, isMe: true }]);
+      socketRef.current.emit('public-chat-message', meetingId, publicMessage);
+    }
     setInputValue("");
   };
   
-  const backToMeetingLink = topic 
-    ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`
-    : `/dashboard/meeting/${meetingId}`;
+  const backToMeetingLink = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
 
   return (
     <div className="flex flex-col h-full bg-muted/30">
@@ -105,7 +149,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           <div className="flex items-center gap-3">
              <MessageSquare className="h-7 w-7 text-primary" />
              <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-                {topic}
+                {privateWithName ? `Chat with ${privateWithName}` : topic}
               </h1>
           </div>
           <Button asChild variant="outline" className="rounded-lg">
@@ -116,6 +160,19 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           </Button>
         </div>
       </header>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-none bg-background shadow-md">
+        <TabsList className="container mx-auto rounded-none border-b p-0 h-12">
+            <TabsTrigger value="public" className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
+                <Users className="mr-2 h-5 w-5" /> Public Chat
+            </TabsTrigger>
+            {privateWithId && (
+                 <TabsTrigger value={privateWithId} className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
+                    <User className="mr-2 h-5 w-5" /> Private: {privateWithName}
+                </TabsTrigger>
+            )}
+        </TabsList>
+      </Tabs>
       
       <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
@@ -133,13 +190,13 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                       <div
                         className={cn(
                           "max-w-[70%] p-3 rounded-xl shadow",
-                          msg.senderName === 'System' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
+                           msg.senderId === 'system' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
                           msg.isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
                         )}
                       >
-                        {!msg.isMe && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                        {!msg.isMe && msg.senderId !== 'system' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
                         <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                        {msg.senderName !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                        {msg.senderId !== 'system' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                       </div>
                       {msg.isMe && (
                         <Avatar className="h-8 w-8 self-start">
@@ -163,7 +220,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
               <Textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={"Type your message..."}
+                placeholder={privateWithName ? `Private message to ${privateWithName}...` : "Type your message..."}
                 className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px]"
                 rows={1}
                 onKeyDown={(e) => {
@@ -182,7 +239,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         </Card>
       </main>
        <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-        Public chat messages are not stored.
+        Chat messages are not stored.
       </footer>
     </div>
   );
