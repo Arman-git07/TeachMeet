@@ -1347,39 +1347,6 @@ function WhiteboardPageComponent() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <AlertDialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <ToolButton icon={Sparkles} label="Refine" disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <ShadDialogTitle>Refine Your Drawing</ShadDialogTitle>
-                  <AlertDialogDescription>
-                    Optionally, tell the AI what you drew to get a better result.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="py-2">
-                  <Label htmlFor="refine-prompt" className="text-sm text-muted-foreground">What did you draw? (e.g., "a bird", "a house")</Label>
-                  <Input
-                    id="refine-prompt"
-                    value={refinePrompt}
-                    onChange={(e) => setRefinePrompt(e.target.value)}
-                    placeholder="Optional prompt..."
-                    className="mt-2"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleRecognizeShape();
-                      }
-                    }}
-                  />
-                </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setRefinePrompt('')}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRecognizeShape}>Refine</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
