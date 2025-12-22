@@ -9,8 +9,8 @@ import {
   ScreenShare,
   ScreenShareOff,
   Pin,
-  Maximize,
-  Minimize,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HandRaiseIcon from "./HandRaiseIcon";
@@ -190,7 +190,7 @@ const VideoTile: React.FC<Props> = ({
             className="h-8 w-8 rounded-full text-white/80 hover:bg-black/50 hover:text-white"
             title={isSpotlight ? "Exit Spotlight" : "Spotlight User"}
           >
-            {isSpotlight ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+            {isSpotlight ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
           </Button>
         </div>
       </div>

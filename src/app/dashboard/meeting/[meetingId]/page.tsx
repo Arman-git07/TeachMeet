@@ -41,6 +41,49 @@ export default function MeetingPage() {
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
 
 
+  const handleLeave = useCallback(async (endForAll = false) => {
+    if (!meetingId || !user) return;
+
+    // Always clean up local storage for the current user
+    try {
+      const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
+      const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+      if (storedMeetingsRaw) {
+        let meetings = JSON.parse(storedMeetingsRaw);
+        if (Array.isArray(meetings)) {
+          const updatedMeetings = meetings.filter(m => m.id !== meetingId);
+          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
+          window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
+        }
+      }
+    } catch (e) {
+      console.error("Failed to clean up localStorage on leave", e);
+    }
+  
+    if (isHost && endForAll) {
+      try {
+        // This update will trigger the onSnapshot listener for all clients,
+        // leading to cleanup and redirection.
+        const meetingRef = doc(db, "meetings", meetingId);
+        await updateDoc(meetingRef, { status: 'ended' });
+      } catch (error) {
+        console.error("Error ending meeting for all:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not end meeting for all participants." });
+      }
+    } else {
+      // Logic for a single user (host or participant) leaving without ending for all.
+      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+      try {
+        await deleteDoc(participantRef);
+      } catch (error) {
+        console.error("Error removing participant on leave:", error);
+      }
+    }
+  
+    // Always redirect the current user away from the meeting page immediately after cleanup.
+    router.push("/");
+  }, [meetingId, user, isHost, router, toast]);
+
   useEffect(() => {
     if (authLoading || !meetingId) return;
 
@@ -50,7 +93,6 @@ export default function MeetingPage() {
       return;
     }
     
-    // Set up a real-time listener for the meeting document
     const meetingRef = doc(db, "meetings", meetingId);
     const unsubscribe = onSnapshot(meetingRef, (snap) => {
         if (!snap.exists()) {
@@ -60,28 +102,13 @@ export default function MeetingPage() {
         }
 
         const data = snap.data();
-        // Check if the current user is the host
         const isUserHost = data.hostId === user.uid;
-        if (isUserHost) {
-          setIsHost(true);
-        }
+        if (isUserHost) setIsHost(true);
         
-        // Check if meeting has ended for everyone
         if (data.status === 'ended') {
             toast({ title: "Meeting Ended", description: "The host has ended this meeting." });
-            // Clean up localStorage for all users on this event
-            const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
-            const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-            if (storedMeetingsRaw) {
-                let meetings = JSON.parse(storedMeetingsRaw);
-                if (Array.isArray(meetings)) {
-                    const updatedMeetings = meetings.filter(m => m.id !== meetingId);
-                    localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
-                    window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
-                }
-            }
-            router.replace("/");
-            return; // Stop further processing
+            handleLeave(false); // Trigger local cleanup without trying to delete again
+            return;
         }
 
         setLoading(false);
@@ -91,10 +118,24 @@ export default function MeetingPage() {
         toast({ variant: "destructive", title: "Connection Error", description: "Could not sync with the meeting." });
         router.replace("/");
     });
+    
+    // Add beforeunload listener
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      handleLeave(false);
+      // Most browsers don't show this message anymore, but it's good practice
+      e.preventDefault(); 
+      e.returnValue = '';
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
 
-  }, [meetingId, user, authLoading, router, searchParams, toast]);
+    return () => {
+      unsubscribe(); // Cleanup Firestore listener on component unmount
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+
+  }, [meetingId, user, authLoading, router, searchParams, toast, handleLeave]);
 
 
   const constructUrl = (page: string) => {
@@ -157,49 +198,6 @@ export default function MeetingPage() {
             setHeaderAction(null);
         };
     }, [topic, meetingId, setHeaderContent, setHeaderAction, showHeaderAsId, memoizedMeetingActions]);
-
-  const handleLeave = async (endForAll = false) => {
-    if (!meetingId || !user) return;
-
-    // Always clean up local storage for the current user
-    try {
-      const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
-      const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-      if (storedMeetingsRaw) {
-        let meetings = JSON.parse(storedMeetingsRaw);
-        if (Array.isArray(meetings)) {
-          const updatedMeetings = meetings.filter(m => m.id !== meetingId);
-          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
-          window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
-        }
-      }
-    } catch (e) {
-      console.error("Failed to clean up localStorage on leave", e);
-    }
-  
-    if (isHost && endForAll) {
-      try {
-        // This update will trigger the onSnapshot listener for all clients,
-        // leading to cleanup and redirection.
-        const meetingRef = doc(db, "meetings", meetingId);
-        await updateDoc(meetingRef, { status: 'ended' });
-      } catch (error) {
-        console.error("Error ending meeting for all:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not end meeting for all participants." });
-      }
-    } else {
-      // Logic for a single user (host or participant) leaving without ending for all.
-      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-      try {
-        await deleteDoc(participantRef);
-      } catch (error) {
-        console.error("Error removing participant on leave:", error);
-      }
-    }
-  
-    // Always redirect the current user away from the meeting page immediately after cleanup.
-    router.push("/");
-  };
   
   if (loading || authLoading) return <div className="w-full h-full flex items-center justify-center bg-[#223D4A]"><Loader2 className="h-8 w-8 text-primary animate-spin" /></div>;
 

@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -5,7 +6,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
-import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Maximize, Pin, MessageSquare, Minimize } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Pin, MessageSquare, Minimize2, Maximize2 } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
@@ -96,6 +97,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
   const [privateMessage, setPrivateMessage] = useState<PrivateMessageActivityItem | null>(null);
+  
+  // Ref to track if the participant doc has been created
+  const participantDocCreated = useRef(false);
 
 
   useEffect(() => {
@@ -273,6 +277,18 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     previousRaisedHands.current = nextSet;
   }, [liveParticipants, toast]);
 
+  const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
+    // Only send updates if the participant document has been created
+    if (user && meetingId && participantDocCreated.current) {
+      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+      try {
+        await updateDoc(participantRef, status);
+      } catch (err) {
+        console.error("Error updating participant status:", err);
+      }
+    }
+  }, [user, meetingId]);
+
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
@@ -381,10 +397,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   useEffect(() => {
     const addSelfToParticipants = async () => {
-        if (user && meetingId && !isLoadingRole) {
+        if (user && meetingId && !isLoadingRole && localStream) { // Wait for role and stream
             const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-            const docSnap = await getDoc(participantRef);
-            if (!docSnap.exists()) {
+            try {
                 await setDoc(participantRef, {
                     name: user.displayName || 'Anonymous',
                     photoURL: user.photoURL || '',
@@ -393,14 +408,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     isMicOn: micOn,
                     joinedAt: serverTimestamp(),
                 });
-            } else {
-              // If doc exists, update the on/off state in case of refresh
-              await updateDoc(participantRef, { isCameraOn: camOn, isMicOn: micOn });
+                participantDocCreated.current = true; // Set flag after successful creation
+            } catch (error) {
+                console.error("Failed to add participant document:", error);
+                toast({ variant: 'destructive', title: 'Connection Error', description: 'Could not join the meeting room state.'});
             }
         }
     };
     addSelfToParticipants();
-  }, [user, meetingId, isHost, isLoadingRole, camOn, micOn]);
+  }, [user, meetingId, isHost, isLoadingRole, localStream, camOn, micOn, toast]);
 
   const { allParticipants, localParticipant, remoteParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
@@ -447,12 +463,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return { allParticipants: all, localParticipant: self, remoteParticipants: remoteOnly, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
   }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId]);
 
-  const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
-    if (user && meetingId) {
-      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-      try { await updateDoc(participantRef, status); } catch (err) { console.error("Error updating participant status:", err); }
-    }
-  }, [user, meetingId]);
 
   const toggleMic = useCallback(() => {
     if (!localStream) return;
@@ -515,6 +525,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             name={spotlightParticipant.name}
             isScreenSharing={spotlightParticipant.isScreenSharing}
             onDoubleClick={() => toggleSpotlight(spotlightParticipant.id)}
+            onSpotlightClick={() => toggleSpotlight(spotlightParticipant.id)}
             className="w-full h-full"
             isSpotlight={true}
           />
