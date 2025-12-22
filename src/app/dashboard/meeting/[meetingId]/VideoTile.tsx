@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,6 +10,7 @@ import {
   ScreenShareOff,
   Pin,
   Maximize,
+  Minimize,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HandRaiseIcon from "./HandRaiseIcon";
@@ -30,10 +30,12 @@ type Props = {
   isScreenSharing?: boolean;
   name?: string;
   onDoubleClick?: () => void;
+  onSpotlightClick?: () => void;
   draggable?: boolean;
   volumeLevel?: number;
   onStopShare?: () => void;
   isPinned?: boolean;
+  isSpotlight?: boolean;
 };
 
 const VideoTile: React.FC<Props> = ({
@@ -49,10 +51,12 @@ const VideoTile: React.FC<Props> = ({
   isScreenSharing = false,
   name = "User",
   onDoubleClick,
+  onSpotlightClick,
   draggable = false,
   volumeLevel = 0,
   onStopShare,
   isPinned = false,
+  isSpotlight = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const tileRef = useRef<HTMLDivElement | null>(null);
@@ -81,18 +85,6 @@ const VideoTile: React.FC<Props> = ({
   }, [stream, name]);
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
-
-  const handleFullscreen = () => {
-    if (tileRef.current) {
-      if (!document.fullscreenElement) {
-        tileRef.current.requestFullscreen().catch(err => {
-          alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-        });
-      } else {
-        document.exitFullscreen();
-      }
-    }
-  };
 
   return (
     <div
@@ -194,11 +186,11 @@ const VideoTile: React.FC<Props> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleFullscreen}
+            onClick={onSpotlightClick}
             className="h-8 w-8 rounded-full text-white/80 hover:bg-black/50 hover:text-white"
-            title="Toggle Fullscreen"
+            title={isSpotlight ? "Exit Spotlight" : "Spotlight User"}
           >
-            <Maximize className="h-5 w-5" />
+            {isSpotlight ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
           </Button>
         </div>
       </div>
