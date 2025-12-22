@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Maximize, Pin, MessageSquare } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, getDoc, query, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDoc, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
