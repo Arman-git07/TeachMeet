@@ -35,6 +35,7 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { recognizeShape } from "@/ai/flows/recognize-shape-flow";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -877,6 +878,126 @@ function WhiteboardPageComponent() {
     setIsPagesPopoverOpen(false);
   };
   
+  const handleRecognizeShape = async () => {
+    // This will be called by the dialog action, so we close it here.
+    setIsRefineDialogOpen(false);
+    
+    const currentPage = pages[currentPageIndex];
+    if (currentPage.selectedElementIds.size === 0) {
+      toast({
+        title: "Nothing to Refine",
+        description: "Please select a drawing first using the select tool.",
+      });
+      setRefinePrompt(''); // Also clear prompt on error
+      return;
+    }
+  
+    const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
+    if (!selectionBox) {
+      toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
+      setRefinePrompt(''); // Also clear prompt on error
+      return;
+    }
+  
+    const recognitionToastId = `recognize-${Date.now()}`;
+    toast({
+      id: recognitionToastId,
+      title: "Refining Shape...",
+      description: "The AI is analyzing your drawing. This might take a moment.",
+      duration: Infinity,
+    });
+  
+    const PADDING = 20;
+    const width = selectionBox.maxX - selectionBox.minX + PADDING * 2;
+    const height = selectionBox.maxY - selectionBox.minY + PADDING * 2;
+  
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) {
+      toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      setRefinePrompt(''); // Also clear prompt on error
+      return;
+    }
+  
+    // Fill with a solid white background, as transparent can be problematic for some models
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, width, height);
+  
+    tempCtx.translate(-selectionBox.minX + PADDING, -selectionBox.minY + PADDING);
+    currentPage.elements.forEach(element => {
+      if (currentPage.selectedElementIds.has(element.id)) {
+        drawElement(tempCtx, element);
+      }
+    });
+  
+    const drawingDataUri = tempCanvas.toDataURL('image/png');
+  
+    try {
+      const result = await recognizeShape({ drawingDataUri, prompt: refinePrompt });
+  
+      const newImg = new Image();
+      newImg.onload = () => {
+        const originalWidth = selectionBox.maxX - selectionBox.minX;
+        const originalHeight = selectionBox.maxY - selectionBox.minY;
+        const aspectRatio = newImg.width / newImg.height;
+  
+        let newWidth = originalWidth;
+        let newHeight = newWidth / aspectRatio;
+  
+        if (newHeight > originalHeight) {
+          newHeight = originalHeight;
+          newWidth = newHeight * aspectRatio;
+        }
+  
+        const newX = selectionBox.minX + (originalWidth - newWidth) / 2;
+        const newY = selectionBox.minY + (originalHeight - newHeight) / 2;
+  
+        const newImageElement: ImageElement = {
+          type: 'image',
+          id: `image_${Date.now()}`,
+          src: result.refinedImageUri,
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        };
+  
+        setLoadedImages(prev => new Map(prev).set(newImageElement.id, newImg));
+  
+        setPages(currentPages => {
+          const newPages = [...currentPages];
+          const pageToUpdate = { ...newPages[currentPageIndex] };
+          const elementsWithoutOld = pageToUpdate.elements.filter(el => !pageToUpdate.selectedElementIds.has(el.id));
+          const finalElements = [...elementsWithoutOld, newImageElement];
+          const updatedPage: ElementState = {
+            elements: finalElements,
+            selectedElementIds: new Set([newImageElement.id])
+          };
+          newPages[currentPageIndex] = updatedPage;
+          pushToHistory(currentPageIndex, updatedPage);
+          return newPages;
+        });
+  
+        toast.update(recognitionToastId, { title: "Shape Refined!", description: "Your drawing has been transformed." });
+      };
+      newImg.onerror = () => {
+        toast.update(recognitionToastId, { variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+      };
+      newImg.src = result.refinedImageUri;
+    } catch (error) {
+      console.error("Shape recognition failed:", error);
+      toast.update(recognitionToastId, {
+        variant: "destructive",
+        title: "Refinement Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+      });
+    } finally {
+        setRefinePrompt(''); // Reset prompt after use
+    }
+  };
+
   const getCanvasAsBlob = async (): Promise<Blob | null> => {
     const canvas = mainCanvasRef.current;
     if (!canvas) return null;
@@ -1218,7 +1339,39 @@ function WhiteboardPageComponent() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <ToolButton icon={Sparkles} label="Refine" disabled={true} />
+             <AlertDialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <ToolButton icon={Sparkles} label="Refine" disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Refine Your Drawing</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Optionally, tell the AI what you drew to get a better result.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-2">
+                  <Label htmlFor="refine-prompt" className="text-sm text-muted-foreground">What did you draw? (e.g., "a bird", "a house")</Label>
+                  <Input
+                    id="refine-prompt"
+                    value={refinePrompt}
+                    onChange={(e) => setRefinePrompt(e.target.value)}
+                    placeholder="Optional prompt..."
+                    className="mt-2"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleRecognizeShape();
+                      }
+                    }}
+                  />
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setRefinePrompt('')}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRecognizeShape}>Refine</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
