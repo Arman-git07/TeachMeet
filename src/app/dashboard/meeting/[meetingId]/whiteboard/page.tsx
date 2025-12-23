@@ -175,7 +175,7 @@ const CollaborateDialogContent = ({ participants, drawingPermissions, onPermissi
     return (
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Whiteboard Collaboration</DialogTitle>
+                <ShadDialogTitle>Whiteboard Collaboration</ShadDialogTitle>
                 <DialogDescription>
                     Allow others in the meeting to draw on your whiteboard. Only one person can draw at a time.
                 </DialogDescription>
@@ -1182,44 +1182,44 @@ export default function WhiteboardPage() {
 
   const memoizedHeaderAction = useCallback(() => (
     <Dialog>
-        <div className="flex items-center gap-2">
-            {meetingId && (
-                <Button asChild variant="outline" size="sm" className="rounded-lg">
-                <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
-                </Link>
-                </Button>
-            )}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                    <MoreVertical className="h-5 w-5" />
-                </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="rounded-xl">
-                    <DialogTrigger asChild>
-                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
-                            <UserCheck className="mr-2 h-4 w-4" />
-                            <span>Collaborate</span>
-                        </DropdownMenuItem>
-                    </DialogTrigger>
-                    <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
-                    <Camera className="mr-2 h-4 w-4" />
-                    <span>Screenshot</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Whiteboard Settings</span>
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
-        <CollaborateDialogContent
-            participants={participants}
-            drawingPermissions={drawingPermissions}
-            onPermissionChange={handlePermissionChange}
-        />
+      <div className="flex items-center gap-2">
+        {meetingId && (
+          <Button asChild variant="outline" size="sm" className="rounded-lg">
+            <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Link>
+          </Button>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DialogTrigger asChild>
+              <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
+                <UserCheck className="mr-2 h-4 w-4" />
+                <span>Collaborate</span>
+              </DropdownMenuItem>
+            </DialogTrigger>
+            <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
+              <Camera className="mr-2 h-4 w-4" />
+              <span>Screenshot</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Whiteboard Settings</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <CollaborateDialogContent
+          participants={participants}
+          drawingPermissions={drawingPermissions}
+          onPermissionChange={handlePermissionChange}
+      />
     </Dialog>
   ), [meetingId, router, topic, participants, drawingPermissions]);
   
