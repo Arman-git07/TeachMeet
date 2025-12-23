@@ -41,27 +41,29 @@ export default function handler(
       console.log("Socket connected:", socket.id);
       const { userId, displayName, photoURL } = socket.handshake.query;
 
-      socket.on("join-room", (roomId: string, currentUserId: string) => {
+      socket.on("join-room", (roomId: string, currentUserId?: string) => {
         socket.join(roomId);
+        const effectiveUserId = currentUserId || userId;
         // @ts-ignore - extending socket object
-        socket.data = { roomId, userId: currentUserId, displayName, photoURL };
+        socket.data = { roomId, userId: effectiveUserId, displayName, photoURL };
 
-        if (!rooms.has(roomId)) {
+        if (!rooms.has(roomId) && effectiveUserId) {
           rooms.set(roomId, {
-            hostId: currentUserId,
-            permissions: { [currentUserId]: true },
+            hostId: effectiveUserId as string,
+            permissions: { [effectiveUserId as string]: true },
             elements: [],
             users: new Map(),
           });
-          console.log(`Room ${roomId} created. Host is ${currentUserId}`);
+          console.log(`Room ${roomId} created. Host is ${effectiveUserId}`);
         }
         
-        const roomState = rooms.get(roomId)!;
-        roomState.users.set(currentUserId, { socketId: socket.id, displayName: displayName as string, photoURL: photoURL as string });
+        if (effectiveUserId) {
+            const roomState = rooms.get(roomId)!;
+            roomState.users.set(effectiveUserId as string, { socketId: socket.id, displayName: displayName as string, photoURL: photoURL as string });
+        }
 
-        socket.emit('initial-state', { permissions: roomState.permissions });
-        socket.to(roomId).emit("user-joined", currentUserId);
-        console.log(`${currentUserId} (socket ${socket.id}) joined room ${roomId}`);
+        socket.to(roomId).emit("user-joined", effectiveUserId);
+        console.log(`${effectiveUserId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
       socket.on("private-chat-message", (roomId: string, message: any) => {
@@ -85,24 +87,20 @@ export default function handler(
       
       socket.on('draw', (data) => {
         // @ts-ignore
-        const { roomId, userId } = socket.data || {};
-        if (roomId && userId) {
-            const roomState = rooms.get(roomId);
-            if (roomState && roomState.permissions[userId]) {
-                socket.to(roomId).emit('draw-event', data);
+        const { userId } = socket.data || {};
+        if (data.ownerId && userId) {
+            const ownerRoomId = `whiteboard-owner-${data.ownerId}`;
+            const ownerSocketId = Array.from(io.sockets.adapter.rooms.get(ownerRoomId) || [])[0];
+            if (ownerSocketId) {
+                io.to(ownerSocketId).emit('draw-from-collaborator', { ...data, collaboratorId: userId });
             }
         }
       });
       
-      socket.on('set-permission', ({ participantId, canDraw }) => {
-        // @ts-ignore
-        const { roomId, userId } = socket.data || {};
-        if (roomId && userId) {
-          const roomState = rooms.get(roomId);
-          if (roomState && roomState.permissions[userId]) {
-            roomState.permissions[participantId] = canDraw;
-            io.to(roomId).emit('permission-update', roomState.permissions);
-          }
+      socket.on('set-permission', ({ ownerId, participantId, canDraw }) => {
+        const participantSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === participantId);
+        if (participantSocket) {
+            participantSocket.emit('permission-update', { canDraw, ownerId });
         }
       });
 
@@ -126,16 +124,9 @@ export default function handler(
           socket.to(roomId).emit("user-left", userId);
           const roomState = rooms.get(roomId);
           if (roomState) {
-            delete roomState.permissions[userId];
-            roomState.users.delete(userId);
-
-            if (roomState.hostId === userId) {
-                const otherUsers = Array.from(roomState.users.keys());
-                const newHost = otherUsers[0] || null;
-                roomState.hostId = newHost;
-                if(newHost) roomState.permissions[newHost] = true;
+            if (roomState.users.has(userId)) {
+                roomState.users.delete(userId);
             }
-             io.to(roomId).emit('permission-update', roomState.permissions);
           }
         }
         console.log("Disconnected:", socket.id);

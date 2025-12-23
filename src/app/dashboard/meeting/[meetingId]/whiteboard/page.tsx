@@ -217,7 +217,7 @@ function WhiteboardPageComponent() {
 
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
-  const [canIDraw, setCanIDraw] = useState(false);
+  const [canIDraw, setCanIDraw] = useState(true); // Default to true, managed by host
 
 
   useEffect(() => {
@@ -520,14 +520,8 @@ function WhiteboardPageComponent() {
     if (activeTool === 'text' && event.target === liveTextInputRef.current) {
         return;
     }
-    
-    if (!canIDraw) { 
-        if (activeTool !== 'select' && activeTool !== 'lasso') {
-            toast({ variant: 'destructive', title: "Permission Denied", description: "You do not have permission to draw on the whiteboard." });
-            return;
-        }
-    }
 
+    if (!canIDraw) return;
 
     if (operationStateRef.current.type === 'texting' && operationStateRef.current.isEditing) {
       finalizeLiveText();
@@ -625,7 +619,7 @@ function WhiteboardPageComponent() {
         case 'erase':
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily, canIDraw, toast]);
+  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily, canIDraw]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
@@ -1192,38 +1186,23 @@ function WhiteboardPageComponent() {
 
     // --- Socket.IO Connection ---
     if (meetingId && auth.currentUser) {
-      const whiteboardRoomId = `whiteboard-${meetingId}`;
+      const whiteboardRoomId = `whiteboard-owner-${auth.currentUser.uid}`;
       const socket = io({
         path: "/api/socketio",
+        query: { userId: auth.currentUser.uid }
       });
       socketRef.current = socket;
 
       socket.on('connect', () => {
-        socket.emit('join-room', whiteboardRoomId, auth.currentUser?.uid);
-        toast({ title: "Whiteboard Connected", description: "Real-time collaboration is now active." });
-      });
-
-      socket.on('connect_error', (err) => {
-        console.error('[Whiteboard] Socket connection error:', err.message);
-        toast({ variant: 'destructive', title: "Connection Error", description: "Could not connect to the real-time whiteboard service." });
+        socket.emit('join-room', whiteboardRoomId);
+        console.log(`Whiteboard owner joined own room: ${whiteboardRoomId}`);
       });
       
-      socket.on('draw-event', (data) => {
-        console.log('Received draw event:', data);
-      });
-      
-      socket.on('initial-state', ({ permissions }) => {
-        if (auth.currentUser) {
-            setDrawingPermissions(permissions || {});
-            setCanIDraw(!!permissions[auth.currentUser.uid]);
-        }
-      });
-
-      socket.on('permission-update', (newPermissions) => {
-        if (auth.currentUser) {
-          setDrawingPermissions(newPermissions);
-          setCanIDraw(!!newPermissions[auth.currentUser.uid]);
-        }
+      socket.on('draw-from-collaborator', (data) => {
+        // Here, the owner receives drawing data from a collaborator and draws it locally.
+        console.log('Received draw event from collaborator:', data);
+        // This part needs logic to draw the received data, possibly on a temporary canvas layer for collaborators.
+        // For now, we'll just log it.
       });
       
       const unsubParticipants = onSnapshot(collection(db, "meetings", meetingId, "participants"), (snapshot) => {
@@ -1240,11 +1219,14 @@ function WhiteboardPageComponent() {
         unsubParticipants();
       };
     }
-  }, [meetingId, toast]);
+  }, [meetingId]);
   
   const handlePermissionChange = (participantId: string, canDraw: boolean) => {
-    setDrawingPermissions(prev => ({...prev, [participantId]: canDraw }));
-    socketRef.current?.emit('set-permission', { participantId, canDraw });
+    setDrawingPermissions(prev => {
+        const newPermissions = {...prev, [participantId]: canDraw };
+        socketRef.current?.emit('set-permission', { ownerId: auth.currentUser?.uid, participantId, canDraw });
+        return newPermissions;
+    });
   };
   
   useEffect(() => {
