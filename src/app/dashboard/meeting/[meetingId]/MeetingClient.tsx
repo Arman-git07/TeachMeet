@@ -20,6 +20,7 @@ import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNot
 import type { JoinRequest, PrivateMessageActivityItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ChatMessage, PublicChatActivityItem } from "./chat/page";
 
 
 type Participant = {
@@ -50,36 +51,24 @@ type LiveParticipantInfo = {
 type Props = { 
   meetingId: string; 
   userId: string;
-  initialCamOn: boolean;
-  initialMicOn: boolean;
   onLeave: (endForAll?: boolean) => void;
   topic: string;
   initialPinnedId?: string | null;
-};
-
-type PublicChatActivityItem = {
-    type: 'publicChat';
-    id: string;
-    title: string;
-    text: string;
-    timestamp: number;
-    senderId: string;
-    meetingId: string;
-    meetingTopic: string;
+  children: React.ReactNode;
 };
 
 const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 
-export default function MeetingClient({ meetingId, userId, initialCamOn, initialMicOn, onLeave, topic, initialPinnedId }: Props) {
+export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId, children }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
-  const [camOn, setCamOn] = useState(initialCamOn);
-  const [micOn, setMicOn] = useState(initialMicOn);
+  const [camOn, setCamOn] = useState(true);
+  const [micOn, setMicOn] = useState(true);
   
   const [loadingMedia, setLoadingMedia] = useState(true);
 
@@ -121,6 +110,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       }
     }
   }, [user, meetingId]);
+  
+  const toggleCamera = useCallback((forceState?: boolean) => {
+    if (!localStream) return;
+    const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
+    localStream.getVideoTracks().forEach(track => { track.enabled = nextState; });
+    setCamOn(nextState);
+    localStorage.setItem('teachmeet-cam-state', String(nextState));
+    updateMyStatus({ isCameraOn: nextState });
+  }, [localStream, camOn, updateMyStatus]);
 
   const toggleMic = useCallback(() => {
     if (!localStream) return;
@@ -139,15 +137,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       return next;
     });
   }, [localStream, micOn, updateMyStatus, userId]);
-
-  const toggleCamera = useCallback((forceState?: boolean) => {
-    if (!localStream) return;
-    const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
-    localStream.getVideoTracks().forEach(track => { track.enabled = nextState; });
-    setCamOn(nextState);
-    localStorage.setItem('teachmeet-cam-state', String(nextState));
-    updateMyStatus({ isCameraOn: nextState });
-  }, [localStream, camOn, updateMyStatus]);
 
 
   useEffect(() => {
@@ -231,9 +220,19 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
         setPinnedId(prev => prev === socketId ? null : prev);
       },
+      onNewPublicMessage: (message: Omit<ChatMessage, 'isMe'>) => {
+        if (message.senderId !== user?.uid) {
+            setPublicChatMessage({
+                ...message,
+                type: 'publicChat',
+                title: `New Message from ${message.senderName}`,
+                meetingTopic: topic,
+            });
+        }
+      }
     });
     return mesh;
-  }, [meetingId, userId]);
+  }, [meetingId, userId, topic, user?.uid]);
 
   const screenShareHelper = useMemo(() => {
     if (!rtc) return null;
@@ -704,6 +703,14 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     return null;
   };
 
+  const childrenWithProps = React.Children.map(children, child => {
+    if (React.isValidElement(child)) {
+      // @ts-ignore
+      return React.cloneElement(child, { rtc, camOn, micOn });
+    }
+    return child;
+  });
+
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1">
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
@@ -749,7 +756,13 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
           ) : (
-              renderLayout()
+             <>
+               {childrenWithProps ? (
+                  <div className="w-full h-full">{childrenWithProps}</div>
+                ) : (
+                  renderLayout()
+                )}
+             </>
           )}
       </main>
 

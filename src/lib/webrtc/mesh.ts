@@ -2,6 +2,7 @@
 "use client";
 
 import { io, Socket } from "socket.io-client";
+import type { ChatMessage } from "@/app/dashboard/meeting/[meetingId]/chat/page";
 
 type PeerEntry = {
   pc: RTCPeerConnection;
@@ -10,7 +11,7 @@ type PeerEntry = {
 };
 
 export class MeshRTC {
-  private socket: Socket;
+  public socket: Socket;
   public roomId: string;
   private userId: string;
   public localStream: MediaStream | null = null;
@@ -24,28 +25,80 @@ export class MeshRTC {
   private _ready = false; 
   private _pendingSignals: Array<() => void> = []; 
 
+  // Chat related properties
+  public hasRegisteredChatHandlers = false;
+  private onNewPublicMessageCallback: ((message: ChatMessage) => void) | null = null;
+  private onNewPrivateMessageCallback: ((message: ChatMessage) => void) | null = null;
+  private userDisplayName: string;
+  private userPhotoURL?: string;
+
   constructor(opts: {
     roomId: string;
     userId: string;
     onRemoteStream: (socketId: string, stream: MediaStream) => void;
     onRemoteLeft?: (socketId: string) => void;
+    onNewPublicMessage: (message: ChatMessage) => void;
   }) {
     this.roomId = opts.roomId;
     this.userId = opts.userId;
     this.onRemoteStream = opts.onRemoteStream;
     this.onRemoteLeft = opts.onRemoteLeft;
+    this.onNewPublicMessageCallback = opts.onNewPublicMessage;
 
+    // These need to be set from useAuth, passed into constructor
+    this.userDisplayName = "User"; // Placeholder
+    
     this.socket = io({
       path: "/api/socketio",
       transports: ["websocket", "polling"],
+      query: { userId: this.userId } // Pass userId for identification
     });
 
     this.registerSocketEvents();
     try { (window as any).__mesh = this; console.log("[mesh] exported instance to window.__mesh"); } catch {}
   }
+
+  public registerChatHandlers(onNewMessage: (message: ChatMessage) => void) {
+      this.onNewPublicMessageCallback = onNewMessage;
+      this.onNewPrivateMessageCallback = onNewMessage;
+      this.hasRegisteredChatHandlers = true;
+  }
   
-  public async init(localStream: MediaStream) {
+  public sendPublicMessage(text: string) {
+    if (!this.socket.connected || !text.trim()) return;
+
+    const message: Omit<ChatMessage, 'isMe'> = {
+      id: `${this.socket.id}-${Date.now()}`,
+      senderId: this.userId,
+      senderName: this.userDisplayName,
+      senderAvatar: this.userPhotoURL,
+      text: text,
+      timestamp: new Date(),
+      isPrivate: false,
+    };
+    this.socket.emit("public-chat-message", this.roomId, message);
+  }
+
+  public sendPrivateMessage(recipientId: string, text: string) {
+    if (!this.socket.connected || !text.trim()) return;
+
+    const message: Omit<ChatMessage, 'isMe'> = {
+      id: `${this.socket.id}-${Date.now()}`,
+      senderId: this.userId,
+      senderName: this.userDisplayName,
+      senderAvatar: this.userPhotoURL,
+      recipientId: recipientId,
+      text: text,
+      timestamp: new Date(),
+      isPrivate: true,
+    };
+    this.socket.emit("private-chat-message", this.roomId, message);
+  }
+  
+  public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
+    this.userDisplayName = displayName;
+    this.userPhotoURL = photoURL;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
     
     this._ready = true;
@@ -62,6 +115,18 @@ export class MeshRTC {
     this.socket.on("connect", () => { 
         this.socketId = this.socket.id; 
         this.socket.emit("join-room", this.roomId, this.socket.id);
+    });
+
+    this.socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe'>) => {
+        if (this.onNewPublicMessageCallback) {
+            this.onNewPublicMessageCallback({ ...message, isMe: message.senderId === this.userId });
+        }
+    });
+
+    this.socket.on("new-private-message", (message: Omit<ChatMessage, 'isMe'>) => {
+        if (this.onNewPrivateMessageCallback) {
+            this.onNewPrivateMessageCallback({ ...message, isMe: message.senderId === this.userId });
+        }
     });
 
     this.socket.on("user-joined", (remoteId: string) => {
@@ -118,7 +183,6 @@ export class MeshRTC {
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       console.log("[mesh] setRemoteDescription done for", fromId);
 
-      // Wait until local stream is attached to this specific peer connection
       await this.waitForLocalStreamAttachment(pc);
 
       const answer = await pc.createAnswer();

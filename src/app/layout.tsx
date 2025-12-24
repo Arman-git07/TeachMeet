@@ -1,3 +1,4 @@
+
 // src/app/layout.tsx
 'use client';
 import React from 'react';
@@ -9,6 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { Providers } from '@/components/common/Providers';
 import { AppShell } from '@/components/common/AppShell';
+import { MeetingRTCProvider } from '@/contexts/MeetingRTCContext';
 
 const geistSansFont = GeistSans;
 const geistMonoFont = GeistMono;
@@ -20,6 +22,7 @@ export default function RootLayout({
 }>) {
   const pathname = usePathname();
   const isAuthPage = pathname.startsWith('/auth');
+  const isMeetingPage = pathname.includes('/dashboard/meeting/');
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -32,15 +35,15 @@ export default function RootLayout({
         geistMonoFont.variable
       )}>
         <Providers>
-          {isAuthPage ? (
-            // Render auth pages without the main app shell (sidebar)
-            children
-          ) : (
-            // Render all other pages with the main app shell
-            <AppShell>
-              {children}
-            </AppShell>
-          )}
+          <MeetingRTCProvider>
+            {isAuthPage ? (
+              children
+            ) : (
+              <AppShell>
+                {children}
+              </AppShell>
+            )}
+          </MeetingRTCProvider>
         </Providers>
         <Toaster />
       </body>

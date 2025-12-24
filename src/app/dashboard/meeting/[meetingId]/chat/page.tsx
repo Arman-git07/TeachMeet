@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, MessageSquare, User, Users } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -14,8 +14,9 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { io, Socket } from "socket.io-client";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   senderName: string;
   senderAvatar?: string;
@@ -25,6 +26,13 @@ interface ChatMessage {
   timestamp: Date;
   isMe: boolean;
   isPrivate: boolean;
+  meetingId?: string;
+  meetingTopic?: string;
+}
+
+export type PublicChatActivityItem = ChatMessage & {
+  type: 'publicChat';
+  title: string;
 }
 
 const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
@@ -38,131 +46,54 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const cam = searchParams.get('cam');
   const mic = searchParams.get('mic');
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
   const [inputValue, setInputValue] = useState("");
   const { user } = useAuth();
-  const socketRef = useRef<Socket | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const [activeTab, setActiveTab] = useState(privateWithId ? privateWithId : 'public');
 
   useEffect(() => {
-    if (!user) return;
+    if (rtc && !rtc.hasRegisteredChatHandlers) {
+      rtc.registerChatHandlers((message) => {
+        setChatHistory(prev => [...prev, message]);
+      });
+    }
+  }, [rtc, setChatHistory]);
 
-    const socket = io({
-      path: "/api/socketio",
-      query: { userId: user.uid, displayName: user.displayName, photoURL: user.photoURL || '' },
-    });
-    socketRef.current = socket;
 
-    socket.on("connect", () => {
-      socket.emit("join-room", meetingId, user.uid);
-    });
-
-    socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe' | 'isPrivate'>) => {
-      if (activeTab === 'public') {
-        setMessages((prev) => [
-          ...prev,
-          { ...message, timestamp: new Date(message.timestamp), isMe: message.senderId === user.uid, isPrivate: false },
-        ]);
-      }
-    });
-
-    socket.on("new-private-message", (message: Omit<ChatMessage, 'isMe' | 'isPrivate'>) => {
-        const currentPrivateChatId = activeTab;
-        const relevantPartyId = message.senderId === user.uid ? message.recipientId : message.senderId;
-
-        if (currentPrivateChatId === relevantPartyId) {
-            setMessages((prev) => [
-                ...prev,
-                { ...message, timestamp: new Date(message.timestamp), isMe: message.senderId === user.uid, isPrivate: true },
-            ]);
-        }
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [meetingId, user, activeTab]);
-
-  // Effect to handle tab changes and set initial system messages
   useEffect(() => {
-      if (activeTab === 'public') {
-          setMessages([
-              { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }
+      if (activeTab === 'public' && !chatHistory.some(m => m.id === 'sys_public_switch')) {
+          setChatHistory(prev => [
+            ...prev.filter(m => m.isPrivate),
+            { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }
           ]);
-      } else if (activeTab === privateWithId && privateWithName) {
-          setMessages([
-            { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' }
+      } else if (activeTab === privateWithId && privateWithName && !chatHistory.some(m => m.id === 'sys_private_switch')) {
+          setChatHistory(prev => [
+             ...prev.filter(m => !m.isPrivate),
+            { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' }
           ]);
-      } else {
-        // Fallback or clear if tab is unknown
-        setMessages([]);
       }
-  }, [activeTab, privateWithId, privateWithName, topic]);
+  }, [activeTab, privateWithId, privateWithName, topic, setChatHistory, chatHistory]);
 
 
   useEffect(() => {
     if (scrollViewportRef.current) {
         scrollViewportRef.current.scrollTo({ top: scrollViewportRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [chatHistory]);
 
-  const notifyOtherComponents = (message: any) => {
-    if (!user) return;
-    try {
-        const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
-        const newNotification = {
-            id: `publicChat-${message.id}`,
-            type: 'publicChat',
-            title: `New Message from ${message.senderName}`,
-            text: message.text,
-            timestamp: Date.now(),
-            senderId: message.senderId,
-            meetingId: meetingId,
-            meetingTopic: topic,
-        };
-        // In a real multi-user app, we'd get all users and write to their localStorage
-        // For this simulation, we'll just write to our own to trigger the event for this user.
-        // A real implementation would involve the server pushing this update to all clients.
-        localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify([newNotification]));
-        window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-    } catch (e) {
-        console.error("Failed to update latest activity for chat notification", e);
-    }
-  };
 
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !user || !socketRef.current) return;
+    if (!inputValue.trim() || !user || !rtc) return;
     
     const isPrivate = activeTab !== 'public';
 
     if (isPrivate) {
       const recipientId = activeTab;
-      const privateMessage = {
-          id: Date.now().toString(),
-          senderId: user.uid,
-          senderName: user.displayName || 'You',
-          senderAvatar: user.photoURL || undefined,
-          recipientId: recipientId,
-          text: inputValue,
-          timestamp: new Date(),
-          isPrivate: true,
-      };
-      socketRef.current.emit('private-chat-message', meetingId, privateMessage);
-
+      rtc.sendPrivateMessage(recipientId, inputValue);
     } else {
-       const publicMessage = {
-        id: Date.now().toString(),
-        senderId: user.uid,
-        senderName: user.displayName || 'Anonymous',
-        senderAvatar: user.photoURL || undefined,
-        text: inputValue,
-        timestamp: new Date(),
-        isPrivate: false,
-      };
-      socketRef.current.emit('public-chat-message', meetingId, publicMessage);
-      notifyOtherComponents(publicMessage);
+      rtc.sendPublicMessage(inputValue);
     }
     setInputValue("");
   };
@@ -173,6 +104,11 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   if (mic) backToMeetingParams.set('mic', mic);
   const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
 
+
+  const messagesToDisplay = chatHistory.filter(msg => {
+    if(activeTab === 'public') return !msg.isPrivate;
+    return msg.isPrivate && (msg.recipientId === activeTab || msg.senderId === activeTab);
+  });
 
   return (
     <div className="flex flex-col h-full bg-muted/30">
@@ -211,7 +147,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           <CardContent className="flex-grow p-0 overflow-hidden">
             <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
-                  {messages.map((msg) => (
+                  {messagesToDisplay.map((msg) => (
                     <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
                       {!msg.isMe && (
                         <Avatar className="h-8 w-8 self-start">
@@ -271,7 +207,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         </Card>
       </main>
        <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-        Chat messages are not stored.
+        Chat history is cleared after the meeting ends.
       </footer>
     </div>
   );
