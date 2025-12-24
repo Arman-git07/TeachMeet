@@ -931,9 +931,7 @@ export default function WhiteboardPage() {
       return;
     }
   
-    const recognitionToastId = `recognize-${Date.now()}`;
-    toast({
-      id: recognitionToastId,
+    const recognitionToast = toast({
       title: "Refining Shape...",
       description: "The AI is analyzing your drawing. This might take a moment.",
       duration: Infinity,
@@ -948,7 +946,7 @@ export default function WhiteboardPage() {
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
-      toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      recognitionToast.update({ variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
       setRefinePrompt(''); // Also clear prompt on error
       return;
     }
@@ -1012,15 +1010,15 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        toast.update(recognitionToastId, { title: "Shape Refined!", description: "Your drawing has been transformed." });
+        recognitionToast.update({ title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
-        toast.update(recognitionToastId, { variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        recognitionToast.update({ variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
-      toast.update(recognitionToastId, {
+      recognitionToast.update({
         variant: "destructive",
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
