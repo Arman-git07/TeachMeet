@@ -57,6 +57,17 @@ type Props = {
   initialPinnedId?: string | null;
 };
 
+type PublicChatActivityItem = {
+    type: 'publicChat';
+    id: string;
+    title: string;
+    text: string;
+    timestamp: number;
+    senderId: string;
+    meetingId: string;
+    meetingTopic: string;
+};
+
 const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 
@@ -67,9 +78,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
-  // Use localStorage to initialize state, providing persistence across navigations
-  const [camOn, setCamOn] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('teachmeet-cam-state') !== 'false' : initialCamOn);
-  const [micOn, setMicOn] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('teachmeet-mic-state') !== 'false' : initialMicOn);
+  const [camOn, setCamOn] = useState(initialCamOn);
+  const [micOn, setMicOn] = useState(initialMicOn);
   
   const [loadingMedia, setLoadingMedia] = useState(true);
 
@@ -77,7 +87,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const [liveParticipants, setLiveParticipants] = useState<Map<string, LiveParticipantInfo>>(new Map());
   const [isHandRaised, setIsHandRaised] = useState(false);
   
-  // Screen Share State
   const [isScreenShareModalOpen, setIsScreenShareModalOpen] = useState(false);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   
@@ -98,8 +107,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
   const [privateMessage, setPrivateMessage] = useState<PrivateMessageActivityItem | null>(null);
+  const [publicChatMessage, setPublicChatMessage] = useState<PublicChatActivityItem | null>(null);
   
-  // Ref to track if the participant doc has been created
   const participantDocCreated = useRef(false);
 
 
@@ -110,7 +119,8 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
         const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
         if (!rawActivity) return;
-        const activities: PrivateMessageActivityItem[] = JSON.parse(rawActivity);
+        const activities: (PrivateMessageActivityItem | PublicChatActivityItem)[] = JSON.parse(rawActivity);
+        
         const latestPrivateMessage = activities.find(
           (act): act is PrivateMessageActivityItem =>
             act.type === 'privateMessage' && act.meetingId === meetingId
@@ -118,6 +128,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         if (latestPrivateMessage && latestPrivateMessage.id !== privateMessage?.id) {
           setPrivateMessage(latestPrivateMessage);
         }
+
+        const latestPublicChatMessage = activities.find(
+            (act): act is PublicChatActivityItem =>
+              act.type === 'publicChat' && act.meetingId === meetingId && act.senderId !== user.uid
+          );
+        if (latestPublicChatMessage && latestPublicChatMessage.id !== publicChatMessage?.id) {
+            setPublicChatMessage(latestPublicChatMessage);
+        }
+
       } catch (e) {
         console.error("Failed to parse activity from localStorage", e);
       }
@@ -126,13 +145,18 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     handleStorageUpdate(); // Check on mount
     window.addEventListener('teachmeet_activity_updated', handleStorageUpdate);
     return () => window.removeEventListener('teachmeet_activity_updated', handleStorageUpdate);
-  }, [user, meetingId, privateMessage?.id]);
+  }, [user, meetingId, privateMessage?.id, publicChatMessage?.id]);
 
   const handleNotificationClick = (message: PrivateMessageActivityItem) => {
     const url = `/dashboard/meeting/${message.meetingId}/chat?topic=${encodeURIComponent(message.meetingTopic)}&privateWith=${message.senderId}&privateWithName=${encodeURIComponent(message.from)}`;
     router.push(url);
-    // Clear the message after navigating
     setPrivateMessage(null);
+  };
+  
+  const handlePublicChatNotificationClick = (message: PublicChatActivityItem) => {
+    const url = `/dashboard/meeting/${message.meetingId}/chat?topic=${encodeURIComponent(message.meetingTopic)}`;
+    router.push(url);
+    setPublicChatMessage(null);
   };
 
 
@@ -141,7 +165,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       setIsLoadingRole(true);
       const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
       if (meetingDoc.exists()) {
-        const hostId = meetingDoc.data().hostId; // Use hostId
+        const hostId = meetingDoc.data().hostId;
         setIsHost(userId === hostId);
       }
       setIsLoadingRole(false);
@@ -229,7 +253,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     updateMyStatus({ isScreenSharing: false });
   };
 
-  useEffect(() => {
+ useEffect(() => {
     let mounted = true;
     let stream: MediaStream | null = null;
     const initMedia = async () => {
@@ -238,9 +262,14 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
         
-        // Use the state which is initialized from localStorage
-        stream.getVideoTracks().forEach(track => { track.enabled = camOn; });
-        stream.getAudioTracks().forEach(track => { track.enabled = micOn; });
+        const desiredCamState = localStorage.getItem('teachmeet-cam-state') !== 'false';
+        const desiredMicState = localStorage.getItem('teachmeet-mic-state') !== 'false';
+        
+        setCamOn(desiredCamState);
+        setMicOn(desiredMicState);
+        
+        stream.getVideoTracks().forEach(track => { track.enabled = desiredCamState; });
+        stream.getAudioTracks().forEach(track => { track.enabled = desiredMicState; });
         
         setLocalStream(stream);
       } catch (err) { console.error("Media init error:", err); toast({ variant: "destructive", title: "Media Error" }); } 
@@ -256,7 +285,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       remoteAnalysersRef.current.clear();
       screenShareHelper?.stopSharing();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast, screenShareHelper]);
 
   const previousRaisedHands = useRef<Set<string>>(new Set());
@@ -282,7 +310,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   }, [liveParticipants, toast]);
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
-    // Only send updates if the participant document has been created
     if (user && meetingId && participantDocCreated.current) {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
       try {
@@ -308,17 +335,15 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
         newParticipants.set(doc.id, data); 
       });
 
-      // Handle host turning off camera remotely
       if (localParticipantData && localParticipantData.isCameraOn === false && camOn) {
-        toggleCamera(false); // Force camera off
+        toggleCamera(false);
         toast({ title: "Camera Turned Off", description: "The host has turned off your camera." });
       }
 
       setLiveParticipants(newParticipants);
     });
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meetingId, userId]);
+  }, [meetingId, userId, camOn, toast, toggleCamera]);
 
   useEffect(() => { if (localStream && rtc) { rtc.init(localStream); } return () => rtc?.leave(); }, [rtc, localStream]);
 
@@ -401,7 +426,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
 
   useEffect(() => {
     const addSelfToParticipants = async () => {
-        if (user && meetingId && !isLoadingRole && localStream) { // Wait for role and stream
+        if (user && meetingId && !isLoadingRole && localStream && !participantDocCreated.current) {
             const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
             try {
                 await setDoc(participantRef, {
@@ -412,7 +437,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
                     isMicOn: micOn,
                     joinedAt: serverTimestamp(),
                 });
-                participantDocCreated.current = true; // Set flag after successful creation
+                participantDocCreated.current = true;
             } catch (error) {
                 console.error("Failed to add participant document:", error);
                 toast({ variant: 'destructive', title: 'Connection Error', description: 'Could not join the meeting room state.'});
@@ -448,7 +473,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     let all = [self, ...remotes];
     const remoteOnly = [...remotes];
 
-    // Reorder based on pinnedId
     if (pinnedId) {
         const pinnedIndex = all.findIndex(p => p.id === pinnedId);
         if (pinnedIndex > -1) {
@@ -501,7 +525,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const newPinnedId = pinnedId === id ? null : id;
     setPinnedId(newPinnedId);
     
-    // Update URL without navigation to allow for refreshing/sharing pinned view
     const url = new URL(window.location.href);
     if (newPinnedId) {
         url.searchParams.set('pin', newPinnedId);
@@ -621,7 +644,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
     
-    // For more than 5 participants
     if (count > 5 && localParticipant) {
       return (
         <div className="w-full h-full flex flex-col gap-2 relative" ref={mainContainerRef}>
@@ -662,7 +684,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       );
     }
     
-    // Fallback for any uncovered case, renders a simple grid of all remote users.
     if (remotes.length > 0 && localParticipant) {
         const gridCols = Math.ceil(Math.sqrt(remotes.length));
         return (
@@ -703,6 +724,23 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
           <Button size="sm">View</Button>
         </div>
       )}
+
+      {publicChatMessage && (
+        <div
+          onClick={() => handlePublicChatNotificationClick(publicChatMessage)}
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-[9998] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border-accent/30 px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown cursor-pointer hover:bg-muted/30"
+        >
+          <div className="flex items-center gap-3">
+            <MessageSquare className="h-6 w-6 text-accent" />
+            <div>
+              <p className="font-semibold">{publicChatMessage.title}</p>
+              <p className="text-sm text-muted-foreground truncate max-w-xs">{publicChatMessage.text}</p>
+            </div>
+          </div>
+          <Button size="sm" variant="outline">View Chat</Button>
+        </div>
+      )}
+
 
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
 

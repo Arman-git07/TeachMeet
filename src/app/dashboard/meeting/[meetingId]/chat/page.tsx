@@ -27,6 +27,7 @@ interface ChatMessage {
   isPrivate: boolean;
 }
 
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -107,6 +108,30 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     }
   }, [messages]);
 
+  const notifyOtherComponents = (message: any) => {
+    if (!user) return;
+    try {
+        const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
+        const newNotification = {
+            id: `publicChat-${message.id}`,
+            type: 'publicChat',
+            title: `New Message from ${message.senderName}`,
+            text: message.text,
+            timestamp: Date.now(),
+            senderId: message.senderId,
+            meetingId: meetingId,
+            meetingTopic: topic,
+        };
+        // In a real multi-user app, we'd get all users and write to their localStorage
+        // For this simulation, we'll just write to our own to trigger the event for this user.
+        // A real implementation would involve the server pushing this update to all clients.
+        localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify([newNotification]));
+        window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+    } catch (e) {
+        console.error("Failed to update latest activity for chat notification", e);
+    }
+  };
+
   const handleSendMessage = () => {
     if (!inputValue.trim() || !user || !socketRef.current) return;
     
@@ -124,7 +149,6 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
           timestamp: new Date(),
           isPrivate: true,
       };
-      // No longer add locally first, let the server echo it back to ensure it was sent
       socketRef.current.emit('private-chat-message', meetingId, privateMessage);
 
     } else {
@@ -137,8 +161,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
         timestamp: new Date(),
         isPrivate: false,
       };
-      // Let server echo back public messages too for consistency
       socketRef.current.emit('public-chat-message', meetingId, publicMessage);
+      notifyOtherComponents(publicMessage);
     }
     setInputValue("");
   };
