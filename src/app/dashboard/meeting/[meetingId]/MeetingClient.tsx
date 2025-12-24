@@ -21,6 +21,7 @@ import type { JoinRequest, PrivateMessageActivityItem } from '@/app/dashboard/cl
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChatMessage, PublicChatActivityItem } from "./chat/page";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
 
 type Participant = {
@@ -64,6 +65,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const { setRtc, setChatHistory } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -100,6 +102,42 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   
   const participantDocCreated = useRef(false);
 
+  const rtc = useMemo(() => {
+    if (!userId || !meetingId || !user) return null;
+    const mesh = new MeshRTC({
+      roomId: meetingId,
+      userId,
+      onRemoteStream: (remoteSocketId, stream) => {
+        setRemoteStreams(prev => {
+          const next = new Map(prev);
+          next.set(remoteSocketId, stream);
+          return next;
+        });
+      },
+      onRemoteLeft: (socketId) => {
+        setRemoteStreams(prev => { const next = new Map(prev); next.delete(socketId); return next; });
+        const entry = remoteAnalysersRef.current.get(socketId);
+        if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
+        remoteAnalysersRef.current.delete(socketId);
+        setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
+        setPinnedId(prev => prev === socketId ? null : prev);
+      },
+      onNewPublicMessage: (message: Omit<ChatMessage, 'isMe'>) => {
+        setChatHistory(prev => [...prev, {...message, isMe: message.senderId === user.uid}]);
+        if (message.senderId !== user.uid) {
+            setPublicChatMessage({
+                ...message,
+                type: 'publicChat',
+                title: `New Message from ${message.senderName}`,
+                meetingTopic: topic,
+            });
+        }
+      }
+    });
+    setRtc(mesh);
+    return mesh;
+  }, [meetingId, userId, topic, user, setRtc, setChatHistory]);
+  
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (user && meetingId && participantDocCreated.current) {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
@@ -200,39 +238,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     fetchMeetingCreator();
   }, [meetingId, userId]);
 
-  const rtc = useMemo(() => {
-    if (!userId || !meetingId) return null;
-    const mesh = new MeshRTC({
-      roomId: meetingId,
-      userId,
-      onRemoteStream: (remoteSocketId, stream) => {
-        setRemoteStreams(prev => {
-          const next = new Map(prev);
-          next.set(remoteSocketId, stream);
-          return next;
-        });
-      },
-      onRemoteLeft: (socketId) => {
-        setRemoteStreams(prev => { const next = new Map(prev); next.delete(socketId); return next; });
-        const entry = remoteAnalysersRef.current.get(socketId);
-        if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
-        remoteAnalysersRef.current.delete(socketId);
-        setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
-        setPinnedId(prev => prev === socketId ? null : prev);
-      },
-      onNewPublicMessage: (message: Omit<ChatMessage, 'isMe'>) => {
-        if (message.senderId !== user?.uid) {
-            setPublicChatMessage({
-                ...message,
-                type: 'publicChat',
-                title: `New Message from ${message.senderName}`,
-                meetingTopic: topic,
-            });
-        }
-      }
-    });
-    return mesh;
-  }, [meetingId, userId, topic, user?.uid]);
 
   const screenShareHelper = useMemo(() => {
     if (!rtc) return null;
@@ -371,7 +376,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     return () => unsubscribe();
   }, [meetingId, userId, camOn, toast, toggleCamera]);
 
-  useEffect(() => { if (localStream && rtc) { rtc.init(localStream); } return () => rtc?.leave(); }, [rtc, localStream]);
+  useEffect(() => { if (localStream && rtc && user) { rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); } return () => rtc?.leave(); }, [rtc, localStream, user]);
 
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
