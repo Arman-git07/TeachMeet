@@ -27,7 +27,7 @@ export interface MeetingActivityItem extends BaseActivityItem {
   participants?: number;
 }
 
-export interface DocumentActivityItem extends BaseActivity_Item {
+export interface DocumentActivityItem extends BaseActivityItem {
   type: 'document';
   isPrivate: boolean;
 }
@@ -109,7 +109,18 @@ export default function HomePage() {
     }
 
     const dismissedItemsRaw = localStorage.getItem(DISMISSED_ITEMS_KEY);
-    const dismissedItemIds: string[] = dismissedItemsRaw ? JSON.parse(dismissedItemsRaw) : [];
+    let dismissedItemIds: string[] = [];
+    if (dismissedItemsRaw) {
+      try {
+        const parsed = JSON.parse(dismissedItemsRaw);
+        if (Array.isArray(parsed)) {
+          dismissedItemIds = parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse dismissed items, clearing.");
+        localStorage.removeItem(DISMISSED_ITEMS_KEY);
+      }
+    }
     
     const startedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
     let ongoingMeetings: MeetingActivityItem[] = [];
@@ -145,7 +156,7 @@ export default function HomePage() {
             const parsed = JSON.parse(latestActivityRaw);
             if (Array.isArray(parsed)) {
                 // Filter out private messages, they are handled in-meeting
-                otherActivities = parsed.filter(item => item.type !== 'privateMessage');
+                otherActivities = parsed.filter(item => item && item.type && item.type !== 'privateMessage');
             }
         } catch (e) {
              console.error("Failed to parse latest activity from localStorage", e);
@@ -154,7 +165,7 @@ export default function HomePage() {
     }
     
     const combined = [...ongoingMeetings, ...otherActivities]
-      .filter(item => item && !dismissedItemIds.includes(item.id))
+      .filter(item => item && item.id && !dismissedItemIds.includes(item.id))
       .sort((a, b) => b.timestamp - a.timestamp);
 
     setAllActivity(combined);
@@ -277,6 +288,10 @@ export default function HomePage() {
       return (
         <ul className="space-y-3 text-left">
           {allActivity.map((item) => {
+            if (!item || !item.type || !itemLinks[item.type]) {
+              console.warn("Skipping invalid activity item:", item);
+              return null;
+            }
             const Icon = itemIcons[item.type];
             const rawId = item.id;
             const link = itemLinks[item.type](rawId, item);
@@ -370,3 +385,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
