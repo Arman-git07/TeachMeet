@@ -111,6 +111,44 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   
   const participantDocCreated = useRef(false);
 
+  const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
+    if (user && meetingId && participantDocCreated.current) {
+      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+      try {
+        await updateDoc(participantRef, status);
+      } catch (err) {
+        console.error("Error updating participant status:", err);
+      }
+    }
+  }, [user, meetingId]);
+
+  const toggleMic = useCallback(() => {
+    if (!localStream) return;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+  
+    const newState = !micOn;
+    audioTrack.enabled = newState;
+    setMicOn(newState);
+    localStorage.setItem('teachmeet-mic-state', String(newState));
+    
+    updateMyStatus({ isMicOn: newState });
+    setVolumeLevels(prev => {
+      const next = new Map(prev);
+      next.set(userId, newState ? (next.get(userId) ?? 0) : 0);
+      return next;
+    });
+  }, [localStream, micOn, updateMyStatus, userId]);
+
+  const toggleCamera = useCallback((forceState?: boolean) => {
+    if (!localStream) return;
+    const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
+    localStream.getVideoTracks().forEach(track => { track.enabled = nextState; });
+    setCamOn(nextState);
+    localStorage.setItem('teachmeet-cam-state', String(nextState));
+    updateMyStatus({ isCameraOn: nextState });
+  }, [localStream, camOn, updateMyStatus]);
+
 
   useEffect(() => {
     const handleStorageUpdate = () => {
@@ -309,17 +347,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     previousRaisedHands.current = nextSet;
   }, [liveParticipants, toast]);
 
-  const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
-    if (user && meetingId && participantDocCreated.current) {
-      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-      try {
-        await updateDoc(participantRef, status);
-      } catch (err) {
-        console.error("Error updating participant status:", err);
-      }
-    }
-  }, [user, meetingId]);
-
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
@@ -490,34 +517,6 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
     const raisedCount = all.filter(p => p.isHandRaised).length;
     return { allParticipants: all, localParticipant: self, remoteParticipants: remoteOnly, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
   }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId]);
-
-
-  const toggleMic = useCallback(() => {
-    if (!localStream) return;
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (!audioTrack) return;
-  
-    const newState = !micOn;
-    audioTrack.enabled = newState;
-    setMicOn(newState);
-    localStorage.setItem('teachmeet-mic-state', String(newState));
-    
-    updateMyStatus({ isMicOn: newState });
-    setVolumeLevels(prev => {
-      const next = new Map(prev);
-      next.set(userId, newState ? (next.get(userId) ?? 0) : 0);
-      return next;
-    });
-  }, [localStream, micOn, updateMyStatus, userId]);
-
-  const toggleCamera = useCallback((forceState?: boolean) => {
-    if (!localStream) return;
-    const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
-    localStream.getVideoTracks().forEach(track => { track.enabled = nextState; });
-    setCamOn(nextState);
-    localStorage.setItem('teachmeet-cam-state', String(nextState));
-    updateMyStatus({ isCameraOn: nextState });
-  }, [localStream, camOn, updateMyStatus]);
 
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   
