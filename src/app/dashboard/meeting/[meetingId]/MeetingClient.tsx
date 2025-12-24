@@ -69,8 +69,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
-  const [camOn, setCamOn] = useState(true);
-  const [micOn, setMicOn] = useState(true);
+  const camOnPref = localStorage.getItem('teachmeet-cam-state') !== 'false';
+  const micOnPref = localStorage.getItem('teachmeet-mic-state') !== 'false';
+
+  const [camOn, setCamOn] = useState(camOnPref);
+  const [micOn, setMicOn] = useState(micOnPref);
   
   const [loadingMedia, setLoadingMedia] = useState(true);
 
