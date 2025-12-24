@@ -39,6 +39,16 @@ export default function MeetingPage() {
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
+  const [currentCamOn, setCurrentCamOn] = useState(true);
+  const [currentMicOn, setCurrentMicOn] = useState(true);
+
+  // Update cam/mic state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentCamOn(localStorage.getItem('teachmeet-cam-state') !== 'false');
+      setCurrentMicOn(localStorage.getItem('teachmeet-mic-state') !== 'false');
+    }
+  }, []);
 
 
   const handleLeave = useCallback(async (endForAll = false) => {
@@ -139,12 +149,12 @@ export default function MeetingPage() {
 
 
   const constructUrl = (page: string) => {
-    let url = `/dashboard/meeting/${meetingId}/${page}`;
-    const topicParam = topic || '';
-    if (topicParam) {
-        url += `?topic=${encodeURIComponent(topicParam)}`;
-    }
-    return url;
+    const params = new URLSearchParams({
+        topic: topic || '',
+        cam: String(currentCamOn),
+        mic: String(currentMicOn),
+    });
+    return `/dashboard/meeting/${meetingId}/${page}?${params.toString()}`;
   };
 
   const memoizedMeetingActions = useCallback(() => (
@@ -181,7 +191,7 @@ export default function MeetingPage() {
         </DropdownMenuItem>
     </DropdownMenuContent>
     </DropdownMenu>
-  ), [meetingId, topic]);
+  ), [meetingId, topic, currentCamOn, currentMicOn]);
   
     useEffect(() => {
         setHeaderContent(

@@ -74,6 +74,9 @@ const ParticipantItem = React.memo(({
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
+  const searchParams = useSearchParams();
+  const cam = searchParams.get('cam');
+  const mic = searchParams.get('mic');
 
   const handleActionClick = (action: string, participantName: string) => {
     toast({
@@ -83,13 +86,22 @@ const ParticipantItem = React.memo(({
     });
   };
   
-  const privateChatLink = `/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic || '')}&privateWith=${participant.id}&privateWithName=${encodeURIComponent(participant.name)}`;
+  const privateChatLinkParams = new URLSearchParams();
+  if (topic) privateChatLinkParams.set('topic', topic);
+  if (cam) privateChatLinkParams.set('cam', cam);
+  if (mic) privateChatLinkParams.set('mic', mic);
+  privateChatLinkParams.set('privateWith', participant.id);
+  privateChatLinkParams.set('privateWithName', participant.name);
+  const privateChatLink = `/dashboard/meeting/${meetingId}/chat?${privateChatLinkParams.toString()}`;
   
-  const pinUrl = new URLSearchParams(topic ? { topic } : {});
+  const pinUrlParams = new URLSearchParams();
+  if (topic) pinUrlParams.set('topic', topic);
+  if (cam) pinUrlParams.set('cam', cam);
+  if (mic) pinUrlParams.set('mic', mic);
   if (!isPinned) {
-      pinUrl.set('pin', participant.id);
+      pinUrlParams.set('pin', participant.id);
   }
-  const pinLink = `/dashboard/meeting/${meetingId}?${pinUrl.toString()}`;
+  const pinLink = `/dashboard/meeting/${meetingId}?${pinUrlParams.toString()}`;
 
   return (
     <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
@@ -185,6 +197,8 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const searchParams = useSearchParams();
   const topicFromParams = searchParams.get('topic');
   const pinnedUserId = searchParams.get('pin');
+  const cam = searchParams.get('cam');
+  const mic = searchParams.get('mic');
   const displayTopic = topicFromParams || `Meeting Participants`;
   const { toast } = useToast();
 
@@ -250,7 +264,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     return () => {
       unsubscribe();
     };
-  }, [meetingId, db, toast]);
+  }, [meetingId, toast]);
 
   const handleRemoveConfirm = async () => {
     if (!participantToRemove) return;
@@ -294,11 +308,12 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     }
   };
 
+  const backToMeetingParams = new URLSearchParams();
+  if (topicFromParams) backToMeetingParams.set('topic', topicFromParams);
+  if (cam) backToMeetingParams.set('cam', cam);
+  if (mic) backToMeetingParams.set('mic', mic);
+  const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
 
-  const backToMeetingLink = topicFromParams 
-    ? `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topicFromParams)}`
-    : `/dashboard/meeting/${meetingId}`;
-  
   const isCurrentUserTheHost = currentUserId === meetingHostId;
 
   return (

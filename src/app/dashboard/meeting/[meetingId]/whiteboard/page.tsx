@@ -214,6 +214,8 @@ export default function WhiteboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic');
+  const cam = searchParams.get('cam');
+  const mic = searchParams.get('mic');
   const meetingId = params.meetingId as string;
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { toast } = useToast();
@@ -911,7 +913,6 @@ export default function WhiteboardPage() {
   };
   
   const handleRecognizeShape = async () => {
-    // This will be called by the dialog action, so we close it here.
     setIsRefineDialogOpen(false);
     
     const currentPage = pages[currentPageIndex];
@@ -920,14 +921,14 @@ export default function WhiteboardPage() {
         title: "Nothing to Refine",
         description: "Please select a drawing first using the select tool.",
       });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt('');
       return;
     }
   
     const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
     if (!selectionBox) {
       toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt('');
       return;
     }
   
@@ -946,12 +947,11 @@ export default function WhiteboardPage() {
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
-      recognitionToast.update({ variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
-      setRefinePrompt(''); // Also clear prompt on error
+      recognitionToast.update({ id: recognitionToast.id, variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      setRefinePrompt('');
       return;
     }
   
-    // Fill with a solid white background, as transparent can be problematic for some models
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, width, height);
   
@@ -1010,21 +1010,21 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        recognitionToast.update({ title: "Shape Refined!", description: "Your drawing has been transformed." });
+        recognitionToast.update({ id: recognitionToast.id, title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
-        recognitionToast.update({ variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        recognitionToast.update({ id: recognitionToast.id, variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
-      recognitionToast.update({
+      recognitionToast.update({ id: recognitionToast.id, 
         variant: "destructive",
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
       });
     } finally {
-        setRefinePrompt(''); // Reset prompt after use
+        setRefinePrompt('');
     }
   };
 
@@ -1183,7 +1183,7 @@ export default function WhiteboardPage() {
       <div className="flex items-center gap-2">
         {meetingId && (
           <Button asChild variant="outline" size="sm" className="rounded-lg">
-            <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
+            <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}&cam=${cam}&mic=${mic}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Link>
@@ -1219,7 +1219,7 @@ export default function WhiteboardPage() {
           onPermissionChange={handlePermissionChange}
       />
     </Dialog>
-  ), [meetingId, router, topic, participants, drawingPermissions]);
+  ), [meetingId, router, topic, participants, drawingPermissions, cam, mic]);
   
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
@@ -1370,7 +1370,7 @@ export default function WhiteboardPage() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Refine Your Drawing</AlertDialogTitle>
+                  <ShadDialogTitle>Refine Your Drawing</ShadDialogTitle>
                   <AlertDialogDescription>
                     Optionally, tell the AI what you drew to get a better result.
                   </AlertDialogDescription>

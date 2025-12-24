@@ -67,8 +67,9 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
-  const [camOn, setCamOn] = useState(initialCamOn);
-  const [micOn, setMicOn] = useState(initialMicOn);
+  // Use localStorage to initialize state, providing persistence across navigations
+  const [camOn, setCamOn] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('teachmeet-cam-state') !== 'false' : initialCamOn);
+  const [micOn, setMicOn] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('teachmeet-mic-state') !== 'false' : initialMicOn);
   
   const [loadingMedia, setLoadingMedia] = useState(true);
 
@@ -236,8 +237,11 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        stream.getVideoTracks().forEach(track => { track.enabled = initialCamOn; });
-        stream.getAudioTracks().forEach(track => { track.enabled = initialMicOn; });
+        
+        // Use the state which is initialized from localStorage
+        stream.getVideoTracks().forEach(track => { track.enabled = camOn; });
+        stream.getAudioTracks().forEach(track => { track.enabled = micOn; });
+        
         setLocalStream(stream);
       } catch (err) { console.error("Media init error:", err); toast({ variant: "destructive", title: "Media Error" }); } 
       finally { if (mounted) setLoadingMedia(false); }
@@ -722,7 +726,7 @@ export default function MeetingClient({ meetingId, userId, initialCamOn, initial
             <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button className="h-12 sm:h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-4 sm:px-6" aria-label="Leave Meeting"><PhoneOff className="h-5 w-5 sm:h-6 sm-6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button>
+                <Button className="h-12 sm:h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-4 sm:px-6" aria-label="Leave Meeting"><PhoneOff className="h-5 w-5 sm:h-6 sm:6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>

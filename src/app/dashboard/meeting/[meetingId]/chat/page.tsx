@@ -34,6 +34,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const topic = searchParams.get('topic') || "Meeting Chat";
   const privateWithId = searchParams.get('privateWith');
   const privateWithName = searchParams.get('privateWithName');
+  const cam = searchParams.get('cam');
+  const mic = searchParams.get('mic');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -141,7 +143,12 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     setInputValue("");
   };
   
-  const backToMeetingLink = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic)}`;
+  const backToMeetingParams = new URLSearchParams();
+  if (topic) backToMeetingParams.set('topic', topic);
+  if (cam) backToMeetingParams.set('cam', cam);
+  if (mic) backToMeetingParams.set('mic', mic);
+  const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
+
 
   return (
     <div className="flex flex-col h-full bg-muted/30">
