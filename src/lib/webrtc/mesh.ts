@@ -77,6 +77,9 @@ export class MeshRTC {
       isPrivate: false,
     };
     this.socket.emit("public-chat-message", this.roomId, message);
+    if(this.onNewPublicMessageCallback) {
+        this.onNewPublicMessageCallback({ ...message, isMe: true });
+    }
   }
 
   public sendPrivateMessage(recipientId: string, text: string) {
@@ -93,6 +96,9 @@ export class MeshRTC {
       isPrivate: true,
     };
     this.socket.emit("private-chat-message", this.roomId, message);
+     if(this.onNewPrivateMessageCallback) {
+        this.onNewPrivateMessageCallback({ ...message, isMe: true });
+    }
   }
   
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {

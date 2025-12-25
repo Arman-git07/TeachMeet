@@ -104,7 +104,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   const memoizedRtc = useMemo(() => {
     if (!userId || !meetingId) return null;
-    const mesh = new MeshRTC({
+    const newRtc = new MeshRTC({
       roomId: meetingId,
       userId,
       onRemoteStream: (remoteSocketId, stream) => {
@@ -122,7 +122,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
         setPinnedId(prev => prev === socketId ? null : prev);
       },
-      onNewPublicMessage: (message: Omit<ChatMessage, 'isMe'>) => {
+      onNewPublicMessage: (message: ChatMessage) => {
         setChatHistory(prev => [...prev, {...message, isMe: message.senderId === user?.uid}]);
         if (message.senderId !== user?.uid) {
             setPublicChatMessage({
@@ -134,10 +134,18 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         }
       }
     });
-    setRtc(mesh);
-    return mesh;
+    setRtc(newRtc);
+    return newRtc;
   }, [meetingId, userId, topic, user, setRtc, setChatHistory]);
   
+  useEffect(() => {
+    if (rtc && !rtc.hasRegisteredChatHandlers) {
+      rtc.registerChatHandlers((message: ChatMessage) => {
+        setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === userId }]);
+      });
+    }
+  }, [rtc, setChatHistory, userId]);
+
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (user && meetingId && participantDocCreated.current) {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
