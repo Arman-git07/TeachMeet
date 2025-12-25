@@ -74,18 +74,11 @@ const ParticipantItem = React.memo(({
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
+
   const searchParams = useSearchParams();
   const cam = searchParams.get('cam');
   const mic = searchParams.get('mic');
 
-  const handleActionClick = (action: string, participantName: string) => {
-    toast({
-      title: `${action} ${participantName}`,
-      description: `The "${action.toLowerCase()}" feature is under development.`,
-      duration: 3000,
-    });
-  };
-  
   const privateChatLinkParams = new URLSearchParams();
   if (topic) privateChatLinkParams.set('topic', topic);
   if (cam) privateChatLinkParams.set('cam', cam);
@@ -94,14 +87,14 @@ const ParticipantItem = React.memo(({
   privateChatLinkParams.set('privateWithName', participant.name);
   const privateChatLink = `/dashboard/meeting/${meetingId}/chat?${privateChatLinkParams.toString()}`;
   
-  const pinUrlParams = new URLSearchParams();
-  if (topic) pinUrlParams.set('topic', topic);
-  if (cam) pinUrlParams.set('cam', cam);
-  if (mic) pinUrlParams.set('mic', mic);
-  if (!isPinned) {
+  const pinUrlParams = new URLSearchParams(searchParams.toString());
+  if (isPinned) {
+      pinUrlParams.delete('pin');
+  } else {
       pinUrlParams.set('pin', participant.id);
   }
   const pinLink = `/dashboard/meeting/${meetingId}?${pinUrlParams.toString()}`;
+
 
   return (
     <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
@@ -177,7 +170,7 @@ const ParticipantItem = React.memo(({
                   </DropdownMenuItem>
                 </>
               )}
-              <DropdownMenuItem onSelect={() => handleActionClick('Report', participant.name)} className="text-destructive focus:text-destructive cursor-pointer">
+              <DropdownMenuItem onSelect={() => toast({ title: "Report User", description: "This feature is under development." })} className="text-destructive focus:text-destructive cursor-pointer">
                 <AlertCircle className="mr-2 h-4 w-4" />
                 <span>Report User</span>
               </DropdownMenuItem>
@@ -403,3 +396,4 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     </>
   );
 }
+
