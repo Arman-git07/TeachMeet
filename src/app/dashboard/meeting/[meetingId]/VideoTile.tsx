@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,6 +16,17 @@ import {
 import { cn } from "@/lib/utils";
 import HandRaiseIcon from "./HandRaiseIcon";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // --- Main VideoTile Component ---
 type Props = {
@@ -30,6 +42,7 @@ type Props = {
   isScreenSharing?: boolean;
   name?: string;
   onDoubleClick?: () => void;
+  onUnpin?: () => void;
   onSpotlightClick?: () => void;
   draggable?: boolean;
   volumeLevel?: number;
@@ -51,6 +64,7 @@ const VideoTile: React.FC<Props> = ({
   isScreenSharing = false,
   name = "User",
   onDoubleClick,
+  onUnpin,
   onSpotlightClick,
   draggable = false,
   volumeLevel = 0,
@@ -100,7 +114,27 @@ const VideoTile: React.FC<Props> = ({
       title={`Double-click to pin/unpin ${name}`}
     >
       <div className="absolute top-2 left-2 z-30 flex items-center gap-1">
-        {isPinned && <Pin className="h-5 w-5 text-white/90" style={{ filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.5))" }} />}
+        {isPinned && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                 <button className="cursor-pointer p-1 hover:bg-black/50 rounded-full" title="Click to unpin">
+                    <Pin className="h-5 w-5 text-white/90" style={{ filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.5))" }} />
+                 </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Unpin Participant?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to unpin {name}?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onUnpin}>Unpin</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+        )}
         <HandRaiseIcon
           isRaised={isHandRaised}
           isFirst={isFirstHand}

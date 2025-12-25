@@ -65,15 +65,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const { setRtc, setChatHistory } = useMeetingRTC();
+  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
-  const camOnPref = localStorage.getItem('teachmeet-cam-state') !== 'false';
-  const micOnPref = localStorage.getItem('teachmeet-mic-state') !== 'false';
-
-  const [camOn, setCamOn] = useState(camOnPref);
-  const [micOn, setMicOn] = useState(micOnPref);
+  const [camOn, setCamOn] = useState(true);
+  const [micOn, setMicOn] = useState(true);
   
   const [loadingMedia, setLoadingMedia] = useState(true);
 
@@ -105,8 +102,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   
   const participantDocCreated = useRef(false);
 
-  const rtc = useMemo(() => {
-    if (!userId || !meetingId || !user) return null;
+  const memoizedRtc = useMemo(() => {
+    if (!userId || !meetingId) return null;
     const mesh = new MeshRTC({
       roomId: meetingId,
       userId,
@@ -126,8 +123,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setPinnedId(prev => prev === socketId ? null : prev);
       },
       onNewPublicMessage: (message: Omit<ChatMessage, 'isMe'>) => {
-        setChatHistory(prev => [...prev, {...message, isMe: message.senderId === user.uid}]);
-        if (message.senderId !== user.uid) {
+        setChatHistory(prev => [...prev, {...message, isMe: message.senderId === user?.uid}]);
+        if (message.senderId !== user?.uid) {
             setPublicChatMessage({
                 ...message,
                 type: 'publicChat',
@@ -243,9 +240,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
 
   const screenShareHelper = useMemo(() => {
-    if (!rtc) return null;
-    return new ScreenShareHelper(rtc);
-  }, [rtc]);
+    if (!memoizedRtc) return null;
+    return new ScreenShareHelper(memoizedRtc);
+  }, [memoizedRtc]);
   
   useEffect(() => {
     if (!screenShareHelper) return;
@@ -379,7 +376,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     return () => unsubscribe();
   }, [meetingId, userId, camOn, toast, toggleCamera]);
 
-  useEffect(() => { if (localStream && rtc && user) { rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); } return () => rtc?.leave(); }, [rtc, localStream, user]);
+  useEffect(() => { if (localStream && memoizedRtc && user) { memoizedRtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); } return () => memoizedRtc?.leave(); }, [memoizedRtc, localStream, user]);
 
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
@@ -559,6 +556,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             isScreenSharing={spotlightParticipant.isScreenSharing}
             onDoubleClick={() => toggleSpotlight(spotlightParticipant.id)}
             onSpotlightClick={() => toggleSpotlight(spotlightParticipant.id)}
+            onUnpin={() => togglePin(spotlightParticipant.id)}
             className="w-full h-full"
             isSpotlight={true}
           />
@@ -582,7 +580,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 isMicOn={!p.isMicOff} 
                                 name={p.name + "'s Screen"}
                                 isScreenSharing={true}
-                                onDoubleClick={() => togglePin(p.id)} 
+                                onDoubleClick={() => togglePin(p.id)}
+                                onUnpin={() => togglePin(p.id)}
                                 className="w-full h-full"
                                 onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}
                                 isPinned={p.id === pinnedId}
@@ -599,7 +598,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                             stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                             isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} 
                             volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} 
-                            isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)}
+                            isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)}
                             onSpotlightClick={() => toggleSpotlight(p.id)}
                         />
                         </div>
@@ -613,20 +612,20 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const count = allParticipants.length;
     const remotes = remoteParticipants;
 
-    if (count === 1) return <div className="w-full h-full flex items-center justify-center p-2"><div className="w-full h-full"><VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} className="w-full h-full" onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} /></div></div>;
+    if (count === 1) return <div className="w-full h-full flex items-center justify-center p-2"><div className="w-full h-full"><VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} className="w-full h-full" onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} /></div></div>;
 
     if (count === 2 && remotes.length === 1 && localParticipant) {
       const remote = remotes[0];
       return (
         <div className="w-full h-full relative" ref={mainContainerRef}>
-            <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} isPinned={remote.id === pinnedId} onDoubleClick={() => togglePin(remote.id)} onSpotlightClick={() => toggleSpotlight(remote.id)} className="w-full h-full" />
+            <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} isPinned={remote.id === pinnedId} onDoubleClick={() => togglePin(remote.id)} onUnpin={() => togglePin(remote.id)} onSpotlightClick={() => toggleSpotlight(remote.id)} className="w-full h-full" />
             <motion.div
               drag
               dragConstraints={mainContainerRef}
               dragMomentum={false}
               className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
             >
-              <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
+              <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
             </motion.div>
         </div>
       );
@@ -636,15 +635,15 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       return (
         <div className="w-full h-full flex flex-col gap-2 relative" ref={mainContainerRef}>
           <div className="flex-1 flex gap-2 min-h-0">
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" /></div>
-            {remotes[1] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} onSpotlightClick={() => toggleSpotlight(remotes[1].id)} className="w-full h-full" /></div>}
+            <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onUnpin={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" /></div>
+            {remotes[1] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} onUnpin={() => togglePin(remotes[1].id)} onSpotlightClick={() => toggleSpotlight(remotes[1].id)} className="w-full h-full" /></div>}
           </div>
           <div className="flex-1 flex gap-2 min-h-0">
-            {remotes[2] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} onSpotlightClick={() => toggleSpotlight(remotes[2].id)} className="w-full h-full" /></div>}
-            {remotes[3] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[3].stream} isCameraOn={!remotes[3].isCamOff} isMicOn={!remotes[3].isMicOff} isHandRaised={remotes[3].isHandRaised||false} isFirstHand={remotes[3].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[3].volumeLevel} profileUrl={remotes[3].avatar} name={remotes[3].name} isPinned={remotes[3].id === pinnedId} onDoubleClick={() => togglePin(remotes[3].id)} onSpotlightClick={() => toggleSpotlight(remotes[3].id)} className="w-full h-full" /></div>}
+            {remotes[2] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} onUnpin={() => togglePin(remotes[2].id)} onSpotlightClick={() => toggleSpotlight(remotes[2].id)} className="w-full h-full" /></div>}
+            {remotes[3] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[3].stream} isCameraOn={!remotes[3].isCamOff} isMicOn={!remotes[3].isMicOff} isHandRaised={remotes[3].isHandRaised||false} isFirstHand={remotes[3].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[3].volumeLevel} profileUrl={remotes[3].avatar} name={remotes[3].name} isPinned={remotes[3].id === pinnedId} onDoubleClick={() => togglePin(remotes[3].id)} onUnpin={() => togglePin(remotes[3].id)} onSpotlightClick={() => toggleSpotlight(remotes[3].id)} className="w-full h-full" /></div>}
           </div>
           <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
-            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
+            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
           </motion.div>
         </div>
       );
@@ -654,11 +653,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       return (
         <div className="w-full h-full flex flex-col gap-2 relative" ref={mainContainerRef}>
           <div className="flex-1 flex gap-2 min-h-0">
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" /></div>
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} onSpotlightClick={() => toggleSpotlight(remotes[1].id)} className="w-full h-full" /></div>
+            <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onUnpin={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" /></div>
+            <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} onUnpin={() => togglePin(remotes[1].id)} onSpotlightClick={() => toggleSpotlight(remotes[1].id)} className="w-full h-full" /></div>
           </div>
           <div className="flex-1 flex gap-2 min-h-0">
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} onSpotlightClick={() => toggleSpotlight(remotes[2].id)} className="w-full h-full" /></div>
+            <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} onUnpin={() => togglePin(remotes[2].id)} onSpotlightClick={() => toggleSpotlight(remotes[2].id)} className="w-full h-full" /></div>
             <div className="flex-1 min-w-0 relative">
               {remotes[3] && (
                 <VideoTile
@@ -673,6 +672,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                   name={remotes[3].name}
                   isPinned={remotes[3].id === pinnedId}
                   onDoubleClick={() => togglePin(remotes[3].id)}
+                  onUnpin={() => togglePin(remotes[3].id)}
                   onSpotlightClick={() => toggleSpotlight(remotes[3].id)}
                   className="w-full h-full"
                 />
@@ -684,7 +684,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             </div>
           </div>
           <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
-            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
+            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
           </motion.div>
         </div>
       );
@@ -697,12 +697,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                 <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
                     {remotes.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
-                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
+                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)} onStopShare={isSharingScreen && p.id === userId ? handleStopSharing : undefined}/>
                         </div>
                     ))}
                 </div>
                  <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
-                    <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
+                    <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} />
                 </motion.div>
             </div>
         );
@@ -714,7 +714,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const childrenWithProps = React.Children.map(children, child => {
     if (React.isValidElement(child)) {
       // @ts-ignore
-      return React.cloneElement(child, { rtc, camOn, micOn });
+      return React.cloneElement(child, { rtc: memoizedRtc, camOn, micOn });
     }
     return child;
   });
