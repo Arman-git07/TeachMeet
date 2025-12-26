@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       setIsConnecting(false);
       socket.emit('join-room', meetingId);
       // Add initial system message once connected
-      setChatHistory([{ id: 'welcome', senderName: 'System', text: `Welcome to the chat for ${topic}.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }]);
+      setChatHistory([{ id: 'welcome', senderName: 'System', text: `Welcome to the chat for ${topic}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }]);
     });
 
     socket.on('new-public-message', (message: Omit<ChatMessage, 'isMe'>) => {

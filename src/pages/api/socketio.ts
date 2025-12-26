@@ -81,7 +81,7 @@ export default function handler(
 
 
       socket.on("public-chat-message", (roomId, message) => {
-        // Echo public messages back to everyone in the room, including sender
+        // Broadcast to everyone in the room, including the sender
         io.to(roomId).emit("new-public-message", message);
       });
       
