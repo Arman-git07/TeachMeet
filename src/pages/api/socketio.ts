@@ -79,7 +79,7 @@ export default function handler(
 
       socket.on("public-chat-message", (roomId, message) => {
         // Broadcast to everyone in the room, including the sender
-        io.to(roomId).emit("new-public-message", message);
+        io.in(roomId).emit("new-public-message", message);
       });
       
       socket.on('draw', (data) => {

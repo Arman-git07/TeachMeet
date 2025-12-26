@@ -15,6 +15,28 @@ import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { io, Socket } from "socket.io-client";
 
+export interface BaseActivityItem {
+  id: string;
+  type: string;
+  title: string;
+  timestamp: number;
+}
+export interface PublicChatActivityItem extends BaseActivityItem {
+  type: 'publicChat';
+  text: string;
+  senderId: string;
+  senderName: string;
+  meetingId: string;
+  meetingTopic: string;
+}
+export interface PrivateMessageActivityItem extends BaseActivityItem {
+    type: 'privateMessage';
+    from: string;
+    senderId: string;
+    meetingId: string;
+    meetingTopic: string;
+}
+
 export interface ChatMessage {
   id: string;
   senderName: string;
@@ -28,6 +50,7 @@ export interface ChatMessage {
   meetingId?: string;
   meetingTopic?: string;
 }
+const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
 
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
@@ -107,6 +130,30 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       socketRef.current.emit("private-chat-message", meetingId, message);
     } else {
       socketRef.current.emit("public-chat-message", meetingId, message);
+       try {
+            const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
+            const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+            let activities = rawActivity ? JSON.parse(rawActivity) : [];
+            if (!Array.isArray(activities)) activities = [];
+
+            const newNotification: PublicChatActivityItem = {
+              id: message.id,
+              type: 'publicChat',
+              title: `New Message from ${message.senderName}`,
+              text: message.text,
+              timestamp: Date.now(),
+              senderId: message.senderId,
+              senderName: message.senderName,
+              meetingId: meetingId,
+              meetingTopic: topic,
+            };
+            activities.unshift(newNotification);
+            
+            localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20))); // Keep last 20 activities
+            window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+        } catch (e) {
+            console.error("Failed to update latest activity in localStorage", e);
+        }
     }
     // Add message to local state immediately for instant feedback
     setChatHistory(prev => [...prev, { ...message, isMe: true }]);

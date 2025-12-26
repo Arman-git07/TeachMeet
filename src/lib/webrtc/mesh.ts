@@ -37,13 +37,11 @@ export class MeshRTC {
     userId: string;
     onRemoteStream: (socketId: string, stream: MediaStream) => void;
     onRemoteLeft?: (socketId: string) => void;
-    onNewPublicMessage: (message: ChatMessage) => void;
   }) {
     this.roomId = opts.roomId;
     this.userId = opts.userId;
     this.onRemoteStream = opts.onRemoteStream;
     this.onRemoteLeft = opts.onRemoteLeft;
-    this.onNewPublicMessageCallback = opts.onNewPublicMessage;
 
     // These need to be set from useAuth, passed into constructor
     this.userDisplayName = "User"; // Placeholder
@@ -124,14 +122,14 @@ export class MeshRTC {
     });
 
     this.socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe'>) => {
-        if (this.onNewPublicMessageCallback) {
-            this.onNewPublicMessageCallback({ ...message, isMe: message.senderId === this.userId });
+        if (this.onNewPublicMessageCallback && message.senderId !== this.userId) {
+            this.onNewPublicMessageCallback({ ...message, isMe: false });
         }
     });
 
     this.socket.on("new-private-message", (message: Omit<ChatMessage, 'isMe'>) => {
         if (this.onNewPrivateMessageCallback) {
-            this.onNewPrivateMessageCallback({ ...message, isMe: message.senderId === this.userId });
+            this.onNewPrivateMessageCallback({ ...message, isMe: false });
         }
     });
 

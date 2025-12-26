@@ -16,11 +16,10 @@ import VideoTile from "./VideoTile";
 import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
-import type { JoinRequest, PrivateMessageActivityItem } from '@/app/dashboard/classrooms/[classroomId]/page';
+import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ChatMessage, PublicChatActivityItem } from "./chat/page";
-import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
+import type { ChatMessage, PublicChatActivityItem, PrivateMessageActivityItem } from "./chat/page";
 
 
 type Participant = {
@@ -64,7 +63,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const { rtc, setRtc, setChatHistory } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -122,25 +120,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
         setPinnedId(prev => prev === socketId ? null : prev);
       },
-      onNewPublicMessage: (message: ChatMessage) => {
-        setChatHistory(prev => [...prev, {...message, isMe: message.senderId === user?.uid}]);
-        if (message.senderId !== user?.uid) {
-            setPublicChatMessage({
-                ...message,
-                type: 'publicChat',
-                title: `New Message from ${message.senderName}`,
-                meetingTopic: topic,
-            });
-        }
-      }
     });
-  }, [meetingId, userId, topic, user, setChatHistory]);
-  
-  useEffect(() => {
-    if(memoizedRtc) {
-      setRtc(memoizedRtc);
-    }
-  }, [memoizedRtc, setRtc]);
+  }, [meetingId, userId, topic, user]);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
