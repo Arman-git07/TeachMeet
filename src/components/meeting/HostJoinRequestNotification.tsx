@@ -4,7 +4,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Check, X, Volume2 } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,26 +23,43 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const playedSoundRef = useRef<Record<string, boolean>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { user } = useAuth();
-  const hostId = user?.uid;
-  const [canAutoplay, setCanAutoplay] = useState(false);
+  
+  // This ref will track if we've successfully played a sound once.
+  const hasAudioBeenUnlocked = useRef(false);
 
   useEffect(() => {
-    // Preload the audio element for faster playback
+    // Preload the audio element.
     audioRef.current = new Audio("/sounds/join-request.mp3");
     audioRef.current.volume = 0.75;
+
+    // A one-time handler to unlock audio on any user click.
+    const unlockAudio = () => {
+      if (audioRef.current && audioRef.current.paused) {
+        audioRef.current.play().catch(() => {});
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      window.removeEventListener('click', unlockAudio, true);
+    };
+
+    window.addEventListener('click', unlockAudio, true);
+
+    return () => {
+      window.removeEventListener('click', unlockAudio, true);
+    };
   }, []);
 
   const playSound = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.play().then(() => {
-        setCanAutoplay(true);
-      }).catch(error => {
-        console.warn("Audio playback failed. This can happen if the user hasn't interacted with the page yet.", error);
-        setCanAutoplay(false); // Explicitly set to false on failure
+      // Always try to play. The browser will block it until first user interaction.
+      audioRef.current.play().catch(error => {
+        // We expect this error initially. It will work after a user click.
+        if (error.name !== 'NotAllowedError') {
+          console.warn("Audio playback failed for a reason other than autoplay policy:", error);
+        }
       });
     }
   }, []);
-
 
   useEffect(() => {
     if (!meetingId) return;
@@ -51,27 +68,25 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     const unsub = onSnapshot(q, (snap) => {
       const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest));
       
-      const newRequests = pendingReqs.filter(req => !requests.some(r => r.id === req.id));
+      const newRequests = pendingReqs.filter(req => !playedSoundRef.current[req.id]);
 
       if (newRequests.length > 0) {
-        setRequests(prev => [...prev, ...newRequests].slice(-3)); // Keep it from getting too long
+        setRequests(prev => [...prev, ...newRequests].slice(-3)); 
         
         newRequests.forEach((req) => {
           if (!playedSoundRef.current[req.id]) {
-            if (canAutoplay) {
-              playSound();
-            }
+            playSound();
             playedSoundRef.current[req.id] = true;
           }
         });
       } else {
-        // This handles removals (when requests are approved/denied)
-        setRequests(pendingReqs);
+        const currentRequestIds = new Set(pendingReqs.map(r => r.id));
+        setRequests(prev => prev.filter(r => currentRequestIds.has(r.id)));
       }
     });
 
     return () => unsub();
-  }, [meetingId, canAutoplay, playSound, requests]);
+  }, [meetingId, playSound]);
 
   const handleRequest = async (req: JoinRequest, action: 'approve' | 'deny') => {
     const isApprove = action === 'approve';
@@ -95,7 +110,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied access.` });
       }
   
-      // Remove from local state immediately for faster UI feedback
       setRequests(prev => prev.filter(r => r.id !== req.id));
   
     } catch (error) {
@@ -125,11 +139,6 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
             </div>
           </div>
           <div className="flex gap-3 items-center">
-             {!canAutoplay && requests.length > 0 && (
-              <button onClick={playSound} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2">
-                  <Volume2 size={18} /> Play Sound
-              </button>
-            )}
             <button
               onClick={() => handleRequest(req, 'approve')}
               className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
