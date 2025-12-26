@@ -41,29 +41,28 @@ export default function handler(
       console.log("Socket connected:", socket.id);
       const { userId, displayName, photoURL } = socket.handshake.query;
 
-      socket.on("join-room", (roomId: string, currentUserId?: string) => {
+      socket.on("join-room", (roomId: string) => {
         socket.join(roomId);
-        const effectiveUserId = currentUserId || userId;
         // @ts-ignore - extending socket object
-        socket.data = { roomId, userId: effectiveUserId, displayName, photoURL };
+        socket.data = { roomId, userId: userId, displayName, photoURL };
 
-        if (!rooms.has(roomId) && effectiveUserId) {
+        if (!rooms.has(roomId) && userId) {
           rooms.set(roomId, {
-            hostId: effectiveUserId as string,
-            permissions: { [effectiveUserId as string]: true },
+            hostId: userId as string,
+            permissions: { [userId as string]: true },
             elements: [],
             users: new Map(),
           });
-          console.log(`Room ${roomId} created. Host is ${effectiveUserId}`);
+          console.log(`Room ${roomId} created. Host is ${userId}`);
         }
         
-        if (effectiveUserId) {
+        if (userId) {
             const roomState = rooms.get(roomId)!;
-            roomState.users.set(effectiveUserId as string, { socketId: socket.id, displayName: displayName as string, photoURL: photoURL as string });
+            roomState.users.set(userId as string, { socketId: socket.id, displayName: displayName as string, photoURL: photoURL as string });
         }
 
-        socket.to(roomId).emit("user-joined", effectiveUserId);
-        console.log(`${effectiveUserId} (socket ${socket.id}) joined room ${roomId}`);
+        socket.to(roomId).emit("user-joined", userId);
+        console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
       socket.on("private-chat-message", (roomId: string, message: any) => {
@@ -75,8 +74,6 @@ export default function handler(
         if (recipientSocket) {
             recipientSocket.emit("new-private-message", message);
         }
-        // Always send back to sender to confirm it was sent and to display it
-        socket.emit("new-private-message", message);
       });
 
 

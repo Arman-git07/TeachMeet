@@ -65,11 +65,14 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     });
 
     socket.on('new-public-message', (message: Omit<ChatMessage, 'isMe'>) => {
-      setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === user.uid }]);
+      // Don't add our own message again if we're receiving the broadcast
+      if (message.senderId === user.uid) return;
+      setChatHistory(prev => [...prev, { ...message, isMe: false }]);
     });
     
     socket.on('new-private-message', (message: Omit<ChatMessage, 'isMe'>) => {
-      setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === user.uid }]);
+      if (message.senderId === user.uid) return; // Don't re-add own private message
+      setChatHistory(prev => [...prev, { ...message, isMe: false }]);
     });
 
     return () => {
@@ -105,6 +108,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     } else {
       socketRef.current.emit("public-chat-message", meetingId, message);
     }
+    // Add message to local state immediately for instant feedback
+    setChatHistory(prev => [...prev, { ...message, isMe: true }]);
     setInputValue("");
   };
   
@@ -116,7 +121,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
 
   const messagesToDisplay = chatHistory.filter(msg => {
     if (activeTab === 'public') return !msg.isPrivate;
-    return msg.isPrivate && (msg.recipientId === activeTab || msg.senderId === activeTab);
+    return msg.isPrivate && ((msg.recipientId === activeTab && msg.senderId === user?.uid) || (msg.senderId === activeTab && msg.recipientId === user?.uid));
   });
 
   return (
