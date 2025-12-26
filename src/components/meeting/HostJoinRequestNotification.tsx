@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Check, X } from "lucide-react";
+import { Check, X, Volume2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,12 +24,25 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { user } = useAuth();
   const hostId = user?.uid;
+  const [canAutoplay, setCanAutoplay] = useState(false);
 
   useEffect(() => {
     // Preload the audio element for faster playback
     audioRef.current = new Audio("/sounds/join-request.mp3");
-    audioRef.current.volume = 0.75; // Increased volume
+    audioRef.current.volume = 0.75;
   }, []);
+
+  const playSound = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.play().then(() => {
+        setCanAutoplay(true);
+      }).catch(error => {
+        console.warn("Audio playback failed. This can happen if the user hasn't interacted with the page yet.", error);
+        setCanAutoplay(false); // Explicitly set to false on failure
+      });
+    }
+  }, []);
+
 
   useEffect(() => {
     if (!meetingId) return;
@@ -37,77 +50,60 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
     const unsub = onSnapshot(q, (snap) => {
       const pendingReqs = snap.docs.map((d) => ({ id: d.id, ...d.data(), userId: d.id } as JoinRequest));
-      setRequests(pendingReqs);
+      
+      const newRequests = pendingReqs.filter(req => !requests.some(r => r.id === req.id));
 
-      pendingReqs.forEach((req) => {
-        if (!playedSoundRef.current[req.id]) {
-          if (audioRef.current) {
-            audioRef.current.play().catch(error => {
-              console.warn("Audio playback failed. This can happen if the user hasn't interacted with the page yet.", error);
-            });
+      if (newRequests.length > 0) {
+        setRequests(prev => [...prev, ...newRequests].slice(-3)); // Keep it from getting too long
+        
+        newRequests.forEach((req) => {
+          if (!playedSoundRef.current[req.id]) {
+            if (canAutoplay) {
+              playSound();
+            }
+            playedSoundRef.current[req.id] = true;
           }
-          playedSoundRef.current[req.id] = true;
-        }
-      });
+        });
+      } else {
+        // This handles removals (when requests are approved/denied)
+        setRequests(pendingReqs);
+      }
     });
 
     return () => unsub();
-  }, [meetingId]);
+  }, [meetingId, canAutoplay, playSound, requests]);
 
-  const handleApprove = async (req: JoinRequest) => {
+  const handleRequest = async (req: JoinRequest, action: 'approve' | 'deny') => {
+    const isApprove = action === 'approve';
     try {
-      const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
       const joinRequestRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
-
-      const batch = writeBatch(db);
-
-      batch.set(participantRef, {
-        name: req.userName || "Guest",
-        photoURL: req.userPhotoURL || "",
-        joinedAt: serverTimestamp(),
-        isHost: false,
-      });
-
-      // Update the status on the existing request doc instead of deleting
-      batch.update(joinRequestRef, {
-        status: "approved",
-        approvedAt: serverTimestamp(),
-        approvedBy: hostId || null,
-      });
-
-      await batch.commit();
-
-      toast({
-        title: "Request Approved",
-        description: `${req.userName} can now join the meeting.`,
-      });
-
+  
+      if (isApprove) {
+        const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
+        const batch = writeBatch(db);
+        batch.set(participantRef, {
+          name: req.userName || "Guest",
+          photoURL: req.userPhotoURL || "",
+          joinedAt: serverTimestamp(),
+          isHost: false,
+        });
+        batch.delete(joinRequestRef);
+        await batch.commit();
+        toast({ title: "Request Approved", description: `${req.userName} can now join the meeting.` });
+      } else {
+        await updateDoc(joinRequestRef, { status: "denied" });
+        toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied access.` });
+      }
+  
+      // Remove from local state immediately for faster UI feedback
+      setRequests(prev => prev.filter(r => r.id !== req.id));
+  
     } catch (error) {
-      console.error("❌ handleApprove failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Action Failed",
-        description: "Could not approve the request.",
-      });
+      console.error(`❌ handle ${action} failed:`, error);
+      toast({ variant: "destructive", title: "Action Failed", description: `Could not ${action} the request.` });
     }
   };
 
-  const handleDeny = async (req: JoinRequest) => {
-    try {
-      const reqRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
-      // Instead of deleting, update the status to 'denied'
-      await updateDoc(reqRef, { status: "denied" });
-      
-      toast({
-        variant: "destructive",
-        title: "Request Denied",
-        description: `${req.userName} was denied access.`,
-      });
-    } catch (err) {
-      console.error("Decline failed: ", err);
-      toast({ variant: "destructive", title: "Action Failed" });
-    }
-  };
 
   if (!requests.length) return null;
 
@@ -120,7 +116,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         >
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12 border-2 border-primary/50">
-              <AvatarImage src={req.userPhotoURL} alt={req.userName} />
+              <AvatarImage src={req.userPhotoURL} alt={req.userName} data-ai-hint="avatar user"/>
               <AvatarFallback>{req.userName?.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
@@ -129,14 +125,19 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
             </div>
           </div>
           <div className="flex gap-3 items-center">
+             {!canAutoplay && requests.length > 0 && (
+              <button onClick={playSound} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2">
+                  <Volume2 size={18} /> Play Sound
+              </button>
+            )}
             <button
-              onClick={() => handleApprove(req)}
+              onClick={() => handleRequest(req, 'approve')}
               className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
             >
               <Check size={18} /> Approve
             </button>
             <button
-              onClick={() => handleDeny(req)}
+              onClick={() => handleRequest(req, 'deny')}
               className="bg-destructive hover:bg-destructive/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
             >
               <X size={18} /> Decline
@@ -147,5 +148,3 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
     </>
   );
 }
-
-    
