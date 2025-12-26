@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, MessageSquare, User, Users } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, User, Users, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -12,7 +12,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { io, Socket } from "socket.io-client";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
@@ -53,26 +52,36 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   
   const [activeTab, setActiveTab] = useState(privateWithId ? privateWithId : 'public');
 
+  // New state to track RTC readiness
+  const [isRtcReady, setIsRtcReady] = useState(!!rtc);
+
   useEffect(() => {
-    if (rtc && !rtc.hasRegisteredChatHandlers) {
-      rtc.registerChatHandlers((message) => {
-        setChatHistory(prev => [...prev, message]);
-      });
+    if (rtc) {
+      setIsRtcReady(true);
     }
-  }, [rtc, setChatHistory]);
+  }, [rtc]);
+
+  useEffect(() => {
+    // This effect ensures chat history is only updated when RTC is ready.
+    if (!isRtcReady) return;
+    
+    const onNewMessage = (message: ChatMessage) => {
+        setChatHistory(prev => [...prev, message]);
+    };
+    
+    if (rtc && !rtc.hasRegisteredChatHandlers) {
+        rtc.registerChatHandlers(onNewMessage);
+    }
+  }, [rtc, setChatHistory, isRtcReady]);
 
 
   useEffect(() => {
       if (activeTab === 'public' && !chatHistory.some(m => m.id === 'sys_public_switch')) {
-          setChatHistory(prev => [
-            ...prev.filter(m => m.isPrivate),
-            { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }
-          ]);
+          const systemMessage = { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' };
+          setChatHistory(prev => [...prev.filter(m => m.isPrivate || m.id === 'sys_private_switch'), systemMessage]);
       } else if (activeTab === privateWithId && privateWithName && !chatHistory.some(m => m.id === 'sys_private_switch')) {
-          setChatHistory(prev => [
-             ...prev.filter(m => !m.isPrivate),
-            { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' }
-          ]);
+           const systemMessage = { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' };
+           setChatHistory(prev => [...prev.filter(m => !m.isPrivate || m.id === 'sys_public_switch'), systemMessage]);
       }
   }, [activeTab, privateWithId, privateWithName, topic, setChatHistory, chatHistory]);
 
@@ -143,68 +152,75 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       </Tabs>
       
       <main className="flex-grow flex flex-col overflow-hidden">
-        <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
-          <CardContent className="flex-grow p-0 overflow-hidden">
-            <ScrollArea className="h-full">
-                <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
-                  {messagesToDisplay.map((msg) => (
-                    <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
-                      {!msg.isMe && (
-                        <Avatar className="h-8 w-8 self-start">
-                          <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
-                          <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div
-                        className={cn(
-                          "max-w-[70%] p-3 rounded-xl shadow",
-                           msg.senderId === 'system' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
-                          msg.isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
-                        )}
-                      >
-                        {!msg.isMe && msg.senderId !== 'system' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
-                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                        {msg.senderId !== 'system' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
-                      </div>
-                      {msg.isMe && (
-                        <Avatar className="h-8 w-8 self-start">
-                           <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'You'} data-ai-hint="avatar user"/>
-                          <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
-                        </Avatar>
-                      )}
+        {!isRtcReady ? (
+            <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p>Connecting to chat...</p>
+            </div>
+        ) : (
+            <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col">
+              <CardContent className="flex-grow p-0 overflow-hidden">
+                <ScrollArea className="h-full">
+                    <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
+                      {messagesToDisplay.map((msg) => (
+                        <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
+                          {!msg.isMe && (
+                            <Avatar className="h-8 w-8 self-start">
+                              <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                              <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div
+                            className={cn(
+                              "max-w-[70%] p-3 rounded-xl shadow",
+                               msg.senderId === 'system' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
+                              msg.isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
+                            )}
+                          >
+                            {!msg.isMe && msg.senderId !== 'system' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                            {msg.senderId !== 'system' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                          </div>
+                          {msg.isMe && (
+                            <Avatar className="h-8 w-8 self-start">
+                               <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'You'} data-ai-hint="avatar user"/>
+                              <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
-          </CardContent>
-          <CardFooter className="p-4 border-t bg-background">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              className="flex w-full items-center gap-2"
-            >
-              <Textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={privateWithName && activeTab === privateWithId ? `Private message to ${privateWithName}...` : "Type your message..."}
-                className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px]"
-                rows={1}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  </ScrollArea>
+              </CardContent>
+              <CardFooter className="p-4 border-t bg-background">
+                <form
+                  onSubmit={(e) => {
                     e.preventDefault();
                     handleSendMessage();
-                  }
-                }}
-              />
-              <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
-                <Send className="h-5 w-5" />
-                <span className="sr-only">Send message</span>
-              </Button>
-            </form>
-          </CardFooter>
-        </Card>
+                  }}
+                  className="flex w-full items-center gap-2"
+                >
+                  <Textarea
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder={privateWithName && activeTab === privateWithId ? `Private message to ${privateWithName}...` : "Type your message..."}
+                    className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px]"
+                    rows={1}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                  />
+                  <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
+                    <Send className="h-5 w-5" />
+                    <span className="sr-only">Send message</span>
+                  </Button>
+                </form>
+              </CardFooter>
+            </Card>
+        )}
       </main>
        <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
         Chat history is cleared after the meeting ends.

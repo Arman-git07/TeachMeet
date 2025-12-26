@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -65,7 +64,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
+  const { rtc, setRtc, setChatHistory } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -101,10 +100,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const [publicChatMessage, setPublicChatMessage] = useState<PublicChatActivityItem | null>(null);
   
   const participantDocCreated = useRef(false);
+  const audioUnlockedRef = useRef(false);
 
   const memoizedRtc = useMemo(() => {
     if (!userId || !meetingId) return null;
-    const newRtc = new MeshRTC({
+    return new MeshRTC({
       roomId: meetingId,
       userId,
       onRemoteStream: (remoteSocketId, stream) => {
@@ -134,17 +134,23 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         }
       }
     });
-    setRtc(newRtc);
-    return newRtc;
-  }, [meetingId, userId, topic, user, setRtc, setChatHistory]);
+  }, [meetingId, userId, topic, user, setChatHistory]);
   
   useEffect(() => {
-    if (rtc && !rtc.hasRegisteredChatHandlers) {
-      rtc.registerChatHandlers((message: ChatMessage) => {
-        setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === userId }]);
-      });
+    if(memoizedRtc) {
+      setRtc(memoizedRtc);
     }
-  }, [rtc, setChatHistory, userId]);
+  }, [memoizedRtc, setRtc]);
+
+  const unlockAudio = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().then(() => {
+        audioUnlockedRef.current = true;
+        console.log("AudioContext resumed successfully.");
+      }).catch(e => console.error("Error resuming AudioContext:", e));
+    }
+  }, []);
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (user && meetingId && participantDocCreated.current) {
@@ -728,7 +734,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   });
 
   return (
-    <div className="flex flex-col h-full overflow-hidden flex-1">
+    <div className="flex flex-col h-full overflow-hidden flex-1" onClick={unlockAudio}>
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
 
       {privateMessage && (

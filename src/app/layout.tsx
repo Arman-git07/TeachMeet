@@ -1,4 +1,3 @@
-
 // src/app/layout.tsx
 'use client';
 import React from 'react';
@@ -22,7 +21,6 @@ export default function RootLayout({
 }>) {
   const pathname = usePathname();
   const isAuthPage = pathname.startsWith('/auth');
-  const isMeetingPage = pathname.includes('/dashboard/meeting/');
 
   return (
     <html lang="en" suppressHydrationWarning>

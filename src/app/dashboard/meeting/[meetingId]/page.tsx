@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { MeetingRTCProvider } from "@/contexts/MeetingRTCContext";
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 
