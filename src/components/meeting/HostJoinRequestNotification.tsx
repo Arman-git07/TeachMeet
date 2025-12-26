@@ -24,29 +24,10 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { user } = useAuth();
   
-  // This ref will track if we've successfully played a sound once.
-  const hasAudioBeenUnlocked = useRef(false);
-
   useEffect(() => {
     // Preload the audio element.
     audioRef.current = new Audio("/sounds/join-request.mp3");
     audioRef.current.volume = 0.75;
-
-    // A one-time handler to unlock audio on any user click.
-    const unlockAudio = () => {
-      if (audioRef.current && audioRef.current.paused) {
-        audioRef.current.play().catch(() => {});
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-      window.removeEventListener('click', unlockAudio, true);
-    };
-
-    window.addEventListener('click', unlockAudio, true);
-
-    return () => {
-      window.removeEventListener('click', unlockAudio, true);
-    };
   }, []);
 
   const playSound = useCallback(() => {

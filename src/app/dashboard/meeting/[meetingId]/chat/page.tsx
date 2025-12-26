@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
+import { io, Socket } from "socket.io-client";
 
 export interface ChatMessage {
   id: string;
@@ -29,13 +28,6 @@ export interface ChatMessage {
   meetingTopic?: string;
 }
 
-export type PublicChatActivityItem = ChatMessage & {
-  type: 'publicChat';
-  title: string;
-}
-
-const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
-
 export default function MeetingChatPage({ params }: { params: { meetingId: string } }) {
   const { meetingId } = params;
   const searchParams = useSearchParams();
@@ -45,46 +37,44 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const cam = searchParams.get('cam');
   const mic = searchParams.get('mic');
 
-  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const { user } = useAuth();
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const [activeTab, setActiveTab] = useState(privateWithId ? privateWithId : 'public');
-
-  // New state to track RTC readiness
-  const [isRtcReady, setIsRtcReady] = useState(!!rtc);
-
-  useEffect(() => {
-    if (rtc) {
-      setIsRtcReady(true);
-    }
-  }, [rtc]);
+  const [isConnecting, setIsConnecting] = useState(true);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // This effect ensures chat history is only updated when RTC is ready.
-    if (!isRtcReady) return;
+    if (!user) return;
+
+    // Initialize socket connection
+    const socket = io({
+      path: "/api/socketio",
+      query: { userId: user.uid, displayName: user.displayName, photoURL: user.photoURL || '' }
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      setIsConnecting(false);
+      socket.emit('join-room', meetingId);
+      // Add initial system message once connected
+      setChatHistory([{ id: 'welcome', senderName: 'System', text: `Welcome to the chat for ${topic}.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }]);
+    });
+
+    socket.on('new-public-message', (message: Omit<ChatMessage, 'isMe'>) => {
+      setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === user.uid }]);
+    });
     
-    const onNewMessage = (message: ChatMessage) => {
-        setChatHistory(prev => [...prev, message]);
+    socket.on('new-private-message', (message: Omit<ChatMessage, 'isMe'>) => {
+      setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === user.uid }]);
+    });
+
+    return () => {
+      socket.disconnect();
     };
-    
-    if (rtc && !rtc.hasRegisteredChatHandlers) {
-        rtc.registerChatHandlers(onNewMessage);
-    }
-  }, [rtc, setChatHistory, isRtcReady]);
-
-
-  useEffect(() => {
-      if (activeTab === 'public' && !chatHistory.some(m => m.id === 'sys_public_switch')) {
-          const systemMessage = { id: 'sys_public_switch', senderName: 'System', text: `Welcome to the public chat for "${topic}". Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' };
-          setChatHistory(prev => [...prev.filter(m => m.isPrivate || m.id === 'sys_private_switch'), systemMessage]);
-      } else if (activeTab === privateWithId && privateWithName && !chatHistory.some(m => m.id === 'sys_private_switch')) {
-           const systemMessage = { id: 'sys_private_switch', senderName: 'System', text: `This is a private chat with ${privateWithName}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: true, senderId: 'system' };
-           setChatHistory(prev => [...prev.filter(m => !m.isPrivate || m.id === 'sys_public_switch'), systemMessage]);
-      }
-  }, [activeTab, privateWithId, privateWithName, topic, setChatHistory, chatHistory]);
-
+  }, [user, meetingId, topic]);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -92,17 +82,27 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     }
   }, [chatHistory]);
 
-
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !user || !rtc) return;
+    if (!inputValue.trim() || !user || !socketRef.current) return;
     
     const isPrivate = activeTab !== 'public';
+    
+    const message: Omit<ChatMessage, 'isMe'> = {
+      id: `${socketRef.current.id}-${Date.now()}`,
+      senderId: user.uid,
+      senderName: user.displayName || 'User',
+      senderAvatar: user.photoURL || undefined,
+      text: inputValue,
+      timestamp: new Date(),
+      isPrivate,
+    };
 
     if (isPrivate) {
-      const recipientId = activeTab;
-      rtc.sendPrivateMessage(recipientId, inputValue);
+      // @ts-ignore
+      message.recipientId = activeTab;
+      socketRef.current.emit("private-chat-message", meetingId, message);
     } else {
-      rtc.sendPublicMessage(inputValue);
+      socketRef.current.emit("public-chat-message", meetingId, message);
     }
     setInputValue("");
   };
@@ -113,9 +113,8 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   if (mic) backToMeetingParams.set('mic', mic);
   const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
 
-
   const messagesToDisplay = chatHistory.filter(msg => {
-    if(activeTab === 'public') return !msg.isPrivate;
+    if (activeTab === 'public') return !msg.isPrivate;
     return msg.isPrivate && (msg.recipientId === activeTab || msg.senderId === activeTab);
   });
 
@@ -152,7 +151,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
       </Tabs>
       
       <main className="flex-grow flex flex-col overflow-hidden">
-        {!isRtcReady ? (
+        {isConnecting ? (
             <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                 <p>Connecting to chat...</p>
