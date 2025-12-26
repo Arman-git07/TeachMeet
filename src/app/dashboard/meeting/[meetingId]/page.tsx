@@ -38,6 +38,9 @@ function MeetingPageContent() {
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
+  const [camOn, setCamOn] = useState(true);
+  const [micOn, setMicOn] = useState(true);
+
 
   const handleLeave = useCallback(async (endForAll = false) => {
     if (!meetingId || !user) return;
@@ -76,6 +79,14 @@ function MeetingPageContent() {
   
     router.push("/");
   }, [meetingId, user, isHost, router, toast]);
+
+  useEffect(() => {
+    // Read device settings from localStorage on initial load
+    const camState = localStorage.getItem('teachmeet-cam-state') !== 'false';
+    const micState = localStorage.getItem('teachmeet-mic-state') !== 'false';
+    setCamOn(camState);
+    setMicOn(micState);
+  }, []);
 
   useEffect(() => {
     if (authLoading || !meetingId) return;
@@ -130,9 +141,9 @@ function MeetingPageContent() {
 
 
   const memoizedMeetingActions = useCallback(() => {
-    const cam = localStorage.getItem('teachmeet-cam-state') !== 'false';
-    const mic = localStorage.getItem('teachmeet-mic-state') !== 'false';
-    const params = new URLSearchParams({ topic: topic || '', cam: String(cam), mic: String(mic) });
+    const params = new URLSearchParams({ topic: topic || '' });
+    params.set('cam', String(camOn));
+    params.set('mic', String(micOn));
 
     const constructUrl = (page: string) => `/dashboard/meeting/${meetingId}/${page}?${params.toString()}`;
 
@@ -171,7 +182,7 @@ function MeetingPageContent() {
         </DropdownMenuContent>
       </DropdownMenu>
     );
-  }, [meetingId, topic]);
+  }, [meetingId, topic, camOn, micOn]);
   
   useEffect(() => {
       setHeaderContent(
