@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Providers } from '@/components/common/Providers';
 import { AppShell } from '@/components/common/AppShell';
 import { MeetingRTCProvider } from '@/contexts/MeetingRTCContext';
+import { BlockProvider } from '@/contexts/BlockContext';
 
 const geistSansFont = GeistSans;
 const geistMonoFont = GeistMono;
@@ -33,15 +34,17 @@ export default function RootLayout({
         geistMonoFont.variable
       )}>
         <Providers>
-          <MeetingRTCProvider>
-            {isAuthPage ? (
-              children
-            ) : (
-              <AppShell>
-                {children}
-              </AppShell>
-            )}
-          </MeetingRTCProvider>
+          <BlockProvider>
+            <MeetingRTCProvider>
+              {isAuthPage ? (
+                children
+              ) : (
+                <AppShell>
+                  {children}
+                </AppShell>
+              )}
+            </MeetingRTCProvider>
+          </BlockProvider>
         </Providers>
         <Toaster />
       </body>

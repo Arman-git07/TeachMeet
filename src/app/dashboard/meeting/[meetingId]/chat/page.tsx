@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { io, Socket } from "socket.io-client";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
+import { useBlock } from "@/contexts/BlockContext";
 
 export interface BaseActivityItem {
   id: string;
@@ -61,47 +63,28 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const cam = searchParams.get('cam');
   const mic = searchParams.get('mic');
 
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState("");
   const { user } = useAuth();
+  const { rtc } = useMeetingRTC();
+  const { isBlocked } = useBlock();
+
+  const { chatHistory, setChatHistory } = useMeetingRTC();
+  const [inputValue, setInputValue] = useState("");
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const [activeTab, setActiveTab] = useState(privateWithId ? privateWithId : 'public');
   const [isConnecting, setIsConnecting] = useState(true);
-  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-
-    // Initialize socket connection
-    const socket = io({
-      path: "/api/socketio",
-      query: { userId: user.uid, displayName: user.displayName, photoURL: user.photoURL || '' }
-    });
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
+    if (rtc) {
       setIsConnecting(false);
-      socket.emit('join-room', meetingId);
-      // Add initial system message once connected
-      setChatHistory([{ id: 'welcome', senderName: 'System', text: `Welcome to the chat for ${topic}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }]);
-    });
-
-    socket.on('new-public-message', (message: Omit<ChatMessage, 'isMe'>) => {
-      // Don't add our own message again if we're receiving the broadcast
-      if (message.senderId === user.uid) return;
-      setChatHistory(prev => [...prev, { ...message, isMe: false }]);
-    });
-    
-    socket.on('new-private-message', (message: Omit<ChatMessage, 'isMe'>) => {
-      if (message.senderId === user.uid) return; // Don't re-add own private message
-      setChatHistory(prev => [...prev, { ...message, isMe: false }]);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [user, meetingId, topic]);
+      // If chat history is empty, add a welcome message.
+      if (chatHistory.length === 0) {
+        setChatHistory([{ id: 'welcome', senderName: 'System', text: `Welcome to the chat for ${topic}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }]);
+      }
+    } else {
+        setIsConnecting(true);
+    }
+  }, [rtc, topic, chatHistory.length, setChatHistory]);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -110,53 +93,16 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   }, [chatHistory]);
 
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !user || !socketRef.current) return;
+    if (!inputValue.trim() || !user || !rtc) return;
     
     const isPrivate = activeTab !== 'public';
     
-    const message: Omit<ChatMessage, 'isMe'> = {
-      id: `${socketRef.current.id}-${Date.now()}`,
-      senderId: user.uid,
-      senderName: user.displayName || 'User',
-      senderAvatar: user.photoURL || undefined,
-      text: inputValue,
-      timestamp: new Date(),
-      isPrivate,
-    };
-
     if (isPrivate) {
-      // @ts-ignore
-      message.recipientId = activeTab;
-      socketRef.current.emit("private-chat-message", meetingId, message);
+      rtc.sendPrivateMessage(activeTab, inputValue);
     } else {
-      socketRef.current.emit("public-chat-message", meetingId, message);
-       try {
-            const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
-            const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-            let activities = rawActivity ? JSON.parse(rawActivity) : [];
-            if (!Array.isArray(activities)) activities = [];
-
-            const newNotification: PublicChatActivityItem = {
-              id: message.id,
-              type: 'publicChat',
-              title: `New Message from ${message.senderName}`,
-              text: message.text,
-              timestamp: Date.now(),
-              senderId: message.senderId,
-              senderName: message.senderName,
-              meetingId: meetingId,
-              meetingTopic: topic,
-            };
-            activities.unshift(newNotification);
-            
-            localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20))); // Keep last 20 activities
-            window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-        } catch (e) {
-            console.error("Failed to update latest activity in localStorage", e);
-        }
+      rtc.sendPublicMessage(inputValue);
     }
-    // Add message to local state immediately for instant feedback
-    setChatHistory(prev => [...prev, { ...message, isMe: true }]);
+    
     setInputValue("");
   };
   
@@ -167,6 +113,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
 
   const messagesToDisplay = chatHistory.filter(msg => {
+    if (isBlocked(msg.senderId)) return false;
     if (activeTab === 'public') return !msg.isPrivate;
     return msg.isPrivate && ((msg.recipientId === activeTab && msg.senderId === user?.uid) || (msg.senderId === activeTab && msg.recipientId === user?.uid));
   });
@@ -195,7 +142,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
             <TabsTrigger value="public" className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
                 <Users className="mr-2 h-5 w-5" /> Public Chat
             </TabsTrigger>
-            {privateWithId && (
+            {privateWithId && !isBlocked(privateWithId) && (
                  <TabsTrigger value={privateWithId} className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
                     <User className="mr-2 h-5 w-5" /> Private: {privateWithName}
                 </TabsTrigger>

@@ -24,6 +24,7 @@ import {
   Loader2,
   CameraOff,
   Hand,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -39,6 +40,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch, updateDoc } from 'firebase/firestore';
+import { useBlock } from "@/contexts/BlockContext";
 
 interface Participant {
   id: string; // This will be the userId
@@ -72,8 +74,12 @@ const ParticipantItem = React.memo(({
   pinnedUserId: string | null;
 }) => {
   const { toast } = useToast();
+  const { blockUser, unblockUser, isBlocked } = useBlock();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
+  const isUserBlocked = isBlocked(participant.id);
+
+  const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
 
   const searchParams = useSearchParams();
   const cam = searchParams.get('cam');
@@ -95,90 +101,123 @@ const ParticipantItem = React.memo(({
   }
   const pinLink = `/dashboard/meeting/${meetingId}?${pinUrlParams.toString()}`;
 
+  const handleBlockConfirm = () => {
+    blockUser(participant.id);
+    toast({ title: "User Blocked", description: `${participant.name} has been blocked.` });
+    setIsBlockConfirmOpen(false);
+  };
+  
+  const handleUnblock = () => {
+    unblockUser(participant.id);
+    toast({ title: "User Unblocked", description: `${participant.name} is now unblocked.` });
+  };
 
   return (
-    <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={participant.photoURL || `https://placehold.co/40x40.png?text=${participant.name.charAt(0)}`} alt={participant.name} data-ai-hint="avatar user"/>
-          <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <div>
-          <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-            {participant.name} {isMe && "(You)"}
-            {isThisParticipantTheHost && <ShieldCheck className="inline-block h-4 w-4 text-primary" title="Host" />}
-            {participant.isHandRaised && <Hand className="inline-block h-4 w-4 text-primary" title="Hand Raised" />}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {participant.isMicOn ? "Unmuted" : "Muted"} | {participant.isCameraOn ? "Camera On" : "Camera Off"}
-          </p>
+    <>
+      <div className={cn("flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors", isUserBlocked && "opacity-50")}>
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={participant.photoURL || `https://placehold.co/40x40.png?text=${participant.name.charAt(0)}`} alt={participant.name} data-ai-hint="avatar user"/>
+            <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+              {participant.name} {isMe && "(You)"}
+              {isThisParticipantTheHost && <ShieldCheck className="inline-block h-4 w-4 text-primary" title="Host" />}
+              {participant.isHandRaised && <Hand className="inline-block h-4 w-4 text-primary" title="Hand Raised" />}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {participant.isMicOn ? "Unmuted" : "Muted"} | {participant.isCameraOn ? "Camera On" : "Camera Off"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
+            {participant.isMicOn ? <Mic className="h-4 w-4 text-foreground" /> : <MicOff className="h-4 w-4 text-muted-foreground" />}
+          </Button>
+          <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
+            {participant.isCameraOn ? <Video className="h-4 w-4 text-foreground" /> : <VideoOff className="h-4 w-4 text-muted-foreground" />}
+          </Button>
+          {!isMe && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
+                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg">
+                {!isUserBlocked && (
+                  <>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link href={privateChatLink}>
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        <span>Chat Privately</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link href={pinLink}>
+                          <Pin className="mr-2 h-4 w-4" />
+                          <span>{isPinned ? "Unpin User" : "Pin User"}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {isUserBlocked ? (
+                   <DropdownMenuItem onSelect={handleUnblock} className="text-primary focus:text-primary cursor-pointer">
+                    <UserCheck className="mr-2 h-4 w-4" />
+                    <span>Unblock User</span>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setIsBlockConfirmOpen(true); }} className="text-destructive focus:text-destructive cursor-pointer">
+                    <UserX className="mr-2 h-4 w-4" />
+                    <span>Block User</span>
+                  </DropdownMenuItem>
+                )}
+                {isCurrentUserHost && !isThisParticipantTheHost && (
+                  <>
+                    <DropdownMenuSeparator />
+                    {participant.isHandRaised && (
+                      <DropdownMenuItem onSelect={() => onLowerHand(participant)} className="cursor-pointer">
+                          <Hand className="mr-2 h-4 w-4" />
+                          <span>Lower Hand</span>
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onSelect={() => onToggleCamera(participant)} className="cursor-pointer" disabled={!participant.isCameraOn}>
+                      <CameraOff className="mr-2 h-4 w-4" />
+                      <span>Turn Off Camera</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onRemoveClick(participant); }} className="text-destructive focus:text-destructive cursor-pointer">
+                      <UserX className="mr-2 h-4 w-4" />
+                      <span>Remove Participant</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => toast({ title: "Report User", description: "This feature is under development." })} className="text-destructive focus:text-destructive cursor-pointer">
+                  <AlertCircle className="mr-2 h-4 w-4" />
+                  <span>Report User</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
-          {participant.isMicOn ? <Mic className="h-4 w-4 text-foreground" /> : <MicOff className="h-4 w-4 text-muted-foreground" />}
-        </Button>
-        <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
-          {participant.isCameraOn ? <Video className="h-4 w-4 text-foreground" /> : <VideoOff className="h-4 w-4 text-muted-foreground" />}
-        </Button>
-        {!isMe && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full w-8 h-8">
-                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg">
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <Link href={privateChatLink}>
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  <span>Chat Privately</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild className="cursor-pointer">
-                 <Link href={pinLink}>
-                    <Pin className="mr-2 h-4 w-4" />
-                    <span>{isPinned ? "Unpin User" : "Pin User"}</span>
-                 </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {isCurrentUserHost && !isThisParticipantTheHost && (
-                <>
-                  {participant.isHandRaised && (
-                     <DropdownMenuItem
-                        onSelect={() => onLowerHand(participant)}
-                        className="cursor-pointer"
-                      >
-                        <Hand className="mr-2 h-4 w-4" />
-                        <span>Lower Hand</span>
-                      </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    onSelect={() => onToggleCamera(participant)}
-                    className="cursor-pointer"
-                    disabled={!participant.isCameraOn}
-                  >
-                    <CameraOff className="mr-2 h-4 w-4" />
-                    <span>Turn Off Camera</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onSelect={(e) => { e.preventDefault(); onRemoveClick(participant); }}
-                    className="text-destructive focus:text-destructive cursor-pointer"
-                  >
-                    <UserX className="mr-2 h-4 w-4" />
-                    <span>Remove Participant</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuItem onSelect={() => toast({ title: "Report User", description: "This feature is under development." })} className="text-destructive focus:text-destructive cursor-pointer">
-                <AlertCircle className="mr-2 h-4 w-4" />
-                <span>Report User</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-    </div>
+      <AlertDialog open={isBlockConfirmOpen} onOpenChange={setIsBlockConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Block {participant.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will not see or hear them, and you won't be able to send them private messages. They will not be notified that you have blocked them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBlockConfirm} className={cn(buttonVariants({variant: "destructive"}))}>Block</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 });
 ParticipantItem.displayName = 'ParticipantItem';
