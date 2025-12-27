@@ -4,7 +4,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Check, X } from "lucide-react";
+import { Check, X, Volume2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,7 +22,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const { toast } = useToast();
   const playedSoundRef = useRef<Record<string, boolean>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const { user } = useAuth();
+  const [audioBlocked, setAudioBlocked] = useState(false);
   
   useEffect(() => {
     // Preload the audio element.
@@ -32,15 +32,28 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
 
   const playSound = useCallback(() => {
     if (audioRef.current) {
-      // Always try to play. The browser will block it until first user interaction.
-      audioRef.current.play().catch(error => {
-        // We expect this error initially. It will work after a user click.
-        if (error.name !== 'NotAllowedError') {
-          console.warn("Audio playback failed for a reason other than autoplay policy:", error);
-        }
-      });
+      // Always try to play.
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          // Playback started successfully.
+          setAudioBlocked(false);
+        }).catch(error => {
+          // Autoplay was prevented. Show the UI to let the user enable it.
+          if (error.name === 'NotAllowedError') {
+            console.warn("Audio playback was blocked by the browser's autoplay policy. Showing user interaction prompt.");
+            setAudioBlocked(true);
+          } else {
+            console.error("Audio playback failed:", error);
+          }
+        });
+      }
     }
   }, []);
+  
+  const handleManualPlaySound = () => {
+    playSound(); // This click will satisfy the browser and play the sound.
+  };
 
   useEffect(() => {
     if (!meetingId) return;
@@ -120,6 +133,14 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
             </div>
           </div>
           <div className="flex gap-3 items-center">
+            {audioBlocked && (
+                <button
+                    onClick={handleManualPlaySound}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
+                >
+                    <Volume2 size={18} /> Play Sound
+                </button>
+            )}
             <button
               onClick={() => handleRequest(req, 'approve')}
               className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
