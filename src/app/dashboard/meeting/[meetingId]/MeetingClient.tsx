@@ -263,7 +263,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   };
 
-  const onModalConfirm = async (shareAudio: boolean) => {
+  const onModalConfirm = async () => {
     setIsScreenShareModalOpen(false);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       toast({
@@ -276,8 +276,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (!screenShareHelper) return;
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: shareAudio });
-      // Always replace for simplicity now
+      // The new modal implies audio is always requested.
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      
       await screenShareHelper.startSharingWithStream("replace", stream);
       setIsSharingScreen(true);
       updateMyStatus({ isScreenSharing: true });
@@ -622,10 +623,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (count === 1) return <div className="w-full h-full flex items-center justify-center p-2"><div className="w-full h-full"><VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} className="w-full h-full" onStopShare={isSharingScreen && localParticipant.id === userId ? handleStopSharing : undefined} /></div></div>;
 
     if (count === 2 && remotes.length === 1 && localParticipant) {
-      const remote = remotes[0];
       return (
         <div className="w-full h-full relative" ref={mainContainerRef}>
-            <VideoTile stream={remote.stream} isCameraOn={!remote.isCamOff} isMicOn={!remote.isMicOff} isHandRaised={remote.isHandRaised || false} isFirstHand={remote.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remote.volumeLevel} profileUrl={remote.avatar} name={remote.name} isScreenSharing={remote.isScreenSharing} isPinned={remote.id === pinnedId} onDoubleClick={() => togglePin(remote.id)} onUnpin={() => togglePin(remote.id)} onSpotlightClick={() => toggleSpotlight(remote.id)} className="w-full h-full" />
+            <VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isScreenSharing={remotes[0].isScreenSharing} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onUnpin={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" />
             <motion.div
               drag
               dragConstraints={mainContainerRef}
