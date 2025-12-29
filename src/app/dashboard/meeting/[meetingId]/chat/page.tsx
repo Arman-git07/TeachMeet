@@ -13,7 +13,6 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { io, Socket } from "socket.io-client";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { useBlock } from "@/contexts/BlockContext";
 
@@ -64,14 +63,13 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const mic = searchParams.get('mic');
 
   const { user } = useAuth();
-  const { rtc } = useMeetingRTC();
+  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
   const { isBlocked } = useBlock();
 
-  const { chatHistory, setChatHistory } = useMeetingRTC();
   const [inputValue, setInputValue] = useState("");
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
-  const [activeTab, setActiveTab] = useState(privateWithId ? privateWithId : 'public');
+  const [activeTab, setActiveTab] = useState(privateWithId && !isBlocked(privateWithId) ? privateWithId : 'public');
   const [isConnecting, setIsConnecting] = useState(true);
 
   useEffect(() => {
@@ -98,6 +96,10 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
     const isPrivate = activeTab !== 'public';
     
     if (isPrivate) {
+      if (isBlocked(activeTab)) {
+        // This should ideally not happen as the tab/option would be hidden, but as a safeguard.
+        return;
+      }
       rtc.sendPrivateMessage(activeTab, inputValue);
     } else {
       rtc.sendPublicMessage(inputValue);
@@ -211,8 +213,9 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                         handleSendMessage();
                       }
                     }}
+                    disabled={activeTab !== 'public' && isBlocked(activeTab)}
                   />
-                  <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
+                  <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim() || (activeTab !== 'public' && isBlocked(activeTab))}>
                     <Send className="h-5 w-5" />
                     <span className="sr-only">Send message</span>
                   </Button>

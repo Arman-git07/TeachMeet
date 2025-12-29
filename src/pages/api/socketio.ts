@@ -9,6 +9,7 @@ interface RoomState {
   permissions: Record<string, boolean>; // userId -> canDraw
   elements: any[]; // Store whiteboard elements
   users: Map<string, { socketId: string, displayName?: string, photoURL?: string }>; // userId -> socketId
+  blocked: Map<string, Set<string>>; // userId -> Set of blocked userIds
 }
 const rooms = new Map<string, RoomState>();
 
@@ -52,6 +53,7 @@ export default function handler(
             permissions: { [userId as string]: true },
             elements: [],
             users: new Map(),
+            blocked: new Map(),
           });
           console.log(`Room ${roomId} created. Host is ${userId}`);
         }
@@ -68,6 +70,15 @@ export default function handler(
       socket.on("private-chat-message", (roomId: string, message: any) => {
         const roomState = rooms.get(roomId);
         if (!roomState) return;
+
+        // Check if sender is blocked by recipient
+        const recipientBlocks = roomState.blocked.get(message.recipientId);
+        if (recipientBlocks && recipientBlocks.has(message.senderId)) {
+            // Optionally, send an error back to the sender
+            socket.emit("message-blocked", { recipientId: message.recipientId });
+            console.log(`Message from ${message.senderId} to ${message.recipientId} blocked.`);
+            return;
+        }
 
         const recipientSocket = getSocketByUserId(io, roomId, message.recipientId);
 
