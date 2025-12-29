@@ -46,7 +46,6 @@ type Props = {
   onSpotlightClick?: () => void;
   draggable?: boolean;
   volumeLevel?: number;
-  onStopShare?: () => void;
   isPinned?: boolean;
   isSpotlight?: boolean;
 };
@@ -68,7 +67,6 @@ const VideoTile: React.FC<Props> = ({
   onSpotlightClick,
   draggable = false,
   volumeLevel = 0,
-  onStopShare,
   isPinned = false,
   isSpotlight = false,
 }) => {
@@ -140,22 +138,7 @@ const VideoTile: React.FC<Props> = ({
           isFirst={isFirstHand}
         />
       </div>
-
-      {/* Stop Sharing Button for local screen share */}
-      {onStopShare && (
-         <div className="absolute top-2 right-2 z-40">
-           <Button
-             onClick={onStopShare}
-             variant="destructive"
-             size="sm"
-             className="h-auto px-3 py-1.5 text-xs rounded-full"
-           >
-             <ScreenShareOff className="mr-1.5 h-3 w-3" />
-             Stop Sharing
-           </Button>
-         </div>
-       )}
-
+      
       {/* Video Layer */}
       <div className="relative w-full h-full z-0">
         <video
@@ -187,7 +170,6 @@ const VideoTile: React.FC<Props> = ({
       </div>
 
       {/* Camera status (top-right) - hidden if stop button is shown */}
-      {!onStopShare && (
         <div className="absolute top-3 right-3 z-30 p-1 rounded-md bg-transparent">
           {isCameraOn ? (
             <Video className="h-5 w-5 text-white" />
@@ -195,7 +177,6 @@ const VideoTile: React.FC<Props> = ({
             <VideoOff className="h-5 w-5 text-red-400" />
           )}
         </div>
-      )}
 
       {/* Bottom info container */}
       <div className="absolute bottom-0 left-0 right-0 z-30 p-3 flex items-center justify-between pointer-events-none">
