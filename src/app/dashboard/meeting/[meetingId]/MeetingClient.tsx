@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -20,7 +19,7 @@ import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNot
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ChatMessage, PublicChatActivityItem, PrivateMessageActivityItem } from "./chat/page";
+import type { ChatMessage, PublicChatActivityItem } from "./chat/page";
 import { useBlock } from "@/contexts/BlockContext";
 
 
@@ -98,7 +97,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
-  const [privateMessage, setPrivateMessage] = useState<PrivateMessageActivityItem | null>(null);
   const [publicChatMessage, setPublicChatMessage] = useState<PublicChatActivityItem | null>(null);
   
   const participantDocCreated = useRef(false);
@@ -106,10 +104,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
-    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume().then(() => {
+    const context = audioContextRef.current;
+    if (context && context.state === 'suspended') {
+      context.resume().then(() => {
         audioUnlockedRef.current = true;
-        console.log("AudioContext resumed successfully.");
+        console.log("AudioContext resumed successfully on user interaction.");
       }).catch(e => console.error("Error resuming AudioContext:", e));
     }
   }, []);
@@ -189,16 +188,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
         const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
         if (!rawActivity) return;
-        const activities: (PrivateMessageActivityItem | PublicChatActivityItem)[] = JSON.parse(rawActivity);
+        const activities: PublicChatActivityItem[] = JSON.parse(rawActivity);
         
-        const latestPrivateMessage = activities.find(
-          (act): act is PrivateMessageActivityItem =>
-            act.type === 'privateMessage' && act.meetingId === meetingId && !isBlocked(act.senderId)
-        );
-        if (latestPrivateMessage && latestPrivateMessage.id !== privateMessage?.id) {
-          setPrivateMessage(latestPrivateMessage);
-        }
-
         const latestPublicChatMessage = activities.find(
             (act): act is PublicChatActivityItem =>
               act.type === 'publicChat' && act.meetingId === meetingId && act.senderId !== user.uid
@@ -215,14 +206,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     handleStorageUpdate(); // Check on mount
     window.addEventListener('teachmeet_activity_updated', handleStorageUpdate);
     return () => window.removeEventListener('teachmeet_activity_updated', handleStorageUpdate);
-  }, [user, meetingId, privateMessage?.id, publicChatMessage?.id, isBlocked]);
+  }, [user, meetingId, publicChatMessage?.id]);
 
-  const handleNotificationClick = (message: PrivateMessageActivityItem) => {
-    const url = `/dashboard/meeting/${message.meetingId}/chat?topic=${encodeURIComponent(message.meetingTopic)}&privateWith=${message.senderId}&privateWithName=${encodeURIComponent(message.from)}`;
-    router.push(url);
-    setPrivateMessage(null);
-  };
-  
   const handlePublicChatNotificationClick = (message: PublicChatActivityItem) => {
     const url = `/dashboard/meeting/${message.meetingId}/chat?topic=${encodeURIComponent(message.meetingTopic)}`;
     router.push(url);
@@ -320,7 +305,16 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         stream.getAudioTracks().forEach(track => { track.enabled = desiredMicState; });
         
         setLocalStream(stream);
-      } catch (err) { console.error("Media init error:", err); toast({ variant: "destructive", title: "Media Error" }); } 
+      } catch (err: any) { 
+        console.error("Media init error:", err); 
+        let description = "An unknown error occurred while accessing your camera and microphone.";
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+            description = "Permission to access camera and microphone was denied. Please check your browser settings.";
+        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+            description = "No camera or microphone was found on your device.";
+        }
+        toast({ variant: "destructive", title: "Media Error", description });
+      } 
       finally { if (mounted) setLoadingMedia(false); }
     };
     initMedia();
@@ -328,7 +322,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       mounted = false;
       stream?.getTracks().forEach(t => t.stop());
       if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
-      audioContextRef.current?.close().catch(() => {});
+      try { audioContextRef.current?.close(); } catch(e) {}
       remoteAnalysersRef.current.forEach(entry => { if (entry.rafId) cancelAnimationFrame(entry.rafId); });
       remoteAnalysersRef.current.clear();
       screenShareHelper?.stopSharing();
@@ -392,12 +386,15 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
     if (!audioContextRef.current) {
         try {
-          const audioContext = new AudioContext();
-          analyserRef.current = audioContext.createAnalyser();
-          analyserRef.current.fftSize = 256;
-          sourceRef.current = audioContext.createMediaStreamSource(localStream);
-          sourceRef.current.connect(analyserRef.current);
-          audioContextRef.current = audioContext;
+          // Check if we are in a browser context before creating AudioContext
+          if (typeof window !== 'undefined' && window.AudioContext) {
+            const audioContext = new AudioContext();
+            analyserRef.current = audioContext.createAnalyser();
+            analyserRef.current.fftSize = 256;
+            sourceRef.current = audioContext.createMediaStreamSource(localStream);
+            sourceRef.current.connect(analyserRef.current);
+            audioContextRef.current = audioContext;
+          }
         } catch(e) {
             console.error("Could not create AudioContext for local stream", e);
             return;
@@ -727,22 +724,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1" onClick={unlockAudio}>
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
-
-      {privateMessage && (
-        <div
-          onClick={() => handleNotificationClick(privateMessage)}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-primary/30 px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown cursor-pointer hover:bg-muted/30"
-        >
-          <div className="flex items-center gap-3">
-            <MessageSquare className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-semibold">New Private Message</p>
-              <p className="text-sm text-muted-foreground">From: {privateMessage.from}</p>
-            </div>
-          </div>
-          <Button size="sm">View</Button>
-        </div>
-      )}
 
       {publicChatMessage && (
         <div

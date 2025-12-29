@@ -143,11 +143,15 @@ function PreJoinPageContent() {
         
         stream.getAudioTracks().forEach((track) => (track.enabled = desiredMicState));
         stream.getVideoTracks().forEach((track) => (track.enabled = desiredCamState));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error accessing media:', error);
         setHasCameraPermission(false); 
         setIsCameraOn(false);
-        toast({ variant: 'destructive', title: 'Media Access Denied', description: 'Please enable camera and microphone permissions.'});
+        let description = "Please enable camera and microphone permissions in your browser settings to continue.";
+        if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+            description = "No camera or microphone was found. Please connect a device and grant permissions.";
+        }
+        toast({ variant: 'destructive', title: 'Media Access Denied', description: description, duration: 7000});
       }
     };
     
@@ -353,6 +357,17 @@ useEffect(() => {
     <div className="flex flex-col h-full overflow-y-auto">
         <header className="flex-shrink-0 p-4 flex justify-between items-center"><div className="flex items-center gap-2"><SidebarTrigger><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger><h1 className="text-xl font-semibold text-foreground">Ready to Join?</h1></div><Button asChild variant="link" className="text-muted-foreground"><Link href="/">Cancel</Link></Button></header>
         {startError && (<div className="px-4"><Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Meeting Not Found</AlertTitle><AlertDescription>{startError}</AlertDescription></Alert></div>)}
+        {hasCameraPermission === false && (
+            <div className="px-4 md:px-8">
+                <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Camera and Microphone Access Denied</AlertTitle>
+                    <AlertDescription>
+                        TeachMeet needs permission to use your camera and microphone. Please enable access in your browser's site settings to continue.
+                    </AlertDescription>
+                </Alert>
+            </div>
+        )}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 p-4 md:p-8">
              <div className="relative w-full bg-muted rounded-2xl flex items-center justify-center overflow-hidden min-h-[250px] lg:min-h-0 shadow-inner">
                 <video ref={videoRef} className={videoClassNames} autoPlay muted playsInline />
