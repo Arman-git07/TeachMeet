@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -13,14 +14,13 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
-import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
+import { ScreenShareHelper } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChatMessage, PublicChatActivityItem, PrivateMessageActivityItem } from "./chat/page";
-import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { useBlock } from "@/contexts/BlockContext";
 
 
@@ -65,9 +65,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const { rtc: memoizedRtc, setRtc, setChatHistory } = useMeetingRTC();
   const { blockedUsers, isBlocked } = useBlock();
   
+  const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   const [camOn, setCamOn] = useState(true);
@@ -115,46 +115,32 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, []);
 
   useEffect(() => {
-      const rtcInstance = new MeshRTC({
-        roomId: meetingId,
-        userId,
-        onRemoteStream: (remoteSocketId, stream) => {
-          setRemoteStreams(prev => {
-            const next = new Map(prev);
-            next.set(remoteSocketId, stream);
-            return next;
-          });
-        },
-        onRemoteLeft: (socketId) => {
-          setRemoteStreams(prev => { const next = new Map(prev); next.delete(socketId); return next; });
-          const entry = remoteAnalysersRef.current.get(socketId);
-          if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
-          remoteAnalysersRef.current.delete(socketId);
-          setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
-          setPinnedId(prev => prev === socketId ? null : prev);
-        },
-      });
-      setRtc(rtcInstance);
-
-      return () => {
-        rtcInstance?.leave();
-        setRtc(null);
-      }
-  }, [meetingId, userId, setRtc]);
-
-  useEffect(() => {
-    if (!memoizedRtc) return;
-
-    const onNewMessage = (message: ChatMessage) => {
-      setChatHistory(prev => [...prev, message]);
-    };
-    memoizedRtc.registerChatHandlers(onNewMessage);
+    const rtcInstance = new MeshRTC({
+      roomId: meetingId,
+      userId,
+      onRemoteStream: (remoteSocketId, stream) => {
+        setRemoteStreams(prev => {
+          const next = new Map(prev);
+          next.set(remoteSocketId, stream);
+          return next;
+        });
+      },
+      onRemoteLeft: (socketId) => {
+        setRemoteStreams(prev => { const next = new Map(prev); next.delete(socketId); return next; });
+        const entry = remoteAnalysersRef.current.get(socketId);
+        if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
+        remoteAnalysersRef.current.delete(socketId);
+        setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
+        setPinnedId(prev => prev === socketId ? null : prev);
+      },
+    });
+    setRtc(rtcInstance);
 
     return () => {
-        memoizedRtc.registerChatHandlers(() => {}); // Clear handlers on cleanup
+      rtcInstance?.leave();
+      setRtc(null);
     }
-
-  }, [memoizedRtc, setChatHistory]);
+  }, [meetingId, userId]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -259,9 +245,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
 
   const screenShareHelper = useMemo(() => {
-    if (!memoizedRtc) return null;
-    return new ScreenShareHelper(memoizedRtc);
-  }, [memoizedRtc]);
+    if (!rtc) return null;
+    return new ScreenShareHelper(rtc);
+  }, [rtc]);
   
   useEffect(() => {
     if (!screenShareHelper) return;
@@ -277,7 +263,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   };
 
-  const onModalConfirm = async (mode: ShareMode) => {
+  const onModalConfirm = async (shareAudio: boolean) => {
     setIsScreenShareModalOpen(false);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       toast({
@@ -290,8 +276,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (!screenShareHelper) return;
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      await screenShareHelper.startSharingWithStream(mode, stream);
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: shareAudio });
+      // Always replace for simplicity now
+      await screenShareHelper.startSharingWithStream("replace", stream);
       setIsSharingScreen(true);
       updateMyStatus({ isScreenSharing: true });
     } catch (err) {
@@ -395,7 +382,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     return () => unsubscribe();
   }, [meetingId, userId, camOn, toast, toggleCamera]);
 
-  useEffect(() => { if (localStream && memoizedRtc && user) { memoizedRtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); } }, [memoizedRtc, localStream, user]);
+  useEffect(() => { if (localStream && rtc && user) { rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); } }, [rtc, localStream, user]);
 
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
@@ -734,7 +721,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const childrenWithProps = React.Children.map(children, child => {
     if (React.isValidElement(child)) {
       // @ts-ignore
-      return React.cloneElement(child, { rtc: memoizedRtc, camOn, micOn });
+      return React.cloneElement(child, { rtc: rtc, camOn, micOn });
     }
     return child;
   });
@@ -776,7 +763,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       )}
 
 
-      <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} cameraOn={camOn} />
+      <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} />
 
       <main className="flex-1 overflow-hidden relative p-2" ref={mainContainerRef}>
           {loadingMedia ? (
