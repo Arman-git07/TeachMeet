@@ -90,7 +90,7 @@ export default function handler(
 
       socket.on("public-chat-message", (roomId, message) => {
         // Broadcast to everyone in the room, including the sender
-        io.in(roomId).emit("new-public-message", message);
+        io.to(roomId).emit("new-public-message", message);
       });
       
       socket.on('draw', (data) => {
@@ -109,6 +109,27 @@ export default function handler(
         const participantSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === participantId);
         if (participantSocket) {
             participantSocket.emit('permission-update', { canDraw, ownerId });
+        }
+      });
+
+      socket.on("block-user", (roomId, blockedUserId) => {
+        const roomState = rooms.get(roomId);
+        const blockerId = (socket.data as any).userId;
+        if (roomState && blockerId && blockedUserId) {
+          if (!roomState.blocked.has(blockerId)) {
+            roomState.blocked.set(blockerId, new Set());
+          }
+          roomState.blocked.get(blockerId)!.add(blockedUserId);
+          console.log(`User ${blockerId} blocked ${blockedUserId} in room ${roomId}`);
+        }
+      });
+
+      socket.on("unblock-user", (roomId, unblockedUserId) => {
+        const roomState = rooms.get(roomId);
+        const unblockerId = (socket.data as any).userId;
+        if (roomState && unblockerId && unblockedUserId) {
+          roomState.blocked.get(unblockerId)?.delete(unblockedUserId);
+          console.log(`User ${unblockerId} unblocked ${unblockedUserId} in room ${roomId}`);
         }
       });
 
