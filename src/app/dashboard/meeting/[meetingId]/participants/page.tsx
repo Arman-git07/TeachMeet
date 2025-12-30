@@ -25,6 +25,7 @@ import {
   CameraOff,
   Hand,
   UserCheck,
+  UserCog
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -40,6 +41,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch, updateDoc } from 'firebase/firestore';
+import { useBlock } from "@/contexts/BlockContext";
+import { BlockUserDialog } from "@/components/meeting/BlockUserDialog";
 
 interface Participant {
   id: string; // This will be the userId
@@ -60,7 +63,8 @@ const ParticipantItem = React.memo(({
   onLowerHand,
   meetingId,
   topic,
-  pinnedUserId
+  pinnedUserId,
+  onBlockClick
 }: { 
   participant: Participant, 
   isCurrentUserHost: boolean,
@@ -68,13 +72,18 @@ const ParticipantItem = React.memo(({
   onRemoveClick: (participant: Participant) => void;
   onToggleCamera: (participant: Participant) => void;
   onLowerHand: (participant: Participant) => void;
+  onBlockClick: (participant: Participant) => void;
   meetingId: string;
   topic: string | null;
   pinnedUserId: string | null;
 }) => {
   const { toast } = useToast();
+  const { unblockUser, getBlockSettings } = useBlock();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
+  const blockInfo = getBlockSettings(participant.id);
+  const isBlocked = !!blockInfo;
+
 
   const searchParams = useSearchParams();
   const cam = searchParams.get('cam');
@@ -99,19 +108,16 @@ const ParticipantItem = React.memo(({
   const reportUrlParams = new URLSearchParams(searchParams.toString());
   reportUrlParams.set('reportedUser', participant.id);
   const reportLink = `/dashboard/meeting/${meetingId}/report?${reportUrlParams.toString()}`;
-
-  const handleBlockConfirm = () => {
-    toast({ title: "Feature in development", description: "Block functionality is not yet implemented." });
-  };
   
   const handleUnblock = () => {
-    toast({ title: "Feature in development", description: "Unblock functionality is not yet implemented." });
+    unblockUser(participant.id);
+    toast({ title: "User Unblocked", description: `You can now see and interact with ${participant.name} again.` });
   };
 
 
   return (
     <>
-      <div className={cn("flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors")}>
+      <div className={cn("flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors", isBlocked && "bg-destructive/10")}>
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={participant.photoURL || `https://placehold.co/40x40.png?text=${participant.name.charAt(0)}`} alt={participant.name} data-ai-hint="avatar user"/>
@@ -122,6 +128,7 @@ const ParticipantItem = React.memo(({
               {participant.name} {isMe && "(You)"}
               {isThisParticipantTheHost && <ShieldCheck className="inline-block h-4 w-4 text-primary" title="Host" />}
               {participant.isHandRaised && <Hand className="inline-block h-4 w-4 text-primary" title="Hand Raised" />}
+              {isBlocked && <UserX className="inline-block h-4 w-4 text-destructive" title="Blocked" />}
             </p>
             <p className="text-xs text-muted-foreground">
               {participant.isMicOn ? "Unmuted" : "Muted"} | {participant.isCameraOn ? "Camera On" : "Camera Off"}
@@ -142,9 +149,9 @@ const ParticipantItem = React.memo(({
                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg">
+              <DropdownMenuContent align="end" className="w-56 rounded-lg shadow-lg">
                   <>
-                    <DropdownMenuItem asChild className="cursor-pointer">
+                    <DropdownMenuItem asChild className="cursor-pointer" disabled={isBlocked}>
                       <Link href={privateChatLink}>
                         <MessageSquare className="mr-2 h-4 w-4" />
                         <span>Chat Privately</span>
@@ -158,10 +165,19 @@ const ParticipantItem = React.memo(({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
-                  <DropdownMenuItem onSelect={handleBlockConfirm} className="text-destructive focus:text-destructive cursor-pointer">
-                    <UserX className="mr-2 h-4 w-4" />
-                    <span>Block User</span>
-                  </DropdownMenuItem>
+
+                  {isBlocked ? (
+                    <DropdownMenuItem onSelect={handleUnblock} className="text-primary focus:text-primary cursor-pointer">
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        <span>Unblock User</span>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onSelect={() => onBlockClick(participant)} className="text-destructive focus:text-destructive cursor-pointer">
+                        <UserX className="mr-2 h-4 w-4" />
+                        <span>Block User...</span>
+                    </DropdownMenuItem>
+                  )}
+                  
                 {isCurrentUserHost && !isThisParticipantTheHost && (
                   <>
                     <DropdownMenuSeparator />
@@ -216,6 +232,9 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   const [showMeetingId, setShowMeetingId] = useState(false);
   const currentUserId = auth.currentUser?.uid;
   const [participantToRemove, setParticipantToRemove] = useState<Participant | null>(null);
+  
+  const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
+  const [participantToBlock, setParticipantToBlock] = useState<Participant | null>(null);
 
   useEffect(() => {
     if (!meetingId || !db) return;
@@ -379,6 +398,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
                       onRemoveClick={() => setParticipantToRemove(participant)}
                       onToggleCamera={handleToggleCamera}
                       onLowerHand={handleLowerHand}
+                      onBlockClick={() => { setParticipantToBlock(participant); setIsBlockDialogOpen(true); }}
                       meetingId={meetingId}
                       topic={topicFromParams}
                       pinnedUserId={pinnedUserId}
@@ -408,6 +428,13 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+    {participantToBlock && (
+        <BlockUserDialog
+            isOpen={isBlockDialogOpen}
+            onOpenChange={setIsBlockDialogOpen}
+            participant={participantToBlock}
+        />
+    )}
     </>
   );
 }
