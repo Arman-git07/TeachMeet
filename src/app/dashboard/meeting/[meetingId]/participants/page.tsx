@@ -75,8 +75,6 @@ const ParticipantItem = React.memo(({
   const { toast } = useToast();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
-  const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
-  const isUserBlocked = false; // Mock value
 
   const searchParams = useSearchParams();
   const cam = searchParams.get('cam');
@@ -97,10 +95,13 @@ const ParticipantItem = React.memo(({
       pinUrlParams.set('pin', participant.id);
   }
   const pinLink = `/dashboard/meeting/${meetingId}?${pinUrlParams.toString()}`;
-  
+
+  const reportUrlParams = new URLSearchParams(searchParams.toString());
+  reportUrlParams.set('reportedUser', participant.id);
+  const reportLink = `/dashboard/meeting/${meetingId}/report?${reportUrlParams.toString()}`;
+
   const handleBlockConfirm = () => {
     toast({ title: "Feature in development", description: "Block functionality is not yet implemented." });
-    setIsBlockConfirmOpen(false);
   };
   
   const handleUnblock = () => {
@@ -110,7 +111,7 @@ const ParticipantItem = React.memo(({
 
   return (
     <>
-      <div className={cn("flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors", isUserBlocked && "opacity-50")}>
+      <div className={cn("flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors")}>
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={participant.photoURL || `https://placehold.co/40x40.png?text=${participant.name.charAt(0)}`} alt={participant.name} data-ai-hint="avatar user"/>
@@ -142,7 +143,6 @@ const ParticipantItem = React.memo(({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg">
-                {!isUserBlocked && (
                   <>
                     <DropdownMenuItem asChild className="cursor-pointer">
                       <Link href={privateChatLink}>
@@ -158,18 +158,10 @@ const ParticipantItem = React.memo(({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
-                )}
-                {isUserBlocked ? (
-                   <DropdownMenuItem onSelect={handleUnblock} className="text-primary focus:text-primary cursor-pointer">
-                    <UserCheck className="mr-2 h-4 w-4" />
-                    <span>Unblock User</span>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setIsBlockConfirmOpen(true); }} className="text-destructive focus:text-destructive cursor-pointer">
+                  <DropdownMenuItem onSelect={handleBlockConfirm} className="text-destructive focus:text-destructive cursor-pointer">
                     <UserX className="mr-2 h-4 w-4" />
                     <span>Block User</span>
                   </DropdownMenuItem>
-                )}
                 {isCurrentUserHost && !isThisParticipantTheHost && (
                   <>
                     <DropdownMenuSeparator />
@@ -190,29 +182,17 @@ const ParticipantItem = React.memo(({
                   </>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => toast({ title: "Report User", description: "This feature is under development." })} className="text-destructive focus:text-destructive cursor-pointer">
-                  <AlertCircle className="mr-2 h-4 w-4" />
-                  <span>Report User</span>
+                <DropdownMenuItem asChild className="text-destructive focus:text-destructive cursor-pointer">
+                  <Link href={reportLink}>
+                    <AlertCircle className="mr-2 h-4 w-4" />
+                    <span>Report User</span>
+                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>
       </div>
-      <AlertDialog open={isBlockConfirmOpen} onOpenChange={setIsBlockConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Block {participant.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This feature is currently under development. When enabled, you will not see or hear them, and you won't be able to send them private messages. They will not be notified that you have blocked them.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBlockConfirm} className={cn(buttonVariants({variant: "destructive"}))}>Block</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 });
