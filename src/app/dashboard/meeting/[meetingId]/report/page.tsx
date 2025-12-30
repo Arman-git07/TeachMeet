@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { collection, onSnapshot, doc, getDoc, DocumentData, query, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, DocumentData, query, addDoc, serverTimestamp, getDocs, where, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -201,23 +201,31 @@ function ReportAbusePageContent() {
                 {isLoading ? (
                   [...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-md" />)
                 ) : (
-                  participants.map(p => (
-                    <div key={p.id} className={cn("flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-muted/50", selectedParticipants.has(p.id) && "bg-primary/10")}>
+                  participants.map(p => {
+                    const isCurrentUser = p.id === auth.currentUser?.uid;
+                    return (
+                    <div key={p.id} className={cn(
+                        "flex items-center gap-3 p-2 rounded-lg", 
+                        !isCurrentUser && "cursor-pointer hover:bg-muted/50", 
+                        selectedParticipants.has(p.id) && "bg-primary/10",
+                        isCurrentUser && "opacity-60 cursor-not-allowed"
+                    )}>
                       <Checkbox
                         id={`participant-${p.id}`}
                         checked={selectedParticipants.has(p.id)}
-                        onCheckedChange={() => handleParticipantSelect(p.id)}
+                        onCheckedChange={() => !isCurrentUser && handleParticipantSelect(p.id)}
                         aria-label={`Select ${p.name}`}
+                        disabled={isCurrentUser}
                       />
-                      <Label htmlFor={`participant-${p.id}`} className="flex items-center gap-3 cursor-pointer flex-grow">
+                      <Label htmlFor={`participant-${p.id}`} className={cn("flex items-center gap-3 flex-grow", !isCurrentUser && "cursor-pointer")}>
                         <Avatar className="h-9 w-9">
                           <AvatarImage src={p.photoURL || undefined} alt={p.name} data-ai-hint="avatar user" />
                           <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <span className="font-medium text-sm">{p.name} {p.id === auth.currentUser?.uid && "(You)"}</span>
+                        <span className="font-medium text-sm">{p.name} {isCurrentUser && "(You)"}</span>
                       </Label>
                     </div>
-                  ))
+                  )})
                 )}
               </CardContent>
             </Card>
