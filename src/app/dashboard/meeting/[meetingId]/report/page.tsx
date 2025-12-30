@@ -4,7 +4,7 @@
 import { Suspense } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { X, AlertCircle } from "lucide-react";
+import { X, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
