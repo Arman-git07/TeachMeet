@@ -17,6 +17,7 @@ import { collection, onSnapshot, doc, getDoc, DocumentData, query } from 'fireba
 import { db, auth } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface Participant {
   id: string;
@@ -162,7 +163,7 @@ function ReportAbusePageContent() {
                       />
                       <Label htmlFor={`participant-${p.id}`} className="flex items-center gap-3 cursor-pointer flex-grow">
                         <Avatar className="h-9 w-9">
-                          <AvatarImage src={p.photoURL} alt={p.name} data-ai-hint="avatar user" />
+                          <AvatarImage src={p.photoURL || undefined} alt={p.name} data-ai-hint="avatar user" />
                           <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <span className="font-medium text-sm">{p.name} {p.id === auth.currentUser?.uid && "(You)"}</span>
