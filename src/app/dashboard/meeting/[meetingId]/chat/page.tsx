@@ -56,7 +56,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
 
   const { user } = useAuth();
   const { toast } = useToast();
-  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
+  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
   const { isBlockedByMe, amIBlockedBy } = useBlock();
 
   const [inputValue, setInputValue] = useState("");
@@ -79,8 +79,9 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   }, [chatHistory]);
   
   const isPrivateChatBlocked = useMemo(() => {
-      if (activeTab === 'public' || !user) return false;
-      return isBlockedByMe(activeTab, 'privateChat') || amIBlockedBy(activeTab, 'privateChat');
+    if (activeTab === 'public' || !user) return false;
+    // You can't message someone if YOU have blocked them, or THEY have blocked you.
+    return isBlockedByMe(activeTab, 'privateChat') || amIBlockedBy(activeTab, 'privateChat');
   }, [activeTab, user, isBlockedByMe, amIBlockedBy]);
 
   const handleSendMessage = () => {
@@ -104,9 +105,12 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
 
   const messagesToDisplay = chatHistory.filter(msg => {
+    // Hide messages in public chat if sender is blocked
     if (activeTab === 'public') {
       if(msg.isPrivate) return false;
-      if (isBlockedByMe(msg.senderId, 'publicChat')) return false; // Filter out public messages from users I blocked
+      if (isBlockedByMe(msg.senderId, 'publicChat')) return false; 
+      // Also hide public messages from people who have blocked me
+      if (amIBlockedBy(msg.senderId, 'publicChat')) return false;
       return true;
     }
     // For private tab, show messages between me and the other person
@@ -137,7 +141,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
             <TabsTrigger value="public" className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
                 <Users className="mr-2 h-5 w-5" /> Public Chat
             </TabsTrigger>
-            {privateWithId && !(isBlockedByMe(privateWithId, 'privateChat') || amIBlockedBy(privateWithId, 'privateChat')) && (
+            {privateWithId && !isPrivateChatBlocked && (
                  <TabsTrigger value={privateWithId} className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
                     <User className="mr-2 h-5 w-5" /> Private: {privateWithName}
                 </TabsTrigger>

@@ -61,10 +61,10 @@ const ParticipantItem = React.memo(({
   onRemoveClick,
   onToggleCamera,
   onLowerHand,
+  onBlockClick,
   meetingId,
   topic,
-  pinnedUserId,
-  onBlockClick
+  pinnedUserId
 }: { 
   participant: Participant, 
   isCurrentUserHost: boolean,
@@ -78,11 +78,13 @@ const ParticipantItem = React.memo(({
   pinnedUserId: string | null;
 }) => {
   const { toast } = useToast();
-  const { unblockUser, getBlockSettings } = useBlock();
+  const { unblockUser, getBlockSettings, isBlockedByMe, amIBlockedBy } = useBlock();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
   const blockInfo = getBlockSettings(participant.id);
   const isBlocked = !!blockInfo;
+  
+  const isPrivateChatDisabled = isBlocked || amIBlockedBy(participant.id, 'privateChat');
 
 
   const searchParams = useSearchParams();
@@ -151,7 +153,7 @@ const ParticipantItem = React.memo(({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 rounded-lg shadow-lg">
                   <>
-                    <DropdownMenuItem asChild className="cursor-pointer" disabled={isBlocked}>
+                    <DropdownMenuItem asChild className="cursor-pointer" disabled={isPrivateChatDisabled}>
                       <Link href={privateChatLink}>
                         <MessageSquare className="mr-2 h-4 w-4" />
                         <span>Chat Privately</span>
