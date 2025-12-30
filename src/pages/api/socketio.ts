@@ -3,6 +3,10 @@ import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer, Socket } from "socket.io";
 
+// A simple in-memory store for block relationships within a room.
+// In a production app, this should be moved to a more persistent store like Redis.
+const roomBlocks = new Map<string, Map<string, Set<string>>>(); // Map<roomId, Map<blockerId, Set<blockedId>>>
+
 export default function handler(
   req: NextApiRequest,
   res: NextApiResponseServerIO
@@ -28,22 +32,81 @@ export default function handler(
         socket.data.userId = userId;
         // @ts-ignore
         socket.data.roomId = roomId;
+        
+        if (!roomBlocks.has(roomId)) {
+            roomBlocks.set(roomId, new Map());
+        }
+        
+        // Notify others that a new user has joined
         socket.to(roomId).emit("user-joined", userId);
+
+        // Tell the new user who has blocked them
+        const roomBlockMap = roomBlocks.get(roomId);
+        const usersWhoBlockedMe: string[] = [];
+        roomBlockMap?.forEach((blockedSet, blockerId) => {
+            if (blockedSet.has(userId)) {
+                usersWhoBlockedMe.push(blockerId);
+            }
+        });
+        socket.emit('initial-block-list', usersWhoBlockedMe);
+
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
       socket.on("public-chat-message", (roomId, message) => {
-        // Broadcast to everyone in the room, including the sender
         io.to(roomId).emit("new-public-message", message);
       });
       
       socket.on("private-chat-message", (roomId, message) => {
-        const recipientSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === message.recipientId);
+        const { senderId, recipientId } = message;
+        const roomBlockMap = roomBlocks.get(roomId);
+
+        // Check if recipient has blocked sender OR sender has blocked recipient
+        const isBlocked = roomBlockMap?.get(recipientId)?.has(senderId) || roomBlockMap?.get(senderId)?.has(recipientId);
+
+        if (isBlocked) {
+            socket.emit('message-blocked', { recipientId });
+            return;
+        }
+
+        const recipientSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === recipientId);
         if (recipientSocket) {
             recipientSocket.emit("new-private-message", message);
         }
       });
 
+      socket.on('block-user', ({ blockedUserId }: { blockedUserId: string }) => {
+          const { userId: blockerId, roomId } = socket.data as { userId: string, roomId: string };
+          if (!blockerId || !roomId || !blockedUserId) return;
+          
+          const roomBlockMap = roomBlocks.get(roomId);
+          if (!roomBlockMap) return;
+
+          if (!roomBlockMap.has(blockerId)) {
+              roomBlockMap.set(blockerId, new Set());
+          }
+          roomBlockMap.get(blockerId)!.add(blockedUserId);
+          
+          const blockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === blockedUserId);
+          if (blockedSocket) {
+              blockedSocket.emit('user-blocked-me', blockerId);
+          }
+      });
+
+      socket.on('unblock-user', ({ unblockedUserId }: { unblockedUserId: string }) => {
+          const { userId: unblockerId, roomId } = socket.data as { userId: string, roomId: string };
+          if (!unblockerId || !roomId || !unblockedUserId) return;
+          
+          const roomBlockMap = roomBlocks.get(roomId);
+          if (!roomBlockMap) return;
+          
+          roomBlockMap.get(unblockerId)?.delete(unblockedUserId);
+          
+          const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
+          if (unblockedSocket) {
+              unblockedSocket.emit('user-unblocked-me', unblockerId);
+          }
+      });
 
       socket.on('draw', (data) => {
         // @ts-ignore
@@ -77,10 +140,16 @@ export default function handler(
       });
 
       socket.on("disconnect", () => {
-        // @ts-ignore
-        const { roomId, userId } = socket.data || {};
+        const { roomId, userId } = socket.data as { roomId: string, userId: string };
         if (roomId && userId) {
           socket.to(roomId).emit("user-left", userId);
+
+          // Clean up block lists on disconnect
+          const roomBlockMap = roomBlocks.get(roomId);
+          if(roomBlockMap) {
+            roomBlockMap.delete(userId); // Remove this user's blocks
+            roomBlockMap.forEach(blockedSet => blockedSet.delete(userId)); // Remove this user from others' blocks
+          }
         }
         console.log("Disconnected:", socket.id);
       });

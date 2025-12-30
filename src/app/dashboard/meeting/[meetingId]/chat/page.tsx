@@ -7,14 +7,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, MessageSquare, User, Users, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { io, Socket } from "socket.io-client";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
+import { useBlock } from "@/contexts/BlockContext";
 
 export interface PublicChatActivityItem {
   type: 'publicChat';
@@ -55,81 +56,42 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
 
   const { user } = useAuth();
   const { toast } = useToast();
+  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
+  const { isBlockedByMe, amIBlockedBy } = useBlock();
 
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const [activeTab, setActiveTab] = useState(privateWithId ? privateWithId : 'public');
-  const [isConnecting, setIsConnecting] = useState(true);
+
+  const isConnecting = !rtc || !rtc.socket.connected;
 
   useEffect(() => {
-    if (!user) return;
-
-    const newSocket = io({
-      path: "/api/socketio",
-      query: {
-        userId: user.uid,
-        displayName: user.displayName || 'Anonymous',
-        photoURL: user.photoURL || ''
-      }
-    });
-
-    setSocket(newSocket);
-    setIsConnecting(true);
-
-    newSocket.on('connect', () => {
-      setIsConnecting(false);
-      newSocket.emit('join-room', meetingId);
-      setChatHistory([{ id: 'welcome', senderName: 'System', text: `Welcome to the chat for ${topic}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }]);
-    });
-
-    newSocket.on('new-public-message', (message: Omit<ChatMessage, 'isMe'>) => {
-      setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === user.uid }]);
-    });
-    
-    newSocket.on('message-blocked', ({ recipientId }) => {
-      toast({
-        variant: 'destructive',
-        title: 'Message Blocked',
-        description: `Your message could not be sent because you are blocked by the recipient.`
-      });
-    });
-
-    newSocket.on('new-private-message', (message: Omit<ChatMessage, 'isMe'>) => {
-      setChatHistory(prev => [...prev, { ...message, isMe: message.senderId === user.uid }]);
-    });
-
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, [meetingId, user, topic, toast]);
-
+    if (chatHistory.length === 0) {
+       setChatHistory([{ id: 'welcome', senderName: 'System', text: `Welcome to the chat for ${topic}. Messages are not persisted after the meeting.`, timestamp: new Date(), isMe: false, isPrivate: false, senderId: 'system' }]);
+    }
+  }, [topic, chatHistory.length, setChatHistory]);
+  
   useEffect(() => {
     if (scrollViewportRef.current) {
         scrollViewportRef.current.scrollTo({ top: scrollViewportRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [chatHistory]);
+  
+  const isPrivateChatBlocked = useMemo(() => {
+      if (activeTab === 'public' || !user) return false;
+      return isBlockedByMe(activeTab, 'privateChat') || amIBlockedBy(activeTab, 'privateChat');
+  }, [activeTab, user, isBlockedByMe, amIBlockedBy]);
 
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !user || !socket) return;
+    if (!inputValue.trim() || !user || !rtc || isPrivateChatBlocked) return;
     
     const isPrivate = activeTab !== 'public';
-    const messagePayload = {
-      senderId: user.uid,
-      senderName: user.displayName || 'Anonymous',
-      senderAvatar: user.photoURL || undefined,
-      text: inputValue,
-      timestamp: new Date(),
-      isPrivate,
-    };
     
     if (isPrivate) {
-      socket.emit("private-chat-message", meetingId, { ...messagePayload, recipientId: activeTab });
+      rtc.sendPrivateMessage(activeTab, inputValue);
     } else {
-      socket.emit("public-chat-message", meetingId, messagePayload);
+      rtc.sendPublicMessage(inputValue);
     }
     
     setInputValue("");
@@ -142,7 +104,12 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
   const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
 
   const messagesToDisplay = chatHistory.filter(msg => {
-    if (activeTab === 'public') return !msg.isPrivate;
+    if (activeTab === 'public') {
+      if(msg.isPrivate) return false;
+      if (isBlockedByMe(msg.senderId, 'publicChat')) return false; // Filter out public messages from users I blocked
+      return true;
+    }
+    // For private tab, show messages between me and the other person
     return msg.isPrivate && ((msg.recipientId === activeTab && msg.senderId === user?.uid) || (msg.senderId === activeTab && msg.recipientId === user?.uid));
   });
 
@@ -170,7 +137,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
             <TabsTrigger value="public" className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
                 <Users className="mr-2 h-5 w-5" /> Public Chat
             </TabsTrigger>
-            {privateWithId && (
+            {privateWithId && !(isBlockedByMe(privateWithId, 'privateChat') || amIBlockedBy(privateWithId, 'privateChat')) && (
                  <TabsTrigger value={privateWithId} className="h-full rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-4">
                     <User className="mr-2 h-5 w-5" /> Private: {privateWithName}
                 </TabsTrigger>
@@ -230,7 +197,7 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                   <Textarea
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={privateWithName && activeTab === privateWithId ? `Private message to ${privateWithName}...` : "Type your message..."}
+                    placeholder={isPrivateChatBlocked ? "You cannot chat with this user." : (privateWithName && activeTab === privateWithId ? `Private message to ${privateWithName}...` : "Type your message...")}
                     className="flex-grow rounded-lg border-border/80 focus:ring-primary text-sm min-h-[40px] max-h-[120px]"
                     rows={1}
                     onKeyDown={(e) => {
@@ -239,8 +206,9 @@ export default function MeetingChatPage({ params }: { params: { meetingId: strin
                         handleSendMessage();
                       }
                     }}
+                    disabled={isPrivateChatBlocked}
                   />
-                  <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
+                  <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim() || isPrivateChatBlocked}>
                     <Send className="h-5 w-5" />
                     <span className="sr-only">Send message</span>
                   </Button>

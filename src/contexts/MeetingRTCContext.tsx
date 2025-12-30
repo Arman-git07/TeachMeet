@@ -28,7 +28,14 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
 export const useMeetingRTC = () => {
   const context = useContext(MeetingRTCContext);
   if (context === undefined) {
-    throw new Error('useMeetingRTC must be used within a MeetingRTCProvider');
+    // This provides a fallback for components that might use this context
+    // outside of a meeting, preventing a hard crash.
+    return {
+        rtc: null,
+        setRtc: () => {},
+        chatHistory: [],
+        setChatHistory: () => {}
+    } as MeetingRTCContextType;
   }
   return context;
 };

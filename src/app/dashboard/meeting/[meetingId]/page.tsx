@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
@@ -12,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Brush, MessageSquare, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 
@@ -30,6 +32,7 @@ function MeetingPageContent() {
   const { toast } = useToast();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user, loading: authLoading } = useAuth();
+  const { rtc } = useMeetingRTC();
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
@@ -44,8 +47,8 @@ function MeetingPageContent() {
   const handleLeave = useCallback(async (endForAll = false) => {
     if (!meetingId || !user) return;
 
-    // Only remove the meeting from local storage if the host ends it for everyone.
-    // If a user just leaves, the entry should persist for rejoining.
+    rtc?.leave();
+
     if (isHost && endForAll) {
         try {
             const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
@@ -81,10 +84,9 @@ function MeetingPageContent() {
     }
   
     router.push("/");
-  }, [meetingId, user, isHost, router, toast]);
+  }, [meetingId, user, isHost, router, toast, rtc]);
 
   useEffect(() => {
-    // Read device settings from localStorage on initial load
     const camState = localStorage.getItem('teachmeet-cam-state') !== 'false';
     const micState = localStorage.getItem('teachmeet-mic-state') !== 'false';
     setCamOn(camState);

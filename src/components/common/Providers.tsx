@@ -17,9 +17,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <AuthProvider>
+        <MeetingRTCProvider>
           <BlockProvider>
               {children}
           </BlockProvider>
+        </MeetingRTCProvider>
       </AuthProvider>
     </ThemeProvider>
   );
