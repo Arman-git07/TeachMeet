@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { collection, onSnapshot, doc, getDoc, DocumentData, query } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, DocumentData, query, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,7 +96,7 @@ function ReportAbusePageContent() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedParticipants.size === 0) {
       toast({ variant: 'destructive', title: 'Selection Required', description: 'Please select at least one participant to report.' });
@@ -106,24 +106,72 @@ function ReportAbusePageContent() {
       toast({ variant: 'destructive', title: 'Abuse Type Required', description: 'Please select a type of abuse from the list.' });
       return;
     }
+    if (!auth.currentUser) {
+        toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be signed in to submit a report.' });
+        return;
+    }
 
     setIsSubmitting(true);
-    // Simulate API call for reporting
-    setTimeout(() => {
-      console.log("--- Abuse Report Submitted ---");
-      console.log("Meeting ID:", meetingId);
-      console.log("Reported Users:", Array.from(selectedParticipants));
-      console.log("Abuse Type:", abuseType);
-      console.log("Additional Info:", additionalInfo);
-      console.log("----------------------------");
+    const reporterId = auth.currentUser.uid;
 
-      toast({
-        title: "Report Submitted",
-        description: "Thank you for helping keep TeachMeet safe. Our team will review your report.",
-      });
-      setIsSubmitting(false);
-      router.back();
-    }, 1500);
+    try {
+        const reportPromises = Array.from(selectedParticipants).map(reportedUserId => {
+            const reportedUser = participants.find(p => p.id === reportedUserId);
+            return addDoc(collection(db, "reports"), {
+                reportedUserId: reportedUserId,
+                reportedUserName: reportedUser?.name || 'Unknown User',
+                meetingId: meetingId,
+                abuseType: abuseType,
+                additionalInfo: additionalInfo,
+                reporterId: reporterId, // Stored for admin review, not shown to user
+                timestamp: serverTimestamp(),
+            });
+        });
+        
+        await Promise.all(reportPromises);
+
+        // --- Simulate backend logic (e.g., Cloud Function) ---
+        for (const reportedUserId of selectedParticipants) {
+             // 1. Simulate notifying the reported user
+            console.log(`[SIMULATION] Notifying user ${reportedUserId} that they have been reported for violating community guidelines.`);
+
+            // 2. Check report count for auto-blocking
+            const reportsQuery = query(collection(db, "reports"), where("reportedUserId", "==", reportedUserId));
+            const reportsSnapshot = await getDocs(reportsQuery);
+            const reportCount = reportsSnapshot.size;
+            
+            console.log(`[SIMULATION] User ${reportedUserId} now has ${reportCount} reports.`);
+
+            if (reportCount >= 3) {
+                console.log(`[SIMULATION] Report count for ${reportedUserId} reached ${reportCount}. Applying a one-year block.`);
+                const oneYearFromNow = new Date();
+                oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+                
+                // In a real app, you would set a custom claim or write to a 'blocked_users' collection
+                // that is checked by security rules and login logic.
+                const blockedUserRef = doc(db, 'systemBlockedUsers', reportedUserId);
+                await setDoc(blockedUserRef, {
+                    blockedAt: serverTimestamp(),
+                    expiresAt: oneYearFromNow,
+                    reason: `Auto-blocked after ${reportCount} reports. Last report type: ${abuseType}`,
+                });
+                 console.log(`[SIMULATION] User ${reportedUserId} has been blocked until ${oneYearFromNow.toISOString()}`);
+            }
+        }
+        
+        toast({
+            title: "Report Submitted",
+            description: "Thank you for helping keep TeachMeet safe. Our team will review your report.",
+        });
+        
+        router.back();
+
+    } catch (error) {
+        console.error("Error submitting abuse report:", error);
+        toast({ variant: 'destructive', title: "Submission Error", description: "Could not submit your report. Please try again." });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
   
   const backLink = `/dashboard/meeting/${meetingId}/participants?${searchParams.toString()}`;
@@ -205,6 +253,7 @@ function ReportAbusePageContent() {
               <Link href={backLink}>Cancel</Link>
             </Button>
             <Button type="submit" className="rounded-lg btn-gel" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
               {isSubmitting ? "Submitting..." : "Submit Report"}
             </Button>
           </footer>
