@@ -3,25 +3,6 @@ import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer, Socket } from "socket.io";
 
-// Store room state in memory
-interface RoomState {
-  hostId: string | null;
-  permissions: Record<string, boolean>; // userId -> canDraw
-  elements: any[]; // Store whiteboard elements
-  users: Map<string, { socketId: string, displayName?: string, photoURL?: string }>; // userId -> socketId
-  blocked: Map<string, Set<string>>; // userId -> Set of blocked userIds
-}
-const rooms = new Map<string, RoomState>();
-
-
-const getSocketByUserId = (io: IOServer, roomId: string, userId: string): Socket | undefined => {
-    const roomState = rooms.get(roomId);
-    const socketId = roomState?.users.get(userId)?.socketId;
-    if (!socketId) return undefined;
-    return io.sockets.sockets.get(socketId);
-};
-
-
 export default function handler(
   req: NextApiRequest,
   res: NextApiResponseServerIO
@@ -40,59 +21,30 @@ export default function handler(
 
     io.on("connection", (socket) => {
       console.log("Socket connected:", socket.id);
-      const { userId, displayName, photoURL } = socket.handshake.query;
-
-      socket.on("join-room", (roomId: string) => {
+      
+      socket.on("join-room", (roomId: string, userId: string) => {
         socket.join(roomId);
-        // @ts-ignore - extending socket object
-        socket.data = { roomId, userId: userId, displayName, photoURL };
-
-        if (!rooms.has(roomId) && userId) {
-          rooms.set(roomId, {
-            hostId: userId as string,
-            permissions: { [userId as string]: true },
-            elements: [],
-            users: new Map(),
-            blocked: new Map(),
-          });
-          console.log(`Room ${roomId} created. Host is ${userId}`);
-        }
-        
-        if (userId) {
-            const roomState = rooms.get(roomId)!;
-            roomState.users.set(userId as string, { socketId: socket.id, displayName: displayName as string, photoURL: photoURL as string });
-        }
-
+        // @ts-ignore
+        socket.data.userId = userId;
+        // @ts-ignore
+        socket.data.roomId = roomId;
         socket.to(roomId).emit("user-joined", userId);
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
-      socket.on("private-chat-message", (roomId: string, message: any) => {
-        const roomState = rooms.get(roomId);
-        if (!roomState) return;
-
-        // Check if sender is blocked by recipient
-        const recipientBlocks = roomState.blocked.get(message.recipientId);
-        if (recipientBlocks && recipientBlocks.has(message.senderId)) {
-            // Optionally, send an error back to the sender
-            socket.emit("message-blocked", { recipientId: message.recipientId });
-            console.log(`Message from ${message.senderId} to ${message.recipientId} blocked.`);
-            return;
-        }
-
-        const recipientSocket = getSocketByUserId(io, roomId, message.recipientId);
-
+      socket.on("public-chat-message", (roomId, message) => {
+        // Broadcast to everyone in the room, including the sender
+        io.to(roomId).emit("new-public-message", message);
+      });
+      
+      socket.on("private-chat-message", (roomId, message) => {
+        const recipientSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === message.recipientId);
         if (recipientSocket) {
             recipientSocket.emit("new-private-message", message);
         }
       });
 
 
-      socket.on("public-chat-message", (roomId, message) => {
-        // Broadcast to everyone in the room, including the sender
-        io.to(roomId).emit("new-public-message", message);
-      });
-      
       socket.on('draw', (data) => {
         // @ts-ignore
         const { userId } = socket.data || {};
@@ -112,28 +64,6 @@ export default function handler(
         }
       });
 
-      socket.on("block-user", (roomId, blockedUserId) => {
-        const roomState = rooms.get(roomId);
-        const blockerId = (socket.data as any).userId;
-        if (roomState && blockerId && blockedUserId) {
-          if (!roomState.blocked.has(blockerId)) {
-            roomState.blocked.set(blockerId, new Set());
-          }
-          roomState.blocked.get(blockerId)!.add(blockedUserId);
-          console.log(`User ${blockerId} blocked ${blockedUserId} in room ${roomId}`);
-        }
-      });
-
-      socket.on("unblock-user", (roomId, unblockedUserId) => {
-        const roomState = rooms.get(roomId);
-        const unblockerId = (socket.data as any).userId;
-        if (roomState && unblockerId && unblockedUserId) {
-          roomState.blocked.get(unblockerId)?.delete(unblockedUserId);
-          console.log(`User ${unblockerId} unblocked ${unblockedUserId} in room ${roomId}`);
-        }
-      });
-
-
       socket.on("offer", (remoteId: string, offer: any) => {
         io.to(remoteId).emit("offer", socket.id, offer);
       });
@@ -151,12 +81,6 @@ export default function handler(
         const { roomId, userId } = socket.data || {};
         if (roomId && userId) {
           socket.to(roomId).emit("user-left", userId);
-          const roomState = rooms.get(roomId);
-          if (roomState) {
-            if (roomState.users.has(userId)) {
-                roomState.users.delete(userId);
-            }
-          }
         }
         console.log("Disconnected:", socket.id);
       });

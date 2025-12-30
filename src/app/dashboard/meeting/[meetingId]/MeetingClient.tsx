@@ -21,7 +21,6 @@ import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page'
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChatMessage, PublicChatActivityItem } from "./chat/page";
-import { useBlock } from "@/contexts/BlockContext";
 
 
 type Participant = {
@@ -65,7 +64,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const { blockedUsers, isBlocked } = useBlock();
   
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -493,7 +491,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       volumeLevel: volumeLevels.get(userId) ?? 0
     };
     const remotes: Participant[] = Array.from(liveParticipants.entries())
-      .filter(([id]) => id !== userId && !isBlocked(id))
+      .filter(([id]) => id !== userId)
       .map(([id, data]) => {
         const remoteStream = remoteStreams.get(id) || null;
         return {
@@ -525,7 +523,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const firstHandRaised = all.filter(p => p.isHandRaised && p.handRaisedAt).sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
     const raisedCount = all.filter(p => p.isHandRaised).length;
     return { allParticipants: all, localParticipant: self, remoteParticipants: remoteOnly, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId, isBlocked]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId]);
 
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   

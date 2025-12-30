@@ -40,7 +40,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch, updateDoc } from 'firebase/firestore';
-import { useBlock } from "@/contexts/BlockContext";
 
 interface Participant {
   id: string; // This will be the userId
@@ -74,12 +73,10 @@ const ParticipantItem = React.memo(({
   pinnedUserId: string | null;
 }) => {
   const { toast } = useToast();
-  const { blockUser, unblockUser, isBlocked } = useBlock();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
-  const isUserBlocked = isBlocked(participant.id);
-
   const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
+  const isUserBlocked = false; // Mock value
 
   const searchParams = useSearchParams();
   const cam = searchParams.get('cam');
@@ -100,17 +97,16 @@ const ParticipantItem = React.memo(({
       pinUrlParams.set('pin', participant.id);
   }
   const pinLink = `/dashboard/meeting/${meetingId}?${pinUrlParams.toString()}`;
-
+  
   const handleBlockConfirm = () => {
-    blockUser(participant.id);
-    toast({ title: "User Blocked", description: `${participant.name} has been blocked.` });
+    toast({ title: "Feature in development", description: "Block functionality is not yet implemented." });
     setIsBlockConfirmOpen(false);
   };
   
   const handleUnblock = () => {
-    unblockUser(participant.id);
-    toast({ title: "User Unblocked", description: `${participant.name} is now unblocked.` });
+    toast({ title: "Feature in development", description: "Unblock functionality is not yet implemented." });
   };
+
 
   return (
     <>
@@ -208,7 +204,7 @@ const ParticipantItem = React.memo(({
           <AlertDialogHeader>
             <AlertDialogTitle>Block {participant.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              You will not see or hear them, and you won't be able to send them private messages. They will not be notified that you have blocked them.
+              This feature is currently under development. When enabled, you will not see or hear them, and you won't be able to send them private messages. They will not be notified that you have blocked them.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -435,5 +431,3 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
     </>
   );
 }
-
-
