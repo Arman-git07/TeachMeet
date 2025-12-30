@@ -44,19 +44,23 @@ function MeetingPageContent() {
   const handleLeave = useCallback(async (endForAll = false) => {
     if (!meetingId || !user) return;
 
-    try {
-      const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
-      const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
-      if (storedMeetingsRaw) {
-        let meetings = JSON.parse(storedMeetingsRaw);
-        if (Array.isArray(meetings)) {
-          const updatedMeetings = meetings.filter(m => m.id !== meetingId);
-          localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
-          window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
+    // Only remove the meeting from local storage if the host ends it for everyone.
+    // If a user just leaves, the entry should persist for rejoining.
+    if (isHost && endForAll) {
+        try {
+            const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
+            const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
+            if (storedMeetingsRaw) {
+                let meetings = JSON.parse(storedMeetingsRaw);
+                if (Array.isArray(meetings)) {
+                    const updatedMeetings = meetings.filter(m => m.id !== meetingId);
+                    localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(updatedMeetings));
+                    window.dispatchEvent(new CustomEvent('teachmeet_meeting_ended'));
+                }
+            }
+        } catch (e) {
+            console.error("Failed to clean up localStorage on end-for-all", e);
         }
-      }
-    } catch (e) {
-      console.error("Failed to clean up localStorage on leave", e);
     }
   
     if (isHost && endForAll) {
