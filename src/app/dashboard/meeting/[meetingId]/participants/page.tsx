@@ -78,13 +78,13 @@ const ParticipantItem = React.memo(({
   pinnedUserId: string | null;
 }) => {
   const { toast } = useToast();
-  const { unblockUser, getBlockSettings, isBlockedByMe, amIBlockedBy } = useBlock();
+  const { unblockUser, getBlockSettings, amIBlockedBy } = useBlock();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
   const blockInfo = getBlockSettings(participant.id);
-  const isBlocked = !!blockInfo;
+  const isBlockedByMe = !!blockInfo;
   
-  const isPrivateChatDisabled = isBlocked || amIBlockedBy(participant.id, 'privateChat');
+  const isPrivateChatDisabled = isBlockedByMe || amIBlockedBy(participant.id, 'privateChat');
 
 
   const searchParams = useSearchParams();
@@ -119,7 +119,7 @@ const ParticipantItem = React.memo(({
 
   return (
     <>
-      <div className={cn("flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors", isBlocked && "bg-destructive/10")}>
+      <div className={cn("flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors", isBlockedByMe && "bg-destructive/10")}>
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={participant.photoURL || `https://placehold.co/40x40.png?text=${participant.name.charAt(0)}`} alt={participant.name} data-ai-hint="avatar user"/>
@@ -130,7 +130,7 @@ const ParticipantItem = React.memo(({
               {participant.name} {isMe && "(You)"}
               {isThisParticipantTheHost && <ShieldCheck className="inline-block h-4 w-4 text-primary" title="Host" />}
               {participant.isHandRaised && <Hand className="inline-block h-4 w-4 text-primary" title="Hand Raised" />}
-              {isBlocked && <UserX className="inline-block h-4 w-4 text-destructive" title="Blocked" />}
+              {isBlockedByMe && <UserX className="inline-block h-4 w-4 text-destructive" title="Blocked by you" />}
             </p>
             <p className="text-xs text-muted-foreground">
               {participant.isMicOn ? "Unmuted" : "Muted"} | {participant.isCameraOn ? "Camera On" : "Camera Off"}
@@ -168,7 +168,7 @@ const ParticipantItem = React.memo(({
                     <DropdownMenuSeparator />
                   </>
 
-                  {isBlocked ? (
+                  {isBlockedByMe ? (
                     <DropdownMenuItem onSelect={handleUnblock} className="text-primary focus:text-primary cursor-pointer">
                         <UserCheck className="mr-2 h-4 w-4" />
                         <span>Unblock User</span>
