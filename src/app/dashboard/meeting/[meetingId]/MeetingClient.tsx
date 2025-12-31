@@ -65,7 +65,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const { isBlocked } = useBlock();
+  const { isBlockedByMe } = useBlock();
   
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -422,7 +422,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => {
     remoteStreams.forEach((stream, id) => {
       if (!stream || stream.getAudioTracks().length === 0 || remoteAnalysersRef.current.has(id)) return;
-      if (isBlocked(id, 'audio')) return; // Don't process audio for blocked users
+      if (isBlockedByMe(id, 'audio')) return; // Don't process audio for blocked users
       try {
         const audioCtx = audioContextRef.current;
         if (!audioCtx || audioCtx.state === 'closed') return;
@@ -451,14 +451,14 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     });
     const existingIds = Array.from(remoteAnalysersRef.current.keys());
     existingIds.forEach(id => {
-      if (!remoteStreams.has(id) || isBlocked(id, 'audio')) {
+      if (!remoteStreams.has(id) || isBlockedByMe(id, 'audio')) {
         const ent = remoteAnalysersRef.current.get(id);
         if (ent && ent.rafId) cancelAnimationFrame(ent.rafId);
         remoteAnalysersRef.current.delete(id);
         setVolumeLevels(prev => { const next = new Map(prev); next.delete(id); return next; });
       }
     });
-  }, [remoteStreams, isBlocked]);
+  }, [remoteStreams, isBlockedByMe]);
 
   useEffect(() => {
     const addSelfToParticipants = async () => {
@@ -496,8 +496,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const remotes: Participant[] = Array.from(liveParticipants.entries())
       .filter(([id]) => id !== userId)
       .map(([id, data]) => {
-        const videoBlocked = isBlocked(id, 'video');
-        const audioBlocked = isBlocked(id, 'audio');
+        const videoBlocked = isBlockedByMe(id, 'video');
+        const audioBlocked = isBlockedByMe(id, 'audio');
         const remoteStream = remoteStreams.get(id) || null;
         
         // Mute audio track if user is blocked
@@ -536,7 +536,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const firstHandRaised = all.filter(p => p.isHandRaised && p.handRaisedAt).sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
     const raisedCount = all.filter(p => p.isHandRaised).length;
     return { allParticipants: all, localParticipant: self, remoteParticipants: remoteOnly, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId, isBlocked]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId, isBlockedByMe]);
 
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   
