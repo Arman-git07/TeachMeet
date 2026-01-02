@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -6,7 +5,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
-import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Pin, MessageSquare, Minimize2, Maximize2 } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Pin, MessageSquare, Minimize2, Maximize2, XCircle } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
@@ -20,8 +19,8 @@ import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNot
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ChatMessage, PublicChatActivityItem } from "./chat/page";
 import { useBlock } from "@/contexts/BlockContext";
+import { MeetingChatPanel } from "./chat/MeetingChatPanel";
 
 
 type Participant = {
@@ -57,9 +56,6 @@ type Props = {
   initialPinnedId?: string | null;
   children: React.ReactNode;
 };
-
-const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
-
 
 export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId, children }: Props) {
   const { user } = useAuth();
@@ -97,11 +93,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const [pinnedId, setPinnedId] = useState<string | null>(initialPinnedId || null);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
-
-  const [publicChatMessage, setPublicChatMessage] = useState<PublicChatActivityItem | null>(null);
   
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
+
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -180,41 +176,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       return next;
     });
   }, [localStream, micOn, updateMyStatus, userId]);
-
-
-  useEffect(() => {
-    const handleStorageUpdate = () => {
-      if (!user) return;
-      try {
-        const LATEST_ACTIVITY_KEY = `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`;
-        const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-        if (!rawActivity) return;
-        const activities: PublicChatActivityItem[] = JSON.parse(rawActivity);
-        
-        const latestPublicChatMessage = activities.find(
-            (act): act is PublicChatActivityItem =>
-              act.type === 'publicChat' && act.meetingId === meetingId && act.senderId !== user.uid
-          );
-        if (latestPublicChatMessage && latestPublicChatMessage.id !== publicChatMessage?.id) {
-            setPublicChatMessage(latestPublicChatMessage);
-        }
-
-      } catch (e) {
-        console.error("Failed to parse activity from localStorage", e);
-      }
-    };
-
-    handleStorageUpdate(); // Check on mount
-    window.addEventListener('teachmeet_activity_updated', handleStorageUpdate);
-    return () => window.removeEventListener('teachmeet_activity_updated', handleStorageUpdate);
-  }, [user, meetingId, publicChatMessage?.id]);
-
-  const handlePublicChatNotificationClick = (message: PublicChatActivityItem) => {
-    const url = `/dashboard/meeting/${message.meetingId}/chat?topic=${encodeURIComponent(message.meetingTopic)}`;
-    router.push(url);
-    setPublicChatMessage(null);
-  };
-
 
   useEffect(() => {
     const fetchMeetingCreator = async () => {
@@ -387,7 +348,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
     if (!audioContextRef.current) {
         try {
-          // Check if we are in a browser context before creating AudioContext
           if (typeof window !== 'undefined' && window.AudioContext) {
             const audioContext = new AudioContext();
             analyserRef.current = audioContext.createAnalyser();
@@ -422,7 +382,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => {
     remoteStreams.forEach((stream, id) => {
       if (!stream || stream.getAudioTracks().length === 0 || remoteAnalysersRef.current.has(id)) return;
-      if (isBlockedByMe(id, 'audio')) return; // Don't process audio for blocked users
+      if (isBlockedByMe(id, 'audio')) return; 
       try {
         const audioCtx = audioContextRef.current;
         if (!audioCtx || audioCtx.state === 'closed') return;
@@ -500,7 +460,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         const audioBlocked = isBlockedByMe(id, 'audio');
         const remoteStream = remoteStreams.get(id) || null;
         
-        // Mute audio track if user is blocked
         if (remoteStream && audioBlocked) {
             remoteStream.getAudioTracks().forEach(t => t.enabled = false);
         } else if (remoteStream && !audioBlocked) {
@@ -736,40 +695,24 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1" onClick={unlockAudio}>
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
-
-      {publicChatMessage && (
-        <div
-          onClick={() => handlePublicChatNotificationClick(publicChatMessage)}
-          className="fixed top-24 left-1/2 -translate-x-1/2 z-[9998] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border-accent/30 px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown cursor-pointer hover:bg-muted/30"
-        >
-          <div className="flex items-center gap-3">
-            <MessageSquare className="h-6 w-6 text-accent" />
-            <div>
-              <p className="font-semibold">{publicChatMessage.title}</p>
-              <p className="text-sm text-muted-foreground truncate max-w-xs">{publicChatMessage.text}</p>
-            </div>
-          </div>
-          <Button size="sm" variant="outline">View Chat</Button>
-        </div>
-      )}
-
-
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} />
 
-      <main className="flex-1 overflow-hidden relative p-2" ref={mainContainerRef}>
-          {loadingMedia ? (
-              <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-          ) : (
-             <>
-               {childrenWithProps ? (
-                  <div className="w-full h-full">{childrenWithProps}</div>
-                ) : (
-                  renderLayout()
-                )}
-             </>
-          )}
+      <main className="flex-1 overflow-hidden relative" ref={mainContainerRef}>
+          <div className={cn("w-full h-full p-2 transition-all duration-300", isChatOpen ? "md:w-[calc(100%-384px)]" : "md:w-full")}>
+            {loadingMedia ? (
+                <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            ) : (
+              <>
+                {childrenWithProps ? (
+                    <div className="w-full h-full">{childrenWithProps}</div>
+                  ) : (
+                    renderLayout()
+                  )}
+              </>
+            )}
+          </div>
           {isSharingScreen && (
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center justify-center pointer-events-none">
               <div className="bg-background/80 backdrop-blur-sm rounded-2xl p-4 flex flex-col items-center gap-3 pointer-events-auto">
@@ -781,12 +724,20 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               </div>
             </div>
           )}
+          <MeetingChatPanel 
+              isOpen={isChatOpen} 
+              onClose={() => setIsChatOpen(false)}
+              meetingId={meetingId} 
+              topic={topic}
+              rtc={rtc}
+          />
       </main>
 
       <footer className="p-2 sm:p-4 bg-background shrink-0 relative z-10">
         <div className="flex items-center justify-center gap-2 sm:gap-4">
             <Button onClick={toggleMic} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={() => toggleCamera()} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
+            <Button onClick={() => setIsChatOpen(prev => !prev)} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isChatOpen ? "bg-primary/80 text-primary-foreground hover:bg-primary" : "bg-secondary/50 hover:bg-secondary/70 text-foreground")} aria-label={isChatOpen ? "Close Chat" : "Open Chat"}><MessageSquare className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
             <Button onClick={handleShareClick} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-foreground")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <ScreenShare className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
             <AlertDialog>
