@@ -167,12 +167,6 @@ function MeetingPageContent() {
             </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href={constructUrl('chat')}>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                <span>Chat</span>
-            </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="cursor-pointer">
             <Link href={constructUrl('participants')}>
                 <Users className="mr-2 h-4 w-4" />
                 <span>Participants</span>

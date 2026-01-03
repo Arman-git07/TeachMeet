@@ -29,38 +29,14 @@ interface MeetingChatPanelProps {
   meetingId: string;
   topic: string;
   rtc: MeshRTC | null;
+  chatHistory: ChatMessage[];
+  setChatHistory: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
-export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, rtc }: MeetingChatPanelProps) {
+export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, rtc, chatHistory, setChatHistory }: MeetingChatPanelProps) {
   const { user } = useAuth();
   const [inputValue, setInputValue] = useState("");
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
-  
-  const handleNewMessage = useCallback((message: ChatMessage) => {
-    // Don't add private messages to public chat history
-    if(message.isPrivate) return;
-    setChatHistory(prev => [...prev, message]);
-  }, []);
-
-  useEffect(() => {
-    if (!rtc || rtc.hasRegisteredChatHandlers) return;
-    
-    rtc.registerChatHandlers(handleNewMessage);
-
-    if (chatHistory.length === 0) {
-        setChatHistory([{ 
-            id: 'welcome', 
-            senderId: 'system',
-            senderName: 'System', 
-            text: `Welcome to the public chat for ${topic}.`, 
-            timestamp: new Date(), 
-            isMe: false,
-            isPrivate: false,
-        }]);
-    }
-
-  }, [rtc, handleNewMessage, chatHistory.length, topic]);
   
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -100,7 +76,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, rtc }: Mee
                 <CardContent className="flex-grow p-0 overflow-hidden">
                     <ScrollArea className="h-full">
                         <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
-                        {chatHistory.map((msg) => (
+                        {chatHistory.filter(msg => !msg.isPrivate).map((msg) => (
                             <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
                             {!msg.isMe && (
                                 <Avatar className="h-8 w-8 self-start">

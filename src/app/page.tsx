@@ -157,8 +157,8 @@ export default function HomePage() {
         try {
             const parsed = JSON.parse(latestActivityRaw);
             if (Array.isArray(parsed)) {
-                // Filter out private messages, they are handled in-meeting
-                otherActivities = parsed.filter(item => item && item.type && item.type !== 'privateMessage');
+                // Filter out private messages and public chat, they are handled in-meeting
+                otherActivities = parsed.filter(item => item && item.type && item.type !== 'privateMessage' && item.type !== 'publicChat');
             }
         } catch (e) {
              console.error("Failed to parse latest activity from localStorage", e);
