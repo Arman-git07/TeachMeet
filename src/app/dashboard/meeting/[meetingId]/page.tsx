@@ -1,4 +1,4 @@
-
+// src/app/dashboard/meeting/[meetingId]/page.tsx
 "use client";
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
@@ -42,6 +42,7 @@ function MeetingPageContent() {
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
 
   const handleLeave = useCallback(async (endForAll = false) => {
@@ -160,6 +161,10 @@ function MeetingPageContent() {
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="rounded-xl w-56">
+            <DropdownMenuItem onSelect={() => setIsChatOpen(prev => !prev)} className="cursor-pointer">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              <span>Public Chat</span>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild className="cursor-pointer">
             <Link href={constructUrl('whiteboard')}>
                 <Brush className="mr-2 h-4 w-4" />
@@ -210,6 +215,8 @@ function MeetingPageContent() {
           onLeave={handleLeave}
           topic={topic}
           initialPinnedId={initialPinnedId}
+          isChatOpen={isChatOpen}
+          toggleChat={() => setIsChatOpen(prev => !prev)}
         >
           {null /* This allows MeetingClient to render its default layout */}
         </MeetingClient>

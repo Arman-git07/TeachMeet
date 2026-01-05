@@ -55,9 +55,11 @@ type Props = {
   topic: string;
   initialPinnedId?: string | null;
   children: React.ReactNode;
+  toggleChat: () => void;
+  isChatOpen: boolean;
 };
 
-export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId, children }: Props) {
+export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId, children, toggleChat, isChatOpen }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -97,7 +99,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
 
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [showChatNotification, setShowChatNotification] = useState(false);
   const chatNotificationTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -749,7 +750,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             exit={{ y: "-100%", opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md cursor-pointer"
-            onClick={() => setIsChatOpen(true)}
+            onClick={() => toggleChat()}
           >
             <div className="p-3 bg-background/80 backdrop-blur-sm rounded-xl shadow-lg border border-primary/30 flex items-center gap-3">
                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
@@ -798,7 +799,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           )}
           <MeetingChatPanel 
               isOpen={isChatOpen} 
-              onClose={() => setIsChatOpen(false)}
+              onClose={() => toggleChat()}
               meetingId={meetingId} 
               topic={topic}
               rtc={rtc}
@@ -811,7 +812,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         <div className="flex items-center justify-center gap-2 sm:gap-4">
             <Button onClick={toggleMic} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={() => toggleCamera()} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
-            <Button onClick={() => setIsChatOpen(prev => !prev)} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isChatOpen ? "bg-primary/80 text-primary-foreground hover:bg-primary" : "bg-secondary/50 hover:bg-secondary/70 text-foreground")} aria-label={isChatOpen ? "Close Chat" : "Open Chat"}><MessageSquare className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
             <Button onClick={handleShareClick} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-foreground")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <ScreenShare className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
             <AlertDialog>
