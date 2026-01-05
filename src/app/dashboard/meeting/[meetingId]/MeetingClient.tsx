@@ -21,6 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
 import { MeetingChatPanel, type ChatMessage } from "./chat/MeetingChatPanel";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 type Participant = {
