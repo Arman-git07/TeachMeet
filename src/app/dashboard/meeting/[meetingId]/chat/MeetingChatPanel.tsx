@@ -11,7 +11,18 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
-import type { ChatMessage } from "./page";
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  recipientId?: string;
+  text: string;
+  timestamp: Date;
+  isMe: boolean;
+  isPrivate: boolean;
+}
 
 interface MeetingChatPanelProps {
   isOpen: boolean;
@@ -34,7 +45,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue
   }, [chatHistory]);
   
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !user || !rtc) return;
+    if (!inputValue?.trim() || !user || !rtc) return;
     
     rtc.sendPublicMessage(inputValue);
     setInputValue("");
@@ -117,7 +128,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue
                         }}
                         disabled={!rtc}
                     />
-                    <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim() || !rtc}>
+                    <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue?.trim() || !rtc}>
                         <Send className="h-5 w-5" />
                         <span className="sr-only">Send message</span>
                     </Button>

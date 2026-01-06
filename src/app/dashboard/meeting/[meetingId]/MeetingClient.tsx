@@ -20,7 +20,8 @@ import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page'
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
-import { MeetingChatPanel, type ChatMessage } from "./chat/MeetingChatPanel";
+import { MeetingChatPanel } from "./chat/MeetingChatPanel";
+import type { ChatMessage } from "./chat/MeetingChatPanel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
@@ -104,6 +105,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const [showChatNotification, setShowChatNotification] = useState(false);
   const chatNotificationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageRef = useRef<ChatMessage | null>(null);
+  
+  const [chatInputValue, setChatInputValue] = useState("");
 
 
   const unlockAudio = useCallback(() => {
@@ -803,6 +806,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               onClose={() => toggleChat()}
               meetingId={meetingId} 
               topic={topic}
+              inputValue={chatInputValue}
+              setInputValue={setChatInputValue}
           />
       </main>
 
