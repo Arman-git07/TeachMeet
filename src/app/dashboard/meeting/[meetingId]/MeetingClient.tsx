@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
 import { MeetingChatPanel, type ChatMessage } from "./chat/MeetingChatPanel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
 
 type Participant = {
@@ -65,8 +66,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
+  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
   
-  const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   const [camOn, setCamOn] = useState(true);
@@ -100,7 +101,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
 
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [showChatNotification, setShowChatNotification] = useState(false);
   const chatNotificationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageRef = useRef<ChatMessage | null>(null);
@@ -143,7 +143,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       rtcInstance?.leave();
       setRtc(null);
     }
-  }, [meetingId, userId]);
+  }, [meetingId, userId, setRtc]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -360,7 +360,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setShowChatNotification(false);
       }, 5000); // Notification disappears after 5 seconds
     }
-  }, [isChatOpen]);
+  }, [isChatOpen, setChatHistory]);
 
   useEffect(() => {
     if (!rtc || rtc.hasRegisteredChatHandlers) return;
@@ -378,7 +378,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             isPrivate: false,
         }]);
     }
-  }, [rtc, handleNewMessage, chatHistory.length, topic]);
+  }, [rtc, handleNewMessage, chatHistory.length, topic, setChatHistory]);
 
   useEffect(() => {
     if (isChatOpen) {
@@ -803,9 +803,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               onClose={() => toggleChat()}
               meetingId={meetingId} 
               topic={topic}
-              rtc={rtc}
-              chatHistory={chatHistory}
-              setChatHistory={setChatHistory}
           />
       </main>
 

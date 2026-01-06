@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import type { MeshRTC } from "@/lib/webrtc/mesh";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
 export interface ChatMessage {
   id: string;
@@ -28,13 +28,11 @@ interface MeetingChatPanelProps {
   onClose: () => void;
   meetingId: string;
   topic: string;
-  rtc: MeshRTC | null;
-  chatHistory: ChatMessage[];
-  setChatHistory: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
-export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, rtc, chatHistory, setChatHistory }: MeetingChatPanelProps) {
+export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingChatPanelProps) {
   const { user } = useAuth();
+  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
   const [inputValue, setInputValue] = useState("");
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
