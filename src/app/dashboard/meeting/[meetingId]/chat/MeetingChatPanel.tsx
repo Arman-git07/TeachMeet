@@ -1,39 +1,30 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, MessageSquare, Users, Loader2, XCircle } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Send, Users, XCircle } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
-
-export interface ChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar?: string;
-  text: string;
-  timestamp: Date;
-  isMe: boolean;
-  isPrivate: boolean;
-  recipientId?: string;
-}
+import type { ChatMessage } from "./page";
 
 interface MeetingChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
   meetingId: string;
   topic: string;
+  inputValue: string;
+  setInputValue: (value: string) => void;
 }
 
-export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingChatPanelProps) {
+export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue, setInputValue }: MeetingChatPanelProps) {
   const { user } = useAuth();
-  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
-  const [inputValue, setInputValue] = useState("");
+  const { rtc, chatHistory } = useMeetingRTC();
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -51,7 +42,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
 
   return (
     <div className={cn(
-        "absolute top-0 right-0 h-full w-96 bg-background border-l transition-transform duration-300 ease-in-out z-20",
+        "absolute top-0 right-0 h-full w-96 bg-background border-l transition-transform duration-300 ease-in-out z-40",
         isOpen ? "translate-x-0" : "translate-x-full"
     )}>
         <div className="flex flex-col h-full">
