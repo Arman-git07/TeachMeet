@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -21,7 +22,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
 import { MeetingChatPanel } from "./chat/MeetingChatPanel";
-import type { ChatMessage } from "./chat/MeetingChatPanel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
@@ -67,7 +67,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
+  const { rtc, setRtc } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -101,13 +101,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
-
-  const [showChatNotification, setShowChatNotification] = useState(false);
-  const chatNotificationTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastMessageRef = useRef<ChatMessage | null>(null);
-  
-  const [chatInputValue, setChatInputValue] = useState("");
-
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -349,48 +342,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, [meetingId, userId, camOn, toast, toggleCamera]);
 
   useEffect(() => { if (localStream && rtc && user) { rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); } }, [rtc, localStream, user]);
-
-  const handleNewMessage = useCallback((message: ChatMessage) => {
-    setChatHistory(prev => [...prev, message]);
-    
-    if (chatNotificationTimerRef.current) {
-      clearTimeout(chatNotificationTimerRef.current);
-    }
-    if (!isChatOpen) {
-      lastMessageRef.current = message;
-      setShowChatNotification(true);
-      chatNotificationTimerRef.current = setTimeout(() => {
-        setShowChatNotification(false);
-      }, 5000); // Notification disappears after 5 seconds
-    }
-  }, [isChatOpen, setChatHistory]);
-
-  useEffect(() => {
-    if (!rtc || rtc.hasRegisteredChatHandlers) return;
-    
-    rtc.registerChatHandlers(handleNewMessage);
-
-    if (chatHistory.length === 0) {
-        setChatHistory([{ 
-            id: 'welcome', 
-            senderId: 'system',
-            senderName: 'System', 
-            text: `Welcome to the public chat for ${topic}.`, 
-            timestamp: new Date(), 
-            isMe: false,
-            isPrivate: false,
-        }]);
-    }
-  }, [rtc, handleNewMessage, chatHistory.length, topic, setChatHistory]);
-
-  useEffect(() => {
-    if (isChatOpen) {
-      setShowChatNotification(false);
-      if (chatNotificationTimerRef.current) {
-        clearTimeout(chatNotificationTimerRef.current);
-      }
-    }
-  }, [isChatOpen]);
 
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
@@ -746,31 +697,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1" onClick={unlockAudio}>
-      <AnimatePresence>
-        {showChatNotification && lastMessageRef.current && (
-          <motion.div
-            initial={{ y: "-100%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "-100%", opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md cursor-pointer"
-            onClick={() => toggleChat()}
-          >
-            <div className="p-3 bg-background/80 backdrop-blur-sm rounded-xl shadow-lg border border-primary/30 flex items-center gap-3">
-               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={lastMessageRef.current.senderAvatar} alt={lastMessageRef.current.senderName} />
-                    <AvatarFallback>{lastMessageRef.current.senderName.charAt(0)}</AvatarFallback>
-                  </Avatar>
-               </div>
-               <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">{lastMessageRef.current.senderName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{lastMessageRef.current.text}</p>
-               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} />
 
@@ -806,8 +732,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               onClose={() => toggleChat()}
               meetingId={meetingId} 
               topic={topic}
-              inputValue={chatInputValue}
-              setInputValue={setChatInputValue}
           />
       </main>
 
