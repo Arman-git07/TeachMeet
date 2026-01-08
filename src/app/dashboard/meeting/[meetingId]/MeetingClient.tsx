@@ -741,6 +741,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               topic={topic}
               inputValue={chatInputValue}
               setInputValue={setChatInputValue}
+              chatHistory={chatHistory}
           />
       </main>
 

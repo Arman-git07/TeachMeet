@@ -31,11 +31,12 @@ interface MeetingChatPanelProps {
   topic: string;
   inputValue: string;
   setInputValue: (value: string) => void;
+  chatHistory: ChatMessage[];
 }
 
-export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue, setInputValue }: MeetingChatPanelProps) {
+export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue, setInputValue, chatHistory }: MeetingChatPanelProps) {
   const { user } = useAuth();
-  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
+  const { rtc, setChatHistory } = useMeetingRTC();
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
