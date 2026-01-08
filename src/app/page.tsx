@@ -13,7 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import type { PublicChatActivityItem } from '@/app/dashboard/meeting/[meetingId]/chat/page';
 
-export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement' | 'publicChat';
+export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement';
 
 interface BaseActivityItem {
   id: string;
@@ -48,7 +48,7 @@ export interface AnnouncementActivityItem extends BaseActivityItem {
     classroomId: string;
 }
 
-export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem | PublicChatActivityItem;
+export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem;
 
 
 const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
@@ -62,7 +62,6 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   recording: Clapperboard,
   chatMention: AtSign,
   announcement: Megaphone,
-  publicChat: Megaphone, // Re-using icon for now
 };
 
 // Updated itemLinks to handle meeting re-join logic
@@ -72,7 +71,6 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   recording: (id) => `/dashboard/recordings`,
   chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
   announcement: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
-  publicChat: (id, item) => `/dashboard/meeting/${item.meetingId}/chat?topic=${encodeURIComponent(item.meetingTopic)}`,
 };
 
 export default function HomePage() {
@@ -261,7 +259,6 @@ export default function HomePage() {
       case 'recording': return `New Recording: ${item.title}`;
       case 'chatMention': return `${(item as ChatMentionActivityItem).mentionedBy} mentioned you: "${item.title}"`;
       case 'announcement': return `New in Classroom: ${item.title}`;
-      case 'publicChat': return `New message in "${(item as PublicChatActivityItem).meetingTopic}"`;
       default: return item.title;
     }
   };
@@ -388,5 +385,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

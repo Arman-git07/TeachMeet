@@ -21,7 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ShareOptionsPanel } from "@/components/common/ShareOptionsPanel";
 import { v4 as uuidv4 } from 'uuid';
 
-const STARTED_MEETINGS_KEY = 'teachmeet-started-meetings';
+const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
 
@@ -79,6 +79,7 @@ export function StartMeetingDialogContent() {
       }, { merge: true });
   
       // 2. Save meeting to localStorage (CRITICAL STEP)
+      const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
       const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
       let meetings = storedMeetingsRaw ? JSON.parse(storedMeetingsRaw) : [];
       if (!Array.isArray(meetings)) meetings = [];
