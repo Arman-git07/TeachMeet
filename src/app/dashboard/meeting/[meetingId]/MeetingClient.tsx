@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -6,7 +5,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
-import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Pin, MessageSquare, Minimize2, Maximize2, XCircle } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Pin, MessageSquare, Minimize2, Maximize2, XCircle, AlertTriangle } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
@@ -103,6 +102,16 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const audioUnlockedRef = useRef(false);
 
   const [chatInputValue, setChatInputValue] = useState('');
+  const [showNewMessageNotification, setShowNewMessageNotification] = useState(false);
+
+  useEffect(() => {
+    if (chatHistory.length > 0 && !isChatOpen) {
+      const lastMessage = chatHistory[chatHistory.length - 1];
+      if (!lastMessage.isMe && lastMessage.senderName !== 'System') {
+          setShowNewMessageNotification(true);
+      }
+    }
+  }, [chatHistory, isChatOpen]);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -737,6 +746,20 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               </>
             )}
           </div>
+          {showNewMessageNotification && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
+              <Button
+                onClick={() => {
+                  toggleChat();
+                  setShowNewMessageNotification(false);
+                }}
+                className="btn-gel rounded-full animate-fade-in"
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                New Message
+              </Button>
+            </div>
+          )}
           {isSharingScreen && (
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center justify-center pointer-events-none">
               <div className="bg-background/80 backdrop-blur-sm rounded-2xl p-4 flex flex-col items-center gap-3 pointer-events-auto">

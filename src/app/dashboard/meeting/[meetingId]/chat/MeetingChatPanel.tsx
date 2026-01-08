@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -32,11 +31,12 @@ interface MeetingChatPanelProps {
   inputValue: string;
   setInputValue: (value: string) => void;
   chatHistory: ChatMessage[];
+  setChatHistory: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
-export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue, setInputValue, chatHistory }: MeetingChatPanelProps) {
+export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue, setInputValue, chatHistory, setChatHistory }: MeetingChatPanelProps) {
   const { user } = useAuth();
-  const { rtc, setChatHistory } = useMeetingRTC();
+  const { rtc } = useMeetingRTC();
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -65,10 +65,18 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue
   const handleSendMessage = () => {
     if (!inputValue.trim() || !user || !rtc) return;
     
-    // Use the RTC layer to send the message
+    const localMessage: ChatMessage = {
+      id: `${Date.now()}`,
+      senderId: user.uid,
+      senderName: user.displayName || 'You',
+      senderAvatar: user.photoURL || undefined,
+      text: inputValue,
+      timestamp: new Date(),
+      isMe: true,
+      isPrivate: false
+    };
+    setChatHistory(prev => [...prev, localMessage]);
     rtc.sendPublicMessage(inputValue);
-
-    // Clear the input field locally
     setInputValue("");
   };
 
