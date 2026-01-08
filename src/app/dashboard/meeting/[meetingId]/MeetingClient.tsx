@@ -21,7 +21,7 @@ import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page'
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
-import { MeetingChatPanel } from "./chat/MeetingChatPanel";
+import { MeetingChatPanel, type ChatMessage } from "./chat/MeetingChatPanel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
@@ -67,7 +67,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc } = useMeetingRTC();
+  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -102,6 +102,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
 
+  const [chatInputValue, setChatInputValue] = useState('');
+
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
     const context = audioContextRef.current;
@@ -133,13 +135,18 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setPinnedId(prev => prev === socketId ? null : prev);
       },
     });
+
+    rtcInstance.registerChatHandlers((message: ChatMessage) => {
+        setChatHistory(prev => [...prev, message]);
+    });
+
     setRtc(rtcInstance);
 
     return () => {
       rtcInstance?.leave();
       setRtc(null);
     }
-  }, [meetingId, userId, setRtc]);
+  }, [meetingId, userId, setRtc, setChatHistory]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -732,6 +739,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               onClose={() => toggleChat()}
               meetingId={meetingId} 
               topic={topic}
+              inputValue={chatInputValue}
+              setInputValue={setChatInputValue}
           />
       </main>
 

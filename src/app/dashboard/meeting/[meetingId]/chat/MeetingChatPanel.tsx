@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
 export interface ChatMessage {
   id: string;
@@ -28,18 +29,19 @@ interface MeetingChatPanelProps {
   onClose: () => void;
   meetingId: string;
   topic: string;
+  inputValue: string;
+  setInputValue: (value: string) => void;
 }
 
-export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingChatPanelProps) {
+export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue, setInputValue }: MeetingChatPanelProps) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState("");
+  const { rtc, chatHistory, setChatHistory } = useMeetingRTC();
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    // Add a welcome message when the panel is opened
-    if (isOpen && messages.length === 0) {
-      setMessages([
+    // Add a welcome message when the panel is opened and chat history is empty
+    if (isOpen && chatHistory.length === 0) {
+      setChatHistory([
         {
           id: 'welcome',
           senderId: 'system',
@@ -51,36 +53,27 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
         }
       ]);
     }
-  }, [isOpen, topic, messages.length]);
+  }, [isOpen, topic, chatHistory.length, setChatHistory]);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
         scrollViewportRef.current.scrollTo({ top: scrollViewportRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [chatHistory]);
   
   const handleSendMessage = () => {
-    if (!inputValue.trim() || !user) return;
+    if (!inputValue.trim() || !user || !rtc) return;
     
-    // This is now a local simulation. It adds the message to the local state.
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      senderId: user.uid,
-      senderName: user.displayName || 'You',
-      senderAvatar: user.photoURL || undefined,
-      text: inputValue,
-      timestamp: new Date(),
-      isMe: true,
-      isPrivate: false,
-    };
+    // Use the RTC layer to send the message
+    rtc.sendPublicMessage(inputValue);
 
-    setMessages(prev => [...prev, newMessage]);
+    // Clear the input field locally
     setInputValue("");
   };
 
   return (
     <div className={cn(
-        "absolute top-0 right-0 h-full w-96 bg-background border-l transition-transform duration-300 ease-in-out z-40",
+        "absolute top-0 right-0 h-full w-96 bg-background border-l transition-transform duration-300 ease-in-out z-50",
         isOpen ? "translate-x-0" : "translate-x-full"
     )}>
         <div className="flex flex-col h-full">
@@ -103,7 +96,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
                 <CardContent className="flex-grow p-0 overflow-hidden">
                     <ScrollArea className="h-full">
                         <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
-                        {messages.map((msg) => (
+                        {chatHistory.map((msg) => (
                             <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
                             {!msg.isMe && (
                                 <Avatar className="h-8 w-8 self-start">
@@ -153,8 +146,9 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
                             handleSendMessage();
                         }
                         }}
+                        disabled={!rtc}
                     />
-                    <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim()}>
+                    <Button type="submit" size="icon" className="rounded-lg btn-gel w-10 h-10" disabled={!inputValue.trim() || !rtc}>
                         <Send className="h-5 w-5" />
                         <span className="sr-only">Send message</span>
                     </Button>
@@ -162,9 +156,6 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
                 </CardFooter>
                 </Card>
             </main>
-            <footer className="flex-none p-2 text-center text-xs text-muted-foreground border-t bg-background">
-                Chat is now local only. Messages are not sent.
-            </footer>
         </div>
     </div>
   );

@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import type { MeshRTC } from '@/lib/webrtc/mesh';
-import type { ChatMessage } from '@/app/dashboard/meeting/[meetingId]/chat/page';
+import type { ChatMessage } from '@/app/dashboard/meeting/[meetingId]/chat/MeetingChatPanel';
 
 interface MeetingRTCContextType {
   rtc: MeshRTC | null;
