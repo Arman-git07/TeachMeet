@@ -115,6 +115,27 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   }, []);
 
+  const handleRemoteLeft = useCallback((remoteUserId: string) => {
+    setRemoteStreams(prev => {
+      const next = new Map(prev);
+      next.delete(remoteUserId);
+      return next;
+    });
+    
+    // Also remove from live participants to update UI immediately
+    setLiveParticipants(prev => {
+        const next = new Map(prev);
+        next.delete(remoteUserId);
+        return next;
+    });
+
+    const entry = remoteAnalysersRef.current.get(remoteUserId);
+    if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
+    remoteAnalysersRef.current.delete(remoteUserId);
+    setVolumeLevels(prev => { const next = new Map(prev); next.delete(remoteUserId); return next; });
+    setPinnedId(prev => prev === remoteUserId ? null : prev);
+  }, []);
+
   useEffect(() => {
     const rtcInstance = new MeshRTC({
       roomId: meetingId,
@@ -126,14 +147,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           return next;
         });
       },
-      onRemoteLeft: (socketId) => {
-        setRemoteStreams(prev => { const next = new Map(prev); next.delete(socketId); return next; });
-        const entry = remoteAnalysersRef.current.get(socketId);
-        if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
-        remoteAnalysersRef.current.delete(socketId);
-        setVolumeLevels(prev => { const next = new Map(prev); next.delete(socketId); return next; });
-        setPinnedId(prev => prev === socketId ? null : prev);
-      },
+      onRemoteLeft: handleRemoteLeft,
     });
 
     rtcInstance.registerChatHandlers((message: ChatMessage) => {
@@ -146,7 +160,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       rtcInstance?.leave();
       setRtc(null);
     }
-  }, [meetingId, userId, setRtc, setChatHistory]);
+  }, [meetingId, userId, setRtc, setChatHistory, handleRemoteLeft]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -742,6 +756,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               inputValue={chatInputValue}
               setInputValue={setChatInputValue}
               chatHistory={chatHistory}
+              setChatHistory={setChatHistory}
           />
       </main>
 

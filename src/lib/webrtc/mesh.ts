@@ -49,7 +49,7 @@ export class MeshRTC {
     this.socket = io({
       path: "/api/socketio",
       transports: ["websocket", "polling"],
-      query: { userId: this.userId } // Pass userId for identification
+      query: { userId: this.userId, roomId: this.roomId }
     });
 
     this.registerSocketEvents();
@@ -118,7 +118,7 @@ export class MeshRTC {
   private registerSocketEvents() {
     this.socket.on("connect", () => { 
         this.socketId = this.socket.id; 
-        this.socket.emit("join-room", this.roomId, this.socket.id);
+        this.socket.emit("join-room", this.roomId, this.userId);
     });
 
     this.socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe'>) => {
@@ -199,7 +199,7 @@ export class MeshRTC {
   }
 
   private async _handleUserJoined(remoteId: string) {
-    if (!remoteId || remoteId === this.socket?.id || this.peers.has(remoteId)) return;
+    if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
 
     const entry = this.createPeerEntry(remoteId, true);
     this.peers.set(remoteId, entry);
