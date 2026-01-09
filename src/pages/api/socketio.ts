@@ -54,11 +54,9 @@ export default function handler(
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
-      socket.on("public-chat-message", (roomId, message: Omit<ChatMessage, 'isMe'>) => {
-        // Broadcast to everyone in the room, including the sender for consistency if needed,
-        // but client-side optimistic UI usually handles the sender's view.
-        // We broadcast to all and let client dedupe.
-        io.to(roomId).emit("new-public-message", message);
+      socket.on("public-chat-message", (roomId, message: ChatMessage) => {
+        // Broadcast to everyone in the room except the sender
+        socket.to(roomId).emit("new-public-message", message);
       });
       
 

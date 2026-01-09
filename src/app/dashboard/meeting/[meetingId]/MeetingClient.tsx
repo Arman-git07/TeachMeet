@@ -67,7 +67,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc, chatHistory, addChatMessage, setChatHistory } = useMeetingRTC();
+  const { rtc, setRtc, chatHistory, addChatMessage } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -102,14 +102,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
 
-  const [chatInputValue, setChatInputValue] = useState('');
   const [showNewMessageNotification, setShowNewMessageNotification] = useState(false);
 
   useEffect(() => {
     if (chatHistory.length > 0 && !isChatOpen) {
-      const lastMessage = chatHistory[chatHistory.length - 1] as ChatMessage;
+      const lastMessage = chatHistory[chatHistory.length - 1];
       // Check if last message is not from current user and not a system message
-      if (lastMessage.senderId !== user?.uid && lastMessage.senderName !== 'System') {
+      if (lastMessage.senderId !== user?.uid && lastMessage.senderId !== 'system') {
           setShowNewMessageNotification(true);
       }
     }

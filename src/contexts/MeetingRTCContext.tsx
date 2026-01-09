@@ -3,7 +3,6 @@
 
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import type { MeshRTC } from '@/lib/webrtc/mesh';
-import { v4 as uuidv4 } from 'uuid';
 
 // This is the shape of the message object for the chat.
 // It will be used consistently across the application.
@@ -15,7 +14,6 @@ export interface ChatMessage {
   recipientId?: string; // For private messages
   text: string;
   timestamp: number; // Using number (Date.now()) for simplicity
-  isMe?: boolean; // This is a client-side flag, not part of the network payload
   isPrivate: boolean;
 }
 
@@ -23,7 +21,7 @@ interface MeetingRTCContextType {
   rtc: MeshRTC | null;
   setRtc: (rtc: MeshRTC | null) => void;
   chatHistory: ChatMessage[];
-  addChatMessage: (msg: Omit<ChatMessage, 'isMe'>) => void;
+  addChatMessage: (msg: ChatMessage) => void;
   setChatHistory: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
@@ -38,7 +36,7 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
    * This is used by both the sender (for optimistic UI) and the receiver.
    * It prevents duplicate messages, which is crucial in a mesh network where a message might be received more than once.
    */
-  const addChatMessage = useCallback((msg: Omit<ChatMessage, 'isMe'>) => {
+  const addChatMessage = useCallback((msg: ChatMessage) => {
     setChatHistory(prev => {
       // Prevent duplicates by checking message ID
       if (prev.some(m => m.id === msg.id)) {

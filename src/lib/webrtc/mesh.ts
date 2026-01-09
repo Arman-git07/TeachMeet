@@ -27,7 +27,7 @@ export class MeshRTC {
 
   // Chat related properties
   public hasRegisteredChatHandlers = false;
-  private onNewPublicMessageCallback: ((message: Omit<ChatMessage, 'isMe'>) => void) | null = null;
+  private onNewPublicMessageCallback: ((message: ChatMessage) => void) | null = null;
 
   constructor(opts: {
     roomId: string;
@@ -50,12 +50,12 @@ export class MeshRTC {
     try { (window as any).__mesh = this; console.log("[mesh] exported instance to window.__mesh"); } catch {}
   }
 
-  public registerChatHandlers(onNewMessage: (message: Omit<ChatMessage, 'isMe'>) => void) {
+  public registerChatHandlers(onNewMessage: (message: ChatMessage) => void) {
       this.onNewPublicMessageCallback = onNewMessage;
       this.hasRegisteredChatHandlers = true;
   }
   
-  public sendPublicMessage(message: Omit<ChatMessage, 'isMe'>) {
+  public sendPublicMessage(message: ChatMessage) {
     if (!this.socket.connected || !message.text.trim()) return;
     this.socket.emit("public-chat-message", this.roomId, message);
   }
@@ -80,7 +80,7 @@ export class MeshRTC {
         this.socket.emit("join-room", this.roomId, this.userId);
     });
 
-    this.socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe'>) => {
+    this.socket.on("new-public-message", (message: ChatMessage) => {
         if (this.onNewPublicMessageCallback && message.senderId !== this.userId) {
             this.onNewPublicMessageCallback(message);
         }

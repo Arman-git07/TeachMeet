@@ -28,7 +28,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
   
   useEffect(() => {
     // Add a welcome message when the panel is opened and chat history is empty
-    if (isOpen && chatHistory.length === 0) {
+    if (isOpen && !chatHistory.some(m => m.id === 'welcome')) {
       addChatMessage({
           id: 'welcome',
           senderId: 'system',
@@ -38,7 +38,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
           isPrivate: false,
         });
     }
-  }, [isOpen, topic, chatHistory.length, addChatMessage]);
+  }, [isOpen, topic, chatHistory, addChatMessage]);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -95,7 +95,7 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
                         <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
                         {chatHistory.map((msg) => (
                             <div key={msg.id} className={cn("flex items-end gap-2", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
-                            {msg.senderId !== user?.uid && (
+                            {msg.senderId !== user?.uid && msg.senderId !== 'system' && (
                                 <Avatar className="h-8 w-8 self-start">
                                 <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
                                 <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
@@ -104,13 +104,13 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingC
                             <div
                                 className={cn(
                                 "max-w-[85%] p-3 rounded-xl shadow",
-                                msg.senderName === 'System' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
+                                msg.senderId === 'system' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
                                 msg.senderId === user?.uid ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
                                 )}
                             >
-                                {msg.senderId !== user?.uid && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                                {msg.senderId !== user?.uid && msg.senderId !== 'system' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
                                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                {msg.senderName !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                                {msg.senderId !== 'system' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                             </div>
                             {msg.senderId === user?.uid && (
                                 <Avatar className="h-8 w-8 self-start">
