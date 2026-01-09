@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -10,51 +11,34 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
-
-export interface ChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar?: string;
-  recipientId?: string;
-  text: string;
-  timestamp: Date;
-  isMe: boolean;
-  isPrivate: boolean;
-}
+import { v4 as uuidv4 } from 'uuid';
 
 interface MeetingChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
   meetingId: string;
   topic: string;
-  inputValue: string;
-  setInputValue: (value: string) => void;
-  chatHistory: ChatMessage[];
-  setChatHistory: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
-export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue, setInputValue, chatHistory, setChatHistory }: MeetingChatPanelProps) {
+export function MeetingChatPanel({ isOpen, onClose, meetingId, topic }: MeetingChatPanelProps) {
   const { user } = useAuth();
-  const { rtc } = useMeetingRTC();
+  const { rtc, chatHistory, addChatMessage } = useMeetingRTC();
+  const [inputValue, setInputValue] = useState('');
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     // Add a welcome message when the panel is opened and chat history is empty
     if (isOpen && chatHistory.length === 0) {
-      setChatHistory([
-        {
+      addChatMessage({
           id: 'welcome',
           senderId: 'system',
           senderName: 'System',
           text: `Welcome to the public chat for ${topic}.`,
-          timestamp: new Date(),
-          isMe: false,
+          timestamp: Date.now(),
           isPrivate: false,
-        }
-      ]);
+        });
     }
-  }, [isOpen, topic, chatHistory.length, setChatHistory]);
+  }, [isOpen, topic, chatHistory.length, addChatMessage]);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -65,18 +49,22 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue
   const handleSendMessage = () => {
     if (!inputValue.trim() || !user || !rtc) return;
     
-    const localMessage: ChatMessage = {
-      id: `${Date.now()}`,
+    const message = {
+      id: uuidv4(),
       senderId: user.uid,
       senderName: user.displayName || 'You',
       senderAvatar: user.photoURL || undefined,
       text: inputValue,
-      timestamp: new Date(),
-      isMe: true,
+      timestamp: Date.now(),
       isPrivate: false
     };
-    setChatHistory(prev => [...prev, localMessage]);
-    rtc.sendPublicMessage(inputValue);
+
+    // 1. Optimistically update the UI by adding to the central state
+    addChatMessage(message);
+    
+    // 2. Broadcast the message over the network
+    rtc.sendPublicMessage(message);
+
     setInputValue("");
   };
 
@@ -106,8 +94,8 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue
                     <ScrollArea className="h-full">
                         <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
                         {chatHistory.map((msg) => (
-                            <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
-                            {!msg.isMe && (
+                            <div key={msg.id} className={cn("flex items-end gap-2", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
+                            {msg.senderId !== user?.uid && (
                                 <Avatar className="h-8 w-8 self-start">
                                 <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
                                 <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
@@ -117,14 +105,14 @@ export function MeetingChatPanel({ isOpen, onClose, meetingId, topic, inputValue
                                 className={cn(
                                 "max-w-[85%] p-3 rounded-xl shadow",
                                 msg.senderName === 'System' ? 'bg-muted text-muted-foreground text-center text-xs w-full' : 
-                                msg.isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
+                                msg.senderId === user?.uid ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none"
                                 )}
                             >
-                                {!msg.isMe && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                                {msg.senderId !== user?.uid && msg.senderName !== 'System' && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
                                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                                 {msg.senderName !== 'System' && <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                             </div>
-                            {msg.isMe && (
+                            {msg.senderId === user?.uid && (
                                 <Avatar className="h-8 w-8 self-start">
                                 <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'You'} data-ai-hint="avatar user"/>
                                 <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>

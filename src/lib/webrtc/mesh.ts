@@ -2,7 +2,7 @@
 "use client";
 
 import { io, Socket } from "socket.io-client";
-import type { ChatMessage } from "@/app/dashboard/meeting/[meetingId]/chat/MeetingChatPanel";
+import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
 type PeerEntry = {
   pc: RTCPeerConnection;
@@ -27,10 +27,7 @@ export class MeshRTC {
 
   // Chat related properties
   public hasRegisteredChatHandlers = false;
-  private onNewPublicMessageCallback: ((message: ChatMessage) => void) | null = null;
-  private onNewPrivateMessageCallback: ((message: ChatMessage) => void) | null = null;
-  private userDisplayName: string;
-  private userPhotoURL?: string;
+  private onNewPublicMessageCallback: ((message: Omit<ChatMessage, 'isMe'>) => void) | null = null;
 
   constructor(opts: {
     roomId: string;
@@ -42,9 +39,6 @@ export class MeshRTC {
     this.userId = opts.userId;
     this.onRemoteStream = opts.onRemoteStream;
     this.onRemoteLeft = opts.onRemoteLeft;
-
-    // These need to be set from useAuth, passed into constructor
-    this.userDisplayName = "User"; // Placeholder
     
     this.socket = io({
       path: "/api/socketio",
@@ -56,53 +50,18 @@ export class MeshRTC {
     try { (window as any).__mesh = this; console.log("[mesh] exported instance to window.__mesh"); } catch {}
   }
 
-  public registerChatHandlers(onNewMessage: (message: ChatMessage) => void) {
+  public registerChatHandlers(onNewMessage: (message: Omit<ChatMessage, 'isMe'>) => void) {
       this.onNewPublicMessageCallback = onNewMessage;
-      this.onNewPrivateMessageCallback = onNewMessage;
       this.hasRegisteredChatHandlers = true;
   }
   
-  public sendPublicMessage(text: string) {
-    if (!this.socket.connected || !text.trim()) return;
-
-    const message: Omit<ChatMessage, 'isMe'> = {
-      id: `${this.socket.id}-${Date.now()}`,
-      senderId: this.userId,
-      senderName: this.userDisplayName,
-      senderAvatar: this.userPhotoURL,
-      text: text,
-      timestamp: new Date(),
-      isPrivate: false,
-    };
+  public sendPublicMessage(message: Omit<ChatMessage, 'isMe'>) {
+    if (!this.socket.connected || !message.text.trim()) return;
     this.socket.emit("public-chat-message", this.roomId, message);
-    if(this.onNewPublicMessageCallback) {
-        this.onNewPublicMessageCallback({ ...message, isMe: true });
-    }
-  }
-
-  public sendPrivateMessage(recipientId: string, text: string) {
-    if (!this.socket.connected || !text.trim()) return;
-
-    const message: Omit<ChatMessage, 'isMe'> = {
-      id: `${this.socket.id}-${Date.now()}`,
-      senderId: this.userId,
-      senderName: this.userDisplayName,
-      senderAvatar: this.userPhotoURL,
-      recipientId: recipientId,
-      text: text,
-      timestamp: new Date(),
-      isPrivate: true,
-    };
-    this.socket.emit("private-chat-message", this.roomId, message);
-     if(this.onNewPrivateMessageCallback) {
-        this.onNewPrivateMessageCallback({ ...message, isMe: true });
-    }
   }
   
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
-    this.userDisplayName = displayName;
-    this.userPhotoURL = photoURL;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
     
     this._ready = true;
@@ -123,13 +82,7 @@ export class MeshRTC {
 
     this.socket.on("new-public-message", (message: Omit<ChatMessage, 'isMe'>) => {
         if (this.onNewPublicMessageCallback && message.senderId !== this.userId) {
-            this.onNewPublicMessageCallback({ ...message, isMe: false });
-        }
-    });
-
-    this.socket.on("new-private-message", (message: Omit<ChatMessage, 'isMe'>) => {
-        if (this.onNewPrivateMessageCallback) {
-            this.onNewPrivateMessageCallback({ ...message, isMe: false });
+            this.onNewPublicMessageCallback(message);
         }
     });
 

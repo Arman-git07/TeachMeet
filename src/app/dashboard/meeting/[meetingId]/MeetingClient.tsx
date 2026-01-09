@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -20,9 +21,9 @@ import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page'
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
-import { MeetingChatPanel, type ChatMessage } from "./chat/MeetingChatPanel";
+import { MeetingChatPanel } from "./chat/MeetingChatPanel";
+import { useMeetingRTC, type ChatMessage } from "@/contexts/MeetingRTCContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
 
 type Participant = {
@@ -66,7 +67,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc, chatHistory, setChatHistory } = useMeetingRTC();
+  const { rtc, setRtc, chatHistory, addChatMessage, setChatHistory } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -106,12 +107,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   useEffect(() => {
     if (chatHistory.length > 0 && !isChatOpen) {
-      const lastMessage = chatHistory[chatHistory.length - 1];
-      if (!lastMessage.isMe && lastMessage.senderName !== 'System') {
+      const lastMessage = chatHistory[chatHistory.length - 1] as ChatMessage;
+      // Check if last message is not from current user and not a system message
+      if (lastMessage.senderId !== user?.uid && lastMessage.senderName !== 'System') {
           setShowNewMessageNotification(true);
       }
     }
-  }, [chatHistory, isChatOpen]);
+  }, [chatHistory, isChatOpen, user?.uid]);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -159,8 +161,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteLeft: handleRemoteLeft,
     });
 
-    rtcInstance.registerChatHandlers((message: ChatMessage) => {
-        setChatHistory(prev => [...prev, message]);
+    // Correctly register the chat handler to use the centralized state
+    rtcInstance.registerChatHandlers((message) => {
+      addChatMessage(message);
     });
 
     setRtc(rtcInstance);
@@ -169,7 +172,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       rtcInstance?.leave();
       setRtc(null);
     }
-  }, [meetingId, userId, setRtc, setChatHistory, handleRemoteLeft]);
+  }, [meetingId, userId, setRtc, handleRemoteLeft, addChatMessage]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -776,10 +779,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               onClose={() => toggleChat()}
               meetingId={meetingId} 
               topic={topic}
-              inputValue={chatInputValue}
-              setInputValue={setChatInputValue}
-              chatHistory={chatHistory}
-              setChatHistory={setChatHistory}
           />
       </main>
 

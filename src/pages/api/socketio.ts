@@ -2,6 +2,7 @@
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer, Socket } from "socket.io";
+import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
 // A simple in-memory store for block relationships within a room.
 // In a production app, this should be moved to a more persistent store like Redis.
@@ -53,27 +54,13 @@ export default function handler(
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
-      socket.on("public-chat-message", (roomId, message) => {
+      socket.on("public-chat-message", (roomId, message: Omit<ChatMessage, 'isMe'>) => {
+        // Broadcast to everyone in the room, including the sender for consistency if needed,
+        // but client-side optimistic UI usually handles the sender's view.
+        // We broadcast to all and let client dedupe.
         io.to(roomId).emit("new-public-message", message);
       });
       
-      socket.on("private-chat-message", (roomId, message) => {
-        const { senderId, recipientId } = message;
-        const roomBlockMap = roomBlocks.get(roomId);
-
-        // Check if recipient has blocked sender OR sender has blocked recipient
-        const isBlocked = roomBlockMap?.get(recipientId)?.has(senderId) || roomBlockMap?.get(senderId)?.has(recipientId);
-
-        if (isBlocked) {
-            socket.emit('message-blocked', { recipientId });
-            return;
-        }
-
-        const recipientSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === recipientId);
-        if (recipientSocket) {
-            recipientSocket.emit("new-private-message", message);
-        }
-      });
 
       socket.on('block-user', ({ blockedUserId }: { blockedUserId: string }) => {
           const { userId: blockerId, roomId } = socket.data as { userId: string, roomId: string };
@@ -128,15 +115,25 @@ export default function handler(
       });
 
       socket.on("offer", (remoteId: string, offer: any) => {
-        io.to(remoteId).emit("offer", socket.id, offer);
+        // Find the specific socket for the user ID and emit to it
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        if (targetSocket) {
+          targetSocket.emit("offer", socket.data.userId, offer);
+        }
       });
       
       socket.on("answer", (remoteId: string, answer: any) => {
-        io.to(remoteId).emit("answer", socket.id, answer);
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        if (targetSocket) {
+          targetSocket.emit("answer", socket.data.userId, answer);
+        }
       });
 
       socket.on("ice-candidate", (remoteId: string, candidate: any) => {
-        io.to(remoteId).emit("ice-candidate", socket.id, candidate);
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        if (targetSocket) {
+          targetSocket.emit("ice-candidate", socket.data.userId, candidate);
+        }
       });
 
       socket.on("disconnect", () => {
