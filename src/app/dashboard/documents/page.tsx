@@ -1,4 +1,3 @@
-
 'use client';
 import { DocumentsClientUI } from '@/components/dashboard/DocumentsClientUI';
 
