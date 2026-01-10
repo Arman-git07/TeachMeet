@@ -105,7 +105,7 @@ export function FeesAndPayment() {
                 </CardHeader>
                 <CardContent className="text-center">
                     <p className="text-muted-foreground">Total Amount Due</p>
-                    <div className="flex justify-center items-center gap-2">{currencySymbols[classroom.feeCurrency || 'INR']}<p className="font-bold text-3xl">{classroom.feeAmount?.toLocaleString() || '0.00'}</p><Badge>{classroom.feeCurrency || 'INR'}</Badge></div>
+                    <div className="flex justify-center items-center gap-2">{currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || 'INR'}<p className="font-bold text-3xl">{classroom.feeAmount?.toLocaleString() || '0.00'}</p><Badge>{classroom.feeCurrency || 'INR'}</Badge></div>
                     <Dialog>
                         <DialogTrigger asChild><Button className="w-full btn-gel mt-4" disabled={!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl}>Pay Now</Button></DialogTrigger>
                         <DialogContent className="sm:max-w-xs">
