@@ -132,7 +132,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       return next;
     });
     
-    // Also remove from live participants to update UI immediately
     setLiveParticipants(prev => {
         const next = new Map(prev);
         next.delete(remoteUserId);
@@ -434,7 +433,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           ent.analyser.getByteFrequencyData(ent.dataArray);
           let sum = 0;
           for (let i = 0; i < ent.dataArray.length; i++) sum += ent.dataArray[i];
-          const avg = sum / ent.dataArray.length;
+          const avg = sum / dataArray.length;
           if (time - lastRemoteUpdateRef.current > 150) {
             setVolumeLevels(prev => { const next = new Map(prev); next.set(id, Math.min(1, avg / 255)); return next; });
             lastRemoteUpdateRef.current = time;
