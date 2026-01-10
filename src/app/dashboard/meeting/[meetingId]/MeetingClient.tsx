@@ -150,10 +150,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const rtcInstance = new MeshRTC({
       roomId: meetingId,
       userId,
-      onRemoteStream: (remoteSocketId, stream) => {
+      onRemoteStream: (remoteUserId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          next.set(remoteSocketId, stream);
+          next.set(remoteUserId, stream);
           return next;
         });
       },
