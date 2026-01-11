@@ -1,4 +1,3 @@
-
 /**
  * @description This ruleset enforces a strict authorization model for meetings, join requests, and participants.
  *   It prioritizes security by ensuring only the host can manage a meeting and only authenticated users can request to join.
@@ -38,31 +37,29 @@ service cloud.firestore {
      * @allow (create) - Authenticated user can create a join request with userId matching request.auth.uid.
      * @allow (get, list) - Only the host of the meeting can list join requests.
      * @allow (update) - Authenticated users can update their own request (to re-request) OR host can update anyone's (to approve/deny).
-     * @allow (delete) - Only the host of the meeting can delete join requests.
+     * @allow (delete) - The host can delete any request, or a user can delete their own (cancel).
      * @deny (create) - Non-authenticated user or mismatched userId cannot create a join request.
      * @deny (update, delete) - Non-host/non-owner user cannot update or delete join requests.
-     * @principle Enforces meeting host control over join requests while allowing users to re-submit.
+     * @principle Enforces meeting host control over join requests while allowing users to manage their own requests.
      */
     match /meetings/{meetingId}/joinRequests/{requestId} {
       allow get, list: if isSignedIn() && isOwner(meetingId, request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // Host can update any request. User can update their own request.
       allow update: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
-      allow delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
+      // Host can delete any request. User can delete their own request to cancel it.
+      allow delete: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || resource.data.userId == request.auth.uid);
     }
-
+    
     /**
      * @description Controls access to the participants subcollection for a specific meeting.
      * @path /meetings/{meetingId}/participants/{userId}
-     * @allow (create) - Only the host of the meeting can add participants.
-     * @allow (get, list) - Only the host of the meeting can read participants.
-     * @allow (update, delete) - Only the host of the meeting can update/delete participants.
-     * @deny (create) - Non-host user cannot add participants.
-     * @deny (update, delete) - Non-host user cannot update/delete participants.
-     * @principle Enforces meeting host control over participants.
+     * @allow (create, update, delete) - Only the host of the meeting can manage participants.
+     * @allow (get, list) - Anyone can read the list of participants in a meeting.
+     * @principle Enforces meeting host control over writes, but allows public reads for participant lists.
      */
     match /meetings/{meetingId}/participants/{userId} {
-      allow get, list: if true; // Allow anyone to read participant list
+      allow get, list: if true;
       allow create, update, delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
     }
 
@@ -81,5 +78,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
