@@ -48,7 +48,7 @@ service cloud.firestore {
       // Host can update any request. User can update their own request.
       allow update: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
       // Host can delete any request. User can delete their own request to cancel it.
-      allow delete: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
+      allow delete: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == resource.data.userId);
     }
     
     /**

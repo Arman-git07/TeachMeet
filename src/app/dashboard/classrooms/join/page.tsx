@@ -74,9 +74,8 @@ export default function JoinClassroomPage() {
             const batch = writeBatch(db);
             const requestRef = doc(db, `classrooms/${foundClassroom.id}/joinRequests`, user.uid);
             
-            // This is the corrected payload. It now uses `studentId` to match the security rule.
             batch.set(requestRef, {
-                studentId: user.uid, // CORRECT: Use studentId to match the security rule
+                userId: user.uid, 
                 studentName: user.displayName || 'Anonymous Student',
                 studentPhotoURL: user.photoURL || '',
                 role: 'student', 

@@ -57,9 +57,13 @@
           "type": "string",
           "format": "date-time",
           "description": "The timestamp when the request was made."
+        },
+        "meetingId": {
+          "type": "string",
+          "description": "The ID of the meeting the user wants to join."
         }
       },
-      "required": ["userId", "userName", "status", "requestedAt"]
+      "required": ["userId", "userName", "status", "requestedAt", "meetingId"]
     },
     "UserProfile": {
       "title": "User Profile",
