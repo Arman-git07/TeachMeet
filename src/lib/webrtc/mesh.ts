@@ -2,7 +2,6 @@
 "use client";
 
 import { io, Socket } from "socket.io-client";
-import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
 type PeerEntry = {
   pc: RTCPeerConnection;
@@ -25,10 +24,6 @@ export class MeshRTC {
   private _ready = false; 
   private _pendingSignals: Array<() => void> = []; 
 
-  // Chat related properties
-  public hasRegisteredChatHandlers = false;
-  private onNewPublicMessageCallback: ((message: ChatMessage) => void) | null = null;
-
   constructor(opts: {
     roomId: string;
     userId: string;
@@ -50,16 +45,6 @@ export class MeshRTC {
     try { (window as any).__mesh = this; console.log("[mesh] exported instance to window.__mesh"); } catch {}
   }
 
-  public registerChatHandlers(onNewMessage: (message: ChatMessage) => void) {
-      this.onNewPublicMessageCallback = onNewMessage;
-      this.hasRegisteredChatHandlers = true;
-  }
-  
-  public sendPublicMessage(message: ChatMessage) {
-    if (!this.socket.connected || !message.text.trim()) return;
-    this.socket.emit("public-chat-message", this.roomId, message);
-  }
-  
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
     console.log("[mesh] init(): localStream ready, tracks:", this.localStream?.getTracks().map(t => t.kind));
@@ -78,12 +63,6 @@ export class MeshRTC {
     this.socket.on("connect", () => { 
         this.socketId = this.socket.id; 
         this.socket.emit("join-room", this.roomId, this.userId);
-    });
-
-    this.socket.on("new-public-message", (message: ChatMessage) => {
-        if (this.onNewPublicMessageCallback && message.senderId !== this.userId) {
-            this.onNewPublicMessageCallback(message);
-        }
     });
 
     this.socket.on("user-joined", (remoteId: string) => {

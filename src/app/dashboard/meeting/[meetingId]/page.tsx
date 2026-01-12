@@ -12,7 +12,7 @@ import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Brush, MessageSquare, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
+import { MoreVertical, Brush, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
@@ -43,7 +43,6 @@ function MeetingPageContent() {
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
 
   const handleLeave = useCallback(async (endForAll = false) => {
@@ -162,10 +161,6 @@ function MeetingPageContent() {
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="rounded-xl w-56">
-            <DropdownMenuItem onSelect={() => setIsChatOpen(prev => !prev)} className="cursor-pointer">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span>Public Chat</span>
-            </DropdownMenuItem>
             <DropdownMenuItem asChild className="cursor-pointer">
             <Link href={constructUrl('whiteboard')}>
                 <Brush className="mr-2 h-4 w-4" />
@@ -216,8 +211,6 @@ function MeetingPageContent() {
           onLeave={handleLeave}
           topic={topic}
           initialPinnedId={initialPinnedId}
-          isChatOpen={isChatOpen}
-          toggleChat={() => setIsChatOpen(prev => !prev)}
         >
           {null /* This allows MeetingClient to render its default layout */}
         </MeetingClient>

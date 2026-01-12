@@ -1,47 +1,146 @@
+import type { NextApiRequest } from "next";
+import type { NextApiResponseServerIO } from "@/types";
+import { Server as IOServer, Socket } from "socket.io";
 
-'use client';
+// A simple in-memory store for block relationships within a room.
+// In a production app, this should be moved to a more persistent store like Redis.
+const roomBlocks = new Map<string, Map<string, Set<string>>>(); // Map<roomId, Map<blockerId, Set<blockedId>>>
 
-import { HelpChat, type HelpChatRef } from '@/components/help/HelpChat';
-import { Input } from '@/components/ui/input';
-import { useRef } from 'react';
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponseServerIO
+) {
+  if (!res.socket.server.io) {
+    console.log("🔌 Initializing new Socket.IO server...");
+    const io = new IOServer(res.socket.server, {
+      path: "/api/socketio",
+      addTrailingSlash: false,
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+      },
+    });
+    res.socket.server.io = io;
 
-export default function HelpPage() {
-  const helpChatRef = useRef<HelpChatRef>(null);
+    io.on("connection", (socket) => {
+      console.log("Socket connected:", socket.id);
+      
+      socket.on("join-room", (roomId: string, userId: string) => {
+        socket.join(roomId);
+        // @ts-ignore
+        socket.data.userId = userId;
+        // @ts-ignore
+        socket.data.roomId = roomId;
+        
+        if (!roomBlocks.has(roomId)) {
+            roomBlocks.set(roomId, new Map());
+        }
+        
+        // Notify others that a new user has joined
+        socket.to(roomId).emit("user-joined", userId);
 
-  const handleTopInputInteraction = () => {
-    helpChatRef.current?.focusChatInput();
-  };
+        // Tell the new user who has blocked them
+        const roomBlockMap = roomBlocks.get(roomId);
+        const usersWhoBlockedMe: string[] = [];
+        roomBlockMap?.forEach((blockedSet, blockerId) => {
+            if (blockedSet.has(userId)) {
+                usersWhoBlockedMe.push(blockerId);
+            }
+        });
+        socket.emit('initial-block-list', usersWhoBlockedMe);
 
-  return (
-    // This div takes full height available in the <main> slot of DashboardLayout
-    <div className="flex flex-col h-full items-center">
-      {/* Top static content - kept relatively compact */}
-      <div className="w-full max-w-3xl text-center pt-4 md:pt-0"> {/* Adjust pt for layout consistency */}
-        <h1 className="text-3xl font-bold text-foreground mb-2">How can we help?</h1>
-        <p className="text-muted-foreground">
-          Ask our AI Assistant any questions you have about using TeachMeet.
-          You can type your query in the chat window below, or use the field here to start.
-        </p>
-      </div>
+        console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
+      });
+      
+      socket.on('block-user', ({ blockedUserId }: { blockedUserId: string }) => {
+          const { userId: blockerId, roomId } = socket.data as { userId: string, roomId: string };
+          if (!blockerId || !roomId || !blockedUserId) return;
+          
+          const roomBlockMap = roomBlocks.get(roomId);
+          if (!roomBlockMap) return;
 
-      <div className="w-full max-w-xl my-4 px-4"> {/* my-4 for vertical spacing */}
-        <Input
-          type="text"
-          placeholder="Click here or scroll down to type your question..."
-          onFocus={handleTopInputInteraction}
-          onClick={handleTopInputInteraction}
-          className="text-center text-base py-3 rounded-lg shadow-md border-primary/30 focus:ring-2 focus:ring-primary cursor-pointer hover:border-primary/60 transition-colors"
-          readOnly
-        />
-        <p className="text-xs text-muted-foreground text-center mt-2">
-          This will focus the main chat input below.
-        </p>
-      </div>
+          if (!roomBlockMap.has(blockerId)) {
+              roomBlockMap.set(blockerId, new Set());
+          }
+          roomBlockMap.get(blockerId)!.add(blockedUserId);
+          
+          const blockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === blockedUserId);
+          if (blockedSocket) {
+              blockedSocket.emit('user-blocked-me', blockerId);
+          }
+      });
 
-      {/* HelpChat container - this div will grow to fill remaining vertical space */}
-      <div className="w-full flex-grow flex flex-col items-center pb-4"> {/* Ensures HelpChat can take height and has some bottom padding */}
-        <HelpChat ref={helpChatRef} />
-      </div>
-    </div>
-  );
+      socket.on('unblock-user', ({ unblockedUserId }: { unblockedUserId: string }) => {
+          const { userId: unblockerId, roomId } = socket.data as { userId: string, roomId: string };
+          if (!unblockerId || !roomId || !unblockedUserId) return;
+          
+          const roomBlockMap = roomBlocks.get(roomId);
+          if (!roomBlockMap) return;
+          
+          roomBlockMap.get(unblockerId)?.delete(unblockedUserId);
+          
+          const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
+          if (unblockedSocket) {
+              unblockedSocket.emit('user-unblocked-me', unblockerId);
+          }
+      });
+
+      socket.on('draw', (data) => {
+        // @ts-ignore
+        const { userId } = socket.data || {};
+        if (data.ownerId && userId) {
+            const ownerRoomId = `whiteboard-owner-${data.ownerId}`;
+            const ownerSocketId = Array.from(io.sockets.adapter.rooms.get(ownerRoomId) || [])[0];
+            if (ownerSocketId) {
+                io.to(ownerSocketId).emit('draw-from-collaborator', { ...data, collaboratorId: userId });
+            }
+        }
+      });
+      
+      socket.on('set-permission', ({ ownerId, participantId, canDraw }) => {
+        const participantSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === participantId);
+        if (participantSocket) {
+            participantSocket.emit('permission-update', { canDraw, ownerId });
+        }
+      });
+
+      socket.on("offer", (remoteId: string, offer: any) => {
+        // Find the specific socket for the user ID and emit to it
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        if (targetSocket) {
+          targetSocket.emit("offer", socket.data.userId, offer);
+        }
+      });
+      
+      socket.on("answer", (remoteId: string, answer: any) => {
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        if (targetSocket) {
+          targetSocket.emit("answer", socket.data.userId, answer);
+        }
+      });
+
+      socket.on("ice-candidate", (remoteId: string, candidate: any) => {
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        if (targetSocket) {
+          targetSocket.emit("ice-candidate", socket.data.userId, candidate);
+        }
+      });
+
+      socket.on("disconnect", () => {
+        const { roomId, userId } = socket.data as { roomId: string, userId: string };
+        if (roomId && userId) {
+          socket.to(roomId).emit("user-left", userId);
+
+          // Clean up block lists on disconnect
+          const roomBlockMap = roomBlocks.get(roomId);
+          if(roomBlockMap) {
+            roomBlockMap.delete(userId); // Remove this user's blocks
+            roomBlockMap.forEach(blockedSet => blockedSet.delete(userId)); // Remove this user from others' blocks
+          }
+        }
+        console.log("Disconnected:", socket.id);
+      });
+    });
+  }
+  res.end();
 }

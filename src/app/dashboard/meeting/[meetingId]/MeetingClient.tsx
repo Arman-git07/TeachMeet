@@ -21,8 +21,7 @@ import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page'
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
-import { MeetingChatPanel } from "./chat/MeetingChatPanel";
-import { useMeetingRTC, type ChatMessage } from "@/contexts/MeetingRTCContext";
+import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
@@ -58,16 +57,14 @@ type Props = {
   topic: string;
   initialPinnedId?: string | null;
   children: React.ReactNode;
-  toggleChat: () => void;
-  isChatOpen: boolean;
 };
 
-export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId, children, toggleChat, isChatOpen }: Props) {
+export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId, children }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc, chatHistory, addChatMessage } = useMeetingRTC();
+  const { rtc, setRtc } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -101,18 +98,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
-
-  const [showNewMessageNotification, setShowNewMessageNotification] = useState(false);
-
-  useEffect(() => {
-    if (chatHistory.length > 0 && !isChatOpen) {
-      const lastMessage = chatHistory[chatHistory.length - 1];
-      // Check if last message is not from current user and not a system message
-      if (lastMessage.senderId !== user?.uid && lastMessage.senderId !== 'system') {
-          setShowNewMessageNotification(true);
-      }
-    }
-  }, [chatHistory, isChatOpen, user?.uid]);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -159,18 +144,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteLeft: handleRemoteLeft,
     });
 
-    // Correctly register the chat handler to use the centralized state
-    rtcInstance.registerChatHandlers((message) => {
-      addChatMessage(message);
-    });
-
     setRtc(rtcInstance);
 
     return () => {
       rtcInstance?.leave();
       setRtc(null);
     }
-  }, [meetingId, userId, setRtc, handleRemoteLeft, addChatMessage]);
+  }, [meetingId, userId, setRtc, handleRemoteLeft]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -732,7 +712,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} />
 
       <main className="flex-1 overflow-hidden relative" ref={mainContainerRef}>
-          <div className={cn("w-full h-full p-2 transition-all duration-300", isChatOpen ? "md:w-[calc(100%-384px)]" : "md:w-full")}>
+          <div className={"w-full h-full p-2 transition-all duration-300"}>
             {loadingMedia ? (
                 <div className="w-full h-full flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -747,20 +727,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               </>
             )}
           </div>
-          {showNewMessageNotification && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
-              <Button
-                onClick={() => {
-                  toggleChat();
-                  setShowNewMessageNotification(false);
-                }}
-                className="btn-gel rounded-full animate-fade-in"
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                New Message
-              </Button>
-            </div>
-          )}
           {isSharingScreen && (
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center justify-center pointer-events-none">
               <div className="bg-background/80 backdrop-blur-sm rounded-2xl p-4 flex flex-col items-center gap-3 pointer-events-auto">
@@ -772,12 +738,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               </div>
             </div>
           )}
-          <MeetingChatPanel 
-              isOpen={isChatOpen} 
-              onClose={() => toggleChat()}
-              meetingId={meetingId} 
-              topic={topic}
-          />
       </main>
 
       <footer className="p-2 sm:p-4 bg-background shrink-0 relative z-10">

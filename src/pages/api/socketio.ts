@@ -2,7 +2,6 @@
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer, Socket } from "socket.io";
-import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
 // A simple in-memory store for block relationships within a room.
 // In a production app, this should be moved to a more persistent store like Redis.
@@ -54,12 +53,6 @@ export default function handler(
         console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
       });
       
-      socket.on("public-chat-message", (roomId, message: ChatMessage) => {
-        // Broadcast to everyone in the room except the sender
-        socket.to(roomId).emit("new-public-message", message);
-      });
-      
-
       socket.on('block-user', ({ blockedUserId }: { blockedUserId: string }) => {
           const { userId: blockerId, roomId } = socket.data as { userId: string, roomId: string };
           if (!blockerId || !roomId || !blockedUserId) return;
