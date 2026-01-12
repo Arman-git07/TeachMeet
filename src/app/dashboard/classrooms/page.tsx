@@ -709,7 +709,7 @@ export default function ClassroomsPage() {
                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Working...
                     </Button>
                 ) : hasPendingRequest ? (
-                    <Button variant="destructive" className="w-full" onClick={() => handleCancelRequest(classroom.id)}>
+                    <Button variant="destructive" className="w-full">
                         <XCircle className="mr-2 h-4 w-4"/>
                         Cancel Request
                     </Button>
@@ -842,6 +842,7 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
 
 
 
