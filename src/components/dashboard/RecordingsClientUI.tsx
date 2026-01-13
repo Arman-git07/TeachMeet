@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Video as VideoIcon, Lock, Globe, FolderOpen, Search, UploadCloud, FilterX, PlayCircle, Download, Youtube, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { auth, storage, db } from '@/lib/firebase';
@@ -72,6 +72,7 @@ export function RecordingsClientUI() {
   
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -121,18 +122,19 @@ export function RecordingsClientUI() {
 
   const initiateUpload = (destination: 'private' | 'public') => {
     setIsUploadChoiceDialogOpen(false);
-    fileInputRef.current?.click();
     fileInputRef.current?.setAttribute('data-destination', destination);
+    fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const destination = event.currentTarget.getAttribute('data-destination') as 'private' | 'public' | null;
 
     if (!file || !destination || !currentUser) return;
-
+    
+    setIsUploading(true);
     const toastId = `upload-rec-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Recording...", description: "Please wait...", duration: Infinity });
+    toast({ id: toastId, title: "Uploading Recording...", description: `Uploading ${file.name}...`, duration: Infinity });
 
     const storagePath = `recordings/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
@@ -141,7 +143,8 @@ export function RecordingsClientUI() {
     uploadTask.on('state_changed',
       () => {},
       (error) => {
-        toast({ id: toastId, variant: "destructive", title: "Upload Failed", description: error.message });
+        toast.update(toastId, { variant: "destructive", title: "Upload Failed", description: error.message });
+        setIsUploading(false);
       },
       async () => {
         try {
@@ -158,15 +161,16 @@ export function RecordingsClientUI() {
             createdAt: serverTimestamp(),
             thumbnailUrl: `https://placehold.co/300x180.png?text=New`,
           });
-          toast({ id: toastId, title: "Recording Uploaded!", description: `${file.name} is now available.` });
+          toast.update(toastId, { title: "Recording Uploaded!", description: `${file.name} is now available.` });
         } catch (error) {
-          toast({ id: toastId, variant: "destructive", title: "Save Failed", description: "Could not save recording details." });
+          toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save recording details." });
         } finally {
             if (event.target) event.target.value = "";
+            setIsUploading(false);
         }
       }
     );
-  };
+  }, [currentUser, toast]);
 
   const handleOpenDeleteDialog = (id: string, name: string, storagePath: string) => {
     setRecordingToDelete({ id, name, storagePath });
@@ -265,8 +269,9 @@ export function RecordingsClientUI() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button className="btn-gel rounded-lg flex-shrink-0" onClick={handleUploadClick}>
-              <UploadCloud className="mr-2 h-5 w-5" /> Upload
+            <Button className="btn-gel rounded-lg flex-shrink-0" onClick={handleUploadClick} disabled={isUploading}>
+              {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
+              {isUploading ? "Uploading..." : "Upload"}
             </Button>
             <input
               type="file"
@@ -275,6 +280,7 @@ export function RecordingsClientUI() {
               className="hidden"
               multiple={false}
               accept="video/*,audio/*"
+              disabled={isUploading}
             />
           </div>
         </div>

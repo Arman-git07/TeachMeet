@@ -45,7 +45,6 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
 
       match /joinRequests/{userId} {
-        // Host can list requests. User can get their own.
         allow get, list: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
         allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
         allow update: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
@@ -129,6 +128,30 @@ service cloud.firestore {
         allow read: if resource.data.isPrivate == false || (isSignedIn() && resource.data.uploaderId == request.auth.uid);
         allow update, delete: if isSignedIn() && resource.data.uploaderId == request.auth.uid;
     }
+    
+    /**
+     * FCM Tokens Collection
+     */
+    match /fcmTokens/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * System Blocked Users Collection (Admin Only)
+     */
+    match /systemBlockedUsers/{userId} {
+        // In a real app, you would restrict this to admin UIDs
+        allow read, write: if false;
+    }
+    
+    /**
+     * Reports Collection (Authenticated Users)
+     */
+    match /reports/{reportId} {
+        allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+        allow read: if false; // Should only be readable by admins
+    }
+
 
     /**
      * Helper Functions

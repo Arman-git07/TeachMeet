@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button, buttonVariants } from "@/components/ui/button";
 import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, Trash2, Loader2, FilterX } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { auth, storage, db } from '@/lib/firebase';
@@ -55,6 +55,7 @@ export function DocumentsClientUI() {
   
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [isUploadChoiceDialogOpen, setIsUploadChoiceDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -105,18 +106,19 @@ export function DocumentsClientUI() {
 
   const initiateUpload = (destination: 'private' | 'public') => {
     setIsUploadChoiceDialogOpen(false);
-    fileInputRef.current?.click();
     fileInputRef.current?.setAttribute('data-destination', destination);
+    fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const destination = event.currentTarget.getAttribute('data-destination') as 'private' | 'public' | null;
 
     if (!file || !destination || !currentUser) return;
-
+    
+    setIsUploading(true);
     const toastId = `upload-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Document...", description: "Please wait...", duration: Infinity });
+    toast({ id: toastId, title: "Uploading Document...", description: `Uploading ${file.name}...`, duration: Infinity });
 
     const storagePath = `documents/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
@@ -125,7 +127,8 @@ export function DocumentsClientUI() {
     uploadTask.on('state_changed',
       () => {},
       (error) => {
-        toast({ id: toastId, variant: "destructive", title: "Upload Failed", description: error.message });
+        toast.update(toastId, { variant: "destructive", title: "Upload Failed", description: error.message });
+        setIsUploading(false);
       },
       async () => {
         try {
@@ -140,15 +143,16 @@ export function DocumentsClientUI() {
             storagePath,
             createdAt: serverTimestamp(),
           });
-          toast({ id: toastId, title: "Document Uploaded!", description: `${file.name} is now available.` });
+          toast.update(toastId, { title: "Document Uploaded!", description: `${file.name} is now available.` });
         } catch (error) {
-          toast({ id: toastId, variant: "destructive", title: "Save Failed", description: "Could not save document details to the database." });
+          toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save document details to the database." });
         } finally {
             if (event.target) event.target.value = "";
+            setIsUploading(false);
         }
       }
     );
-  };
+  }, [currentUser, toast]);
 
   const handleOpenDeleteDialog = (id: string, name: string, storagePath: string) => {
     setDocumentToDelete({ id, name, storagePath });
@@ -246,8 +250,9 @@ export function DocumentsClientUI() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button className="btn-gel rounded-lg flex-shrink-0" onClick={handleUploadClick}>
-              <UploadCloud className="mr-2 h-5 w-5" /> Upload
+            <Button className="btn-gel rounded-lg flex-shrink-0" onClick={handleUploadClick} disabled={isUploading}>
+              {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <UploadCloud className="mr-2 h-5 w-5" />}
+              {isUploading ? "Uploading..." : "Upload"}
             </Button>
             <input
               type="file"
@@ -255,6 +260,7 @@ export function DocumentsClientUI() {
               onChange={handleFileChange}
               className="hidden"
               multiple={false}
+              disabled={isUploading}
             />
           </div>
         </div>
