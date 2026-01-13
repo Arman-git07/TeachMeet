@@ -186,7 +186,7 @@ const CollaborateDialogContent = ({ participants, drawingPermissions, onPermissi
                         <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
                             <div className="flex items-center gap-3">
                                 <Avatar className="h-9 w-9">
-                                    <AvatarImage src={p.photoURL} />
+                                    <AvatarImage src={p.photoURL} data-ai-hint="avatar user"/>
                                     <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div>
@@ -912,7 +912,7 @@ export default function WhiteboardPage() {
     setIsPagesPopoverOpen(false);
   };
   
-  const handleRecognizeShape = async () => {
+  const handleRecognizeShape = useCallback(async () => {
     setIsRefineDialogOpen(false);
     
     const currentPage = pages[currentPageIndex];
@@ -1026,7 +1026,7 @@ export default function WhiteboardPage() {
     } finally {
         setRefinePrompt('');
     }
-  };
+  }, [pages, currentPageIndex, toast, refinePrompt, drawElement, pushToHistory]);
 
   const getCanvasAsBlob = async (): Promise<Blob | null> => {
     const canvas = mainCanvasRef.current;

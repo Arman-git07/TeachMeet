@@ -2,7 +2,7 @@
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch, updateDoc } from 'firebase/firestore';
@@ -95,6 +95,7 @@ const ParticipantItem = React.memo(({
   if (topic) privateChatLinkParams.set('topic', topic);
   if (cam) privateChatLinkParams.set('cam', cam);
   if (mic) privateChatLinkParams.set('mic', mic);
+  if (pinnedUserId) privateChatLinkParams.set('pin', pinnedUserId);
   privateChatLinkParams.set('privateWith', participant.id);
   privateChatLinkParams.set('privateWithName', participant.name);
   const privateChatLink = `/dashboard/meeting/${meetingId}/chat?${privateChatLinkParams.toString()}`;
@@ -341,6 +342,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
   if (topicFromParams) backToMeetingParams.set('topic', topicFromParams);
   if (cam) backToMeetingParams.set('cam', cam);
   if (mic) backToMeetingParams.set('mic', mic);
+  if (pinnedUserId) backToMeetingParams.set('pin', pinnedUserId);
   const backToMeetingLink = `/dashboard/meeting/${meetingId}?${backToMeetingParams.toString()}`;
 
   const isCurrentUserTheHost = currentUserId === meetingHostId;

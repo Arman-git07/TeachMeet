@@ -2,6 +2,7 @@
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer, Socket } from "socket.io";
+import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
 // A simple in-memory store for block relationships within a room.
 // In a production app, this should be moved to a more persistent store like Redis.
@@ -84,6 +85,23 @@ export default function handler(
           if (unblockedSocket) {
               unblockedSocket.emit('user-unblocked-me', unblockerId);
           }
+      });
+
+      socket.on('chat-message', (message: ChatMessage) => {
+        const { roomId } = socket.data as { roomId: string };
+        if (!roomId) return;
+        
+        if (message.isPrivate && message.recipientId) {
+            // Find socket of recipient and sender to deliver private message
+            const recipientSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === message.recipientId);
+            if (recipientSocket) {
+                recipientSocket.emit('chat-message', message);
+            }
+            // The sender already added it to their own UI, so no need to emit back to them.
+        } else {
+            // Broadcast public message to everyone in the room except the sender
+            socket.to(roomId).emit('chat-message', message);
+        }
       });
 
       socket.on('draw', (data) => {

@@ -37,12 +37,22 @@ function MeetingPageContent() {
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
-  const initialPinnedId = searchParams.get('pin') || null;
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
+
+  // Centralized state for pinned user
+  const [pinnedId, setPinnedId] = useState<string | null>(() => searchParams.get('pin'));
+
+  useEffect(() => {
+    // Sync pinnedId state with URL search params
+    const currentPin = searchParams.get('pin');
+    if (currentPin !== pinnedId) {
+        setPinnedId(currentPin);
+    }
+  }, [searchParams, pinnedId]);
 
 
   const handleLeave = useCallback(async (endForAll = false) => {
@@ -150,6 +160,9 @@ function MeetingPageContent() {
     const params = new URLSearchParams({ topic: topic || '' });
     params.set('cam', String(camOn));
     params.set('mic', String(micOn));
+    if (pinnedId) {
+        params.set('pin', pinnedId);
+    }
 
     const constructUrl = (page: string) => `/dashboard/meeting/${meetingId}/${page}?${params.toString()}`;
 
@@ -182,7 +195,7 @@ function MeetingPageContent() {
         </DropdownMenuContent>
       </DropdownMenu>
     );
-  }, [meetingId, topic, camOn, micOn]);
+  }, [meetingId, topic, camOn, micOn, pinnedId]);
   
   useEffect(() => {
       setHeaderContent(
@@ -210,7 +223,7 @@ function MeetingPageContent() {
           userId={user.uid}
           onLeave={handleLeave}
           topic={topic}
-          initialPinnedId={initialPinnedId}
+          initialPinnedId={pinnedId}
         >
           {null /* This allows MeetingClient to render its default layout */}
         </MeetingClient>
