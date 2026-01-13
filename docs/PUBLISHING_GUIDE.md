@@ -38,7 +38,25 @@ Whether you are in Firebase Studio or have published your app, all your data (us
 
 Firebase Studio is just a code editor that is directly connected to your live Firebase project's backend. This is powerful because any data you create while testing in the studio is real data in your live database.
 
-## 4. How to Make Changes After Publishing
+## 4. Storing Large Files (Recordings, Documents)
+
+**Can Firebase handle large files?**
+**Yes, absolutely.** Firebase Storage is built on Google Cloud Storage, the same infrastructure that powers Google Photos and YouTube. It is designed to handle very large files (gigabytes in size), so it's perfect for storing meeting recordings and other large documents.
+
+**Do I have to pay for storage? And when?**
+You don't have to pay for anything upfront. Your project starts on the **free "Spark" plan**, which includes:
+*   **5 GB** of total storage.
+*   **1 GB** of data downloads per day.
+*   A generous number of upload and download operations.
+
+This is usually plenty to get started and test your app with real users. You only need to think about upgrading to the paid **"Blaze" (pay-as-you-go) plan** if your app becomes popular and you start exceeding these free limits.
+
+**You can upgrade to the Blaze plan at any time, before or after publishing.** The best approach is to publish on the free plan, monitor your usage in the Firebase console, and only upgrade if you need to.
+
+**Are there other storage options?**
+While you could use other services like Amazon S3, it's highly recommended to stick with Firebase Storage for this app. It is deeply integrated with Firebase Authentication for security (e.g., ensuring only the user who uploaded a file can delete it) and the Firebase SDKs we use make file management simple and efficient.
+
+## 5. How to Make Changes After Publishing
 
 This is the best part! Your workflow doesn't change.
 
