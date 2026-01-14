@@ -792,8 +792,8 @@ export default function ClassroomsPage() {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div className="container mx-auto p-4 md:p-8 flex flex-col h-full">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden">
             <PanelLeftOpen className="h-6 w-6" />
@@ -836,11 +836,17 @@ export default function ClassroomsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs defaultValue="discover" className="w-full">
-        <TabsList><TabsTrigger value="discover"><Eye className="mr-2 h-4 w-4" /> Discover</TabsTrigger><TabsTrigger value="my-classes"><School className="mr-2 h-4 w-4" /> My Classes</TabsTrigger><TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger></TabsList>
-        <TabsContent value="discover" className="mt-4"><DiscoverClassesTab /></TabsContent>
-        <TabsContent value="my-classes" className="mt-4"><MyClassesTab /></TabsContent>
-        <TabsContent value="enrolled" className="mt-4"><EnrolledClassesTab /></TabsContent>
+      <Tabs defaultValue="discover" className="w-full flex-1 flex flex-col overflow-hidden">
+        <TabsList className="flex-shrink-0">
+          <TabsTrigger value="discover"><Eye className="mr-2 h-4 w-4" /> Discover</TabsTrigger>
+          <TabsTrigger value="my-classes"><School className="mr-2 h-4 w-4" /> My Classes</TabsTrigger>
+          <TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger>
+        </TabsList>
+        <div className="flex-1 overflow-y-auto mt-4">
+          <TabsContent value="discover"><DiscoverClassesTab /></TabsContent>
+          <TabsContent value="my-classes"><MyClassesTab /></TabsContent>
+          <TabsContent value="enrolled"><EnrolledClassesTab /></TabsContent>
+        </div>
       </Tabs>
     </div>
   );
