@@ -13,12 +13,12 @@ import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus } from 
 import { ParticipantsManagement } from './ParticipantsManagement';
 import { SubjectTeachers } from './SubjectTeachers';
 import { FeesAndPayment } from './FeesAndPayment';
-import { JoinRequests } from './JoinRequests';
 import type { DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { deleteObject, ref } from 'firebase/storage';
+import Link from 'next/link';
 
 const ItemDeleteDialog = memo(({ itemToDelete, setItemToDelete, onConfirmDelete }: { itemToDelete: DeletableItem | null; setItemToDelete: (item: DeletableItem | null) => void; onConfirmDelete: () => void }) => {
     return (
@@ -81,9 +81,11 @@ export function ClassroomHeader() {
                         <DropdownMenuContent align="end">
                             {canUserManage && (
                                 <>
-                                    <DialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="join-requests"><UserPlus className="mr-2 h-4 w-4"/>Join Requests</DropdownMenuItem>
-                                    </DialogTrigger>
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
+                                            <UserPlus className="mr-2 h-4 w-4"/>Join Requests
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DialogTrigger asChild>
                                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="participants"><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem>
                                     </DialogTrigger>
@@ -99,8 +101,6 @@ export function ClassroomHeader() {
                         </DropdownMenuContent>
                     </DropdownMenu>
                     
-                    {/* The content for each dialog is now handled by the respective components */}
-                    {canUserManage && <JoinRequests />}
                     <ParticipantsManagement />
                     <SubjectTeachers />
                     <FeesAndPayment />
