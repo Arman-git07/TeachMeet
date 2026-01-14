@@ -50,7 +50,7 @@ export default function DashboardLayout({
     <DynamicHeaderProvider>
       <div className="flex flex-col flex-1 h-screen overflow-hidden">
         <DashboardHeader />
-        <main className="flex flex-1 flex-col bg-background overflow-hidden">
+        <main className="flex flex-1 flex-col bg-background overflow-y-auto">
           {children}
         </main>
       </div>

@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -794,7 +793,7 @@ export default function ClassroomsPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden">
             <PanelLeftOpen className="h-6 w-6" />
@@ -802,12 +801,16 @@ export default function ClassroomsPage() {
           <h1 className="text-3xl font-bold">Classrooms</h1>
         </div>
         { user && (
-            <div>
-                <Button asChild variant="outline" className="mr-2">
+            <div className="flex flex-shrink-0 gap-2 w-full sm:w-auto">
+                <Button asChild variant="outline" className="flex-1 sm:flex-initial">
                     <Link href="/dashboard/classrooms/join">Join a Class</Link>
                 </Button>
                 <Dialog open={isCreateDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setClassroomToEdit(null); setIsCreateDialogOpen(isOpen); }}>
-                  <DialogTrigger asChild><Button onClick={handleCreateNew}><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
+                  <DialogTrigger asChild>
+                    <Button onClick={handleCreateNew} className="flex-1 sm:flex-initial">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Create New
+                    </Button>
+                  </DialogTrigger>
                   <DialogContent><CreateClassroomDialogContent onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
                 </Dialog>
             </div>
@@ -842,9 +845,3 @@ export default function ClassroomsPage() {
     </div>
   );
 }
-
-
-
-
-
-
