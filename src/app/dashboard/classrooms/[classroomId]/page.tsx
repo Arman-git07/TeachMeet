@@ -7,6 +7,7 @@ import { Announcements } from '@/components/classroom/Announcements';
 import { ClassMaterials } from '@/components/classroom/ClassMaterials';
 import { Assignments } from '@/components/classroom/Assignments';
 import { Exams } from '@/components/classroom/Exams';
+import { ClassroomHeader } from '@/components/classroom/ClassroomHeader';
 
 // --- Interfaces (kept for type safety in child components) ---
 export interface TeacherInfo {
@@ -101,32 +102,35 @@ export default function ClassroomPage() {
     // All data fetching and context providing is now handled by the layout.
     // This component just renders the UI for the main classroom page.
     return (
-        <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
-            <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
-                <div className="w-full whitespace-nowrap rounded-lg border-b flex-shrink-0">
-                    <TabsList className="inline-flex h-auto">
-                        <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
-                        <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
-                        <TabsTrigger value="assignments"><Book className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
-                        <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
-                    </TabsList>
-                </div>
-                
-                <div className="flex-grow overflow-y-auto pt-4">
-                    <TabsContent value="announcements">
-                        <Announcements />
-                    </TabsContent>
-                    <TabsContent value="materials">
-                        <ClassMaterials />
-                    </TabsContent>
-                    <TabsContent value="assignments">
-                        <Assignments />
-                    </TabsContent>
-                    <TabsContent value="exams">
-                        <Exams />
-                    </TabsContent>
-                </div>
-            </Tabs>
-        </main>
+        <>
+            <ClassroomHeader />
+            <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
+                <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
+                    <div className="w-full whitespace-nowrap rounded-lg border-b flex-shrink-0">
+                        <TabsList className="inline-flex h-auto">
+                            <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
+                            <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
+                            <TabsTrigger value="assignments"><Book className="mr-2 h-4 w-4" />Assignments</TabsTrigger>
+                            <TabsTrigger value="exams"><ClipboardCheck className="mr-2 h-4 w-4" />Exams</TabsTrigger>
+                        </TabsList>
+                    </div>
+                    
+                    <div className="flex-grow overflow-y-auto pt-4">
+                        <TabsContent value="announcements">
+                            <Announcements />
+                        </TabsContent>
+                        <TabsContent value="materials">
+                            <ClassMaterials />
+                        </TabsContent>
+                        <TabsContent value="assignments">
+                            <Assignments />
+                        </TabsContent>
+                        <TabsContent value="exams">
+                            <Exams />
+                        </TabsContent>
+                    </div>
+                </Tabs>
+            </main>
+        </>
     );
 }

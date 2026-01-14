@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { resolveRoleForUser, type Role } from "@/lib/roles";
 import { ClassroomProvider } from '@/contexts/ClassroomContext';
 import type { Classroom } from '@/app/dashboard/classrooms/[classroomId]/page';
-import { ClassroomHeader } from '@/components/classroom/ClassroomHeader';
 
 export default function ClassroomDetailLayout({
   children,
@@ -83,7 +82,6 @@ export default function ClassroomDetailLayout({
   return (
     <ClassroomProvider value={contextValue}>
       <div className="flex flex-1 flex-col h-full overflow-hidden">
-        <ClassroomHeader />
         {children}
       </div>
     </ClassroomProvider>

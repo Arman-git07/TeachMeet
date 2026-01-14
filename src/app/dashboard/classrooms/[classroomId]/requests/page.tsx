@@ -10,13 +10,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Check, X } from 'lucide-react';
+import { Loader2, Check, X, ArrowLeft } from 'lucide-react';
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function JoinRequestsPage() {
     const { classroomId, classroom } = useClassroom();
+    const router = useRouter();
     const { toast } = useToast();
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export default function JoinRequestsPage() {
                 {requests.map(req => (
                     <Card key={req.id} className="p-3 bg-muted/30">
                         <div className="flex items-start gap-4">
-                            <Avatar className="mt-1"><AvatarImage src={req.studentPhotoURL} data-ai-hint="avatar user" /><AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback></Avatar>
+                            <Avatar className="mt-1"><AvatarImage src={req.studentPhotoURL} data-ai-hint="avatar user"/><AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback></Avatar>
                             <div className="flex-grow">
                                 <div className="flex justify-between items-start">
                                     <div>
@@ -117,28 +120,34 @@ export default function JoinRequestsPage() {
     };
 
     return (
-        <main className="flex-1 p-4 md:px-8 md:pb-8 overflow-y-auto">
-            <Card>
+        <main className="flex-1 p-4 md:px-8 md:pb-8 flex flex-col h-full overflow-y-auto">
+             <header className="mb-6 flex items-center justify-between flex-shrink-0">
+                <Button variant="link" onClick={() => router.back()} className="p-0 text-muted-foreground">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Classroom
+                </Button>
+            </header>
+            <Card className="flex-1 flex flex-col">
                 <CardHeader>
                     <CardTitle>Pending Join Requests</CardTitle>
                     <CardDescription>Review users who want to join your classroom.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <Tabs defaultValue="students">
+                <CardContent className="flex-grow flex flex-col">
+                    <Tabs defaultValue="students" className="flex-1 flex flex-col">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="students">Students <Badge variant={studentRequests.length > 0 ? "default" : "secondary"} className="ml-2">{studentRequests.length}</Badge></TabsTrigger>
                             <TabsTrigger value="teachers">Teachers <Badge variant={teacherRequests.length > 0 ? "default" : "secondary"} className="ml-2">{teacherRequests.length}</Badge></TabsTrigger>
                         </TabsList>
-                        <TabsContent value="students" className="pt-4">
-                            <ScrollArea className="max-h-[60vh]">
-                                {renderRequestList(studentRequests)}
+                        <div className="flex-grow mt-4 overflow-hidden">
+                            <ScrollArea className="h-full">
+                                <TabsContent value="students">
+                                    {renderRequestList(studentRequests)}
+                                </TabsContent>
+                                <TabsContent value="teachers">
+                                    {renderRequestList(teacherRequests)}
+                                </TabsContent>
                             </ScrollArea>
-                        </TabsContent>
-                        <TabsContent value="teachers" className="pt-4">
-                             <ScrollArea className="max-h-[60vh]">
-                                {renderRequestList(teacherRequests)}
-                            </ScrollArea>
-                        </TabsContent>
+                        </div>
                     </Tabs>
                 </CardContent>
             </Card>
