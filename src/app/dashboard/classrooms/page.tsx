@@ -102,6 +102,7 @@ export interface Classroom {
   title: string;
   description: string;
   teacherId: string;
+  creatorId: string;
   teacherName: string;
   isPublic: boolean;
   students: string[];
@@ -166,6 +167,7 @@ const CreateClassroomDialogContent = ({
           title: title.trim(),
           description: description.trim(),
           teacherId: user.uid,
+          creatorId: user.uid,
           teacherName: user.displayName || 'Anonymous Teacher',
           isPublic,
           students: [], 
@@ -202,7 +204,7 @@ const CreateClassroomDialogContent = ({
           <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="A brief summary" disabled={isLoading}/>
         </div>
         <div className="flex items-center space-x-2 justify-end">
-          <Label htmlFor="is-public">{isPublic ? 'Public' : 'Private'}</Label>
+          <Label htmlFor="is-public">{isPublic ? 'Make Private' : 'Make Public'}</Label>
           <Switch id="is-public" checked={isPublic} onCheckedChange={setIsPublic} disabled={isLoading}/>
         </div>
       </div>
@@ -525,13 +527,30 @@ export default function ClassroomsPage() {
         toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete your own classrooms.' });
         return;
     }
+    
+    const toastId = `delete-${classroomToDelete.id}`;
+    toast({ id: toastId, title: 'Deleting Classroom...', description: `"${classroomToDelete.title}" and all its data will be permanently removed.` });
+    
     try {
         const classroomRef = doc(db, 'classrooms', classroomToDelete.id);
+        
+        // Comprehensive deletion of all subcollections
+        const subcollections = ['announcements', 'assignments', 'exams', 'materials', 'participants', 'joinRequests', 'teachers'];
+        for (const sub of subcollections) {
+            const subcollectionRef = collection(db, classroomRef.path, sub);
+            const snapshot = await getDocs(subcollectionRef);
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+
+        // Delete the main classroom document
         await deleteDoc(classroomRef);
-        toast({ title: 'Success', description: `Classroom "${classroomToDelete.title}" deleted.` });
+
+        toast.update(toastId, { title: 'Success', description: `Classroom "${classroomToDelete.title}" has been deleted.` });
     } catch (error) {
       console.error('Error deleting classroom:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the classroom. Check Firestore rules and permissions.' });
+      toast.update(toastId, { variant: 'destructive', title: 'Error', description: 'Could not delete the classroom. Check Firestore rules and console for errors.' });
     } finally {
       setClassroomToDelete(null);
     }
@@ -831,7 +850,7 @@ export default function ClassroomsPage() {
 
       <AlertDialog open={!!classroomToDelete} onOpenChange={(isOpen) => !isOpen && setClassroomToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the classroom &quot;{classroomToDelete?.title}&quot;. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the classroom &quot;{classroomToDelete?.title}&quot; and ALL of its associated data (announcements, assignments, etc.). This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -851,3 +870,5 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
+    
