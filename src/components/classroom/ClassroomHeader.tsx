@@ -68,7 +68,7 @@ export function ClassroomHeader() {
 
     return (
         <>
-            <header className="mb-6 px-4 md:px-8 flex items-center justify-between flex-shrink-0">
+            <header className="mb-6 px-4 md:px-8 pt-4 flex items-center justify-between flex-shrink-0">
                 <div>
                     <Button variant="link" onClick={() => router.push('/dashboard/classrooms')} className="p-0 mb-2 text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Back to classrooms</Button>
                     <h1 className="text-4xl font-bold">{classroom.title}</h1>
