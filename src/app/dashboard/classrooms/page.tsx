@@ -202,7 +202,7 @@ const CreateClassroomDialogContent = ({
           <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="A brief summary" disabled={isLoading}/>
         </div>
         <div className="flex items-center space-x-2 justify-end">
-          <Label htmlFor="is-public">Make Public</Label>
+          <Label htmlFor="is-public">{isPublic ? 'Public' : 'Private'}</Label>
           <Switch id="is-public" checked={isPublic} onCheckedChange={setIsPublic} disabled={isLoading}/>
         </div>
       </div>
