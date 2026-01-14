@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, query, onSnapshot, orderBy, doc, writeBatch, arrayUnion, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useClassroom } from '@/contexts/ClassroomContext';
@@ -12,6 +12,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Check, X } from 'lucide-react';
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
 export default function JoinRequestsPage() {
     const { classroomId, classroom } = useClassroom();
@@ -27,6 +29,9 @@ export default function JoinRequestsPage() {
         });
         return unsubscribe;
     }, [classroomId]);
+
+    const studentRequests = useMemo(() => joinRequests.filter(req => req.role === 'student'), [joinRequests]);
+    const teacherRequests = useMemo(() => joinRequests.filter(req => req.role === 'teacher'), [joinRequests]);
 
     const handleRequest = useCallback(async (request: JoinRequest, action: 'approve' | 'deny') => {
         if (!classroomId || !request.requesterId) {
@@ -74,48 +79,67 @@ export default function JoinRequestsPage() {
         }
     }, [classroomId, toast, classroom]);
 
+    const renderRequestList = (requests: JoinRequest[]) => {
+        if (requests.length === 0) {
+            return <p className="text-sm text-muted-foreground text-center py-8">There are no pending requests in this category.</p>;
+        }
+
+        return (
+            <div className="space-y-4">
+                {requests.map(req => (
+                    <Card key={req.id} className="p-3 bg-muted/30">
+                        <div className="flex items-start gap-4">
+                            <Avatar className="mt-1"><AvatarImage src={req.studentPhotoURL} data-ai-hint="avatar user" /><AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback></Avatar>
+                            <div className="flex-grow">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-medium text-sm">{req.studentName}</p>
+                                        <p className="text-xs capitalize text-muted-foreground">{req.role}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => handleRequest(req, 'approve')} disabled={isProcessing === req.id}>{isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4" />}</Button>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleRequest(req, 'deny')} disabled={isProcessing === req.id}>{isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <X className="h-4 w-4" />}</Button>
+                                    </div>
+                                </div>
+                                {req.role === 'teacher' && req.applicationData && (
+                                    <div className="mt-2 text-xs space-y-1 text-muted-foreground border-t pt-2">
+                                        <p><strong>Subject:</strong> {req.applicationData.subject}</p>
+                                        <p><strong>Availability:</strong> {req.applicationData.availability}</p>
+                                        {req.resumeURL && <Button asChild size="sm" variant="link" className="p-0 h-auto mt-1"><a href={req.resumeURL} target="_blank" rel="noopener noreferrer">View Resume</a></Button>}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+                ))}
+            </div>
+        );
+    };
+
     return (
         <main className="flex-1 p-4 md:px-8 md:pb-8 overflow-y-auto">
             <Card>
                 <CardHeader>
-                    <CardTitle>Pending Requests ({joinRequests.length})</CardTitle>
-                    <CardDescription>Review the users who want to join your classroom.</CardDescription>
+                    <CardTitle>Pending Join Requests</CardTitle>
+                    <CardDescription>Review users who want to join your classroom.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="max-h-[60vh]">
-                        <div className="space-y-4">
-                            {joinRequests.length > 0 ? (
-                                joinRequests.map(req => (
-                                    <Card key={req.id} className="p-3 bg-muted/30">
-                                        <div className="flex items-start gap-4">
-                                            <Avatar className="mt-1"><AvatarImage src={req.studentPhotoURL} data-ai-hint="avatar user" /><AvatarFallback>{req.studentName.charAt(0)}</AvatarFallback></Avatar>
-                                            <div className="flex-grow">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <p className="font-medium text-sm">{req.studentName}</p>
-                                                        <p className="text-xs capitalize text-muted-foreground">{req.role}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => handleRequest(req, 'approve')} disabled={isProcessing === req.id}>{isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4" />}</Button>
-                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleRequest(req, 'deny')} disabled={isProcessing === req.id}>{isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <X className="h-4 w-4" />}</Button>
-                                                    </div>
-                                                </div>
-                                                {req.role === 'teacher' && req.applicationData && (
-                                                    <div className="mt-2 text-xs space-y-1 text-muted-foreground border-t pt-2">
-                                                        <p><strong>Subject:</strong> {req.applicationData.subject}</p>
-                                                        <p><strong>Availability:</strong> {req.applicationData.availability}</p>
-                                                        {req.resumeURL && <Button asChild size="sm" variant="link" className="p-0 h-auto mt-1"><a href={req.resumeURL} target="_blank" rel="noopener noreferrer">View Resume</a></Button>}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </Card>
-                                ))
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center py-8">There are no pending join requests.</p>
-                            )}
-                        </div>
-                    </ScrollArea>
+                    <Tabs defaultValue="students">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="students">Students <Badge variant={studentRequests.length > 0 ? "default" : "secondary"} className="ml-2">{studentRequests.length}</Badge></TabsTrigger>
+                            <TabsTrigger value="teachers">Teachers <Badge variant={teacherRequests.length > 0 ? "default" : "secondary"} className="ml-2">{teacherRequests.length}</Badge></TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="students" className="pt-4">
+                            <ScrollArea className="max-h-[60vh]">
+                                {renderRequestList(studentRequests)}
+                            </ScrollArea>
+                        </TabsContent>
+                        <TabsContent value="teachers" className="pt-4">
+                             <ScrollArea className="max-h-[60vh]">
+                                {renderRequestList(teacherRequests)}
+                            </ScrollArea>
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
         </main>
