@@ -9,10 +9,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus } from 'lucide-react';
 import { ParticipantsManagement } from './ParticipantsManagement';
 import { SubjectTeachers } from './SubjectTeachers';
 import { FeesAndPayment } from './FeesAndPayment';
+import { JoinRequests } from './JoinRequests';
 import type { DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -79,21 +80,27 @@ export function ClassroomHeader() {
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             {canUserManage && (
-                                <DialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem>
-                                </DialogTrigger>
+                                <>
+                                    <DialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="join-requests"><UserPlus className="mr-2 h-4 w-4"/>Join Requests</DropdownMenuItem>
+                                    </DialogTrigger>
+                                    <DialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="participants"><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem>
+                                    </DialogTrigger>
+                                </>
                             )}
                              <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="subject-teachers"><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem>
                              </DialogTrigger>
                             <DropdownMenuSeparator />
                             <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Fees & Payment</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="fees"><CreditCard className="mr-2 h-4 w-4"/>Fees & Payment</DropdownMenuItem>
                             </DialogTrigger>
                         </DropdownMenuContent>
                     </DropdownMenu>
                     
                     {/* The content for each dialog is now handled by the respective components */}
+                    {canUserManage && <JoinRequests />}
                     <ParticipantsManagement />
                     <SubjectTeachers />
                     <FeesAndPayment />
