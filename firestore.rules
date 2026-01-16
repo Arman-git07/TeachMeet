@@ -45,12 +45,15 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
 
       match /joinRequests/{userId} {
-        // Corrected Rule: A user needs 'get' access to read the document before they can 'delete' it based on its content.
+        // Allow a user to read their own request so they can check its status.
         allow get, list: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
+        // Allow a user to create a request for themselves.
         allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
+        // Allow user to update their own request (e.g., withdraw).
         allow update: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
-        // This delete rule now works because of the 'get' permission above.
-        allow delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || resource.data.requesterId == request.auth.uid);
+        // Allow user to delete their own request by checking their auth UID against the document ID.
+        // This is more robust than checking resource.data, which requires a separate 'get' permission.
+        allow delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
       }
       
       match /participants/{userId} {
