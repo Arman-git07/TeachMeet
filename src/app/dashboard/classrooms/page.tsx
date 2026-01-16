@@ -75,7 +75,6 @@ import {
   GraduationCap,
   Briefcase,
   FileUp,
-  XCircle,
   Book,
   Phone,
   Clock,
@@ -523,8 +522,8 @@ export default function ClassroomsPage() {
 
   const handleDelete = async () => {
     if (!classroomToDelete || !user) return;
-    if (user.uid !== classroomToDelete.teacherId) {
-        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete your own classrooms.' });
+    if (user.uid !== classroomToDelete.creatorId) {
+        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete classrooms you created.' });
         return;
     }
     
@@ -591,29 +590,6 @@ export default function ClassroomsPage() {
     }
   }, [user, toast]);
   
-   const handleCancelRequest = useCallback(async (classroomId: string) => {
-    if (!user) return;
-    setRequestingToJoin(classroomId);
-    try {
-      const batch = writeBatch(db);
-      // Delete from classroom's joinRequests
-      const joinRequestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
-      batch.delete(joinRequestRef);
-      // Delete from user's pendingJoinRequests
-      const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
-      batch.delete(userPendingRequestRef);
-
-      await batch.commit();
-
-      toast({ title: 'Request Canceled', description: 'Your join request has been withdrawn.' });
-    } catch (error) {
-        console.error("Error canceling join request:", error);
-        toast({ variant: 'destructive', title: 'Cancel Failed', description: 'Could not cancel your join request.' });
-    } finally {
-        setRequestingToJoin(null);
-    }
-  }, [user, toast]);
-
   const handleOpenTeacherAppDialog = (classroom: Classroom) => {
     setSelectedClassroomForApp(classroom);
     setIsTeacherAppDialogOpen(true);
@@ -727,9 +703,8 @@ export default function ClassroomsPage() {
                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Working...
                     </Button>
                 ) : hasPendingRequest ? (
-                    <Button variant="destructive" className="w-full" onClick={() => handleCancelRequest(classroom.id)}>
-                        <XCircle className="mr-2 h-4 w-4"/>
-                        Cancel Request
+                    <Button variant="outline" className="w-full" disabled>
+                        Request Sent
                     </Button>
                 ) : (
                     <div className="grid grid-cols-2 gap-2">
@@ -749,7 +724,7 @@ export default function ClassroomsPage() {
           </CardFooter>
     </Card>
     );
-  }, [user, requestingToJoin, handleRequestToJoinStudent, handleCancelRequest, pendingRequestIds, enrolledClasses]);
+  }, [user, requestingToJoin, handleRequestToJoinStudent, pendingRequestIds, enrolledClasses]);
 
   const renderSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -870,5 +845,7 @@ export default function ClassroomsPage() {
     </div>
   );
 }
+
+    
 
     
