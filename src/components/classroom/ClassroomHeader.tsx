@@ -6,7 +6,7 @@ import { useClassroom } from '@/contexts/ClassroomContext';
 import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus } from 'lucide-react';
 import { ParticipantsManagement } from './ParticipantsManagement';
@@ -44,6 +44,11 @@ export function ClassroomHeader() {
     const { toast } = useToast();
     const canUserManage = canManage(userRole);
     const [itemToDelete, setItemToDelete] = useState<DeletableItem | null>(null);
+    
+    const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
+    const [isTeachersOpen, setIsTeachersOpen] = useState(false);
+    const [isFeesOpen, setIsFeesOpen] = useState(false);
+
 
     const handleDeleteItem = useCallback(async () => {
         if (!itemToDelete || !classroomId) return;
@@ -84,35 +89,38 @@ export function ClassroomHeader() {
                                         <UserPlus className="mr-2 h-4 w-4"/>Join Requests
                                     </Link>
                                 </DropdownMenuItem>
-                                
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem>
-                                    </DialogTrigger>
-                                    <ParticipantsManagement />
-                                </Dialog>
+                                <DropdownMenuItem onSelect={() => setIsParticipantsOpen(true)}>
+                                    <Users className="mr-2 h-4 w-4"/>Manage Participants
+                                </DropdownMenuItem>
                             </>
                         )}
                         
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem>
-                            </DialogTrigger>
-                            <SubjectTeachers />
-                        </Dialog>
+                        <DropdownMenuItem onSelect={() => setIsTeachersOpen(true)}>
+                            <Briefcase className="mr-2 h-4 w-4"/>Subject Teachers
+                        </DropdownMenuItem>
                         
                         <DropdownMenuSeparator />
 
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Fees & Payment</DropdownMenuItem>
-                            </DialogTrigger>
-                            <FeesAndPayment />
-                        </Dialog>
+                        <DropdownMenuItem onSelect={() => setIsFeesOpen(true)}>
+                            <CreditCard className="mr-2 h-4 w-4"/>Fees & Payment
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </header>
+            
             <ItemDeleteDialog itemToDelete={itemToDelete} setItemToDelete={setItemToDelete} onConfirmDelete={handleDeleteItem} />
+            
+            <Dialog open={isParticipantsOpen} onOpenChange={setIsParticipantsOpen}>
+                <ParticipantsManagement />
+            </Dialog>
+
+            <Dialog open={isTeachersOpen} onOpenChange={setIsTeachersOpen}>
+                <SubjectTeachers />
+            </Dialog>
+            
+            <Dialog open={isFeesOpen} onOpenChange={setIsFeesOpen}>
+                <FeesAndPayment />
+            </Dialog>
         </>
     );
 }
