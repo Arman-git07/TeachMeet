@@ -75,36 +75,43 @@ export function ClassroomHeader() {
                     <p className="text-lg text-muted-foreground">{classroom.description}</p>
                     <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
                 </div>
-                <Dialog>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            {canUserManage && (
-                                <>
-                                    <DropdownMenuItem asChild>
-                                        <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
-                                            <UserPlus className="mr-2 h-4 w-4"/>Join Requests
-                                        </Link>
-                                    </DropdownMenuItem>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        {canUserManage && (
+                            <>
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
+                                        <UserPlus className="mr-2 h-4 w-4"/>Join Requests
+                                    </Link>
+                                </DropdownMenuItem>
+                                
+                                <Dialog>
                                     <DialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="participants"><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}><Users className="mr-2 h-4 w-4"/>Manage Participants</DropdownMenuItem>
                                     </DialogTrigger>
-                                </>
-                            )}
-                             <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="subject-teachers"><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem>
-                             </DialogTrigger>
-                            <DropdownMenuSeparator />
+                                    <ParticipantsManagement />
+                                </Dialog>
+                            </>
+                        )}
+                        
+                        <Dialog>
                             <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-dialog-id="fees"><CreditCard className="mr-2 h-4 w-4"/>Fees & Payment</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><Briefcase className="mr-2 h-4 w-4"/>Subject Teachers</DropdownMenuItem>
                             </DialogTrigger>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    
-                    <ParticipantsManagement />
-                    <SubjectTeachers />
-                    <FeesAndPayment />
-                </Dialog>
+                            <SubjectTeachers />
+                        </Dialog>
+                        
+                        <DropdownMenuSeparator />
+
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><CreditCard className="mr-2 h-4 w-4"/>Fees & Payment</DropdownMenuItem>
+                            </DialogTrigger>
+                            <FeesAndPayment />
+                        </Dialog>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </header>
             <ItemDeleteDialog itemToDelete={itemToDelete} setItemToDelete={setItemToDelete} onConfirmDelete={handleDeleteItem} />
         </>
