@@ -434,6 +434,7 @@ export default function ClassroomsPage() {
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [requestingToJoin, setRequestingToJoin] = useState<string | null>(null);
+  const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
 
 
   // Fetch My Classes
@@ -590,6 +591,33 @@ export default function ClassroomsPage() {
     }
   }, [user, toast]);
   
+  const handleCancelRequest = useCallback(async (classroomId: string) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: "Not authenticated" });
+        return;
+    }
+    setCancelingRequest(classroomId);
+    try {
+        const batch = writeBatch(db);
+        // Path to the request in the classroom's subcollection
+        const classroomRequestRef = doc(db, 'classrooms', classroomId, 'joinRequests', user.uid);
+        // Path to the request marker in the user's own subcollection
+        const userPendingRequestRef = doc(db, 'users', user.uid, 'pendingJoinRequests', classroomId);
+
+        batch.delete(classroomRequestRef);
+        batch.delete(userPendingRequestRef);
+
+        await batch.commit();
+
+        toast({ title: "Request Canceled", description: "Your request to join the class has been withdrawn." });
+    } catch (error) {
+        console.error("Error canceling request:", error);
+        toast({ variant: 'destructive', title: 'Cancellation Failed', description: 'Could not cancel the request. Please check Firestore rules and console for errors.' });
+    } finally {
+        setCancelingRequest(null);
+    }
+  }, [user, toast]);
+
   const handleOpenTeacherAppDialog = (classroom: Classroom) => {
     setSelectedClassroomForApp(classroom);
     setIsTeacherAppDialogOpen(true);
@@ -644,13 +672,12 @@ export default function ClassroomsPage() {
 
   const renderDiscoverClassroomCard = useCallback((classroom: Classroom) => {
     const isRequesting = requestingToJoin === classroom.id;
+    const isCanceling = cancelingRequest === classroom.id;
     const isMyClass = user?.uid === classroom.teacherId;
     const hasPendingRequest = pendingRequestIds.has(classroom.id);
     const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === classroom.id);
     
     if (isEnrolled) {
-        // If the user is already enrolled, show the card with an "Enter Class" button.
-        // This handles the case where a request was just approved.
         return (
             <Card key={classroom.id} className="flex flex-col">
                 <CardHeader>
@@ -669,7 +696,6 @@ export default function ClassroomsPage() {
         );
     }
     
-    // If it's the user's own class, show it with an "Enter Class" button.
     if (isMyClass) {
        return (
           <Card key={classroom.id} className="flex flex-col">
@@ -703,8 +729,9 @@ export default function ClassroomsPage() {
                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Working...
                     </Button>
                 ) : hasPendingRequest ? (
-                    <Button variant="outline" className="w-full" disabled>
-                        Request Sent
+                    <Button variant="destructive" className="w-full" onClick={() => handleCancelRequest(classroom.id)} disabled={isCanceling}>
+                        {isCanceling ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                        Cancel Request
                     </Button>
                 ) : (
                     <div className="grid grid-cols-2 gap-2">
@@ -724,7 +751,7 @@ export default function ClassroomsPage() {
           </CardFooter>
     </Card>
     );
-  }, [user, requestingToJoin, handleRequestToJoinStudent, pendingRequestIds, enrolledClasses]);
+  }, [user, requestingToJoin, cancelingRequest, handleRequestToJoinStudent, handleCancelRequest, pendingRequestIds, enrolledClasses]);
 
   const renderSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
