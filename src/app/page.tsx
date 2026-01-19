@@ -350,7 +350,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
       <AppHeader showLogo={false} />
-      <main className="flex-grow flex flex-col items-center pt-16 sm:pt-4 relative pb-[18rem]">
+      <main className="flex-grow flex flex-col pt-16 sm:pt-4 relative pb-[18rem]">
         <div
           className="absolute inset-0 opacity-10"
           style={{
@@ -360,7 +360,7 @@ export default function HomePage() {
             maskImage: "radial-gradient(circle at center, white, transparent 70%)"
           }}
         />
-        <div className="relative z-10 flex w-full max-w-md flex-col items-center px-4 text-center">
+        <div className="relative z-10 mx-auto flex w-full max-w-md flex-col items-center px-4 text-center">
           <Logo
             text={logoText}
             size="medium"
