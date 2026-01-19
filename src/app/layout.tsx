@@ -1,3 +1,4 @@
+
 // src/app/layout.tsx
 'use client';
 import React from 'react';
@@ -22,7 +23,7 @@ export default function RootLayout({
         
       </head>
       <body className={cn(
-        'font-sans antialiased min-h-screen flex flex-col',
+        'font-sans antialiased min-h-screen flex flex-col overflow-x-hidden',
         'subpixel-antialiased' // Added for potentially smoother font rendering
       )}>
         <Providers>
