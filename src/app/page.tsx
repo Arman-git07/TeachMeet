@@ -349,9 +349,9 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <AppHeader showLogo={false} />
-      <main className="flex-grow flex flex-col items-center justify-start p-4 pt-16 sm:justify-center sm:pt-4 relative pb-[18rem]">
+      <main className="flex-grow flex flex-col items-center p-4 pt-16 sm:pt-4 relative pb-[18rem]">
         <div
           className="absolute inset-0 opacity-10"
           style={{
