@@ -105,6 +105,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStartRef = useRef<number>(0);
+  const saveDestinationRef = useRef<'private' | 'public'>('private');
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -223,11 +224,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           try {
             const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
             const durationMs = Date.now() - recordingStartRef.current;
-            const durationSec = Math.round(durationMs / 1000);
             const durationStr = new Date(durationMs).toISOString().substr(11, 8);
 
             const fileName = `rec_${topic.replace(/\s/g, '_')}_${new Date().toISOString()}.webm`;
-            const filePath = `recordings/${user.uid}/private/${fileName}`;
+            const destination = saveDestinationRef.current;
+            const filePath = `recordings/${user.uid}/${destination}/${fileName}`;
+
             const fileRef = storageRef(storage, filePath);
             await uploadBytes(fileRef, blob);
             const downloadURL = await getDownloadURL(fileRef);
@@ -241,11 +243,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               downloadURL,
               storagePath: filePath,
               uploaderId: user.uid,
-              isPrivate: true, // Default to private
+              isPrivate: destination === 'private',
               createdAt: serverTimestamp(),
             });
             
-            toast.update(toastId, { title: 'Recording Saved!', description: 'Your recording is available in the library.' });
+            toast.update(toastId, { title: 'Recording Saved!', description: `Your recording is available in your ${destination} recordings.` });
           } catch (e: any) {
             toast.update(toastId, { variant: 'destructive', title: 'Upload Failed', description: e.message });
           } finally {
@@ -262,8 +264,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   }, [localStream, user, setIsRecording, setIsUploading, toast, topic]);
 
-  const stopRecording = useCallback(async () => {
+  const stopRecording = useCallback(async (destination: 'private' | 'public') => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          saveDestinationRef.current = destination;
           mediaRecorderRef.current.stop();
           setIsRecording(false);
           toast({ title: 'Recording Stopped', description: 'Finalizing and uploading your recording...' });

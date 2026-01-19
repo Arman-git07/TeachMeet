@@ -16,6 +16,7 @@ import { MoreVertical, Brush, Users, Settings, UserCheck, Loader2, Video, Messag
 import { useToast } from "@/hooks/use-toast";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { MeetingChatPanel } from "./chat/MeetingChatPanel";
+import { SaveRecordingDialog } from "@/components/meeting/SaveRecordingDialog";
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 
@@ -49,7 +50,7 @@ function MeetingPageContent() {
   const { toast } = useToast();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user, loading: authLoading } = useAuth();
-  const { rtc, isRecording, isUploading, recordingControls, setIsChatOpen } = useMeetingRTC();
+  const { rtc, isRecording, isUploading, recordingControls, setIsChatOpen, isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen } = useMeetingRTC();
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
@@ -184,7 +185,7 @@ function MeetingPageContent() {
 
     const handleRecordingToggle = () => {
       if (isRecording) {
-        recordingControls.stop();
+        setIsSaveRecordingDialogOpen(true);
       } else {
         recordingControls.start();
       }
@@ -227,7 +228,7 @@ function MeetingPageContent() {
         </DropdownMenuContent>
       </DropdownMenu>
     );
-  }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls, setIsChatOpen]);
+  }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls, setIsChatOpen, setIsSaveRecordingDialogOpen]);
   
   useEffect(() => {
       setHeaderContent(
@@ -250,15 +251,26 @@ function MeetingPageContent() {
   return (
     <div className="flex-1 w-full bg-[#223D4A] text-foreground flex flex-col h-full">
       {meetingId && user?.uid && (
-        <MeetingClient
-          meetingId={meetingId}
-          userId={user.uid}
-          onLeave={handleLeave}
-          topic={topic}
-          initialPinnedId={pinnedId}
-        >
-          <MeetingChatPanel />
-        </MeetingClient>
+        <>
+          <MeetingClient
+            meetingId={meetingId}
+            userId={user.uid}
+            onLeave={handleLeave}
+            topic={topic}
+            initialPinnedId={pinnedId}
+          >
+            <MeetingChatPanel />
+          </MeetingClient>
+          <SaveRecordingDialog 
+            isOpen={isSaveRecordingDialogOpen}
+            onOpenChange={setIsSaveRecordingDialogOpen}
+            onSave={(destination) => {
+              recordingControls.stop(destination);
+              setIsSaveRecordingDialogOpen(false);
+            }}
+            isSaving={isUploading}
+          />
+        </>
       )}
     </div>
   );

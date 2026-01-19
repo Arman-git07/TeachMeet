@@ -19,7 +19,7 @@ export interface ChatMessage {
 
 interface RecordingControls {
   start: () => Promise<void>;
-  stop: () => Promise<void>;
+  stop: (destination: 'private' | 'public') => Promise<void>;
 }
 
 interface MeetingRTCContextType {
@@ -35,6 +35,8 @@ interface MeetingRTCContextType {
   setIsUploading: (isUploading: boolean) => void;
   recordingControls: RecordingControls;
   setRecordingControls: (controls: RecordingControls) => void;
+  isSaveRecordingDialogOpen: boolean;
+  setIsSaveRecordingDialogOpen: (isOpen: boolean) => void;
 }
 
 const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undefined);
@@ -45,9 +47,10 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen] = useState(false);
   const [recordingControls, setRecordingControls] = useState<RecordingControls>({
     start: async () => console.warn('startRecording not implemented'),
-    stop: async () => console.warn('stopRecording not implemented'),
+    stop: async (destination) => console.warn('stopRecording not implemented'),
   });
 
   const addChatMessage = useCallback((message: ChatMessage) => {
@@ -61,7 +64,8 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
       isChatOpen, setIsChatOpen,
       isRecording, setIsRecording,
       isUploading, setIsUploading,
-      recordingControls, setRecordingControls
+      recordingControls, setRecordingControls,
+      isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen
     }}>
       {children}
     </MeetingRTCContext.Provider>
