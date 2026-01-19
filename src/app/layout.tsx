@@ -23,7 +23,7 @@ export default function RootLayout({
         
       </head>
       <body className={cn(
-        'font-sans antialiased min-h-screen flex flex-col overflow-x-hidden',
+        'font-sans antialiased min-h-screen flex flex-col',
         'subpixel-antialiased' // Added for potentially smoother font rendering
       )}>
         <Providers>
