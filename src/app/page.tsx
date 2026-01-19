@@ -11,7 +11,6 @@ import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import type { PublicChatActivityItem } from '@/app/dashboard/meeting/[meetingId]/chat/page';
 
 export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement';
 
@@ -349,9 +348,9 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <AppHeader showLogo={false} />
-      <main className="flex-grow flex flex-col items-center p-4 pt-16 sm:pt-4 relative pb-[18rem]">
+      <main className="flex-grow flex flex-col items-center pt-16 sm:pt-4 relative pb-[18rem]">
         <div
           className="absolute inset-0 opacity-10"
           style={{
@@ -361,7 +360,7 @@ export default function HomePage() {
             maskImage: "radial-gradient(circle at center, white, transparent 70%)"
           }}
         />
-        <div className="relative z-10 flex flex-col items-center text-center">
+        <div className="relative z-10 flex w-full max-w-md flex-col items-center px-4 text-center">
           <Logo
             text={logoText}
             size="medium"
@@ -372,7 +371,7 @@ export default function HomePage() {
             onClick={handleComplexLogoAnimation}
             animateChars={animateChars && logoText === 'TeachMeet'}
           />
-          <div className="mt-8 p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center border">
+          <div className="mt-8 w-full p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg text-center border">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
               <History className="mr-3 h-6 w-6" />
               Latest Activity
