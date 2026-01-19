@@ -7,8 +7,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Pin, MessageSquare, Minimize2, Maximize2, XCircle, AlertTriangle } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, getDoc, writeBatch, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, onSnapshot, doc, updateDoc, getDoc, writeBatch, serverTimestamp, deleteDoc, setDoc, addDoc } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes } from 'firebase/storage';
+import { getDownloadURL } from "firebase/storage";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -64,7 +66,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc } = useMeetingRTC();
+  const { rtc, setRtc, setIsRecording, setIsUploading, setRecordingControls } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
@@ -99,6 +101,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   
   const participantDocCreated = useRef(false);
   const audioUnlockedRef = useRef(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStartRef = useRef<number>(0);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -191,6 +197,81 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       return next;
     });
   }, [localStream, micOn, updateMyStatus, userId]);
+
+  const startRecording = useCallback(async () => {
+    if (!localStream || !user) {
+        toast({ variant: 'destructive', title: 'Cannot Record', description: 'Local media is not available.' });
+        return;
+    }
+
+    try {
+        const options = { mimeType: 'video/webm; codecs=vp9' };
+        mediaRecorderRef.current = new MediaRecorder(localStream, options);
+        recordedChunksRef.current = [];
+        
+        mediaRecorderRef.current.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                recordedChunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorderRef.current.onstop = async () => {
+          setIsUploading(true);
+          const toastId = toast({ title: 'Processing Recording...', duration: Infinity });
+
+          try {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const durationMs = Date.now() - recordingStartRef.current;
+            const durationSec = Math.round(durationMs / 1000);
+            const durationStr = new Date(durationMs).toISOString().substr(11, 8);
+
+            const fileName = `rec_${topic.replace(/\s/g, '_')}_${new Date().toISOString()}.webm`;
+            const filePath = `recordings/${user.uid}/private/${fileName}`;
+            const fileRef = storageRef(storage, filePath);
+            await uploadBytes(fileRef, blob);
+            const downloadURL = await getDownloadURL(fileRef);
+
+            await addDoc(collection(db, 'recordings'), {
+              name: fileName,
+              date: new Date().toLocaleDateString(),
+              duration: durationStr,
+              size: `${(blob.size / 1024 / 1024).toFixed(2)}MB`,
+              thumbnailUrl: `https://placehold.co/300x180.png?text=${encodeURIComponent(durationStr)}`,
+              downloadURL,
+              storagePath: filePath,
+              uploaderId: user.uid,
+              isPrivate: true, // Default to private
+              createdAt: serverTimestamp(),
+            });
+            
+            toast.update(toastId, { title: 'Recording Saved!', description: 'Your recording is available in the library.' });
+          } catch (e: any) {
+            toast.update(toastId, { variant: 'destructive', title: 'Upload Failed', description: e.message });
+          } finally {
+            setIsUploading(false);
+          }
+        };
+        
+        mediaRecorderRef.current.start(1000); // 1-second timeslice
+        recordingStartRef.current = Date.now();
+        setIsRecording(true);
+        toast({ title: 'Recording Started', description: 'Your local audio and video are being recorded.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Recording Error', description: e.message });
+    }
+  }, [localStream, user, setIsRecording, setIsUploading, toast, topic]);
+
+  const stopRecording = useCallback(async () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+          toast({ title: 'Recording Stopped', description: 'Finalizing and uploading your recording...' });
+      }
+  }, [setIsRecording, toast]);
+
+  useEffect(() => {
+    setRecordingControls({ start: startRecording, stop: stopRecording });
+  }, [setRecordingControls, startRecording, stopRecording]);
 
   useEffect(() => {
     const fetchMeetingCreator = async () => {

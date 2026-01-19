@@ -12,7 +12,7 @@ import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Brush, Users, Settings, UserCheck, Loader2 } from 'lucide-react';
+import { MoreVertical, Brush, Users, Settings, UserCheck, Loader2, Video } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 
@@ -26,6 +26,21 @@ interface Participant {
   isHost?: boolean;
 }
 
+export interface Recording {
+  id: string;
+  name: string;
+  date: string;
+  duration: string;
+  size: string;
+  thumbnailUrl?: string;
+  downloadURL: string;
+  storagePath: string;
+  uploaderId: string;
+  isPrivate: boolean;
+  createdAt?: any;
+}
+
+
 function MeetingPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -33,7 +48,7 @@ function MeetingPageContent() {
   const { toast } = useToast();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user, loading: authLoading } = useAuth();
-  const { rtc } = useMeetingRTC();
+  const { rtc, isRecording, isUploading, recordingControls } = useMeetingRTC();
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
@@ -166,6 +181,14 @@ function MeetingPageContent() {
 
     const constructUrl = (page: string) => `/dashboard/meeting/${meetingId}/${page}?${params.toString()}`;
 
+    const handleRecordingToggle = () => {
+      if (isRecording) {
+        recordingControls.stop();
+      } else {
+        recordingControls.start();
+      }
+    };
+
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -174,6 +197,10 @@ function MeetingPageContent() {
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="rounded-xl w-56">
+            <DropdownMenuItem onSelect={handleRecordingToggle} disabled={isUploading} className="cursor-pointer">
+              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Video className="mr-2 h-4 w-4" />}
+              <span>{isUploading ? 'Uploading...' : isRecording ? 'Stop Recording' : 'Start Recording'}</span>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild className="cursor-pointer">
             <Link href={constructUrl('whiteboard')}>
                 <Brush className="mr-2 h-4 w-4" />
@@ -195,7 +222,7 @@ function MeetingPageContent() {
         </DropdownMenuContent>
       </DropdownMenu>
     );
-  }, [meetingId, topic, camOn, micOn, pinnedId]);
+  }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls]);
   
   useEffect(() => {
       setHeaderContent(

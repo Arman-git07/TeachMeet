@@ -17,11 +17,22 @@ export interface ChatMessage {
   isPrivate: boolean;
 }
 
+interface RecordingControls {
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+}
+
 interface MeetingRTCContextType {
   rtc: MeshRTC | null;
   setRtc: (rtc: MeshRTC | null) => void;
   chatHistory: ChatMessage[];
   addChatMessage: (message: ChatMessage) => void;
+  isRecording: boolean;
+  setIsRecording: (isRecording: boolean) => void;
+  isUploading: boolean;
+  setIsUploading: (isUploading: boolean) => void;
+  recordingControls: RecordingControls;
+  setRecordingControls: (controls: RecordingControls) => void;
 }
 
 const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undefined);
@@ -29,13 +40,25 @@ const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undef
 export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [recordingControls, setRecordingControls] = useState<RecordingControls>({
+    start: async () => console.warn('startRecording not implemented'),
+    stop: async () => console.warn('stopRecording not implemented'),
+  });
 
   const addChatMessage = useCallback((message: ChatMessage) => {
     setChatHistory(prev => [...prev, message]);
   }, []);
 
   return (
-    <MeetingRTCContext.Provider value={{ rtc, setRtc, chatHistory, addChatMessage }}>
+    <MeetingRTCContext.Provider value={{ 
+      rtc, setRtc, 
+      chatHistory, addChatMessage,
+      isRecording, setIsRecording,
+      isUploading, setIsUploading,
+      recordingControls, setRecordingControls
+    }}>
       {children}
     </MeetingRTCContext.Provider>
   );
