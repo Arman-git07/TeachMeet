@@ -14,7 +14,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
-import { ScreenShareHelper } from "@/lib/webrtc/screenShare";
+import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -67,6 +67,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { rtc, setRtc } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
   
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
@@ -224,7 +225,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   };
 
-  const onModalConfirm = async (shareAudio: boolean) => {
+  const onModalConfirm = async (shareAudio: boolean, mode: ShareMode) => {
     setIsScreenShareModalOpen(false);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       toast({
@@ -238,12 +239,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: shareAudio });
-      
-      await screenShareHelper.startSharingWithStream("replace", stream);
+      setScreenShareStream(stream);
+      await screenShareHelper.startSharingWithStream(mode, stream);
       setIsSharingScreen(true);
       updateMyStatus({ isScreenSharing: true });
     } catch (err) {
       console.error("Screen share cancelled or failed:", err);
+      setScreenShareStream(null);
       if (err instanceof Error && err.name === 'NotAllowedError') {
          toast({ variant: "default", title: "Screen Share Canceled", description: "You did not grant permission to share your screen." });
       } else if (err instanceof Error) {
@@ -260,6 +262,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     await screenShareHelper?.stopSharing(); 
     setIsSharingScreen(false); 
     updateMyStatus({ isScreenSharing: false });
+    setScreenShareStream(null);
   };
 
  useEffect(() => {
@@ -467,6 +470,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       isScreenSharing: isSharingScreen, isLocal: true, stream: localStream,
       volumeLevel: volumeLevels.get(userId) ?? 0
     };
+    
+    if (isSharingScreen && screenShareHelper?.currentMode === 'replace') {
+        self.stream = screenShareStream;
+    }
+
     const remotes: Participant[] = Array.from(liveParticipants.entries())
       .filter(([id]) => id !== userId)
       .map(([id, data]) => {
@@ -491,7 +499,24 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       });
       
     let all = [self, ...remotes];
-    const remoteOnly = [...remotes];
+
+    if (isSharingScreen && screenShareHelper?.currentMode === 'alongside' && screenShareStream) {
+        self.isScreenSharing = false; // Main tile is camera
+        const screenShareParticipant: Participant = {
+            id: `${userId}-screen`,
+            name: `${self.name}'s Screen`,
+            avatar: self.avatar,
+            isCamOff: false,
+            isMicOff: true,
+            isLocal: true,
+            stream: screenShareStream,
+            isScreenSharing: true,
+            volumeLevel: 0,
+        };
+        all.push(screenShareParticipant);
+    }
+    
+    const remoteOnly = all.filter(p => !p.isLocal);
 
     if (pinnedId) {
         const pinnedIndex = all.findIndex(p => p.id === pinnedId);
@@ -509,7 +534,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const firstHandRaised = all.filter(p => p.isHandRaised && p.handRaisedAt).sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
     const raisedCount = all.filter(p => p.isHandRaised).length;
     return { allParticipants: all, localParticipant: self, remoteParticipants: remoteOnly, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId, isBlockedByMe]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId, isBlockedByMe, screenShareHelper, screenShareStream]);
 
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   
@@ -567,7 +592,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 stream={p.stream} 
                                 isCameraOn={!p.isCamOff} 
                                 isMicOn={!p.isMicOff} 
-                                name={p.name + "'s Screen"}
+                                name={p.name}
                                 isScreenSharing={true}
                                 onDoubleClick={() => togglePin(p.id)}
                                 onUnpin={() => togglePin(p.id)}

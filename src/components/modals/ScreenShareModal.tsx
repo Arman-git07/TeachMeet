@@ -14,21 +14,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Cast } from 'lucide-react';
-import { cn } from "@/lib/utils";
-import { buttonVariants } from "../ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import type { ShareMode } from "@/lib/webrtc/screenShare";
+
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onConfirm: (shareAudio: boolean) => void;
+  onConfirm: (shareAudio: boolean, mode: ShareMode) => void;
 };
 
 export const ScreenShareModal: React.FC<Props> = ({ open, onClose, onConfirm }) => {
   const [shareAudio, setShareAudio] = useState(true);
+  const [shareMode, setShareMode] = useState<ShareMode>('replace');
 
   const handleContinue = () => {
-    onConfirm(shareAudio);
+    onConfirm(shareAudio, shareMode);
   };
   
   const handleOpenChange = (isOpen: boolean) => {
@@ -43,15 +44,34 @@ export const ScreenShareModal: React.FC<Props> = ({ open, onClose, onConfirm }) 
         <AlertDialogHeader>
           <AlertDialogTitle className="text-xl">Share your screen?</AlertDialogTitle>
           <AlertDialogDescription>
-            People will see everything on your screen, including notifications. TeachMeet will have access to all of the information that is visible on your screen.
+            Choose how you want to present. Your browser will ask you to select a screen, window, or tab.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="flex items-center space-x-2 py-4">
+        
+        <RadioGroup defaultValue="replace" value={shareMode} onValueChange={(value) => setShareMode(value as ShareMode)} className="py-4 space-y-3">
+          <Label htmlFor="replace-mode" className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer has-[:checked]:bg-primary/10 has-[:checked]:border-primary">
+            <RadioGroupItem value="replace" id="replace-mode" />
+            <div className="grid gap-0.5">
+                <span className="font-medium">Replace Camera Feed</span>
+                <span className="text-xs text-muted-foreground">Your screen will replace your video.</span>
+            </div>
+          </Label>
+           <Label htmlFor="alongside-mode" className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer has-[:checked]:bg-primary/10 has-[:checked]:border-primary">
+            <RadioGroupItem value="alongside" id="alongside-mode" />
+             <div className="grid gap-0.5">
+                <span className="font-medium">Share as New Video</span>
+                <span className="text-xs text-muted-foreground">Your screen appears as a new participant.</span>
+            </div>
+          </Label>
+        </RadioGroup>
+
+        <div className="flex items-center space-x-2 pt-4 border-t">
           <Checkbox id="share-audio" checked={shareAudio} onCheckedChange={(checked) => setShareAudio(Boolean(checked))} />
           <Label htmlFor="share-audio" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            Also share your device's audio
+            Also share tab/device audio
           </Label>
         </div>
+
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={handleContinue}>Continue</AlertDialogAction>

@@ -11,6 +11,8 @@ export class ScreenShareHelper {
   private originalTrack: MediaStreamTrack | null = null;
   private isSharingFlag = false;
   private onStopCallbacks: Array<() => void> = [];
+  public currentMode: ShareMode | null = null;
+
 
   constructor(mesh: MeshRTC) {
     this.mesh = mesh;
@@ -48,44 +50,23 @@ export class ScreenShareHelper {
 
     this.screenStream = stream;
     this.screenTrack = track;
+    this.currentMode = mode;
 
-    // If replace, store original camera track (if available)
     if (mode === "replace") {
-      try {
-        this.originalTrack = this.mesh.getLocalVideoTrack?.() ?? null;
-      } catch (err) {
-        console.warn("Could not read original local track:", err);
-        this.originalTrack = null;
-      }
+      this.originalTrack = this.mesh.getLocalVideoTrack?.() ?? null;
+      await this.mesh.replaceTrack(this.screenTrack);
+    } else { // 'alongside'
+      await this.mesh.addTrack?.(this.screenTrack);
     }
+    
+    this.isSharingFlag = true;
 
-    try {
-      if (mode === "replace") {
-        // Replace camera with screen
-        await this.mesh.replaceTrack(this.screenTrack);
-      } else {
-        // Send screen as an additional track on existing connection
-        await this.mesh.addTrack?.(this.screenTrack);
-      }
-      this.isSharingFlag = true;
+    this.mesh.socket?.emit?.("screen-share-started", {
+      roomId: this.mesh.roomId,
+      mode,
+    });
 
-       // Optional: emit socket/event if mesh exposes socket
-      this.mesh.socket?.emit?.("screen-share-started", {
-        roomId: this.mesh.roomId,
-        mode,
-      });
-
-       console.log("Screen sharing started (mode:", mode, ")");
-    } catch (err) {
-      console.error("Failed to start screen sharing:", err);
-      // clean up if failed
-      if (this.screenTrack) {
-        try { this.screenTrack.stop(); } catch {}
-      }
-      this.screenStream = null;
-      this.screenTrack = null;
-      throw err;
-    }
+    console.log("Screen sharing started (mode:", mode, ")");
   }
 
    // Convenience: call getDisplayMedia and start sharing — keep for backward compatibility,
@@ -104,7 +85,6 @@ export class ScreenShareHelper {
     if (!this.isSharingFlag) return;
 
     try {
-      // Stop the screen track if still running
       if (this.screenTrack) {
         try { this.screenTrack.onended = null; } catch {}
         try { this.screenTrack.stop(); } catch {}
@@ -117,39 +97,32 @@ export class ScreenShareHelper {
         } catch (e) { /* ignore */ }
       }
 
-       // If we replaced camera, restore the original camera track
-      if (this.originalTrack) {
+      if (this.currentMode === 'replace' && this.originalTrack) {
         try {
           await this.mesh.restoreCameraTrack?.();
         } catch (err) {
           console.error("Failed to restore camera track:", err);
-          // fallback: try replaceTrack with originalTrack
           try { await this.mesh.replaceTrack(this.originalTrack); } catch (e) { console.error(e); }
         }
-      } else {
-        // If we were sending alongside, ask mesh to remove the screen track sender
-        if(this.screenTrack) {
-          try {
+      } else if (this.currentMode === 'alongside' && this.screenTrack) {
+        try {
             await this.mesh.removeTrack?.(this.screenTrack);
-          } catch (err) {
+        } catch (err) {
             console.warn("mesh.removeTrack failed (maybe not implemented):", err);
-          }
         }
       }
 
-       // Update local flags
       this.screenStream = null;
       this.screenTrack = null;
       this.originalTrack = null;
       this.isSharingFlag = false;
+      this.currentMode = null;
 
-       // Notify UI callbacks
       this.notifyStop();
 
-       // Optional event to peers
       this.mesh.socket?.emit?.("screen-share-stopped", { roomId: this.mesh.roomId });
 
-       console.log("Screen sharing stopped.");
+      console.log("Screen sharing stopped.");
     } catch (err) {
       console.error("Error stopping screen share:", err);
       // still attempt to reset flags
@@ -157,6 +130,7 @@ export class ScreenShareHelper {
       this.screenTrack = null;
       this.originalTrack = null;
       this.isSharingFlag = false;
+      this.currentMode = null;
       this.notifyStop();
     }
   }
