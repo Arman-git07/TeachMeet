@@ -104,7 +104,7 @@ const VideoTile: React.FC<Props> = ({
       onDoubleClick={onDoubleClick}
       className={cn(
         "relative bg-black rounded-lg overflow-hidden transition-all duration-300",
-        isSpeaking ? "ring-4 ring-primary ring-offset-2 ring-offset-background" : "ring-0",
+        isSpeaking ? "ring-4 ring-inset ring-primary" : "",
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       )}
@@ -158,7 +158,7 @@ const VideoTile: React.FC<Props> = ({
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <Avatar className={cn(
                 "w-28 h-28 border-4 border-background shadow-lg transition-all duration-300",
-                isSpeaking ? "ring-4 ring-primary ring-offset-2 ring-offset-background" : ""
+                isSpeaking ? "ring-4 ring-inset ring-primary" : ""
               )}>
               <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
               <AvatarFallback className="text-5xl">
