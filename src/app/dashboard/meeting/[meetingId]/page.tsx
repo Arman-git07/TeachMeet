@@ -12,9 +12,10 @@ import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Brush, Users, Settings, UserCheck, Loader2, Video } from 'lucide-react';
+import { MoreVertical, Brush, Users, Settings, UserCheck, Loader2, Video, MessageSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
+import { MeetingChatPanel } from "./chat/MeetingChatPanel";
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 
@@ -48,7 +49,7 @@ function MeetingPageContent() {
   const { toast } = useToast();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user, loading: authLoading } = useAuth();
-  const { rtc, isRecording, isUploading, recordingControls } = useMeetingRTC();
+  const { rtc, isRecording, isUploading, recordingControls, setIsChatOpen } = useMeetingRTC();
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
@@ -197,6 +198,10 @@ function MeetingPageContent() {
             </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="rounded-xl w-56">
+            <DropdownMenuItem onSelect={() => setIsChatOpen(true)} className="cursor-pointer">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              <span>Chat</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={handleRecordingToggle} disabled={isUploading} className="cursor-pointer">
               {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Video className="mr-2 h-4 w-4" />}
               <span>{isUploading ? 'Uploading...' : isRecording ? 'Stop Recording' : 'Start Recording'}</span>
@@ -222,7 +227,7 @@ function MeetingPageContent() {
         </DropdownMenuContent>
       </DropdownMenu>
     );
-  }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls]);
+  }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls, setIsChatOpen]);
   
   useEffect(() => {
       setHeaderContent(
@@ -252,7 +257,7 @@ function MeetingPageContent() {
           topic={topic}
           initialPinnedId={pinnedId}
         >
-          {null /* This allows MeetingClient to render its default layout */}
+          <MeetingChatPanel />
         </MeetingClient>
       )}
     </div>

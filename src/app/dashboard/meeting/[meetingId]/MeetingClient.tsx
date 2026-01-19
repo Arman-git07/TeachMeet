@@ -66,7 +66,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const { toast } = useToast();
   const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc, setIsRecording, setIsUploading, setRecordingControls } = useMeetingRTC();
+  const { rtc, setRtc, setIsRecording, setIsUploading, setRecordingControls, addChatMessage } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
@@ -149,6 +149,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         });
       },
       onRemoteLeft: handleRemoteLeft,
+      onChatMessage: addChatMessage,
     });
 
     setRtc(rtcInstance);
@@ -157,7 +158,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       rtcInstance?.leave();
       setRtc(null);
     }
-  }, [meetingId, userId, setRtc, handleRemoteLeft]);
+  }, [meetingId, userId, setRtc, handleRemoteLeft, addChatMessage]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {

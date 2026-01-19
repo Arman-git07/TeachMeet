@@ -27,6 +27,8 @@ interface MeetingRTCContextType {
   setRtc: (rtc: MeshRTC | null) => void;
   chatHistory: ChatMessage[];
   addChatMessage: (message: ChatMessage) => void;
+  isChatOpen: boolean;
+  setIsChatOpen: (isOpen: boolean) => void;
   isRecording: boolean;
   setIsRecording: (isRecording: boolean) => void;
   isUploading: boolean;
@@ -40,6 +42,7 @@ const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undef
 export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [recordingControls, setRecordingControls] = useState<RecordingControls>({
@@ -55,6 +58,7 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
     <MeetingRTCContext.Provider value={{ 
       rtc, setRtc, 
       chatHistory, addChatMessage,
+      isChatOpen, setIsChatOpen,
       isRecording, setIsRecording,
       isUploading, setIsUploading,
       recordingControls, setRecordingControls

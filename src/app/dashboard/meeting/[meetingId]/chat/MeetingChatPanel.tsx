@@ -1,146 +1,123 @@
-import type { NextApiRequest } from "next";
-import type { NextApiResponseServerIO } from "@/types";
-import { Server as IOServer, Socket } from "socket.io";
 
-// A simple in-memory store for block relationships within a room.
-// In a production app, this should be moved to a more persistent store like Redis.
-const roomBlocks = new Map<string, Map<string, Set<string>>>(); // Map<roomId, Map<blockerId, Set<blockedId>>>
+'use client';
 
-export default function handler(
-  req: NextApiRequest,
-  res: NextApiResponseServerIO
-) {
-  if (!res.socket.server.io) {
-    console.log("🔌 Initializing new Socket.IO server...");
-    const io = new IOServer(res.socket.server, {
-      path: "/api/socketio",
-      addTrailingSlash: false,
-      cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-      },
-    });
-    res.socket.server.io = io;
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { Send, MessageSquare } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useMeetingRTC, type ChatMessage } from "@/contexts/MeetingRTCContext";
+import { useBlock } from "@/contexts/BlockContext";
 
-    io.on("connection", (socket) => {
-      console.log("Socket connected:", socket.id);
-      
-      socket.on("join-room", (roomId: string, userId: string) => {
-        socket.join(roomId);
-        // @ts-ignore
-        socket.data.userId = userId;
-        // @ts-ignore
-        socket.data.roomId = roomId;
-        
-        if (!roomBlocks.has(roomId)) {
-            roomBlocks.set(roomId, new Map());
-        }
-        
-        // Notify others that a new user has joined
-        socket.to(roomId).emit("user-joined", userId);
+export function MeetingChatPanel() {
+  const { user } = useAuth();
+  const { rtc, chatHistory, addChatMessage, isChatOpen, setIsChatOpen } = useMeetingRTC();
+  const { isBlockedByMe } = useBlock();
 
-        // Tell the new user who has blocked them
-        const roomBlockMap = roomBlocks.get(roomId);
-        const usersWhoBlockedMe: string[] = [];
-        roomBlockMap?.forEach((blockedSet, blockerId) => {
-            if (blockedSet.has(userId)) {
-                usersWhoBlockedMe.push(blockerId);
-            }
-        });
-        socket.emit('initial-block-list', usersWhoBlockedMe);
+  const [inputValue, setInputValue] = useState("");
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-        console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
-      });
-      
-      socket.on('block-user', ({ blockedUserId }: { blockedUserId: string }) => {
-          const { userId: blockerId, roomId } = socket.data as { userId: string, roomId: string };
-          if (!blockerId || !roomId || !blockedUserId) return;
-          
-          const roomBlockMap = roomBlocks.get(roomId);
-          if (!roomBlockMap) return;
+  useEffect(() => {
+    if (isChatOpen) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isChatOpen]);
 
-          if (!roomBlockMap.has(blockerId)) {
-              roomBlockMap.set(blockerId, new Set());
-          }
-          roomBlockMap.get(blockerId)!.add(blockedUserId);
-          
-          const blockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === blockedUserId);
-          if (blockedSocket) {
-              blockedSocket.emit('user-blocked-me', blockerId);
-          }
-      });
+  useEffect(() => {
+    if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTo({ top: scrollViewportRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [chatHistory]);
 
-      socket.on('unblock-user', ({ unblockedUserId }: { unblockedUserId: string }) => {
-          const { userId: unblockerId, roomId } = socket.data as { userId: string, roomId: string };
-          if (!unblockerId || !roomId || !unblockedUserId) return;
-          
-          const roomBlockMap = roomBlocks.get(roomId);
-          if (!roomBlockMap) return;
-          
-          roomBlockMap.get(unblockerId)?.delete(unblockedUserId);
-          
-          const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
-          if (unblockedSocket) {
-              unblockedSocket.emit('user-unblocked-me', unblockerId);
-          }
-      });
+  const handleSendMessage = useCallback(() => {
+    if (!inputValue.trim() || !user || !rtc) return;
 
-      socket.on('draw', (data) => {
-        // @ts-ignore
-        const { userId } = socket.data || {};
-        if (data.ownerId && userId) {
-            const ownerRoomId = `whiteboard-owner-${data.ownerId}`;
-            const ownerSocketId = Array.from(io.sockets.adapter.rooms.get(ownerRoomId) || [])[0];
-            if (ownerSocketId) {
-                io.to(ownerSocketId).emit('draw-from-collaborator', { ...data, collaboratorId: userId });
-            }
-        }
-      });
-      
-      socket.on('set-permission', ({ ownerId, participantId, canDraw }) => {
-        const participantSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === participantId);
-        if (participantSocket) {
-            participantSocket.emit('permission-update', { canDraw, ownerId });
-        }
-      });
+    const newMessage: ChatMessage = {
+      id: `${Date.now()}-${user.uid}`,
+      senderId: user.uid,
+      senderName: user.displayName || 'You',
+      senderAvatar: user.photoURL || undefined,
+      text: inputValue,
+      timestamp: Date.now(),
+      isPrivate: false, // For now, all messages are public in the meeting
+    };
+    
+    // Optimistic update
+    addChatMessage(newMessage);
+    // Send to others
+    rtc.socket.emit('chat-message', newMessage);
 
-      socket.on("offer", (remoteId: string, offer: any) => {
-        // Find the specific socket for the user ID and emit to it
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
-        if (targetSocket) {
-          targetSocket.emit("offer", socket.data.userId, offer);
-        }
-      });
-      
-      socket.on("answer", (remoteId: string, answer: any) => {
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
-        if (targetSocket) {
-          targetSocket.emit("answer", socket.data.userId, answer);
-        }
-      });
+    setInputValue("");
+    inputRef.current?.focus();
+  }, [inputValue, user, rtc, addChatMessage]);
 
-      socket.on("ice-candidate", (remoteId: string, candidate: any) => {
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
-        if (targetSocket) {
-          targetSocket.emit("ice-candidate", socket.data.userId, candidate);
-        }
-      });
+  const filteredMessages = chatHistory.filter(msg => !msg.isPrivate && !isBlockedByMe(msg.senderId, 'publicChat'));
 
-      socket.on("disconnect", () => {
-        const { roomId, userId } = socket.data as { roomId: string, userId: string };
-        if (roomId && userId) {
-          socket.to(roomId).emit("user-left", userId);
-
-          // Clean up block lists on disconnect
-          const roomBlockMap = roomBlocks.get(roomId);
-          if(roomBlockMap) {
-            roomBlockMap.delete(userId); // Remove this user's blocks
-            roomBlockMap.forEach(blockedSet => blockedSet.delete(userId)); // Remove this user from others' blocks
-          }
-        }
-        console.log("Disconnected:", socket.id);
-      });
-    });
-  }
-  res.end();
+  return (
+    <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+        <SheetContent className="flex flex-col p-0">
+            <SheetHeader className="p-4 border-b">
+                <SheetTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5"/>Meeting Chat</SheetTitle>
+            </SheetHeader>
+            <div className="flex-grow overflow-hidden">
+                 <ScrollArea className="h-full">
+                    <div className="p-4 space-y-4" ref={scrollViewportRef}>
+                    {filteredMessages.map((msg) => (
+                        <div key={msg.id} className={cn("flex items-end gap-2", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
+                        {msg.senderId !== user?.uid && (
+                            <Avatar className="h-8 w-8 self-start">
+                            <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
+                            <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                        )}
+                        <div
+                            className={cn(
+                            "max-w-[80%] p-3 rounded-xl shadow",
+                            msg.senderId === user?.uid
+                                ? "bg-primary text-primary-foreground rounded-br-none"
+                                : "bg-card text-card-foreground rounded-bl-none"
+                            )}
+                        >
+                            {msg.senderId !== user?.uid && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
+                            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                            <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                        {msg.senderId === user?.uid && (
+                            <Avatar className="h-8 w-8 self-start">
+                            <AvatarImage src={user?.photoURL || `https://placehold.co/40x40/00FFFF/000000.png?text=Y`} alt="You" data-ai-hint="avatar user"/>
+                            <AvatarFallback>{user?.displayName?.charAt(0) || 'Y'}</AvatarFallback>
+                            </Avatar>
+                        )}
+                        </div>
+                    ))}
+                    </div>
+                </ScrollArea>
+            </div>
+            <SheetFooter className="p-4 border-t bg-background">
+                <form
+                    onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                    className="flex w-full items-center gap-2"
+                >
+                    <Input
+                        ref={inputRef}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        placeholder="Type your message..."
+                        className="flex-grow rounded-full border-border/80 focus:ring-primary text-sm h-10"
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                    />
+                    <Button type="submit" size="icon" className="rounded-full btn-gel w-10 h-10" disabled={!inputValue.trim()}>
+                        <Send className="h-5 w-5" />
+                        <span className="sr-only">Send message</span>
+                    </Button>
+                </form>
+            </SheetFooter>
+        </SheetContent>
+    </Sheet>
+  );
 }
