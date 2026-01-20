@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MeetingChatPanel } from "./chat/MeetingChatPanel";
 
 
 type Participant = {
@@ -58,10 +59,9 @@ type Props = {
   onLeave: (endForAll?: boolean) => void;
   topic: string;
   initialPinnedId?: string | null;
-  children: React.ReactNode;
 };
 
-export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId, children }: Props) {
+export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -808,16 +808,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     return null;
   };
 
-  const childrenWithProps = React.Children.map(children, child => {
-    if (React.isValidElement(child)) {
-      // @ts-ignore
-      return React.cloneElement(child, { rtc: rtc, camOn, micOn });
-    }
-    return child;
-  });
-
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1" onClick={unlockAudio}>
+      <MeetingChatPanel />
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} />
 
@@ -828,13 +821,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             ) : (
-              <>
-                {childrenWithProps ? (
-                    <div className="w-full h-full">{childrenWithProps}</div>
-                  ) : (
-                    renderLayout()
-                  )}
-              </>
+              renderLayout()
             )}
           </div>
           {isSharingScreen && (

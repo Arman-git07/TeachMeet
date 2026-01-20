@@ -258,9 +258,7 @@ function MeetingPageContent() {
             onLeave={handleLeave}
             topic={topic}
             initialPinnedId={pinnedId}
-          >
-            <MeetingChatPanel />
-          </MeetingClient>
+          />
           <SaveRecordingDialog 
             isOpen={isSaveRecordingDialogOpen}
             onOpenChange={setIsSaveRecordingDialogOpen}
