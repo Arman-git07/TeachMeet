@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Youtube, Lock, Globe, Loader2 } from 'lucide-react';
+import { Mail, Lock, Globe, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface SaveRecordingDialogProps {
@@ -30,9 +30,10 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
     onSave(destination);
   };
   
-  const handleOpenYouTube = () => {
-    // This opens the TeachMeet YouTube channel page. Users with permission can upload from there.
-    window.open('https://youtube.com/@teachmeet786', '_blank', 'noopener,noreferrer');
+  const handleEmailRecording = () => {
+    const subject = "TeachMeet Meeting Recording";
+    const body = "I've recorded a meeting. Please find the video file attached.\n\n(After saving, please go to your recordings library, download this video, and attach it to this email.)";
+    window.location.href = `mailto:07arman2004@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   return (
@@ -41,7 +42,7 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
         <DialogHeader>
           <DialogTitle>Save Your Recording</DialogTitle>
           <DialogDescription>
-            First, save your recording to TeachMeet. After it's saved, you can download it from your library and upload it to other sites.
+            Choose a destination for your recording. You can email it to the administrator after it's saved.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-6">
@@ -59,12 +60,12 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
             </RadioGroup>
           </div>
           <div className="space-y-3">
-             <Label className="font-semibold">2. Optional: Upload to YouTube</Label>
-             <Button variant="outline" className="w-full justify-start border-red-500/50 text-red-600 hover:bg-red-500/10 hover:text-red-700" onClick={handleOpenYouTube}>
-                <Youtube className="mr-2 h-4 w-4" />
-                Go to TeachMeet YouTube Channel
+             <Label className="font-semibold">2. Optional: Email to Admin</Label>
+             <Button variant="outline" className="w-full justify-start" onClick={handleEmailRecording}>
+                <Mail className="mr-2 h-4 w-4" />
+                Email Recording to Admin
              </Button>
-             <p className="text-xs text-muted-foreground">This will open the channel in a new tab. If you have permission, you can upload your video there after saving and downloading it.</p>
+             <p className="text-xs text-muted-foreground">This will open your email client. You'll need to save the recording first, then download it from your library and attach it to the email.</p>
           </div>
         </div>
         <DialogFooter>
