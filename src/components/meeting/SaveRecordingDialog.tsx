@@ -31,8 +31,8 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
   };
   
   const handleOpenYouTube = () => {
-    // This is the direct upload page for YouTube Studio.
-    window.open('https://studio.youtube.com/', '_blank', 'noopener,noreferrer');
+    // This opens the TeachMeet YouTube channel page. Users with permission can upload from there.
+    window.open('https://youtube.com/@teachmeet786', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -62,9 +62,9 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
              <Label className="font-semibold">2. Optional: Upload to YouTube</Label>
              <Button variant="outline" className="w-full justify-start border-red-500/50 text-red-600 hover:bg-red-500/10 hover:text-red-700" onClick={handleOpenYouTube}>
                 <Youtube className="mr-2 h-4 w-4" />
-                Open YouTube Upload Page
+                Go to TeachMeet YouTube Channel
              </Button>
-             <p className="text-xs text-muted-foreground">This will open YouTube Studio in a new tab. You can upload your video there after you have saved and downloaded it.</p>
+             <p className="text-xs text-muted-foreground">This will open the channel in a new tab. If you have permission, you can upload your video there after saving and downloading it.</p>
           </div>
         </div>
         <DialogFooter>
