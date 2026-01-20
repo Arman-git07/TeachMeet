@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -30,7 +31,8 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
   };
   
   const handleOpenYouTube = () => {
-    window.open('https://youtube.com/@teachmeet786?si=nwITfas2lG0tgh4a', '_blank', 'noopener,noreferrer');
+    // This is the direct upload page for YouTube Studio.
+    window.open('https://studio.youtube.com/', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -39,12 +41,12 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
         <DialogHeader>
           <DialogTitle>Save Your Recording</DialogTitle>
           <DialogDescription>
-            Choose a destination for your recording and optionally upload it to YouTube.
+            First, save your recording to TeachMeet. After it's saved, you can download it from your library and upload it to other sites.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-6">
           <div className="space-y-3">
-            <Label className="font-semibold">Save Destination</Label>
+            <Label className="font-semibold">1. Choose Save Destination</Label>
             <RadioGroup value={destination} onValueChange={(value) => setDestination(value as 'private' | 'public')}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="private" id="r-private" />
@@ -57,12 +59,12 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
             </RadioGroup>
           </div>
           <div className="space-y-3">
-             <Label className="font-semibold">External Sharing</Label>
+             <Label className="font-semibold">2. Optional: Upload to YouTube</Label>
              <Button variant="outline" className="w-full justify-start border-red-500/50 text-red-600 hover:bg-red-500/10 hover:text-red-700" onClick={handleOpenYouTube}>
                 <Youtube className="mr-2 h-4 w-4" />
-                Upload to TeachMeet YouTube (Manual)
+                Open YouTube Upload Page
              </Button>
-             <p className="text-xs text-muted-foreground">This will open YouTube Studio in a new tab for you to upload the downloaded file.</p>
+             <p className="text-xs text-muted-foreground">This will open YouTube Studio in a new tab. You can upload your video there after you have saved and downloaded it.</p>
           </div>
         </div>
         <DialogFooter>
