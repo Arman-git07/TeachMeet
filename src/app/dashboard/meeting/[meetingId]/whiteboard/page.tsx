@@ -1364,17 +1364,17 @@ export default function WhiteboardPage() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <AlertDialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
-              <AlertDialogTrigger asChild>
+             <Dialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
+              <DialogTrigger asChild>
                 <ToolButton icon={Sparkles} label="Refine" disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
                   <ShadDialogTitle>Refine Your Drawing</ShadDialogTitle>
-                  <AlertDialogDescription>
+                  <DialogDescription>
                     Optionally, tell the AI what you drew to get a better result.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
+                  </DialogDescription>
+                </DialogHeader>
                 <div className="py-2">
                   <Label htmlFor="refine-prompt" className="text-sm text-muted-foreground">What did you draw? (e.g., "a bird", "a house")</Label>
                   <Input
@@ -1391,12 +1391,14 @@ export default function WhiteboardPage() {
                     }}
                   />
                 </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setRefinePrompt('')}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRecognizeShape}>Refine</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="secondary" onClick={() => setRefinePrompt('')}>Cancel</Button>
+                  </DialogClose>
+                  <Button type="button" onClick={handleRecognizeShape}>Refine</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
