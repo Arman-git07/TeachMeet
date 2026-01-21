@@ -46,7 +46,7 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
         { text: textPrompt },
       ],
       config: {
-        responseModalities: ['IMAGE'],
+        responseModalities: ['IMAGE', 'TEXT'],
       },
   });
   
