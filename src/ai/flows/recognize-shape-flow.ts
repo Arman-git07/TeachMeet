@@ -7,7 +7,7 @@
  * - RecognizeShapeOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai, googleAI} from '@/ai/genkit';
 import {z} from 'zod';
 
 const RecognizeShapeInputSchema = z.object({
@@ -40,7 +40,7 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
   `;
 
   const { media } = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-image-preview',
+      model: googleAI.model('gemini-2.5-flash-image-preview'),
       prompt: [
         { media: { url: input.drawingDataUri } },
         { text: textPrompt },
