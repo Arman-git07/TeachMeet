@@ -73,7 +73,7 @@ type OperationState =
   | { type: 'idle' }
   | { type: 'drawing'; currentPath: Point[] }
   | { type: 'shaping'; startPoint: Point, currentPoint: Point }
-  | { type: 'texting'; position: Point; isEditing: boolean } // Added isEditing flag
+  | { type: 'texting'; position: Point; isEditing: boolean }
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
   
@@ -531,7 +531,7 @@ export default function WhiteboardPage() {
     textInput.value = '';
     textInput.style.display = 'none';
     operationStateRef.current = { type: 'idle' };
-  }, [selectedColor, pushToHistory, getFontString, currentPageIndex, fontSize]);
+  }, [selectedColor, pushToHistory, getFontString, currentPageIndex, fontSize, fontFamily]);
   
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -560,8 +560,6 @@ export default function WhiteboardPage() {
     if (activeTool === 'text' && event.target === liveTextInputRef.current) {
         return;
     }
-
-    if (!canIDraw) return;
 
     if (operationStateRef.current.type === 'texting' && operationStateRef.current.isEditing) {
       finalizeLiveText();
@@ -698,6 +696,11 @@ export default function WhiteboardPage() {
 
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
+
+    if (opState.type === 'texting') {
+      // Don't reset state here, wait for blur or another click.
+      return;
+    }
     
     if (opState.type === 'drawing' && opState.currentPath.length > 1) {
         socketRef.current?.emit('draw', { type: 'end' });
@@ -821,7 +824,9 @@ export default function WhiteboardPage() {
         }
     }
 
-    operationStateRef.current = { type: 'idle' };
+    if (opState.type !== 'texting') {
+      operationStateRef.current = { type: 'idle' };
+    }
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
 
