@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI agent for recognizing and refining user drawings on a whiteboard.
@@ -10,7 +9,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
-import {retrier} from '@genkit-ai/flow';
 
 const RecognizeShapeInputSchema = z.object({
   drawingDataUri: z
@@ -50,14 +48,6 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
       config: {
         responseModalities: ['IMAGE'],
       },
-      retrier: retrier({ 
-        maxAttempts: 3,
-        backoff: {
-          initialDelay: 1000,
-          maxDelay: 10000,
-          multiplier: 2
-        }
-      })
   });
   
   if (!media?.url) {
