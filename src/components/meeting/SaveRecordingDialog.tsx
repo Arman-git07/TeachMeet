@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Mail, Lock, Globe, Loader2, Youtube } from 'lucide-react';
+import { Mail, Lock, Globe, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface SaveRecordingDialogProps {
@@ -34,10 +34,6 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
     const subject = "TeachMeet Meeting Recording";
     const body = "I've recorded a meeting. Please find the video file attached.\n\n(After saving, please go to your recordings library, download this video, and attach it to this email.)";
     window.location.href = `mailto:07arman2004@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-
-  const handleYouTubeUpload = () => {
-    window.open('https://studio.youtube.com/', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -70,12 +66,10 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
                     <Mail className="mr-2 h-4 w-4" />
                     Email Recording to Admin
                 </Button>
-                <Button variant="outline" className="w-full justify-start" onClick={handleYouTubeUpload}>
-                    <Youtube className="mr-2 h-4 w-4 text-red-600" />
-                    Upload to YouTube
-                </Button>
              </div>
-             <p className="text-xs text-muted-foreground">You'll need to save the recording first, then download it from your library before you can attach it to an email or upload it.</p>
+             <p className="text-xs text-muted-foreground mt-2">
+                To upload to YouTube, please mail the creator/owner. You will need to save and download the recording first before you can attach it.
+             </p>
           </div>
         </div>
         <DialogFooter>
