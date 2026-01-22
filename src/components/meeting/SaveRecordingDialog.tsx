@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Mail, Lock, Globe, Loader2 } from 'lucide-react';
+import { Mail, Lock, Globe, Loader2, Youtube } from 'lucide-react';
 import { useState } from 'react';
 
 interface SaveRecordingDialogProps {
@@ -36,13 +36,17 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
     window.location.href = `mailto:07arman2004@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  const handleYouTubeUpload = () => {
+    window.open('https://studio.youtube.com/', '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md rounded-xl">
         <DialogHeader>
           <DialogTitle>Save Your Recording</DialogTitle>
           <DialogDescription>
-            Choose a destination for your recording. You can email it to the administrator after it's saved.
+            Choose a destination for your recording. You can also share it after it's saved.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-6">
@@ -60,12 +64,18 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
             </RadioGroup>
           </div>
           <div className="space-y-3">
-             <Label className="font-semibold">2. Optional: Email to Admin</Label>
-             <Button variant="outline" className="w-full justify-start" onClick={handleEmailRecording}>
-                <Mail className="mr-2 h-4 w-4" />
-                Email Recording to Admin
-             </Button>
-             <p className="text-xs text-muted-foreground">This will open your email client. You'll need to save the recording first, then download it from your library and attach it to the email.</p>
+             <Label className="font-semibold">2. Optional: Share Recording</Label>
+             <div className="space-y-2">
+                <Button variant="outline" className="w-full justify-start" onClick={handleEmailRecording}>
+                    <Mail className="mr-2 h-4 w-4" />
+                    Email Recording to Admin
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={handleYouTubeUpload}>
+                    <Youtube className="mr-2 h-4 w-4 text-red-600" />
+                    Upload to YouTube
+                </Button>
+             </div>
+             <p className="text-xs text-muted-foreground">You'll need to save the recording first, then download it from your library before you can attach it to an email or upload it.</p>
           </div>
         </div>
         <DialogFooter>
