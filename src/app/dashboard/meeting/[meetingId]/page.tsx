@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { MeetingChatPanel } from "./chat/MeetingChatPanel";
 import { SaveRecordingDialog } from "@/components/meeting/SaveRecordingDialog";
+import { UserProfileDropdown } from "@/components/common/UserProfileDropdown";
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 
@@ -192,41 +193,44 @@ function MeetingPageContent() {
     };
 
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-            <MoreVertical className="h-5 w-5" />
-            </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="rounded-xl w-56">
-            <DropdownMenuItem onSelect={() => setIsChatOpen(true)} className="cursor-pointer">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span>Chat</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={handleRecordingToggle} disabled={isUploading} className="cursor-pointer">
-              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Video className="mr-2 h-4 w-4" />}
-              <span>{isUploading ? 'Uploading...' : isRecording ? 'Stop Recording' : 'Start Recording'}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href={constructUrl('whiteboard')}>
-                <Brush className="mr-2 h-4 w-4" />
-                <span>Whiteboard</span>
-            </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href={constructUrl('participants')}>
-                <Users className="mr-2 h-4 w-4" />
-                <span>Participants</span>
-            </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Meeting Settings</span>
-            </Link>
-            </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+              <MoreVertical className="h-5 w-5" />
+              </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl w-56">
+              <DropdownMenuItem onSelect={() => setIsChatOpen(true)} className="cursor-pointer">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                <span>Chat</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleRecordingToggle} disabled={isUploading} className="cursor-pointer">
+                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Video className="mr-2 h-4 w-4" />}
+                <span>{isUploading ? 'Uploading...' : isRecording ? 'Stop Recording' : 'Start Recording'}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href={constructUrl('whiteboard')}>
+                  <Brush className="mr-2 h-4 w-4" />
+                  <span>Whiteboard</span>
+              </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href={constructUrl('participants')}>
+                  <Users className="mr-2 h-4 w-4" />
+                  <span>Participants</span>
+              </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href={`/dashboard/settings?highlight=advancedMeetingSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Meeting Settings</span>
+              </Link>
+              </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <UserProfileDropdown />
+      </div>
     );
   }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls, setIsChatOpen, setIsSaveRecordingDialogOpen]);
   
