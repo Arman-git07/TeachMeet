@@ -17,7 +17,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { MeetingChatPanel } from "./chat/MeetingChatPanel";
 import { SaveRecordingDialog } from "@/components/meeting/SaveRecordingDialog";
-import { UserProfileDropdown } from "@/components/common/UserProfileDropdown";
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 
@@ -229,7 +228,6 @@ function MeetingPageContent() {
               </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <UserProfileDropdown />
       </div>
     );
   }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls, setIsChatOpen, setIsSaveRecordingDialogOpen]);
