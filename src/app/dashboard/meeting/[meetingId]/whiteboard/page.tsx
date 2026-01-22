@@ -73,7 +73,7 @@ type OperationState =
   | { type: 'idle' }
   | { type: 'drawing'; currentPath: Point[] }
   | { type: 'shaping'; startPoint: Point, currentPoint: Point }
-  | { type: 'texting'; position: Point; isEditing: boolean }
+  | { type: 'texting'; position: Point }
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
   
@@ -501,7 +501,7 @@ export default function WhiteboardPage() {
 
   const finalizeLiveText = useCallback(() => {
     const opState = operationStateRef.current;
-    if (opState.type !== 'texting' || !opState.isEditing) return;
+    if (opState.type !== 'texting') return;
 
     const textInput = liveTextInputRef.current;
     if (!textInput) return;
@@ -561,7 +561,7 @@ export default function WhiteboardPage() {
         return;
     }
 
-    if (operationStateRef.current.type === 'texting' && operationStateRef.current.isEditing) {
+    if (operationStateRef.current.type === 'texting') {
       finalizeLiveText();
     }
     
@@ -639,7 +639,7 @@ export default function WhiteboardPage() {
             operationStateRef.current = { type: 'shaping', startPoint: pos, currentPoint: pos };
             break;
         case 'text':
-            operationStateRef.current = { type: 'texting', position: pos, isEditing: true };
+            operationStateRef.current = { type: 'texting', position: pos };
             if (liveTextInputRef.current) {
                 const input = liveTextInputRef.current;
                 input.style.top = `${pos.y}px`;
@@ -697,13 +697,10 @@ export default function WhiteboardPage() {
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
 
-    // For the text tool, we do nothing on pointer up.
-    // Finalization happens on blur or the next pointer down on the canvas.
     if (opState.type === 'texting') {
       return;
     }
 
-    // Handle finalization for other tools
     if (opState.type === 'drawing' && opState.currentPath.length > 1) {
         socketRef.current?.emit('draw', { type: 'end' });
         const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
@@ -826,8 +823,10 @@ export default function WhiteboardPage() {
         }
     }
 
-    // Reset state to idle and clear temp canvas for all non-text tools
-    operationStateRef.current = { type: 'idle' };
+    if (opState.type !== 'texting') {
+        operationStateRef.current = { type: 'idle' };
+    }
+    
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
 
