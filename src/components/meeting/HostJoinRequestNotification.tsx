@@ -120,19 +120,19 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       {requests.map((req) => (
         <div
           key={req.id}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-primary/30 px-6 py-4 flex items-center justify-between w-[90%] max-w-lg animate-slideDown"
+          className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[9999] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-primary/30 p-4 sm:px-6 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-4 w-[90%] max-w-lg animate-slideDown"
         >
-          <div className="flex items-center gap-4">
-            <Avatar className="h-12 w-12 border-2 border-primary/50">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <Avatar className="h-12 w-12 border-2 border-primary/50 flex-shrink-0">
               <AvatarImage src={req.userPhotoURL} alt={req.userName} data-ai-hint="avatar user"/>
               <AvatarFallback>{req.userName?.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
+            <div className="flex flex-col text-center sm:text-left">
               <span className="text-lg font-semibold">Join Request</span>
               <span className="text-sm text-muted-foreground">{req.userName || "A participant"} wants to join.</span>
             </div>
           </div>
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center flex-shrink-0">
             {audioBlocked && (
                 <button
                     onClick={handleManualPlaySound}
@@ -145,13 +145,13 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
               onClick={() => handleRequest(req, 'approve')}
               className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
             >
-              <Check size={18} /> Approve
+              <Check size={18} /> <span className="hidden sm:inline">Approve</span>
             </button>
             <button
               onClick={() => handleRequest(req, 'deny')}
               className="bg-destructive hover:bg-destructive/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
             >
-              <X size={18} /> Decline
+              <X size={18} /> <span className="hidden sm:inline">Decline</span>
             </button>
           </div>
         </div>
