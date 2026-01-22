@@ -104,7 +104,7 @@ const VideoTile: React.FC<Props> = ({
       onDoubleClick={onDoubleClick}
       className={cn(
         "relative bg-black rounded-lg overflow-hidden transition-all duration-300",
-        isSpeaking ? "ring-4 ring-primary" : "",
+        isSpeaking ? "ring-2 sm:ring-4 ring-primary" : "", // Responsive ring
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       )}
@@ -116,7 +116,7 @@ const VideoTile: React.FC<Props> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                  <button className="cursor-pointer p-1 hover:bg-black/50 rounded-full" title="Click to unpin">
-                    <Pin className="h-5 w-5 text-white/90" style={{ filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.5))" }} />
+                    <Pin className="h-4 w-4 sm:h-5 sm:w-5 text-white/90" style={{ filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.5))" }} />
                  </button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -157,10 +157,10 @@ const VideoTile: React.FC<Props> = ({
         {(!isCameraOn && !isScreenSharing || !stream) && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <Avatar className={cn(
-                "w-28 h-28 border-4 border-background shadow-lg transition-all duration-300"
+                "w-1/3 h-1/3 max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300"
               )}>
               <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-              <AvatarFallback className="text-5xl">
+              <AvatarFallback className="text-3xl md:text-5xl">
                 {name?.charAt(0) ?? "U"}
               </AvatarFallback>
             </Avatar>
@@ -169,30 +169,30 @@ const VideoTile: React.FC<Props> = ({
       </div>
 
       {/* Camera status (top-right) - hidden if stop button is shown */}
-        <div className="absolute top-3 right-3 z-30 p-1 rounded-md bg-transparent">
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 p-1 rounded-md bg-transparent">
           {isCameraOn ? (
-            <Video className="h-5 w-5 text-white" />
+            <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
           ) : (
-            <VideoOff className="h-5 w-5 text-red-400" />
+            <VideoOff className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />
           )}
         </div>
 
       {/* Bottom info container */}
-      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 flex items-center justify-between pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 z-30 p-2 sm:p-3 flex items-center justify-between pointer-events-none">
         {/* Left-aligned info: Avatar, Name, Status icons */}
         <div className="flex items-center gap-2 text-white pointer-events-auto" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
-          <Avatar className="w-7 h-7 shrink-0">
+          <Avatar className="w-6 h-6 sm:w-7 sm:h-7 shrink-0">
             <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-            <AvatarFallback>{name?.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="text-xs sm:text-sm">{name?.charAt(0)}</AvatarFallback>
           </Avatar>
-          <div className="text-sm font-medium truncate max-w-[160px]">{name}</div>
+          <div className="text-xs sm:text-sm font-medium truncate">{name}</div>
           
           {isMicOn ? (
-            <Mic className="h-4 w-4 text-green-400" />
+            <Mic className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
           ) : (
-            <MicOff className="h-4 w-4 text-red-400" />
+            <MicOff className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />
           )}
-          {isScreenSharing && <ScreenShare className="h-4 w-4 text-blue-400" />}
+          {isScreenSharing && <ScreenShare className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />}
         </div>
         
         {/* Right-aligned info: Fullscreen button */}
@@ -201,10 +201,10 @@ const VideoTile: React.FC<Props> = ({
             variant="ghost"
             size="icon"
             onClick={onSpotlightClick}
-            className="h-8 w-8 rounded-full text-white/80 hover:bg-black/50 hover:text-white"
+            className="h-7 w-7 sm:h-8 sm:w-8 rounded-full text-white/80 hover:bg-black/50 hover:text-white"
             title={isSpotlight ? "Exit Spotlight" : "Spotlight User"}
           >
-            {isSpotlight ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+            {isSpotlight ? <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />}
           </Button>
         </div>
       </div>
