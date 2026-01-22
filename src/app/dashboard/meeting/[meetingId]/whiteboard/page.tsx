@@ -555,7 +555,7 @@ export default function WhiteboardPage() {
   }, [handleDeleteSelected, pages, currentPageIndex]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
-    if (event.buttons !== 1) return;
+    if (event.buttons !== 1 || !canIDraw) return;
     
     if (activeTool === 'text' && event.target === liveTextInputRef.current) {
         return;
@@ -660,7 +660,7 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily, canIDraw]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
-    if (event.buttons !== 1) return;
+    if (event.buttons !== 1 || !canIDraw) return;
     const pos = getPointerPosition(event);
     const opState = operationStateRef.current;
 
@@ -692,13 +692,13 @@ export default function WhiteboardPage() {
         }
         setTempDragPreview(draggedElements);
     }
-  }, [getPointerPosition, redrawTempCanvas]);
+  }, [getPointerPosition, redrawTempCanvas, canIDraw]);
 
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
 
-    if (opState.type === 'texting') {
-      // Don't reset state here, wait for blur or another click.
+    if (opState.type === 'texting' && opState.isEditing) {
+      // Don't finalize on pointer up, wait for another click or blur.
       return;
     }
     
