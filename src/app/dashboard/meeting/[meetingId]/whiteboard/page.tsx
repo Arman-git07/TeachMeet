@@ -697,11 +697,13 @@ export default function WhiteboardPage() {
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
 
-    if (opState.type === 'texting' && opState.isEditing) {
-      // Don't finalize on pointer up, wait for another click or blur.
+    // For the text tool, we do nothing on pointer up.
+    // Finalization happens on blur or the next pointer down on the canvas.
+    if (opState.type === 'texting') {
       return;
     }
-    
+
+    // Handle finalization for other tools
     if (opState.type === 'drawing' && opState.currentPath.length > 1) {
         socketRef.current?.emit('draw', { type: 'end' });
         const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
@@ -824,9 +826,8 @@ export default function WhiteboardPage() {
         }
     }
 
-    if (opState.type !== 'texting') {
-      operationStateRef.current = { type: 'idle' };
-    }
+    // Reset state to idle and clear temp canvas for all non-text tools
+    operationStateRef.current = { type: 'idle' };
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
 
