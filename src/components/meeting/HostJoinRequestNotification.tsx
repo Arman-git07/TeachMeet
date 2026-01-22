@@ -98,7 +98,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
         });
         batch.delete(joinRequestRef);
         await batch.commit();
-        toast({ title: "Request Approved", description: `${req.userName} can now join the meeting.` });
+        toast({ title: "Request Accepted", description: `${req.userName} can now join the meeting.` });
       } else {
         await updateDoc(joinRequestRef, { status: "denied" });
         toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied access.` });
@@ -145,7 +145,7 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
               onClick={() => handleRequest(req, 'approve')}
               className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
             >
-              <Check size={18} /> <span className="hidden sm:inline">Approve</span>
+              <Check size={18} /> <span className="hidden sm:inline">Accept</span>
             </button>
             <button
               onClick={() => handleRequest(req, 'deny')}
