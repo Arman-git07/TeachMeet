@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMeetingRTC, type ChatMessage } from "@/contexts/MeetingRTCContext";
 import { useBlock } from "@/contexts/BlockContext";
+import { UserProfileDropdown } from "@/components/common/UserProfileDropdown";
 
 export function MeetingChatPanel() {
   const { user } = useAuth();
@@ -61,8 +61,9 @@ export function MeetingChatPanel() {
   return (
     <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
         <SheetContent className="flex flex-col p-0">
-            <SheetHeader className="p-4 border-b">
+            <SheetHeader className="p-4 border-b flex flex-row items-center justify-between">
                 <SheetTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5"/>Meeting Chat</SheetTitle>
+                <UserProfileDropdown />
             </SheetHeader>
             <div className="flex-grow overflow-hidden">
                  <ScrollArea className="h-full">
