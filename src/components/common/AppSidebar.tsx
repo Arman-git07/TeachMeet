@@ -1,4 +1,3 @@
-
 'use client';
 import Link from 'next/link';
 import { StartMeetingDialogContent } from '@/components/meeting/StartMeetingDialogContent';
@@ -22,6 +21,7 @@ import {
   Library,
   History,
   PanelLeftOpen,
+  MessageSquare,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
@@ -263,6 +263,7 @@ export function AppSidebar() {
         <SidebarMenu className="space-y-2">
           <SidebarSeparator />
           <NavItem href={isAuthenticated ? "/dashboard/help" : "/help"} icon={HelpCircle} currentPath={pathname}>Help</NavItem>
+          <NavItem href="mailto:07arman2004@gmail.com?subject=Suggestion for TeachMeet" icon={MessageSquare} currentPath={pathname}>Suggestions</NavItem>
           <NavItem href={isAuthenticated ? "/dashboard/settings" : "/settings"} icon={Settings} currentPath={pathname}>Settings</NavItem>
           <NavItem icon={Library} currentPath={pathname} isDropdown dropdownItems={legalAndInfoItems}>Legal & Info</NavItem>
           {isAuthenticated && (
