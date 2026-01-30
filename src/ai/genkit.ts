@@ -1,7 +1,7 @@
 'use server';
 
 import {genkit, type Genkit} from 'genkit';
-import {googleAI as genkitGoogleAI} from '@genkit-ai/googleai';
+import {googleAI as genkitGoogleAI} from '@genkit-ai/google-genai';
 
 
 // NOTE: The API key check was moved inside functions that use AI,

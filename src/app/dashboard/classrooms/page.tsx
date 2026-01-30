@@ -255,7 +255,7 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
             mobile: data.mobile,
             message: data.message || ""
         }
-    }, { merge: false });
+    }, { merge: true }); // Use merge:true to allow re-application
 }
 
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
@@ -593,30 +593,38 @@ export default function ClassroomsPage() {
   
   const handleCancelRequest = useCallback(async (classroomId: string) => {
     if (!user) {
-        toast({ variant: 'destructive', title: "Not authenticated" });
+        toast({ variant: 'destructive', title: "Authentication required", description: "You must be signed in to cancel a request." });
         return;
     }
     setCancelingRequest(classroomId);
+
     try {
         const batch = writeBatch(db);
-        // Path to the request in the classroom's subcollection
-        const classroomRequestRef = doc(db, 'classrooms', classroomId, 'joinRequests', user.uid);
-        // Path to the request marker in the user's own subcollection
-        const userPendingRequestRef = doc(db, 'users', user.uid, 'pendingJoinRequests', classroomId);
 
-        batch.delete(classroomRequestRef);
-        batch.delete(userPendingRequestRef);
+        // Define document paths clearly
+        const joinRequestPath = `classrooms/${classroomId}/joinRequests/${user.uid}`;
+        const pendingRequestMarkerPath = `users/${user.uid}/pendingJoinRequests/${classroomId}`;
 
+        // Schedule both documents for deletion
+        batch.delete(doc(db, joinRequestPath));
+        batch.delete(doc(db, pendingRequestMarkerPath));
+        
+        // Commit the atomic operation
         await batch.commit();
 
         toast({ title: "Request Canceled", description: "Your request to join the class has been withdrawn." });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error canceling request:", error);
-        toast({ variant: 'destructive', title: 'Cancellation Failed', description: 'Could not cancel the request. Please check Firestore rules and console for errors.' });
+        let description = 'Could not cancel the request. Please try again.';
+        if (error.code === 'permission-denied') {
+            description = 'Permission denied. Please check your Firestore rules.'
+        }
+        toast({ variant: 'destructive', title: 'Cancellation Failed', description });
     } finally {
         setCancelingRequest(null);
     }
   }, [user, toast]);
+
 
   const handleOpenTeacherAppDialog = (classroom: Classroom) => {
     setSelectedClassroomForApp(classroom);
@@ -876,3 +884,4 @@ export default function ClassroomsPage() {
     
 
     
+

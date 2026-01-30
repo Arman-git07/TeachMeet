@@ -74,8 +74,9 @@ export default function JoinClassroomPage() {
             const batch = writeBatch(db);
             const requestRef = doc(db, `classrooms/${foundClassroom.id}/joinRequests`, user.uid);
             
+            // CORRECTED: Use 'requesterId' to match security rules
             batch.set(requestRef, {
-                userId: user.uid, 
+                requesterId: user.uid,
                 studentName: user.displayName || 'Anonymous Student',
                 studentPhotoURL: user.photoURL || '',
                 role: 'student', 

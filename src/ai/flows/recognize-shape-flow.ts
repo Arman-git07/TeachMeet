@@ -7,8 +7,8 @@
  * - RecognizeShapeOutput - The return type for the function.
  */
 
-import {ai, googleAI} from '@/ai/genkit';
-import {z} from 'zod';
+import { ai, googleAI } from '@/ai/genkit';
+import { z } from 'zod';
 
 const RecognizeShapeInputSchema = z.object({
   drawingDataUri: z
@@ -25,7 +25,6 @@ const RecognizeShapeOutputSchema = z.object({
 });
 export type RecognizeShapeOutput = z.infer<typeof RecognizeShapeOutputSchema>;
 
-
 export async function recognizeShape(input: RecognizeShapeInput): Promise<RecognizeShapeOutput> {
   const textPrompt = `You are a sophisticated graphic design assistant. Your task is to transform a user's rough drawing into a professional, clean, and high-quality graphic.
 
@@ -39,6 +38,7 @@ export async function recognizeShape(input: RecognizeShapeInput): Promise<Recogn
   **User's Prompt:** "${input.prompt || 'No hint provided. Interpret the drawing.'}"
   `;
 
+  // Use the modern Genkit v1.x syntax for image generation.
   const { media } = await ai.generate({
       model: googleAI.model('gemini-2.5-flash-image-preview'),
       prompt: [

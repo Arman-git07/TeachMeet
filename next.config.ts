@@ -15,7 +15,6 @@ const nextConfig = {
   // },
   experimental: {
     optimizePackageImports: [
-      '@genkit-ai/flow',
       '@genkit-ai/google-genai',
       '@radix-ui/react-accordion',
       '@radix-ui/react-alert-dialog',
