@@ -1,146 +1,80 @@
-import type { NextApiRequest } from "next";
-import type { NextApiResponseServerIO } from "@/types";
-import { Server as IOServer, Socket } from "socket.io";
+'use client';
 
-// A simple in-memory store for block relationships within a room.
-// In a production app, this should be moved to a more persistent store like Redis.
-const roomBlocks = new Map<string, Map<string, Set<string>>>(); // Map<roomId, Map<blockerId, Set<blockedId>>>
+import { AppHeader } from "@/components/common/AppHeader";
+import { HelpChat, type HelpChatRef } from "@/components/help/HelpChat";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { LifeBuoy, MessageCircle } from "lucide-react";
+import { useRef } from "react";
 
-export default function handler(
-  req: NextApiRequest,
-  res: NextApiResponseServerIO
-) {
-  if (!res.socket.server.io) {
-    console.log("🔌 Initializing new Socket.IO server...");
-    const io = new IOServer(res.socket.server, {
-      path: "/api/socketio",
-      addTrailingSlash: false,
-      cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-      },
-    });
-    res.socket.server.io = io;
+export default function HelpPage() {
+    const chatRef = useRef<HelpChatRef>(null);
 
-    io.on("connection", (socket) => {
-      console.log("Socket connected:", socket.id);
-      
-      socket.on("join-room", (roomId: string, userId: string) => {
-        socket.join(roomId);
-        // @ts-ignore
-        socket.data.userId = userId;
-        // @ts-ignore
-        socket.data.roomId = roomId;
+    const handleContactSupportClick = () => {
+        chatRef.current?.focusChatInput();
+    };
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      <AppHeader showLogo={true} />
+      <main className="flex-grow container mx-auto py-12 px-4">
+        <div className="text-center mb-12">
+            <LifeBuoy className="mx-auto h-16 w-16 text-primary mb-4" />
+            <h1 className="text-4xl font-bold tracking-tight">Help & Support</h1>
+            <p className="mt-2 text-lg text-muted-foreground">
+                How can we assist you today?
+            </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            <Card className="shadow-lg rounded-xl">
+                <CardHeader>
+                    <CardTitle>Frequently Asked Questions</CardTitle>
+                    <CardDescription>
+                        Find quick answers to common questions about TeachMeet.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <h4 className="font-semibold">How do I start or join a meeting?</h4>
+                        <p className="text-sm text-muted-foreground">Use the "Start New Meeting" or "Join Meeting" buttons on the home page or in the sidebar. You'll need a meeting code or link to join.</p>
+                    </div>
+                     <div>
+                        <h4 className="font-semibold">How can I share my screen?</h4>
+                        <p className="text-sm text-muted-foreground">During a meeting, use the screen share button in the control bar. You can choose to share your entire screen, a window, or a browser tab.</p>
+                    </div>
+                     <div>
+                        <h4 className="font-semibold">Where are my recordings and documents?</h4>
+                        <p className="text-sm text-muted-foreground">You can find all your saved recordings and uploaded documents in the "Recordings" and "Documents" sections in the sidebar.</p>
+                    </div>
+                </CardContent>
+            </Card>
+
+             <Card className="shadow-lg rounded-xl sticky top-24">
+                <CardHeader>
+                    <CardTitle>Contact Support</CardTitle>
+                    <CardDescription>
+                        Can't find what you're looking for? Chat with our AI Assistant.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <p className="text-sm text-muted-foreground">
+                        Our AI assistant can help answer your questions about using TeachMeet. Just type your question below.
+                    </p>
+                    <Button className="w-full mt-4 btn-gel" onClick={handleContactSupportClick}>
+                        <MessageCircle className="mr-2 h-4 w-4" /> Chat with AI Assistant
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
         
-        if (!roomBlocks.has(roomId)) {
-            roomBlocks.set(roomId, new Map());
-        }
-        
-        // Notify others that a new user has joined
-        socket.to(roomId).emit("user-joined", userId);
-
-        // Tell the new user who has blocked them
-        const roomBlockMap = roomBlocks.get(roomId);
-        const usersWhoBlockedMe: string[] = [];
-        roomBlockMap?.forEach((blockedSet, blockerId) => {
-            if (blockedSet.has(userId)) {
-                usersWhoBlockedMe.push(blockerId);
-            }
-        });
-        socket.emit('initial-block-list', usersWhoBlockedMe);
-
-        console.log(`${userId} (socket ${socket.id}) joined room ${roomId}`);
-      });
-      
-      socket.on('block-user', ({ blockedUserId }: { blockedUserId: string }) => {
-          const { userId: blockerId, roomId } = socket.data as { userId: string, roomId: string };
-          if (!blockerId || !roomId || !blockedUserId) return;
-          
-          const roomBlockMap = roomBlocks.get(roomId);
-          if (!roomBlockMap) return;
-
-          if (!roomBlockMap.has(blockerId)) {
-              roomBlockMap.set(blockerId, new Set());
-          }
-          roomBlockMap.get(blockerId)!.add(blockedUserId);
-          
-          const blockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === blockedUserId);
-          if (blockedSocket) {
-              blockedSocket.emit('user-blocked-me', blockerId);
-          }
-      });
-
-      socket.on('unblock-user', ({ unblockedUserId }: { unblockedUserId: string }) => {
-          const { userId: unblockerId, roomId } = socket.data as { userId: string, roomId: string };
-          if (!unblockerId || !roomId || !unblockedUserId) return;
-          
-          const roomBlockMap = roomBlocks.get(roomId);
-          if (!roomBlockMap) return;
-          
-          roomBlockMap.get(unblockerId)?.delete(unblockedUserId);
-          
-          const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
-          if (unblockedSocket) {
-              unblockedSocket.emit('user-unblocked-me', unblockerId);
-          }
-      });
-
-      socket.on('draw', (data) => {
-        // @ts-ignore
-        const { userId } = socket.data || {};
-        if (data.ownerId && userId) {
-            const ownerRoomId = `whiteboard-owner-${data.ownerId}`;
-            const ownerSocketId = Array.from(io.sockets.adapter.rooms.get(ownerRoomId) || [])[0];
-            if (ownerSocketId) {
-                io.to(ownerSocketId).emit('draw-from-collaborator', { ...data, collaboratorId: userId });
-            }
-        }
-      });
-      
-      socket.on('set-permission', ({ ownerId, participantId, canDraw }) => {
-        const participantSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === participantId);
-        if (participantSocket) {
-            participantSocket.emit('permission-update', { canDraw, ownerId });
-        }
-      });
-
-      socket.on("offer", (remoteId: string, offer: any) => {
-        // Find the specific socket for the user ID and emit to it
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
-        if (targetSocket) {
-          targetSocket.emit("offer", socket.data.userId, offer);
-        }
-      });
-      
-      socket.on("answer", (remoteId: string, answer: any) => {
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
-        if (targetSocket) {
-          targetSocket.emit("answer", socket.data.userId, answer);
-        }
-      });
-
-      socket.on("ice-candidate", (remoteId: string, candidate: any) => {
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
-        if (targetSocket) {
-          targetSocket.emit("ice-candidate", socket.data.userId, candidate);
-        }
-      });
-
-      socket.on("disconnect", () => {
-        const { roomId, userId } = socket.data as { roomId: string, userId: string };
-        if (roomId && userId) {
-          socket.to(roomId).emit("user-left", userId);
-
-          // Clean up block lists on disconnect
-          const roomBlockMap = roomBlocks.get(roomId);
-          if(roomBlockMap) {
-            roomBlockMap.delete(userId); // Remove this user's blocks
-            roomBlockMap.forEach(blockedSet => blockedSet.delete(userId)); // Remove this user from others' blocks
-          }
-        }
-        console.log("Disconnected:", socket.id);
-      });
-    });
-  }
-  res.end();
+        <div className="mt-12">
+            <HelpChat ref={chatRef} />
+        </div>
+      </main>
+      <footer className="py-8 text-center text-muted-foreground text-sm border-t border-border">
+        © {new Date().getFullYear()} TeachMeet. All rights reserved.
+      </footer>
+    </div>
+  );
 }
