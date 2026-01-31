@@ -99,8 +99,15 @@ export function ClassMaterials() {
             });
             toast.update(toastId, { title: "Material Uploaded!" });
             setMaterialFile(null);
-        } catch (error) {
-            toast.update(toastId, { variant: "destructive", title: "Upload Failed" });
+        } catch (error: any) {
+            console.error("Failed to upload material:", error);
+            let title = "Upload Failed";
+            let description = "Could not upload the material. Please try again.";
+            if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
+               title = "API Key Configuration Error";
+               description = "Could not connect to Firebase. Please check your API key configuration.";
+            }
+            toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
         } finally {
             setIsUploading(false);
         }

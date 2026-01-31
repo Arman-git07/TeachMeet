@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -58,22 +59,37 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
 
     const onPaymentDetailsSubmit = useCallback(async (data: z.infer<typeof paymentDetailsSchema>) => {
         let qrCodeUrl = classroom?.paymentDetails?.qrCodeUrl;
-        if (data.qrCode && data.qrCode[0]) {
-            const file = data.qrCode[0];
-            const qrRef = storageRef(storage, `classrooms/${classroomId}/paymentQR.png`);
-            await uploadBytes(qrRef, file);
-            qrCodeUrl = await getDownloadURL(qrRef);
+        try {
+            if (data.qrCode && data.qrCode[0]) {
+                const file = data.qrCode[0];
+                const qrRef = storageRef(storage, `classrooms/${classroomId}/paymentQR.png`);
+                await uploadBytes(qrRef, file);
+                qrCodeUrl = await getDownloadURL(qrRef);
+            }
+            await updateDoc(doc(db, 'classrooms', classroomId), { paymentDetails: { upiId: data.upiId, qrCodeUrl } });
+            toast({ title: 'Payment Details Updated!' });
+            setIsSettingsOpen(false);
+        } catch (error: any) {
+             console.error("Failed to update payment details:", error);
+             let title = "Update Failed";
+             let description = "Could not save payment details. Please try again.";
+             if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
+                title = "API Key Configuration Error";
+                description = "Could not connect to Firebase. This is likely an API key issue. Please ensure your API key is correct and unrestricted, and that the 'Identity Toolkit API' is enabled in your Google Cloud project.";
+             }
+             toast({
+                variant: 'destructive',
+                title: title,
+                description: description,
+                duration: 9000
+             });
         }
-        await updateDoc(doc(db, 'classrooms', classroomId), { paymentDetails: { upiId: data.upiId, qrCodeUrl } });
-        toast({ title: 'Payment Details Updated!' });
-        setIsSettingsOpen(false);
     }, [classroomId, classroom?.paymentDetails?.qrCodeUrl, toast]);
 
     if (!classroom) return null;
 
     return (
         <>
-            {/* Main Dialog */}
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -106,7 +122,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 </DialogContent>
             </Dialog>
 
-            {/* Nested Dialog 1: Settings */}
             <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>Update Payment Settings</DialogTitle></DialogHeader>
@@ -134,7 +149,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 </DialogContent>
             </Dialog>
 
-            {/* Nested Dialog 2: Pay Now */}
             <Dialog open={isPayNowOpen} onOpenChange={setIsPayNowOpen}>
                 <DialogContent className="sm:max-w-xs">
                     <DialogHeader><DialogTitle>Payment Information</DialogTitle></DialogHeader>

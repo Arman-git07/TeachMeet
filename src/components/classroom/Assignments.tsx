@@ -114,8 +114,15 @@ export function Assignments() {
             toast.update(toastId, { title: "Assignment Created!" });
             setIsDialogOpen(false);
             assignmentForm.reset();
-        } catch (error) {
-            toast.update(toastId, { variant: 'destructive', title: "Creation Failed" });
+        } catch (error: any) {
+            console.error("Failed to create assignment:", error);
+            let title = "Creation Failed";
+            let description = "Could not create the assignment. Please try again.";
+            if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
+               title = "API Key Configuration Error";
+               description = "Could not connect to Firebase. Please check your API key configuration and ensure required Firebase services are enabled.";
+            }
+            toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
         }
     }, [canUserManage, user, classroomId, toast, assignmentForm]);
 
@@ -135,8 +142,15 @@ export function Assignments() {
                 studentId: user.uid, studentName: user.displayName || 'Student', submittedAt: serverTimestamp(), submissionUrl, grade: null, feedback: null
             });
             toast.update(submissionToastId, { title: "Submission Successful!" });
-        } catch (error) {
-            toast.update(submissionToastId, { variant: 'destructive', title: "Submission Failed" });
+        } catch (error: any) {
+            console.error("Failed to submit assignment:", error);
+            let title = "Submission Failed";
+            let description = "Could not submit your assignment. Please try again.";
+            if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
+               title = "API Key Configuration Error";
+               description = "Could not connect to Firebase. Please check your API key configuration.";
+            }
+            toast.update(submissionToastId, { variant: 'destructive', title, description, duration: 9000 });
         }
     }, [classroomId, user, toast]);
 
