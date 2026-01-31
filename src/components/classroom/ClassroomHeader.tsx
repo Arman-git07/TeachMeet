@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useCallback, memo } from 'react';
@@ -72,12 +73,14 @@ export function ClassroomHeader() {
 
     return (
         <>
-            <header className="mb-6 px-4 md:px-8 pt-4 flex items-start justify-between gap-4">
+            <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-sm p-4 border-b flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                    <Button variant="link" onClick={() => router.push('/dashboard/classrooms')} className="p-0 mb-2 text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Back to classrooms</Button>
-                    <h1 className="text-3xl md:text-4xl font-bold break-words">{classroom.title}</h1>
-                    <p className="text-md md:text-lg text-muted-foreground break-words mt-1">{classroom.description}</p>
-                    <p className="text-sm text-muted-foreground break-words mt-1">Taught by: {classroom.teacherName}</p>
+                    <Button variant="link" onClick={() => router.push('/dashboard/classrooms')} className="p-0 mb-1 text-muted-foreground h-auto">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to classrooms
+                    </Button>
+                    <h1 className="text-2xl md:text-3xl font-bold break-words">{classroom.title}</h1>
+                    <p className="text-sm text-muted-foreground mt-1 truncate">Taught by: {classroom.teacherName}</p>
                 </div>
                 <div className="flex-shrink-0">
                     <DropdownMenu>
