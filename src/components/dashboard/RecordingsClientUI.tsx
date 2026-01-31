@@ -88,28 +88,52 @@ export function RecordingsClientUI() {
     }
 
     setIsLoading(true);
-    const recRef = collection(db, "recordings");
-    const q = query(recRef, 
-      or(
-        where("isPrivate", "==", false), 
-        where("uploaderId", "==", currentUser.uid)
-      ), 
+
+    const publicQuery = query(collection(db, "recordings"), 
+      where("isPrivate", "==", false),
       orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        setRecordings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording)));
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error("Error fetching recordings:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Could not fetch recordings." });
-        setIsLoading(false);
-      }
+    const privateQuery = query(collection(db, "recordings"), 
+      where("uploaderId", "==", currentUser.uid),
+      where("isPrivate", "==", true),
+      orderBy("createdAt", "desc")
     );
+    
+    let publicRecs: Recording[] = [];
+    let privateRecs: Recording[] = [];
 
-    return () => unsubscribe();
+    const mergeAndSetRecordings = () => {
+      const allRecs = [...publicRecs, ...privateRecs];
+      const uniqueRecs = Array.from(new Map(allRecs.map(rec => [rec.id, rec])).values());
+      uniqueRecs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+      setRecordings(uniqueRecs);
+    };
+
+    const unsubPublic = onSnapshot(publicQuery, (snapshot) => {
+      publicRecs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
+      mergeAndSetRecordings();
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching public recordings:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch public recordings." });
+      setIsLoading(false);
+    });
+
+    const unsubPrivate = onSnapshot(privateQuery, (snapshot) => {
+      privateRecs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
+      mergeAndSetRecordings();
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching private recordings:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch your private recordings." });
+      setIsLoading(false);
+    });
+
+    return () => {
+      unsubPublic();
+      unsubPrivate();
+    };
   }, [currentUser, toast]);
   
   const handleUploadClick = () => {

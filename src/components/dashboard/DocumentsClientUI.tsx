@@ -71,28 +71,60 @@ export function DocumentsClientUI() {
     }
 
     setIsLoading(true);
-    const docsRef = collection(db, "documents");
-    const q = query(docsRef, 
-      or(
-        where("isPrivate", "==", false), 
-        where("uploaderId", "==", currentUser.uid)
-      ), 
+    
+    // We must perform two separate queries and merge the results because Firestore
+    // security rules do not allow a single query that combines "all public docs"
+    // and "my private docs" (as it could leak data).
+
+    // Query 1: All public documents
+    const publicQuery = query(collection(db, "documents"), 
+      where("isPrivate", "==", false),
       orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document)));
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error("Error fetching documents:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents." });
-        setIsLoading(false);
-      }
+    // Query 2: The current user's private documents
+    const privateQuery = query(collection(db, "documents"), 
+      where("uploaderId", "==", currentUser.uid),
+      where("isPrivate", "==", true),
+      orderBy("createdAt", "desc")
     );
+    
+    let publicDocs: Document[] = [];
+    let privateDocs: Document[] = [];
 
-    return () => unsubscribe();
+    const mergeAndSetDocuments = () => {
+      const allDocs = [...publicDocs, ...privateDocs];
+      // Use a Map to ensure uniqueness in case a doc somehow appears in both
+      const uniqueDocs = Array.from(new Map(allDocs.map(doc => [doc.id, doc])).values());
+      // Sort the final combined list by creation date
+      uniqueDocs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+      setDocuments(uniqueDocs);
+    };
+
+    const unsubPublic = onSnapshot(publicQuery, (snapshot) => {
+      publicDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
+      mergeAndSetDocuments();
+      setIsLoading(false); // Set loading to false once we have at least some data
+    }, (error) => {
+      console.error("Error fetching public documents:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch public documents." });
+      setIsLoading(false);
+    });
+
+    const unsubPrivate = onSnapshot(privateQuery, (snapshot) => {
+      privateDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
+      mergeAndSetDocuments();
+      setIsLoading(false); // Set loading to false once we have at least some data
+    }, (error) => {
+      console.error("Error fetching private documents:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch your private documents." });
+      setIsLoading(false);
+    });
+
+    return () => {
+      unsubPublic();
+      unsubPrivate();
+    };
   }, [currentUser, toast]);
 
 
