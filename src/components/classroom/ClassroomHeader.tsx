@@ -79,7 +79,7 @@ export function ClassroomHeader() {
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to classrooms
                     </Button>
-                    <h1 className="text-2xl md:text-3xl font-bold break-words">{classroom.title}</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold truncate" title={classroom.title}>{classroom.title}</h1>
                     <p className="text-sm text-muted-foreground mt-1 truncate">Taught by: {classroom.teacherName}</p>
                 </div>
                 <div className="flex-shrink-0">
