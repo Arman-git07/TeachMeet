@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -106,7 +105,7 @@ export default function ClassroomPage() {
             <ClassroomHeader />
             <main className="flex-1 flex flex-col px-4 md:px-8 overflow-hidden">
                 <Tabs defaultValue="announcements" className="w-full flex flex-col flex-1 overflow-hidden">
-                    <div className="w-full whitespace-nowrap rounded-lg border-b flex-shrink-0">
+                    <div className="w-full overflow-x-auto whitespace-nowrap rounded-lg border-b flex-shrink-0">
                         <TabsList className="inline-flex h-auto">
                             <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" />Announcements</TabsTrigger>
                             <TabsTrigger value="materials"><FileText className="mr-2 h-4 w-4" />Materials</TabsTrigger>
