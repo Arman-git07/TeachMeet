@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -16,7 +17,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogClose, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -125,7 +136,6 @@ export function Exams() {
                         <DialogContent className="sm:max-w-3xl">
                             <DialogHeader><DialogTitle>Create New Exam</DialogTitle></DialogHeader>
                             <form onSubmit={examForm.handleSubmit(onExamSubmit)} className="space-y-4 py-4">
-                                {/* Form fields go here */}
                                 <div className="space-y-2"><Label>Exam Title</Label><Input {...examForm.register('title')} />{examForm.formState.errors.title && <p className="text-destructive text-sm">{examForm.formState.errors.title.message}</p>}</div>
                                 <div className="grid md:grid-cols-2 gap-4">
                                     <div><Label>Exam Date & Time</Label><Controller control={examForm.control} name="date" render={({ field }) => (<Input type="datetime-local" onChange={(e) => field.onChange(new Date(e.target.value))} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />)} />{examForm.formState.errors.date && <p className="text-destructive text-sm">{examForm.formState.errors.date.message}</p>}</div>
@@ -170,9 +180,21 @@ export function Exams() {
                             <div className="flex items-center gap-2">
                                 <Button size="sm" className="btn-gel">Take Exam</Button>
                                 {(canUserManage || user?.uid === exam.authorId) && (
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100" onClick={() => handleDelete({ collectionName: 'exams', item: exam })}><Trash2 className="h-4 w-4" /></Button>
-                                    </AlertDialogTrigger>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100"><Trash2 className="h-4 w-4" /></Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>This will permanently delete this exam. This action cannot be undone.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDelete({ collectionName: 'exams', item: exam })}>Delete</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 )}
                             </div>
                         </div>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -9,7 +10,17 @@ import { canPost } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
-import { AlertDialog, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import AnnouncementComposer from './AnnouncementComposer';
 import type { Announcement } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -24,16 +35,27 @@ const AnnouncementItem = memo(({ announcement, canDelete, onDeleteClick }: { ann
                 {announcement.vanishAt && ` | Vanishes on ${new Date(announcement.vanishAt?.toDate()).toLocaleString()}`}
             </p>
             {canDelete && (
-                <AlertDialogTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={onDeleteClick}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </AlertDialogTrigger>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>This will permanently delete this announcement. This action cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={onDeleteClick}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             )}
         </div>
     );
