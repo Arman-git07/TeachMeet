@@ -72,40 +72,42 @@ export function ClassroomHeader() {
 
     return (
         <>
-            <header className="mb-6 px-4 md:px-8 pt-4 flex items-center justify-between flex-shrink-0">
-                <div>
+            <header className="mb-6 px-4 md:px-8 pt-4 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
                     <Button variant="link" onClick={() => router.push('/dashboard/classrooms')} className="p-0 mb-2 text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" />Back to classrooms</Button>
-                    <h1 className="text-4xl font-bold">{classroom.title}</h1>
-                    <p className="text-lg text-muted-foreground">{classroom.description}</p>
-                    <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
+                    <h1 className="text-3xl md:text-4xl font-bold break-words">{classroom.title}</h1>
+                    <p className="text-md md:text-lg text-muted-foreground break-words mt-1">{classroom.description}</p>
+                    <p className="text-sm text-muted-foreground break-words mt-1">Taught by: {classroom.teacherName}</p>
                 </div>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        {canUserManage && (
-                            <>
-                                <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
-                                        <UserPlus className="mr-2 h-4 w-4"/>Join Requests
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => setIsParticipantsOpen(true)}>
-                                    <Users className="mr-2 h-4 w-4"/>Manage Participants
-                                </DropdownMenuItem>
-                            </>
-                        )}
-                        
-                        <DropdownMenuItem onSelect={() => setIsTeachersOpen(true)}>
-                            <Briefcase className="mr-2 h-4 w-4"/>Subject Teachers
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
+                <div className="flex-shrink-0">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            {canUserManage && (
+                                <>
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
+                                            <UserPlus className="mr-2 h-4 w-4"/>Join Requests
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => setIsParticipantsOpen(true)}>
+                                        <Users className="mr-2 h-4 w-4"/>Manage Participants
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            
+                            <DropdownMenuItem onSelect={() => setIsTeachersOpen(true)}>
+                                <Briefcase className="mr-2 h-4 w-4"/>Subject Teachers
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
 
-                        <DropdownMenuItem onSelect={() => setIsFeesOpen(true)}>
-                            <CreditCard className="mr-2 h-4 w-4"/>Fees & Payment
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                            <DropdownMenuItem onSelect={() => setIsFeesOpen(true)}>
+                                <CreditCard className="mr-2 h-4 w-4"/>Fees & Payment
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </header>
             
             <ItemDeleteDialog itemToDelete={itemToDelete} setItemToDelete={setItemToDelete} onConfirmDelete={handleDeleteItem} />
