@@ -90,14 +90,12 @@ export function RecordingsClientUI() {
     setIsLoading(true);
 
     const publicQuery = query(collection(db, "recordings"), 
-      where("isPrivate", "==", false),
-      orderBy("createdAt", "desc")
+      where("isPrivate", "==", false)
     );
 
     const privateQuery = query(collection(db, "recordings"), 
       where("uploaderId", "==", currentUser.uid),
-      where("isPrivate", "==", true),
-      orderBy("createdAt", "desc")
+      where("isPrivate", "==", true)
     );
     
     let publicRecs: Recording[] = [];
