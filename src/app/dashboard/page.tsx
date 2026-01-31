@@ -3,9 +3,15 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { v4 as uuidv4 } from 'uuid';
 
 export default function DashboardPage() {
   const router = useRouter();
+
+  const handleStartMeeting = () => {
+    const meetingId = `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
+    router.push(`/dashboard/meeting/prejoin?meetingId=${meetingId}&role=host`);
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
@@ -22,7 +28,7 @@ export default function DashboardPage() {
 
       {/* Start New Meeting Button */}
       <Button
-        onClick={() => router.push("/dashboard/meeting/prejoin")}
+        onClick={handleStartMeeting}
         className="w-full max-w-md bg-green-500 hover:bg-green-600 text-white font-semibold py-6 rounded-xl shadow-lg transition duration-200"
       >
         + Start New Meeting
