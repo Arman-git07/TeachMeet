@@ -104,13 +104,15 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == userId;
 
         match /pendingJoinRequests/{classroomId} {
-            allow read, write, delete: if isSignedIn() && request.auth.uid == userId;
+            // UPDATED: Allow classroom owner to delete the request marker.
+            allow read, create, update: if isSignedIn() && request.auth.uid == userId;
+            allow delete: if isSignedIn() && (request.auth.uid == userId || isClassroomOwner(classroomId, request.auth.uid));
         }
 
         match /enrolled/{classroomId} {
+            // UPDATED: Allow classroom owner to manage enrollment status for users.
             allow read: if isSignedIn() && request.auth.uid == userId;
-            // Writes to this subcollection are handled via batch writes in `ParticipantsManagement`.
-            allow write: if false; 
+            allow write: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid); 
         }
     }
     
