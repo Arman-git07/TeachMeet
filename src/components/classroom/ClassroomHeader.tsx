@@ -6,7 +6,6 @@ import { useClassroom } from '@/contexts/ClassroomContext';
 import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus } from 'lucide-react';
 import { ParticipantsManagement } from './ParticipantsManagement';
@@ -14,6 +13,7 @@ import { SubjectTeachers } from './SubjectTeachers';
 import { FeesAndPayment } from './FeesAndPayment';
 import type { DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog } from '@/components/ui/dialog';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { deleteObject, ref } from 'firebase/storage';
@@ -118,9 +118,7 @@ export function ClassroomHeader() {
                 <SubjectTeachers />
             </Dialog>
             
-            <Dialog open={isFeesOpen} onOpenChange={setIsFeesOpen}>
-                <FeesAndPayment />
-            </Dialog>
+            <FeesAndPayment isOpen={isFeesOpen} onOpenChange={setIsFeesOpen} />
         </>
     );
 }
