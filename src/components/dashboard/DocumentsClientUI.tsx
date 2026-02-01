@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,49 +73,23 @@ export function DocumentsClientUI() {
 
     setIsLoading(true);
     
-    const publicQuery = query(collection(db, "documents"), 
-      where("isPrivate", "==", false)
+    const q = query(
+      collection(db, "documents"), 
+      orderBy("createdAt", "desc")
     );
 
-    const privateQuery = query(collection(db, "documents"), 
-      where("uploaderId", "==", currentUser.uid),
-      where("isPrivate", "==", true)
-    );
-    
-    let publicDocs: Document[] = [];
-    let privateDocs: Document[] = [];
-
-    const mergeAndSetDocuments = () => {
-      const allDocs = [...publicDocs, ...privateDocs];
-      const uniqueDocs = Array.from(new Map(allDocs.map(doc => [doc.id, doc])).values());
-      uniqueDocs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-      setDocuments(uniqueDocs);
-    };
-
-    const unsubPublic = onSnapshot(publicQuery, (snapshot) => {
-      publicDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
-      mergeAndSetDocuments();
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
+      const relevantDocs = allDocs.filter(doc => !doc.isPrivate || doc.uploaderId === currentUser.uid);
+      setDocuments(relevantDocs);
       setIsLoading(false);
     }, (error) => {
-      console.error("Error fetching public documents:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch public documents." });
+      console.error("Error fetching documents:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents." });
       setIsLoading(false);
     });
 
-    const unsubPrivate = onSnapshot(privateQuery, (snapshot) => {
-      privateDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
-      mergeAndSetDocuments();
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching private documents:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch your private documents." });
-      setIsLoading(false);
-    });
-
-    return () => {
-      unsubPublic();
-      unsubPrivate();
-    };
+    return () => unsubscribe();
   }, [currentUser, toast]);
 
 
@@ -140,17 +115,33 @@ export function DocumentsClientUI() {
     
     setIsUploading(true);
     const toastId = `upload-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Document...", description: `Uploading ${file.name}...`, duration: Infinity });
+    toast({ id: toastId, title: "Uploading Document...", description: `Starting upload for ${file.name}...`, duration: Infinity });
 
     const storagePath = `documents/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
     const uploadTask = uploadBytesResumable(fileRef, file);
 
     uploadTask.on('state_changed',
-      () => {},
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        toast.update(toastId, {
+            description: `Uploading ${file.name}... ${Math.round(progress)}%`
+        });
+      },
       (error) => {
-        toast.update(toastId, { variant: "destructive", title: "Upload Failed", description: error.message });
+        console.error("Failed to upload document:", error);
+        let title = "Upload Failed";
+        let description = "Could not upload the document. Please try again.";
+        if (error.code === 'storage/unauthorized') {
+            title = "Permission Denied";
+            description = "You do not have permission to upload files. Check storage security rules.";
+        } else if (error.code && error.code.includes('auth/requests-to-this-api')) {
+           title = "API Key Configuration Error";
+           description = "Could not connect to Firebase. Please check your API key configuration.";
+        }
+        toast.update(toastId, { variant: "destructive", title, description, duration: 9000 });
         setIsUploading(false);
+        if (event.target) event.target.value = "";
       },
       async () => {
         try {
@@ -166,7 +157,7 @@ export function DocumentsClientUI() {
             createdAt: serverTimestamp(),
           });
           toast.update(toastId, { title: "Document Uploaded!", description: `${file.name} is now available.` });
-        } catch (error) {
+        } catch (dbError) {
           toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save document details to the database." });
         } finally {
             if (event.target) event.target.value = "";
@@ -188,8 +179,10 @@ export function DocumentsClientUI() {
     
     try {
       await deleteDoc(doc(db, "documents", id));
-      const fileRef = storageRef(storage, storagePath);
-      await deleteObject(fileRef);
+      if (storagePath) {
+          const fileRef = storageRef(storage, storagePath);
+          await deleteObject(fileRef);
+      }
       
       toast({ title: "Document Deleted", description: `"${name}" has been successfully deleted.` });
       setDocumentToDelete(null); 
