@@ -18,7 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function JoinRequestsPage() {
-    const { classroomId, classroom } = useClassroom();
+    const { classroomId, classroom, user } = useClassroom();
     const router = useRouter();
     const { toast } = useToast();
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
@@ -37,8 +37,8 @@ export default function JoinRequestsPage() {
     const teacherRequests = useMemo(() => joinRequests.filter(req => req.role === 'teacher'), [joinRequests]);
 
     const handleRequest = useCallback(async (request: JoinRequest, action: 'approve' | 'deny') => {
-        if (!classroomId || !request.requesterId) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Missing classroom or requestor ID.' });
+        if (!classroomId || !request.requesterId || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Missing required data or not authenticated.' });
             return;
         }
 
@@ -59,8 +59,25 @@ export default function JoinRequestsPage() {
                 if (request.role === 'teacher') {
                      batch.update(classroomRef, { teachers: arrayUnion({ uid: request.requesterId, name: request.studentName, photoURL: request.studentPhotoURL || "" }) });
                      batch.set(doc(db, `classrooms/${classroomId}/teachers`, request.requesterId), { uid: request.requesterId, name: request.studentName, ...request.applicationData, addedAt: serverTimestamp() });
-                } else {
+                } else { // Is a student
                     batch.update(classroomRef, { students: arrayUnion(request.requesterId) });
+                    
+                    // Add automatic welcome announcement for students
+                    if (classroom) {
+                        const announcementRef = doc(collection(db, `classrooms/${classroomId}/announcements`));
+                        const vanishAt = new Date();
+                        vanishAt.setHours(vanishAt.getHours() + 1);
+
+                        batch.set(announcementRef, {
+                            text: `Hi ${request.studentName}, welcome to "${classroom.title}"!`,
+                            type: 'text',
+                            creatorName: 'System',
+                            creatorId: user.uid, // The user performing the action
+                            authorId: user.uid,  // The user performing the action, for security rules
+                            createdAt: serverTimestamp(),
+                            vanishAt: vanishAt,
+                        });
+                    }
                 }
 
                 if (classroom) {
@@ -80,7 +97,7 @@ export default function JoinRequestsPage() {
         } finally {
             setIsProcessing(null);
         }
-    }, [classroomId, toast, classroom]);
+    }, [classroomId, toast, classroom, user]);
 
     const renderRequestList = (requests: JoinRequest[]) => {
         if (requests.length === 0) {
