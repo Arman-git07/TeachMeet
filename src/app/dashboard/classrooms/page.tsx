@@ -742,7 +742,7 @@ export default function ClassroomsPage() {
                         Cancel Request
                     </Button>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                         <Button variant="outline" onClick={() => handleRequestToJoinStudent(classroom.id)}>
                             <GraduationCap className="mr-2 h-4 w-4"/>
                             Join as Student
@@ -887,5 +887,7 @@ export default function ClassroomsPage() {
 
 
 
+
+    
 
     
