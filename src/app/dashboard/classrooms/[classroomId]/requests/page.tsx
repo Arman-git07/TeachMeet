@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -27,6 +26,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 export default function JoinRequestsPage() {
     const { classroomId, classroom, user } = useClassroom();
@@ -156,11 +164,39 @@ export default function JoinRequestsPage() {
                                     </div>
                                 </div>
                                 {req.role === 'teacher' && req.applicationData && (
-                                    <div className="mt-2 text-xs space-y-1 text-muted-foreground border-t pt-2">
-                                        <p><strong>Subject:</strong> {req.applicationData.subject}</p>
-                                        <p><strong>Availability:</strong> {req.applicationData.availability}</p>
-                                        {req.resumeURL && <Button asChild size="sm" variant="link" className="p-0 h-auto mt-1"><a href={req.resumeURL} target="_blank" rel="noopener noreferrer">View Resume</a></Button>}
-                                    </div>
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <div className="mt-2 text-xs space-y-1 text-muted-foreground border-t pt-2 cursor-pointer hover:bg-muted/50 p-2 rounded-md">
+                                                <p><strong>Subject:</strong> {req.applicationData.subject}</p>
+                                                <p><strong>Availability:</strong> {req.applicationData.availability}</p>
+                                                <p className="text-accent font-medium mt-1">Click to view full application</p>
+                                            </div>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Teacher Application: {req.studentName}</DialogTitle>
+                                                <DialogDescription>
+                                                    Review the full application details below.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="py-4 space-y-3 text-sm">
+                                                <p><strong>Subject:</strong> {req.applicationData.subject}</p>
+                                                <p><strong>Mobile:</strong> {req.applicationData.mobile}</p>
+                                                <p><strong>Qualification:</strong> {req.applicationData.qualification}</p>
+                                                <p><strong>Experience:</strong> {req.applicationData.experience}</p>
+                                                <p><strong>Availability:</strong> {req.applicationData.availability}</p>
+                                                {req.applicationData.message && <p className="border-t pt-3 mt-3"><strong>Message:</strong> {req.applicationData.message}</p>}
+                                                {req.resumeURL && (
+                                                    <Button asChild size="sm" variant="outline" className="mt-2">
+                                                        <a href={req.resumeURL} target="_blank" rel="noopener noreferrer">View Resume</a>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <DialogClose asChild>
+                                                <Button type="button" variant="secondary">Close</Button>
+                                            </DialogClose>
+                                        </DialogContent>
+                                    </Dialog>
                                 )}
                             </div>
                         </div>
