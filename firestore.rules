@@ -42,52 +42,52 @@ service cloud.firestore {
     match /classrooms/{classroomId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
-      allow update, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
+      allow update, delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
 
       match /joinRequests/{userId} {
         // Allow a user to read their own request so they can check its status.
-        allow get, list: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
+        allow get, list: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
         // Allow a user to create a request for themselves.
         allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
         // Allow user to update their own request (e.g., withdraw).
-        allow update: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
+        allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
         // Allow user to delete their own request by checking their auth UID against the document ID.
         // This is more robust than checking resource.data, which requires a separate 'get' permission.
-        allow delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == userId);
+        allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
       }
       
       match /participants/{userId} {
         allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
+        allow create, update, delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
       }
       
       match /announcements/{announcementId} {
         allow get, list: if true;
         allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
-        allow delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
+        allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
       }
       
       match /materials/{materialId} {
         allow get, list: if true;
         allow create: if isSignedIn() && request.resource.data.uploaderId == request.auth.uid;
-        allow delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || resource.data.uploaderId == request.auth.uid);
+        allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.uploaderId == request.auth.uid);
       }
 
       match /assignments/{assignmentId} {
         allow get, list: if true;
-        allow create, delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.resource.data.creatorId == request.auth.uid);
+        allow create, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.resource.data.creatorId == request.auth.uid);
         
         match /submissions/{studentId} {
-            allow get, list: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == studentId);
+            allow get, list: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
             allow create, update: if isSignedIn() && request.auth.uid == studentId;
-            allow delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || request.auth.uid == studentId);
+            allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
         }
       }
 
       match /exams/{examId} {
         allow get, list: if true;
         allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
-        allow delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
+        allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
       }
 
       match /teachers/{teacherId} {
@@ -104,15 +104,17 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == userId;
 
         match /pendingJoinRequests/{classroomId} {
-            // UPDATED: Allow classroom owner to delete the request marker.
-            allow read, create, update: if isSignedIn() && request.auth.uid == userId;
-            allow delete: if isSignedIn() && (request.auth.uid == userId || isClassroomOwner(classroomId, request.auth.uid));
+            // Allow a user to manage their own pending request.
+            // Allow a classroom manager to delete the request after approval/denial.
+            allow read, write: if isSignedIn() && request.auth.uid == userId;
+            allow delete: if isSignedIn() && (request.auth.uid == userId || canManageClassroom(classroomId, request.auth.uid));
         }
 
         match /enrolled/{classroomId} {
-            // UPDATED: Allow classroom owner to manage enrollment status for users.
+            // Allow a user to see their own enrollments.
+            // Allow a classroom manager to manage the enrollment status for any user.
             allow read: if isSignedIn() && request.auth.uid == userId;
-            allow write: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid); 
+            allow write: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid); 
         }
     }
     
@@ -173,6 +175,14 @@ service cloud.firestore {
     
     function isClassroomOwner(classroomId, userId) {
       return get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == userId;
+    }
+
+    function isTeacher(classroomId, userId) {
+      return exists(/databases/$(database)/documents/classrooms/$(classroomId)/teachers/$(userId));
+    }
+    
+    function canManageClassroom(classroomId, userId) {
+        return isClassroomOwner(classroomId, userId) || isTeacher(classroomId, userId);
     }
   }
 }
