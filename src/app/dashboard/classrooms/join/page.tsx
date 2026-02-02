@@ -102,15 +102,16 @@ export default function JoinClassroomPage() {
                 try {
                     const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
                     let activities: ActivityItem[] = [];
-                     if (rawActivity) {
+                    if (rawActivity) {
                         try {
                             const parsed = JSON.parse(rawActivity);
                             if (Array.isArray(parsed)) {
                                 activities = parsed;
+                            } else {
+                                console.warn("Stored activity data is not an array, starting fresh.");
                             }
-                        } catch {
-                            // Corrupted data, start fresh
-                            activities = [];
+                        } catch (e) {
+                            console.error("Failed to parse activity data, starting fresh.", e);
                         }
                     }
 

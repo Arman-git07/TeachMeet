@@ -270,17 +270,19 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
         if (teacherId) {
             const LATEST_ACTIVITY_KEY = `teachmeet-latest-activity-${teacherId}`;
             let activities: ActivityItem[] = [];
-             if (LATEST_ACTIVITY_KEY) {
+            if (LATEST_ACTIVITY_KEY) {
                 try {
                     const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
                     if (rawActivity) {
                         const parsed = JSON.parse(rawActivity);
                         if (Array.isArray(parsed)) {
                             activities = parsed;
+                        } else {
+                           console.warn("Stored activity data is not an array, starting fresh.");
                         }
                     }
-                } catch {
-                    activities = [];
+                } catch (e) {
+                    console.error("Failed to parse activity data, starting fresh.", e);
                 }
             }
 
@@ -785,7 +787,7 @@ export default function ClassroomsPage() {
                         Cancel Request
                     </Button>
                 ) : (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <Button variant="outline" onClick={() => handleRequestToJoinStudent(classroom.id)}>
                             <GraduationCap className="mr-2 h-4 w-4"/>
                             Join as Student
