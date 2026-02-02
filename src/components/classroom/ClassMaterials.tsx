@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -94,8 +95,7 @@ export function ClassMaterials() {
     const handleMaterialUpload = useCallback(async () => {
         if (!materialFile || !user) return;
         setIsUploading(true);
-        const toastId = `upload-${Date.now()}`;
-        toast({ id: toastId, title: "Uploading Material...", duration: Infinity });
+        const toastHandle = toast({ title: "Uploading Material...", duration: Infinity });
         
         try {
             const path = `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`;
@@ -104,7 +104,7 @@ export function ClassMaterials() {
 
             uploadTask.on('state_changed', (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                toast.update(toastId, { description: `Upload is ${Math.round(progress)}% done` });
+                toastHandle.update({ description: `Upload is ${Math.round(progress)}% done` });
             });
 
             await uploadTask;
@@ -113,7 +113,7 @@ export function ClassMaterials() {
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
                 name: materialFile.name, url, uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Anonymous', type: 'file', storagePath: path,
             });
-            toast.update(toastId, { title: "Material Uploaded!" });
+            toastHandle.update({ title: "Material Uploaded!" });
             setMaterialFile(null);
         } catch (error: any) {
             console.error("Failed to upload material:", error);
@@ -128,7 +128,7 @@ export function ClassMaterials() {
                     description = "Could not connect to Firebase. Please check your API key configuration.";
                 }
             }
-            toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
+            toastHandle.update({ variant: 'destructive', title, description, duration: 9000 });
         } finally {
             setIsUploading(false);
         }

@@ -12,6 +12,7 @@ import {
   getDownloadURL,
   ref,
   uploadBytes,
+  uploadBytesResumable,
 } from "firebase/storage";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -122,6 +123,8 @@ export default function AnnouncementComposer({
     }
 
     setLoading(true);
+    const toastHandle = toast({ title: "Posting Announcement...", duration: Infinity });
+    
     try {
       let audioUrl: string | null = null;
       let storagePath: string | null = null; 
@@ -129,7 +132,14 @@ export default function AnnouncementComposer({
       if (audioBlob) {
         const path = `announcements/${classId}/${user.uid}/${Date.now()}.webm`;
         const audioStorageRef = ref(storage, path);
-        await uploadBytes(audioStorageRef, audioBlob, { contentType: "audio/webm" });
+        const uploadTask = uploadBytesResumable(audioStorageRef, audioBlob, { contentType: "audio/webm" });
+
+        uploadTask.on('state_changed', (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            toastHandle.update({ description: `Uploading audio... ${Math.round(progress)}%` });
+        });
+
+        await uploadTask;
         audioUrl = await getDownloadURL(audioStorageRef);
         storagePath = path;
       }
@@ -150,7 +160,7 @@ export default function AnnouncementComposer({
       setText("");
       setVanishAt("");
       setAudioBlob(null);
-      toast({ title: "Announcement posted!" });
+      toastHandle.update({ title: "Announcement posted!" });
     } catch (error: any) {
       console.error("Failed to post announcement:", error);
       let title = "Failed to Post Announcement";
@@ -169,7 +179,7 @@ export default function AnnouncementComposer({
         }
       }
 
-      toast({
+      toastHandle.update({
         variant: "destructive",
         title: title,
         description: description,

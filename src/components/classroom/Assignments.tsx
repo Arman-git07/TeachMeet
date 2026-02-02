@@ -93,8 +93,7 @@ export function Assignments() {
         const answerKeyFile = data.answerKey?.[0];
         if (!answerKeyFile) return;
 
-        const toastId = `assignment-upload-${Date.now()}`;
-        toast({ id: toastId, title: "Creating Assignment...", description: "Please wait." });
+        const toastHandle = toast({ title: "Creating Assignment...", description: "Please wait." });
         try {
             const path = `classrooms/${classroomId}/assignments/${Date.now()}-${answerKeyFile.name}`;
             const fileRef = storageRef(storage, path);
@@ -111,7 +110,7 @@ export function Assignments() {
                 storagePath: path,
             });
 
-            toast.update(toastId, { title: "Assignment Created!" });
+            toastHandle.update({ title: "Assignment Created!" });
             setIsDialogOpen(false);
             assignmentForm.reset();
         } catch (error: any) {
@@ -122,7 +121,7 @@ export function Assignments() {
                title = "API Key Configuration Error";
                description = "Could not connect to Firebase. Please check your API key configuration and ensure required Firebase services are enabled.";
             }
-            toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
+            toastHandle.update({ variant: 'destructive', title, description, duration: 9000 });
         }
     }, [canUserManage, user, classroomId, toast, assignmentForm]);
 
@@ -133,15 +132,14 @@ export function Assignments() {
         const submissionFile = fileInput?.files?.[0];
         if (!submissionFile) return;
 
-        const submissionToastId = `submission-${Date.now()}`;
-        toast({ id: submissionToastId, title: "Submitting..." });
+        const toastHandle = toast({ title: "Submitting..." });
         try {
             const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${assignmentId}/submissions/${user.uid}-${submissionFile.name}`);
             const submissionUrl = await getDownloadURL(await uploadBytes(fileRef, submissionFile).then(s => s.ref));
             await setDoc(doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", user.uid), {
                 studentId: user.uid, studentName: user.displayName || 'Student', submittedAt: serverTimestamp(), submissionUrl, grade: null, feedback: null
             });
-            toast.update(submissionToastId, { title: "Submission Successful!" });
+            toastHandle.update({ title: "Submission Successful!" });
         } catch (error: any) {
             console.error("Failed to submit assignment:", error);
             let title = "Submission Failed";
@@ -150,7 +148,7 @@ export function Assignments() {
                title = "API Key Configuration Error";
                description = "Could not connect to Firebase. Please check your API key configuration.";
             }
-            toast.update(submissionToastId, { variant: 'destructive', title, description, duration: 9000 });
+            toastHandle.update({ variant: 'destructive', title, description, duration: 9000 });
         }
     }, [classroomId, user, toast]);
 

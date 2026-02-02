@@ -73,9 +73,6 @@ export function DocumentsClientUI() {
 
     setIsLoading(true);
     
-    // This query now correctly fetches only the documents the user is allowed to see,
-    // by combining public documents with the user's own private documents.
-    // This respects the Firestore security rules and prevents permission errors.
     const q = query(
       collection(db, "documents"), 
       or(
@@ -87,8 +84,6 @@ export function DocumentsClientUI() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
       
-      // We sort client-side because ordering on a field different from the 'or'
-      // filter's fields would require a composite index. This is more robust.
       fetchedDocs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
       setDocuments(fetchedDocs);
@@ -124,8 +119,7 @@ export function DocumentsClientUI() {
     if (!file || !destination || !currentUser) return;
     
     setIsUploading(true);
-    const toastId = `upload-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Document...", description: `Starting upload for ${file.name}...`, duration: Infinity });
+    const toastHandle = toast({ title: "Uploading Document...", description: `Starting upload for ${file.name}...`, duration: Infinity });
 
     try {
         const storagePath = `documents/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
@@ -135,7 +129,7 @@ export function DocumentsClientUI() {
         uploadTask.on('state_changed',
             (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                toast.update(toastId, {
+                toastHandle.update({
                     description: `Uploading ${file.name}... ${Math.round(progress)}%`
                 });
             }
@@ -156,7 +150,7 @@ export function DocumentsClientUI() {
             createdAt: serverTimestamp(),
         });
         
-        toast.update(toastId, { title: "Document Uploaded!", description: `${file.name} is now available.` });
+        toastHandle.update({ title: "Document Uploaded!", description: `${file.name} is now available.` });
     } catch (error: any) {
         console.error("Failed to upload document:", error);
         let title = "Upload Failed";
@@ -169,13 +163,13 @@ export function DocumentsClientUI() {
             } else if (error.code === 'permission-denied') { // Firestore error
                 title = "Database Error";
                 description = "You do not have permission to save the file metadata. Check Firestore rules.";
-            } else if (error.code.includes('auth/requests-to-this-api')) {
+            } else if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
                 title = "API Key Configuration Error";
                 description = "Could not connect to Firebase. Please check your API key configuration.";
             }
         }
         
-        toast.update(toastId, { variant: "destructive", title, description, duration: 9000 });
+        toastHandle.update({ variant: "destructive", title, description, duration: 9000 });
     } finally {
         if (event.target) event.target.value = "";
         setIsUploading(false);

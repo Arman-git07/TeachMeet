@@ -135,8 +135,7 @@ export function RecordingsClientUI() {
     if (!file || !destination || !currentUser) return;
     
     setIsUploading(true);
-    const toastId = `upload-rec-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Recording...", description: `Starting upload for ${file.name}...`, duration: Infinity });
+    const toastHandle = toast({ title: "Uploading Recording...", description: `Starting upload for ${file.name}...`, duration: Infinity });
 
     try {
         const storagePath = `recordings/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
@@ -146,7 +145,7 @@ export function RecordingsClientUI() {
         uploadTask.on('state_changed',
             (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                toast.update(toastId, {
+                toastHandle.update({
                     description: `Uploading ${file.name}... ${Math.round(progress)}%`
                 });
             }
@@ -169,7 +168,7 @@ export function RecordingsClientUI() {
             thumbnailUrl: `https://placehold.co/300x180.png?text=New`,
         });
 
-        toast.update(toastId, { title: "Recording Uploaded!", description: `${file.name} is now available.` });
+        toastHandle.update({ title: "Recording Uploaded!", description: `${file.name} is now available.` });
 
     } catch (error: any) {
         console.error("Failed to upload recording:", error);
@@ -182,12 +181,12 @@ export function RecordingsClientUI() {
             } else if (error.code === 'permission-denied') { // Firestore error
                 title = "Database Error";
                 description = "You do not have permission to save the recording metadata. Check Firestore rules.";
-            } else if (error.code.includes('auth/requests-to-this-api')) {
+            } else if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
                 title = "API Key Configuration Error";
                 description = "Could not connect to Firebase. Please check your API key configuration.";
             }
         }
-        toast.update(toastId, { variant: "destructive", title, description, duration: 9000 });
+        toastHandle.update({ variant: "destructive", title, description, duration: 9000 });
     } finally {
         if (event.target) event.target.value = "";
         setIsUploading(false);
