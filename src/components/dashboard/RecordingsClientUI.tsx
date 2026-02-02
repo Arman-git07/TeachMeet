@@ -92,17 +92,22 @@ export function RecordingsClientUI() {
 
     const q = query(
       collection(db, "recordings"),
-      orderBy("createdAt", "desc")
+      or(
+        where("isPrivate", "==", false),
+        where("uploaderId", "==", currentUser.uid)
+      )
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const allRecs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
-        const relevantRecs = allRecs.filter(rec => !rec.isPrivate || rec.uploaderId === currentUser.uid);
-        setRecordings(relevantRecs);
+        const fetchedRecs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
+
+        fetchedRecs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+        setRecordings(fetchedRecs);
         setIsLoading(false);
     }, (error) => {
         console.error("Error fetching recordings:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Could not fetch recordings. Check Firestore rules." });
+        toast({ variant: 'destructive', title: "Error", description: "Could not fetch recordings. Please check your security rules." });
         setIsLoading(false);
     });
 

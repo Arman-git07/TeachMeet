@@ -73,19 +73,29 @@ export function DocumentsClientUI() {
 
     setIsLoading(true);
     
+    // This query now correctly fetches only the documents the user is allowed to see,
+    // by combining public documents with the user's own private documents.
+    // This respects the Firestore security rules and prevents permission errors.
     const q = query(
       collection(db, "documents"), 
-      orderBy("createdAt", "desc")
+      or(
+        where("isPrivate", "==", false),
+        where("uploaderId", "==", currentUser.uid)
+      )
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
-      const relevantDocs = allDocs.filter(doc => !doc.isPrivate || doc.uploaderId === currentUser.uid);
-      setDocuments(relevantDocs);
+      const fetchedDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
+      
+      // We sort client-side because ordering on a field different from the 'or'
+      // filter's fields would require a composite index. This is more robust.
+      fetchedDocs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      setDocuments(fetchedDocs);
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching documents:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents. Check Firestore rules." });
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents. Please check your Firestore rules." });
       setIsLoading(false);
     });
 
