@@ -12,11 +12,11 @@
     --muted: 210 30% 90%; /* Light Grayish Blue */
     --muted-foreground: 210 40% 45%; /* Medium Grayish Blue */
 
-    --popover: 170 65% 59%; /* #4FE0CB */
-    --popover-foreground: 170 80% 10%; /* Dark Teal for contrast */
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 40% 10%;
 
-    --card: 170 65% 59%; /* #4FE0CB */
-    --card-foreground: 170 80% 10%; /* Dark Teal for contrast */
+    --card: 0 0% 100%;
+    --card-foreground: 210 40% 10%;
 
     --border: 210 30% 85%; /* Slightly darker gray border */
     --input: 210 30% 98%; /* Lighter Gray Input Background */
