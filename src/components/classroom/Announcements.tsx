@@ -66,16 +66,23 @@ export function Announcements() {
     const { classroomId, user, userRole } = useClassroom();
     const { toast } = useToast();
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [currentTime, setCurrentTime] = useState(new Date()); // State to trigger re-renders
     const canUserPost = canPost(userRole);
     
+    // Set up a timer to update the current time every minute
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60000); // 60,000 milliseconds = 1 minute
+        return () => clearInterval(timer);
+    }, []);
+
     useEffect(() => {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'announcements'), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const now = new Date();
-            const fetchedAnnouncements = snapshot.docs
-                .map(d => ({ id: d.id, ...d.data() } as Announcement))
-                .filter(a => !a.vanishAt || a.vanishAt.toDate() > now);
+            // Fetch all announcements, filtering will happen in render
+            const fetchedAnnouncements = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
             setAnnouncements(fetchedAnnouncements);
         }, (error) => {
             console.error("Error fetching announcements:", error);
@@ -101,12 +108,15 @@ export function Announcements() {
             toast({ variant: 'destructive', title: "Deletion Failed", description: error.message });
         }
     }, [classroomId, toast]);
+    
+    // Filter announcements based on the current time state
+    const visibleAnnouncements = announcements.filter(a => !a.vanishAt || a.vanishAt.toDate() > currentTime);
 
     return (
         <div className="space-y-4">
             {canUserPost && classroomId && <AnnouncementComposer classId={classroomId} canPost={canUserPost} />}
             <div className="space-y-3">
-                {announcements.length > 0 ? announcements.map(a => (
+                {visibleAnnouncements.length > 0 ? visibleAnnouncements.map(a => (
                     <AnnouncementItem
                         key={a.id}
                         announcement={a}

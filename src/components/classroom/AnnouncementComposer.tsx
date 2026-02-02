@@ -111,23 +111,36 @@ export default function AnnouncementComposer({
       });
       return;
     }
+    
+    // **NEW:** Require vanish date
+    if (!vanishAt) {
+        toast({
+            variant: "destructive",
+            title: "Vanish Date Required",
+            description: "Please select a date and time for the announcement to disappear.",
+        });
+        return;
+    }
 
     setLoading(true);
     try {
       let audioUrl: string | null = null;
+      let storagePath: string | null = null; // For deletion later
 
       if (audioBlob) {
         const path = `announcements/${classId}/${user.uid}/${Date.now()}.webm`;
-        const storageRef = ref(storage, path);
-        await uploadBytes(storageRef, audioBlob, { contentType: "audio/webm" });
-        audioUrl = await getDownloadURL(storageRef);
+        const audioStorageRef = ref(storage, path);
+        await uploadBytes(audioStorageRef, audioBlob, { contentType: "audio/webm" });
+        audioUrl = await getDownloadURL(audioStorageRef);
+        storagePath = path;
       }
 
       await addDoc(collection(db, "classrooms", classId, "announcements"), {
         text: text.trim() || null,
         audioUrl,
+        storagePath,
         type: audioUrl ? 'audio' : 'text',
-        vanishAt: vanishAt ? new Date(vanishAt) : null,
+        vanishAt: new Date(vanishAt),
         creatorName: user.displayName || "Teacher",
         creatorId: user.uid,
         authorId: user.uid, // for security rules
@@ -202,24 +215,25 @@ export default function AnnouncementComposer({
             </Button>
           </div>
         )}
-        <div className="flex items-center gap-2 ml-auto">
-          <Label htmlFor="vanishDate" className="text-sm text-muted-foreground sr-only">Vanish Date</Label>
+      </div>
+      <div className="flex flex-col sm:flex-row items-center gap-4 justify-between mt-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Label htmlFor="vanishDate" className="text-sm text-muted-foreground whitespace-nowrap">Vanish Date*</Label>
           <Input
             id="vanishDate"
             type="datetime-local"
             value={vanishAt}
             disabled={!canPost || loading}
             onChange={(e) => setVanishAt(e.target.value)}
-            className="rounded-lg bg-background p-2 ring-1 ring-border w-auto"
+            className="rounded-lg bg-background p-2 ring-1 ring-border w-full"
+            required
           />
         </div>
-      </div>
-      <div className="mt-4 flex justify-end">
-        <Button
+         <Button
           type="button"
-          disabled={!canPost || loading || (!text.trim() && !audioBlob)}
+          disabled={!canPost || loading || ((!text.trim() && !audioBlob) || !vanishAt)}
           onClick={handlePost}
-          className="rounded-lg btn-gel"
+          className="rounded-lg btn-gel w-full sm:w-auto"
         >
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
           {loading ? "Posting..." : "Post Announcement"}
