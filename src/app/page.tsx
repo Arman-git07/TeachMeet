@@ -6,13 +6,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone } from 'lucide-react';
+import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone, UserPlus } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 
-export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement';
+export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement' | 'joinRequest';
 
 interface BaseActivityItem {
   id: string;
@@ -47,7 +47,13 @@ export interface AnnouncementActivityItem extends BaseActivityItem {
     classroomId: string;
 }
 
-export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem;
+export interface JoinRequestActivityItem extends BaseActivityItem {
+    type: 'joinRequest';
+    classroomId: string;
+    requesterName: string;
+}
+
+export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem | JoinRequestActivityItem;
 
 
 const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
@@ -61,15 +67,16 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   recording: Clapperboard,
   chatMention: AtSign,
   announcement: Megaphone,
+  joinRequest: UserPlus,
 };
 
-// Updated itemLinks to handle meeting re-join logic
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   meeting: (id, item) => `/dashboard/meeting/prejoin?meetingId=${id}&topic=${encodeURIComponent(item.title)}&role=host`,
   document: (id) => `/dashboard/documents`,
   recording: (id) => `/dashboard/recordings`,
-  chatMention: (id, item) => `/dashboard/classrooms`, // Link to classrooms page for now
+  chatMention: (id, item) => `/dashboard/classrooms`,
   announcement: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
+  joinRequest: (id, item) => `/dashboard/classrooms/${item.classroomId}/requests`,
 };
 
 export default function HomePage() {
@@ -258,6 +265,7 @@ export default function HomePage() {
       case 'recording': return `New Recording: ${item.title}`;
       case 'chatMention': return `${(item as ChatMentionActivityItem).mentionedBy} mentioned you: "${item.title}"`;
       case 'announcement': return `New in Classroom: ${item.title}`;
+      case 'joinRequest': return `${(item as JoinRequestActivityItem).requesterName} wants to join: "${item.title}"`;
       default: return item.title;
     }
   };

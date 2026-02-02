@@ -18,6 +18,7 @@ interface FoundClassroom {
     id: string;
     title: string;
     teacherName: string;
+    teacherId: string;
 }
 
 export default function JoinClassroomPage() {
@@ -53,7 +54,8 @@ export default function JoinClassroomPage() {
                 setFoundClassroom({
                     id: docSnap.id,
                     title: data.title,
-                    teacherName: data.teacherName
+                    teacherName: data.teacherName,
+                    teacherId: data.teacherId,
                 });
             } else {
                 toast({ variant: 'destructive', title: 'Not Found', description: 'No public classroom found with that code.' });
@@ -74,7 +76,6 @@ export default function JoinClassroomPage() {
             const batch = writeBatch(db);
             const requestRef = doc(db, `classrooms/${foundClassroom.id}/joinRequests`, user.uid);
             
-            // CORRECTED: Use 'requesterId' to match security rules
             batch.set(requestRef, {
                 requesterId: user.uid,
                 studentName: user.displayName || 'Anonymous Student',
@@ -84,7 +85,6 @@ export default function JoinClassroomPage() {
                 requestedAt: serverTimestamp()
             });
 
-            // Also create a document in the user's subcollection to track their pending requests
             const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, foundClassroom.id);
             batch.set(userPendingRequestRef, { 
                 classroomId: foundClassroom.id, 
@@ -94,6 +94,31 @@ export default function JoinClassroomPage() {
             
             await batch.commit();
             
+            // --- NOTIFICATION LOGIC ---
+            if (foundClassroom.teacherId) {
+                const LATEST_ACTIVITY_KEY = `teachmeet-latest-activity-${foundClassroom.teacherId}`;
+                try {
+                    const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+                    let activities = rawActivity ? JSON.parse(rawActivity) : [];
+                    if (!Array.isArray(activities)) activities = [];
+
+                    const newNotification = {
+                      id: `joinReq-${Date.now()}-${user.uid}`,
+                      type: 'joinRequest',
+                      title: foundClassroom.title,
+                      timestamp: Date.now(),
+                      classroomId: foundClassroom.id,
+                      requesterName: user.displayName || 'A new student'
+                    };
+                    activities.unshift(newNotification);
+                    localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
+                    window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+                } catch(e) {
+                    console.error("Failed to create join request notification", e);
+                }
+            }
+            // --- END NOTIFICATION LOGIC ---
+
             toast({ title: 'Request Sent!', description: 'Your request to join has been sent to the teacher.' });
             router.push('/dashboard/classrooms');
         } catch (error) {

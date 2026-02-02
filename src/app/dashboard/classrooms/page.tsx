@@ -56,6 +56,7 @@ import {
   setDoc,
   getDocs,
   collectionGroup,
+  getDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -236,11 +237,10 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
     const user = auth.currentUser;
     if (!user) throw new Error("Not logged in");
 
-    // The joinRequests doc ID MUST be the applicant's UID
     const ref = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
 
     await setDoc(ref, {
-        requesterId: user.uid, // Correct field name for rules
+        requesterId: user.uid,
         studentName: data.fullName,
         studentPhotoURL: user.photoURL || "",
         role: "teacher",
@@ -255,7 +255,38 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
             mobile: data.mobile,
             message: data.message || ""
         }
-    }, { merge: true }); // Use merge:true to allow re-application
+    }, { merge: true });
+
+    try {
+        const classroomRef = doc(db, "classrooms", classroomId);
+        const classroomSnap = await getDoc(classroomRef);
+        if (!classroomSnap.exists()) return;
+
+        const classroomData = classroomSnap.data();
+        const teacherId = classroomData.teacherId;
+        const classroomTitle = classroomData.title;
+
+        if (teacherId) {
+            const LATEST_ACTIVITY_KEY = `teachmeet-latest-activity-${teacherId}`;
+            const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+            let activities = rawActivity ? JSON.parse(rawActivity) : [];
+            if (!Array.isArray(activities)) activities = [];
+
+            const newNotification = {
+                id: `joinReq-${Date.now()}-${user.uid}`,
+                type: 'joinRequest',
+                title: classroomTitle,
+                timestamp: Date.now(),
+                classroomId: classroomId,
+                requesterName: data.fullName || 'A new teacher'
+            };
+            activities.unshift(newNotification);
+            localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
+            window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+        }
+    } catch(e) {
+        console.error("Failed to create teacher join request notification", e);
+    }
 }
 
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
