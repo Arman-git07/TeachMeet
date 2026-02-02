@@ -133,9 +133,11 @@ export function Exams() {
                 {canUserManage && (
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add New Exam</Button></DialogTrigger>
-                        <DialogContent className="sm:max-w-3xl">
-                            <DialogHeader><DialogTitle>Create New Exam</DialogTitle></DialogHeader>
-                            <form onSubmit={examForm.handleSubmit(onExamSubmit)} className="space-y-4 py-4">
+                        <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90dvh] p-0">
+                            <DialogHeader className="p-6 pb-4 border-b">
+                                <DialogTitle>Create New Exam</DialogTitle>
+                            </DialogHeader>
+                            <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit)} className="flex-grow overflow-y-auto space-y-4 p-6">
                                 <div className="space-y-2"><Label>Exam Title</Label><Input {...examForm.register('title')} />{examForm.formState.errors.title && <p className="text-destructive text-sm">{examForm.formState.errors.title.message}</p>}</div>
                                 <div className="grid md:grid-cols-2 gap-4">
                                     <div><Label>Exam Date & Time</Label><Controller control={examForm.control} name="date" render={({ field }) => (<Input type="datetime-local" onChange={(e) => field.onChange(new Date(e.target.value))} onBlur={field.onBlur} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />)} />{examForm.formState.errors.date && <p className="text-destructive text-sm">{examForm.formState.errors.date.message}</p>}</div>
@@ -162,8 +164,8 @@ export function Exams() {
                                     {examForm.formState.errors.questions && <p className="text-destructive text-sm">{examForm.formState.errors.questions.message}</p>}
                                     <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => append({ type: 'qa', question: '', answer: '' })}>Add Q/A</Button><Button type="button" variant="outline" onClick={() => append({ type: 'mcq', question: '', options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }], correctOptionIndex: 0 })}>Add MCQ</Button></div>
                                 </div>
-                                <DialogFooter><DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose><Button type="submit">Create Exam</Button></DialogFooter>
                             </form>
+                            <DialogFooter className="p-6 pt-4 border-t flex-shrink-0"><DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose><Button type="submit" form="exam-form">Create Exam</Button></DialogFooter>
                         </DialogContent>
                     </Dialog>
                 )}
