@@ -254,7 +254,7 @@ export default function AnnouncementComposer({
         )}
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-4 justify-between mt-2">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-0">
           <Label htmlFor="vanishDate" className="text-sm text-muted-foreground">Vanish Date*</Label>
           <Input
             id="vanishDate"
@@ -270,7 +270,7 @@ export default function AnnouncementComposer({
           type="button"
           disabled={!canPost || loading || ((!text.trim() && !audioBlob) || !vanishAt)}
           onClick={handlePost}
-          className="rounded-lg btn-gel w-full sm:w-auto"
+          className="rounded-lg btn-gel w-full sm:w-auto sm:flex-shrink-0"
         >
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
           {loading ? "Posting..." : "Post Announcement"}
