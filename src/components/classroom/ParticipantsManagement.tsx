@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -8,13 +7,23 @@ import { useClassroom } from '@/contexts/ClassroomContext';
 import { useToast } from '@/hooks/use-toast';
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, UserX } from 'lucide-react';
-import Link from 'next/link';
-import type { JoinRequest, UserProfile } from '@/app/dashboard/classrooms/[classroomId]/page';
+import { Loader2, UserX } from 'lucide-react';
+import type { UserProfile } from '@/app/dashboard/classrooms/[classroomId]/page';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription as AlertDialogDesc,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
 
 export function ParticipantsManagement() {
     const { classroomId, user, userRole, classroom } = useClassroom();
@@ -72,9 +81,27 @@ export function ParticipantsManagement() {
                                 <span className="text-sm flex-grow">{p.name}</span>
                                 <Badge variant={p.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{p.role}</Badge>
                                 {userRole==='creator' && p.uid !== user?.uid && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70" onClick={() => handleRemoveParticipant(p)} disabled={isProcessing === p.uid}>
-                                        {isProcessing === p.uid ? <Loader2 className="h-4 w-4 animate-spin"/> : <UserX className="h-4 w-4" />}
-                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70" disabled={isProcessing === p.uid}>
+                                                {isProcessing === p.uid ? <Loader2 className="h-4 w-4 animate-spin"/> : <UserX className="h-4 w-4" />}
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDesc>
+                                                    This will permanently remove <strong>{p.name}</strong> from the classroom. They will have to request to join again.
+                                                </AlertDialogDesc>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleRemoveParticipant(p)}>
+                                                    Remove
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 )}
                             </div>
                         )) : (
