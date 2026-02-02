@@ -11,7 +11,6 @@ import {
 import {
   getDownloadURL,
   ref,
-  uploadBytes,
   uploadBytesResumable,
 } from "firebase/storage";
 import { Button } from "@/components/ui/button";
@@ -123,7 +122,7 @@ export default function AnnouncementComposer({
     }
 
     setLoading(true);
-    const toastHandle = toast({ title: "Posting Announcement...", duration: Infinity });
+    const toastHandle = toast({ id: `announcement-post-${Date.now()}`, title: "Posting Announcement...", duration: Infinity });
     
     try {
       let audioUrl: string | null = null;
@@ -134,10 +133,18 @@ export default function AnnouncementComposer({
         const audioStorageRef = ref(storage, path);
         const uploadTask = uploadBytesResumable(audioStorageRef, audioBlob, { contentType: "audio/webm" });
 
-        uploadTask.on('state_changed', (snapshot) => {
+        uploadTask.on('state_changed', 
+          (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            toastHandle.update({ description: `Uploading audio... ${Math.round(progress)}%` });
-        });
+             if (toastHandle.update) {
+                toastHandle.update({ description: `Uploading audio... ${Math.round(progress)}%` });
+            }
+          },
+          (error) => {
+            // This is the error handler for the upload task itself
+            throw error; // Re-throw to be caught by the outer try-catch
+          }
+        );
 
         await uploadTask;
         audioUrl = await getDownloadURL(audioStorageRef);
@@ -160,31 +167,35 @@ export default function AnnouncementComposer({
       setText("");
       setVanishAt("");
       setAudioBlob(null);
-      toastHandle.update({ title: "Announcement posted!" });
+       if (toastHandle.update) {
+        toastHandle.update({ title: "Announcement posted!", description: "" });
+      }
     } catch (error: any) {
       console.error("Failed to post announcement:", error);
       let title = "Failed to Post Announcement";
-      let description = "Check your permissions (Firestore rules) and console for details.";
+      let description = "An unknown error occurred. Please try again.";
 
       if (error.code) {
         if (error.code.startsWith('auth/requests-to-this-api')) {
             title = "API Key Configuration Error";
-            description = "Could not connect to Firebase services. This is likely an API key configuration issue. Please ensure your key is valid and unrestricted.";
+            description = "Could not connect to Firebase services. This is likely an API key configuration issue.";
         } else if (error.code === 'storage/unauthorized') {
             title = "Storage Permission Denied";
-            description = "You do not have permission to upload files. Please check your Firestore Storage rules.";
+            description = "You do not have permission to upload files. Please check your Storage security rules.";
         } else if (error.code === 'permission-denied') {
             title = "Permission Denied";
-            description = "You do not have permission to post an announcement. Check Firestore rules for the 'announcements' collection."
+            description = "You do not have permission to post an announcement. Check Firestore security rules."
         }
       }
 
-      toastHandle.update({
-        variant: "destructive",
-        title: title,
-        description: description,
-        duration: 9000,
-      });
+       if (toastHandle.update) {
+        toastHandle.update({
+          variant: "destructive",
+          title: title,
+          description: description,
+          duration: 9000,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -244,14 +255,14 @@ export default function AnnouncementComposer({
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-4 justify-between mt-2">
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Label htmlFor="vanishDate" className="text-sm text-muted-foreground whitespace-nowrap">Vanish Date*</Label>
+          <Label htmlFor="vanishDate" className="text-sm text-muted-foreground">Vanish Date*</Label>
           <Input
             id="vanishDate"
             type="datetime-local"
             value={vanishAt}
             disabled={!canPost || loading}
             onChange={(e) => setVanishAt(e.target.value)}
-            className="rounded-lg bg-background p-2 ring-1 ring-border w-full"
+            className="rounded-lg bg-background p-2 ring-1 ring-border flex-1 min-w-0"
             required
           />
         </div>

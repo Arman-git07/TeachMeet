@@ -95,17 +95,25 @@ export function ClassMaterials() {
     const handleMaterialUpload = useCallback(async () => {
         if (!materialFile || !user) return;
         setIsUploading(true);
-        const toastHandle = toast({ title: "Uploading Material...", duration: Infinity });
+        const toastHandle = toast({ id: `material-upload-${Date.now()}`, title: "Uploading Material...", duration: Infinity });
         
         try {
             const path = `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`;
             const fileRef = storageRef(storage, path);
             const uploadTask = uploadBytesResumable(fileRef, materialFile);
 
-            uploadTask.on('state_changed', (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                toastHandle.update({ description: `Upload is ${Math.round(progress)}% done` });
-            });
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    if (toastHandle.update) {
+                        toastHandle.update({ description: `Upload is ${Math.round(progress)}% done` });
+                    }
+                },
+                (error) => {
+                    // Re-throw to be caught by the outer catch block
+                    throw error;
+                }
+            );
 
             await uploadTask;
             const url = await getDownloadURL(uploadTask.snapshot.ref);
@@ -113,7 +121,9 @@ export function ClassMaterials() {
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
                 name: materialFile.name, url, uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Anonymous', type: 'file', storagePath: path,
             });
-            toastHandle.update({ title: "Material Uploaded!" });
+            if (toastHandle.update) {
+                toastHandle.update({ title: "Material Uploaded!" });
+            }
             setMaterialFile(null);
         } catch (error: any) {
             console.error("Failed to upload material:", error);
@@ -122,13 +132,15 @@ export function ClassMaterials() {
             if (error.code) {
                 if (error.code === 'storage/unauthorized' || error.code === 'permission-denied') {
                     title = "Permission Denied";
-                    description = "You do not have permission to upload materials to this classroom. Please check security rules.";
+                    description = "You do not have permission to upload materials. Check security rules.";
                 } else if (error.code.includes('auth/requests-to-this-api')) {
                     title = "API Key Configuration Error";
-                    description = "Could not connect to Firebase. Please check your API key configuration.";
+                    description = "Could not connect to Firebase. Check API key configuration.";
                 }
             }
-            toastHandle.update({ variant: 'destructive', title, description, duration: 9000 });
+            if (toastHandle.update) {
+                toastHandle.update({ variant: 'destructive', title, description, duration: 9000 });
+            }
         } finally {
             setIsUploading(false);
         }
@@ -148,7 +160,7 @@ export function ClassMaterials() {
             console.error("Link share failed:", error);
             let description = "Could not share the link.";
             if (error.code === 'permission-denied') {
-                description = "You do not have permission to share materials. Please check security rules.";
+                description = "You do not have permission to share materials. Check security rules.";
             }
             toast({ variant: "destructive", title: "Sharing Failed", description });
         } finally {
@@ -167,8 +179,8 @@ export function ClassMaterials() {
                                 <TabsTrigger value="link">Share Link</TabsTrigger>
                             </TabsList>
                             <TabsContent value="file" className="pt-4">
-                                <div className="flex gap-2">
-                                    <Input id="material-upload" type="file" onChange={(e) => setMaterialFile(e.target.files ? e.target.files[0] : null)} disabled={isUploading} />
+                                <div className="flex items-center gap-2">
+                                    <Input id="material-upload" type="file" onChange={(e) => setMaterialFile(e.target.files ? e.target.files[0] : null)} disabled={isUploading} className="flex-1 min-w-0"/>
                                     <Button onClick={handleMaterialUpload} disabled={!materialFile || isUploading}>
                                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Upload
                                     </Button>
