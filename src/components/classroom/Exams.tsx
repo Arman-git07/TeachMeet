@@ -16,13 +16,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogClose, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -191,7 +191,8 @@ export function Exams() {
             return;
         }
 
-        const toastHandle = toast({ id: `exam-create-${Date.now()}`, title: 'Creating Exam...', description: 'Please wait...', duration: Infinity });
+        const toastId = `exam-create-${Date.now()}`;
+        const toastHandle = toast({ id: toastId, title: 'Creating Exam...', description: 'Please wait...', duration: Infinity });
         try {
             let examData: any = { title: data.title, date: data.date, vanishAt: data.vanishAt || null, authorId: user.uid };
             if (examFile) {
@@ -302,7 +303,7 @@ export function Exams() {
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>
                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>This will permanently delete this exam. This action cannot be undone.</AlertDialogDescription>
+                                                    <AlertDescription>This will permanently delete this exam. This action cannot be undone.</AlertDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
