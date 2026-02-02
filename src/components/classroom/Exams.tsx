@@ -53,6 +53,55 @@ const examSchema = z.object({
     path: ["vanishAt"],
 });
 
+const MCQQuestionEditor = ({ nestIndex, control, register, setValue, watch }: { nestIndex: number; control: any, register: any, setValue: any, watch: any }) => {
+    const { fields, remove, append } = useFieldArray({
+        control,
+        name: `questions.${nestIndex}.options`
+    });
+    
+    const correctIndex = watch(`questions.${nestIndex}.correctOptionIndex`);
+
+    const handleRemoveOption = (indexToRemove: number) => {
+        const selectedIndex = watch(`questions.${nestIndex}.correctOptionIndex`);
+        
+        // If the selected correct answer is the one being removed, reset to the first option.
+        // If a preceding option is removed, decrement the selected index to keep it pointing to the same option text.
+        if (selectedIndex === indexToRemove) {
+            setValue(`questions.${nestIndex}.correctOptionIndex`, 0, { shouldDirty: true });
+        } else if (selectedIndex > indexToRemove) {
+            setValue(`questions.${nestIndex}.correctOptionIndex`, selectedIndex - 1, { shouldDirty: true });
+        }
+        
+        remove(indexToRemove);
+    };
+
+    return (
+        <div className="space-y-2 pl-4">
+            <Label className="text-xs text-muted-foreground">Options (select the correct one)</Label>
+            <RadioGroup 
+                onValueChange={(v) => setValue(`questions.${nestIndex}.correctOptionIndex`, parseInt(v))} 
+                value={correctIndex !== undefined ? String(correctIndex) : undefined}
+                className="space-y-2"
+            >
+                {fields.map((item, k) => (
+                    <div key={item.id} className="flex items-center gap-2">
+                        <RadioGroupItem value={String(k)} id={`q${nestIndex}-opt${k}`} />
+                        <Label htmlFor={`q${nestIndex}-opt${k}`} className="sr-only">Option {k + 1}</Label>
+                        <Input {...register(`questions.${nestIndex}.options.${k}.text`)} placeholder={`Option ${k + 1}`} />
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 shrink-0" onClick={() => handleRemoveOption(k)} disabled={fields.length <= 2}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                ))}
+            </RadioGroup>
+            <Button type="button" size="sm" variant="outline" onClick={() => append({ text: '' })} disabled={fields.length >= 6}>
+                Add Option
+            </Button>
+        </div>
+    );
+};
+
+
 export function Exams() {
     const { classroomId, user, userRole } = useClassroom();
     const { toast } = useToast();
@@ -154,15 +203,19 @@ export function Exams() {
                                                 <Input {...examForm.register(`questions.${index}.question`)} placeholder="Question Text" />
                                                 {field.type === 'qa' && <Textarea {...examForm.register(`questions.${index}.answer`)} placeholder="Answer" />}
                                                 {field.type === 'mcq' && (
-                                                    <div className="space-y-2 pl-4">
-                                                        {field.options?.map((_, optIndex) => (<div key={optIndex} className="flex items-center gap-2"><Input {...examForm.register(`questions.${index}.options.${optIndex}.text`)} placeholder={`Option ${optIndex + 1}`} /><RadioGroup onValueChange={(v) => examForm.setValue(`questions.${index}.correctOptionIndex`, parseInt(v))} value={String(examForm.watch(`questions.${index}.correctOptionIndex`))}><RadioGroupItem value={String(optIndex)} id={`q${index}-opt${optIndex}`} /></RadioGroup><Label htmlFor={`q${index}-opt${optIndex}`} className="text-xs">Correct</Label></div>))}
-                                                    </div>
+                                                    <MCQQuestionEditor
+                                                        nestIndex={index}
+                                                        control={examForm.control}
+                                                        register={examForm.register}
+                                                        setValue={examForm.setValue}
+                                                        watch={examForm.watch}
+                                                    />
                                                 )}
                                             </Card>
                                         ))}
                                     </ScrollArea>
                                     {examForm.formState.errors.questions && <p className="text-destructive text-sm">{examForm.formState.errors.questions.message}</p>}
-                                    <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => append({ type: 'qa', question: '', answer: '' })}>Add Q/A</Button><Button type="button" variant="outline" onClick={() => append({ type: 'mcq', question: '', options: [{ text: '' }, { text: '' }, { text: '' }, { text: '' }], correctOptionIndex: 0 })}>Add MCQ</Button></div>
+                                    <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => append({ type: 'qa', question: '', answer: '' })}>Add Q/A</Button><Button type="button" variant="outline" onClick={() => append({ type: 'mcq', question: '', options: [{ text: '' }, { text: '' }], correctOptionIndex: 0 })}>Add MCQ</Button></div>
                                 </div>
                             </form>
                             <DialogFooter className="p-6 pt-4 border-t flex-shrink-0"><DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose><Button type="submit" form="exam-form">Create Exam</Button></DialogFooter>
