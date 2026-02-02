@@ -95,6 +95,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { auth } from '@/lib/firebase';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { type ActivityItem, type JoinRequestActivityItem } from '@/app/page';
 
 
 export interface Classroom {
@@ -268,11 +269,22 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
 
         if (teacherId) {
             const LATEST_ACTIVITY_KEY = `teachmeet-latest-activity-${teacherId}`;
-            const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-            let activities = rawActivity ? JSON.parse(rawActivity) : [];
-            if (!Array.isArray(activities)) activities = [];
+            let activities: ActivityItem[] = [];
+             if (LATEST_ACTIVITY_KEY) {
+                try {
+                    const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
+                    if (rawActivity) {
+                        const parsed = JSON.parse(rawActivity);
+                        if (Array.isArray(parsed)) {
+                            activities = parsed;
+                        }
+                    }
+                } catch {
+                    activities = [];
+                }
+            }
 
-            const newNotification = {
+            const newNotification: JoinRequestActivityItem = {
                 id: `joinReq-${Date.now()}-${user.uid}`,
                 type: 'joinRequest',
                 title: classroomTitle,

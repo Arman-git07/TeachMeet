@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Search, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { type ActivityItem, type JoinRequestActivityItem } from '@/app/page';
+
 
 interface FoundClassroom {
     id: string;
@@ -99,10 +101,20 @@ export default function JoinClassroomPage() {
                 const LATEST_ACTIVITY_KEY = `teachmeet-latest-activity-${foundClassroom.teacherId}`;
                 try {
                     const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-                    let activities = rawActivity ? JSON.parse(rawActivity) : [];
-                    if (!Array.isArray(activities)) activities = [];
+                    let activities: ActivityItem[] = [];
+                     if (rawActivity) {
+                        try {
+                            const parsed = JSON.parse(rawActivity);
+                            if (Array.isArray(parsed)) {
+                                activities = parsed;
+                            }
+                        } catch {
+                            // Corrupted data, start fresh
+                            activities = [];
+                        }
+                    }
 
-                    const newNotification = {
+                    const newNotification: JoinRequestActivityItem = {
                       id: `joinReq-${Date.now()}-${user.uid}`,
                       type: 'joinRequest',
                       title: foundClassroom.title,
