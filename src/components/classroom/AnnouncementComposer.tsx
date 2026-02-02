@@ -112,7 +112,6 @@ export default function AnnouncementComposer({
       return;
     }
     
-    // **NEW:** Require vanish date
     if (!vanishAt) {
         toast({
             variant: "destructive",
@@ -125,7 +124,7 @@ export default function AnnouncementComposer({
     setLoading(true);
     try {
       let audioUrl: string | null = null;
-      let storagePath: string | null = null; // For deletion later
+      let storagePath: string | null = null; 
 
       if (audioBlob) {
         const path = `announcements/${classId}/${user.uid}/${Date.now()}.webm`;
@@ -152,12 +151,29 @@ export default function AnnouncementComposer({
       setVanishAt("");
       setAudioBlob(null);
       toast({ title: "Announcement posted!" });
-    } catch (err) {
-      console.error("Failed to post announcement:", err);
+    } catch (error: any) {
+      console.error("Failed to post announcement:", error);
+      let title = "Failed to Post Announcement";
+      let description = "Check your permissions (Firestore rules) and console for details.";
+
+      if (error.code) {
+        if (error.code.startsWith('auth/requests-to-this-api')) {
+            title = "API Key Configuration Error";
+            description = "Could not connect to Firebase services. This is likely an API key configuration issue. Please ensure your key is valid and unrestricted.";
+        } else if (error.code === 'storage/unauthorized') {
+            title = "Storage Permission Denied";
+            description = "You do not have permission to upload files. Please check your Firestore Storage rules.";
+        } else if (error.code === 'permission-denied') {
+            title = "Permission Denied";
+            description = "You do not have permission to post an announcement. Check Firestore rules for the 'announcements' collection."
+        }
+      }
+
       toast({
         variant: "destructive",
-        title: "Failed to Post Announcement",
-        description: "Check your permissions (Firestore rules) and console for details.",
+        title: title,
+        description: description,
+        duration: 9000,
       });
     } finally {
       setLoading(false);
