@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -134,8 +133,7 @@ export function Exams() {
             return;
         }
 
-        const toastId = `exam-upload-${Date.now()}`;
-        toast({ id: toastId, title: 'Creating Exam...', description: 'Please wait...' });
+        const toastHandle = toast({ title: 'Creating Exam...', description: 'Please wait...', duration: Infinity });
         try {
             let examData: any = { title: data.title, date: data.date, vanishAt: data.vanishAt || null, authorId: user.uid };
             if (examFile) {
@@ -150,11 +148,11 @@ export function Exams() {
                 examData.content = data.questions;
             }
             await addDoc(collection(db, 'classrooms', classroomId, 'exams'), examData);
-            toast.update(toastId, { title: "Exam Created!" });
+            toastHandle.update({ id: toastHandle.id, title: "Exam Created!", description: "" });
             setIsDialogOpen(false);
             examForm.reset({ questions: [] });
         } catch (error) {
-            toast.update(toastId, { variant: 'destructive', title: "Creation Failed" });
+            toastHandle.update({ id: toastHandle.id, variant: 'destructive', title: "Creation Failed", description: "Could not create the exam." });
         }
     }, [canUserManage, user, classroomId, toast, examForm]);
     
