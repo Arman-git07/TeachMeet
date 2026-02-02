@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
 import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Loader2, Link as LinkIcon, Trash2, FileText } from 'lucide-react';
-import { AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Material, DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 const MaterialItem = memo(({ material, canDelete, onDeleteClick }: { material: Material; canDelete: boolean; onDeleteClick: () => void }) => {
@@ -28,16 +27,24 @@ const MaterialItem = memo(({ material, canDelete, onDeleteClick }: { material: M
                 </div>
             </a>
             {canDelete && (
-                <AlertDialogTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={onDeleteClick}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </AlertDialogTrigger>
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>Delete Material?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{material.name}". This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={onDeleteClick}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             )}
         </div>
     );
@@ -88,12 +95,21 @@ export function ClassMaterials() {
         if (!materialFile || !user) return;
         setIsUploading(true);
         const toastId = `upload-${Date.now()}`;
-        toast({ id: toastId, title: "Uploading...", description: "Please wait." });
+        toast({ id: toastId, title: "Uploading Material...", duration: Infinity });
+        
         try {
             const path = `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`;
             const fileRef = storageRef(storage, path);
-            const snapshot = await uploadBytes(fileRef, materialFile);
-            const url = await getDownloadURL(snapshot.ref);
+            const uploadTask = uploadBytesResumable(fileRef, materialFile);
+
+            uploadTask.on('state_changed', (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                toast.update(toastId, { description: `Upload is ${Math.round(progress)}% done` });
+            });
+
+            await uploadTask;
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
                 name: materialFile.name, url, uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Anonymous', type: 'file', storagePath: path,
             });
@@ -103,9 +119,14 @@ export function ClassMaterials() {
             console.error("Failed to upload material:", error);
             let title = "Upload Failed";
             let description = "Could not upload the material. Please try again.";
-            if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-               title = "API Key Configuration Error";
-               description = "Could not connect to Firebase. Please check your API key configuration.";
+            if (error.code) {
+                if (error.code === 'storage/unauthorized' || error.code === 'permission-denied') {
+                    title = "Permission Denied";
+                    description = "You do not have permission to upload materials to this classroom. Please check security rules.";
+                } else if (error.code.includes('auth/requests-to-this-api')) {
+                    title = "API Key Configuration Error";
+                    description = "Could not connect to Firebase. Please check your API key configuration.";
+                }
             }
             toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
         } finally {
@@ -123,8 +144,13 @@ export function ClassMaterials() {
             toast({ title: "Link Shared!" });
             setMaterialLink('');
             setMaterialName('');
-        } catch (error) {
-            toast({ variant: "destructive", title: "Sharing Failed" });
+        } catch (error: any) {
+            console.error("Link share failed:", error);
+            let description = "Could not share the link.";
+            if (error.code === 'permission-denied') {
+                description = "You do not have permission to share materials. Please check security rules.";
+            }
+            toast({ variant: "destructive", title: "Sharing Failed", description });
         } finally {
             setIsUploading(false);
         }

@@ -85,7 +85,7 @@ export function DocumentsClientUI() {
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching documents:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents." });
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents. Check Firestore rules." });
       setIsLoading(false);
     });
 
@@ -107,7 +107,7 @@ export function DocumentsClientUI() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const destination = event.currentTarget.getAttribute('data-destination') as 'private' | 'public' | null;
 
@@ -117,36 +117,25 @@ export function DocumentsClientUI() {
     const toastId = `upload-${Date.now()}`;
     toast({ id: toastId, title: "Uploading Document...", description: `Starting upload for ${file.name}...`, duration: Infinity });
 
-    const storagePath = `documents/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
-    const fileRef = storageRef(storage, storagePath);
-    const uploadTask = uploadBytesResumable(fileRef, file);
+    try {
+        const storagePath = `documents/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
+        const fileRef = storageRef(storage, storagePath);
+        const uploadTask = uploadBytesResumable(fileRef, file);
 
-    uploadTask.on('state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        toast.update(toastId, {
-            description: `Uploading ${file.name}... ${Math.round(progress)}%`
-        });
-      },
-      (error) => {
-        console.error("Failed to upload document:", error);
-        let title = "Upload Failed";
-        let description = "Could not upload the document. Please try again.";
-        if (error.code === 'storage/unauthorized') {
-            title = "Permission Denied";
-            description = "You do not have permission to upload files. Check storage security rules.";
-        } else if (error.code && error.code.includes('auth/requests-to-this-api')) {
-           title = "API Key Configuration Error";
-           description = "Could not connect to Firebase. Please check your API key configuration.";
-        }
-        toast.update(toastId, { variant: "destructive", title, description, duration: 9000 });
-        setIsUploading(false);
-        if (event.target) event.target.value = "";
-      },
-      async () => {
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          await addDoc(collection(db, "documents"), {
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                toast.update(toastId, {
+                    description: `Uploading ${file.name}... ${Math.round(progress)}%`
+                });
+            }
+        );
+
+        await uploadTask;
+
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        
+        await addDoc(collection(db, "documents"), {
             name: file.name,
             lastModified: new Date().toISOString(),
             size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
@@ -155,16 +144,32 @@ export function DocumentsClientUI() {
             downloadURL,
             storagePath,
             createdAt: serverTimestamp(),
-          });
-          toast.update(toastId, { title: "Document Uploaded!", description: `${file.name} is now available.` });
-        } catch (dbError) {
-          toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save document details to the database." });
-        } finally {
-            if (event.target) event.target.value = "";
-            setIsUploading(false);
+        });
+        
+        toast.update(toastId, { title: "Document Uploaded!", description: `${file.name} is now available.` });
+    } catch (error: any) {
+        console.error("Failed to upload document:", error);
+        let title = "Upload Failed";
+        let description = "Could not upload the document. Please try again.";
+        
+        if (error.code) {
+            if (error.code === 'storage/unauthorized') {
+                title = "Permission Denied";
+                description = "You do not have permission to upload files. Check storage security rules.";
+            } else if (error.code === 'permission-denied') { // Firestore error
+                title = "Database Error";
+                description = "You do not have permission to save the file metadata. Check Firestore rules.";
+            } else if (error.code.includes('auth/requests-to-this-api')) {
+                title = "API Key Configuration Error";
+                description = "Could not connect to Firebase. Please check your API key configuration.";
+            }
         }
-      }
-    );
+        
+        toast.update(toastId, { variant: "destructive", title, description, duration: 9000 });
+    } finally {
+        if (event.target) event.target.value = "";
+        setIsUploading(false);
+    }
   }, [currentUser, toast]);
 
   const handleOpenDeleteDialog = (id: string, name: string, storagePath: string) => {
@@ -175,17 +180,14 @@ export function DocumentsClientUI() {
   const handleConfirmDeleteDocument = async () => {
     if (!documentToDelete) return;
     const { id, name, storagePath } = documentToDelete;
-    setIsDeleteDialogOpen(false);
     
     try {
-      await deleteDoc(doc(db, "documents", id));
       if (storagePath) {
           const fileRef = storageRef(storage, storagePath);
           await deleteObject(fileRef);
       }
-      
+      await deleteDoc(doc(db, "documents", id));
       toast({ title: "Document Deleted", description: `"${name}" has been successfully deleted.` });
-      setDocumentToDelete(null); 
     } catch (error: any) {
       console.error("Deletion failed:", error);
       if (error.code === 'storage/object-not-found') {
@@ -198,7 +200,9 @@ export function DocumentsClientUI() {
       } else {
          toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the document. Please check console for details." });
       }
-      setDocumentToDelete(null);
+    } finally {
+        setIsDeleteDialogOpen(false);
+        setDocumentToDelete(null); 
     }
   };
 
