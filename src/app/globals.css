@@ -133,18 +133,8 @@
 /* Custom utility for 3D gel text effect */
 .text-gel-gradient {
   @apply bg-gradient-to-b from-primary via-green-400 to-accent bg-clip-text text-transparent;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1)) drop-shadow(0 2px 3px rgba(0,0,0,0.1));
   paint-order: stroke fill;
 }
-
-.dark .text-gel-gradient {
-   -webkit-text-stroke: 0.5px hsl(var(--background) / 0.5);
-}
-
-.light .text-gel-gradient {
-   -webkit-text-stroke: 0.5px hsl(var(--foreground) / 0.1);
-}
-
 
 /* Ensure body takes full height for layouts */
 html, body, #__next {

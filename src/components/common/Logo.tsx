@@ -1,4 +1,3 @@
-
 'use client';
 
 import { cn } from '@/lib/utils';
@@ -40,14 +39,11 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       data-testid="sidebar-logo"
       className={cn(
         'font-extrabold tracking-tight text-gel-gradient select-none',
-        'dark:[--logo-outline-color:hsl(var(--background)/0.5)] [--logo-outline-color:hsl(var(--foreground)/0.3)]',
         sizeClasses[size],
         className
       )}
       style={{
-        WebkitTextStroke: `1px var(--logo-outline-color)`,
         textShadow: `
-          0px 2px 2px hsl(var(--background) / 0.3),
           0px 4px 5px hsl(var(--primary) / 0.2),
           0px 0px 10px hsl(var(--accent) / 0.2),
           2px 2px 3px hsl(var(--primary-foreground) / 0.05)
