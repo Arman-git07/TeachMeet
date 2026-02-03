@@ -47,7 +47,7 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
         display: 'inline-block',
         transform: 'scaleX(1.35)', // Making the font "more wide"
         transformOrigin: 'center',
-        letterSpacing: '0.08em', // Extra spacing to complement the wider font
+        letterSpacing: '0.01em', // Reduced spacing to bring letters closer together
         textShadow: `
           1px 1px 0px hsl(var(--primary) / 0.8),
           2px 2px 0px hsl(var(--primary) / 0.6),
