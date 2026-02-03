@@ -45,16 +45,16 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       style={{
         fontFamily: "'Oleo Script', system-ui",
         display: 'inline-block',
-        transform: 'scaleX(1.35)', // Making the font "more wide"
+        transform: 'scaleX(1.35)', // Horizontal stretch
         transformOrigin: 'center',
-        letterSpacing: '0.01em', // Reduced spacing to bring letters closer together
+        letterSpacing: '-0.02em', // Tightened spacing to counteract scaleX gap
         textShadow: `
           1px 1px 0px hsl(var(--primary) / 0.8),
           2px 2px 0px hsl(var(--primary) / 0.6),
           3px 3px 0px hsl(var(--accent) / 0.4),
           4px 4px 0px hsl(var(--accent) / 0.2),
-          0px 10px 30px hsl(var(--primary) / 0.5),
-          0px 15px 50px hsl(var(--accent) / 0.3)
+          0px 8px 20px hsl(var(--primary) / 0.3),
+          0px 12px 40px hsl(var(--accent) / 0.2)
         `,
       }}
       {...props}
