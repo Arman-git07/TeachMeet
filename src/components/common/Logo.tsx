@@ -44,13 +44,12 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       )}
       style={{
         textShadow: `
-          1px 1px 0px hsl(var(--primary) / 0.8),
-          2px 2px 0px hsl(var(--primary) / 0.7),
-          3px 3px 0px hsl(var(--primary) / 0.6),
-          4px 4px 0px hsl(var(--primary) / 0.5),
-          5px 5px 0px hsl(var(--primary) / 0.4),
-          0px 8px 15px rgba(0, 0, 0, 0.25),
-          0px 15px 30px hsl(var(--primary) / 0.3)
+          1px 1px 0px #000000,
+          2px 2px 0px #000000,
+          3px 3px 0px #000000,
+          4px 4px 0px #000000,
+          5px 5px 0px #000000,
+          0px 8px 15px rgba(0, 0, 0, 0.4)
         `,
       }}
       {...props}
