@@ -1,3 +1,4 @@
+
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -372,8 +373,8 @@ export default function HomePage() {
             text={logoText}
             size="medium"
             className={cn(
-              'mb-8 text-center cursor-pointer logo-animate-complex',
-              animateChars && logoText === 'TeachMeet' && 'logo-animate-complex'
+              'mb-8 text-center cursor-pointer',
+              animateChars && logoText === 'TeachMeet' && 'logo-animate-chars'
             )}
             onClick={handleComplexLogoAnimation}
             animateChars={true}
