@@ -45,11 +45,11 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       style={{
         fontFamily: "'Creepster', system-ui",
         textShadow: `
-          0 1px 0 rgba(0,0,0,0.1),
-          0 2px 0 rgba(0,0,0,0.08),
-          0 3px 0 rgba(0,0,0,0.05),
-          0 4px 12px hsl(var(--primary) / 0.4),
-          0 8px 24px hsl(var(--accent) / 0.3)
+          1px 1px 0px rgba(0,0,0,0.2),
+          2px 2px 0px rgba(0,0,0,0.15),
+          3px 3px 0px rgba(0,0,0,0.1),
+          0px 4px 15px hsl(var(--primary) / 0.4),
+          0px 8px 30px hsl(var(--accent) / 0.3)
         `,
       }}
       {...props}
