@@ -1,4 +1,3 @@
-
 'use client';
 
 import { cn } from '@/lib/utils';
@@ -46,6 +45,10 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       style={{
         fontFamily: "'Oleo Script', system-ui",
         textShadow: `
+          1px 1px 0px hsl(var(--foreground) / 0.2),
+          2px 2px 0px hsl(var(--foreground) / 0.15),
+          3px 3px 0px hsl(var(--foreground) / 0.1),
+          4px 4px 0px hsl(var(--foreground) / 0.05),
           0px 4px 20px hsl(var(--primary) / 0.6),
           0px 8px 40px hsl(var(--accent) / 0.4)
         `,
