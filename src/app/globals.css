@@ -113,7 +113,11 @@
   }
 }
 
-/* Custom utility for 3D gel button appearance */
+/* Custom utility for 3D gel text effect */
+.text-gel-gradient {
+  @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  paint-order: stroke fill;
+}
 .btn-gel {
   @apply text-primary-foreground shadow-md transition-all duration-150 ease-in-out;
   background-image: linear-gradient(to bottom, hsl(var(--primary)), hsl(var(--primary) / 0.8));
