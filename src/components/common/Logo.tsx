@@ -38,15 +38,16 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
     <h1
       data-testid="sidebar-logo"
       className={cn(
-        'font-extrabold tracking-tight text-gel-gradient select-none pb-2',
+        'tracking-tight text-gel-gradient select-none pb-2',
         sizeClasses[size],
         className
       )}
       style={{
+        fontFamily: "'Bungee', cursive",
         textShadow: `
-          1px 1px 0px rgba(0,0,0,0.15),
-          2px 2px 0px rgba(0,0,0,0.1),
-          3px 3px 0px rgba(0,0,0,0.05),
+          0 1px 0 rgba(0,0,0,0.15),
+          0 2px 0 rgba(0,0,0,0.1),
+          0 3px 0 rgba(0,0,0,0.05),
           0 4px 12px hsl(var(--primary) / 0.4),
           0 8px 24px hsl(var(--accent) / 0.3)
         `,
