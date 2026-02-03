@@ -43,7 +43,7 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
         className
       )}
       style={{
-        fontFamily: "'Permanent Marker', cursive",
+        fontFamily: "'Oleo Script', cursive",
         textShadow: `
           0 1px 0 rgba(0,0,0,0.1),
           0 2px 0 rgba(0,0,0,0.08),
