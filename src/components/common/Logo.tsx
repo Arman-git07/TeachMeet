@@ -43,7 +43,6 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
         className
       )}
       style={{
-        fontFamily: "'Bungee', cursive",
         textShadow: `
           1px 1px 0px rgba(0,0,0,0.15),
           2px 2px 0px rgba(0,0,0,0.1),
