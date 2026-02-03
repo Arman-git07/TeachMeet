@@ -38,19 +38,24 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
     <h1
       data-testid="sidebar-logo"
       className={cn(
-        'tracking-tight text-gel-gradient select-none pb-2',
+        'text-gel-gradient select-none pb-2 inline-block',
         sizeClasses[size],
         className
       )}
       style={{
         fontFamily: "'Oleo Script', system-ui",
+        display: 'inline-block',
+        transform: 'scaleX(1.35)', // Making the font "more wide"
+        transformOrigin: 'center',
+        letterSpacing: '0.08em', // Extra spacing to complement the wider font
         textShadow: `
-          1px 1px 0px hsl(var(--foreground) / 0.2),
-          2px 2px 0px hsl(var(--foreground) / 0.15),
-          3px 3px 0px hsl(var(--foreground) / 0.1),
-          4px 4px 0px hsl(var(--foreground) / 0.05),
-          0px 4px 20px hsl(var(--primary) / 0.6),
-          0px 8px 40px hsl(var(--accent) / 0.4)
+          1px 1px 0px hsl(var(--foreground) / 0.25),
+          2px 2px 0px hsl(var(--foreground) / 0.25),
+          3px 3px 0px hsl(var(--foreground) / 0.25),
+          4px 4px 0px hsl(var(--foreground) / 0.25),
+          5px 5px 0px hsl(var(--foreground) / 0.25),
+          0px 10px 30px hsl(var(--primary) / 0.5),
+          0px 15px 50px hsl(var(--accent) / 0.3)
         `,
       }}
       {...props}

@@ -367,7 +367,7 @@ export default function HomePage() {
             maskImage: "radial-gradient(circle at center, white, transparent 70%)"
           }}
         />
-        <div className="relative z-10 flex w-full flex-col items-center text-center">
+        <div className="relative z-10 flex w-full flex-col items-center text-center px-4 overflow-hidden">
           <Logo
             text={logoText}
             size="medium"
