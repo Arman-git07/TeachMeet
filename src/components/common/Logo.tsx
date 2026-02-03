@@ -44,9 +44,9 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
       )}
       style={{
         textShadow: `
-          0px 4px 5px hsl(var(--primary) / 0.2),
-          0px 0px 10px hsl(var(--accent) / 0.2),
-          2px 2px 3px hsl(var(--primary-foreground) / 0.05)
+          0px 4px 8px hsl(var(--primary) / 0.3),
+          0px 8px 16px hsl(var(--accent) / 0.1),
+          0px 0px 20px hsl(var(--primary) / 0.2)
         `,
       }}
       {...props}
