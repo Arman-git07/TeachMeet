@@ -372,11 +372,11 @@ export default function HomePage() {
             text={logoText}
             size="medium"
             className={cn(
-              'mb-8 text-center cursor-pointer',
+              'mb-8 text-center cursor-pointer logo-animate-complex',
               animateChars && logoText === 'TeachMeet' && 'logo-animate-complex'
             )}
             onClick={handleComplexLogoAnimation}
-            animateChars={animateChars && logoText === 'TeachMeet'}
+            animateChars={true}
           />
           <div className="mt-8 p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center border">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
