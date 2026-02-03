@@ -38,16 +38,19 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
     <h1
       data-testid="sidebar-logo"
       className={cn(
-        'font-extrabold tracking-tight text-gel-gradient select-none',
+        'font-extrabold tracking-tight text-gel-gradient select-none pb-2',
         sizeClasses[size],
         className
       )}
       style={{
         textShadow: `
-          2px 4px 8px rgba(0, 0, 0, 0.15),
-          0px 6px 15px hsl(var(--primary) / 0.6),
-          0px 10px 30px hsl(var(--accent) / 0.4),
-          0px 0px 40px hsl(var(--primary) / 0.3)
+          1px 1px 0px hsl(var(--primary) / 0.8),
+          2px 2px 0px hsl(var(--primary) / 0.7),
+          3px 3px 0px hsl(var(--primary) / 0.6),
+          4px 4px 0px hsl(var(--primary) / 0.5),
+          5px 5px 0px hsl(var(--primary) / 0.4),
+          0px 8px 15px rgba(0, 0, 0, 0.25),
+          0px 15px 30px hsl(var(--primary) / 0.3)
         `,
       }}
       {...props}
