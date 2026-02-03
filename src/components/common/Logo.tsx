@@ -43,10 +43,10 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
         className
       )}
       style={{
-        fontFamily: "'Bungee', cursive",
+        fontFamily: "'Permanent Marker', cursive",
         textShadow: `
-          0 1px 0 rgba(0,0,0,0.15),
-          0 2px 0 rgba(0,0,0,0.1),
+          0 1px 0 rgba(0,0,0,0.1),
+          0 2px 0 rgba(0,0,0,0.08),
           0 3px 0 rgba(0,0,0,0.05),
           0 4px 12px hsl(var(--primary) / 0.4),
           0 8px 24px hsl(var(--accent) / 0.3)
