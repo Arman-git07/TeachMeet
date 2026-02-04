@@ -238,9 +238,11 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
     const user = auth.currentUser;
     if (!user) throw new Error("Not logged in");
 
-    const ref = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
+    const batch = writeBatch(db);
 
-    await setDoc(ref, {
+    const classroomJoinReqRef = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
+
+    batch.set(classroomJoinReqRef, {
         requesterId: user.uid,
         studentName: data.fullName,
         studentPhotoURL: user.photoURL || "",
@@ -257,6 +259,16 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
             message: data.message || ""
         }
     }, { merge: true });
+
+    // Add marker to user's collection so the UI knows there is a pending request
+    const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
+    batch.set(userPendingRequestRef, { 
+        classroomId, 
+        requestedAt: serverTimestamp(),
+        role: 'teacher'
+    });
+
+    await batch.commit();
 
     try {
         const classroomRef = doc(db, "classrooms", classroomId);
@@ -925,14 +937,3 @@ export default function ClassroomsPage() {
     </div>
   );
 }
-
-    
-
-    
-
-
-
-
-    
-
-    
