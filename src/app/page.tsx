@@ -81,9 +81,6 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
 export default function HomePage() {
   const [allActivity, setAllActivity] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [logoText, setLogoText] = useState('TeachMeet');
-  const [animateChars, setAnimateChars] = useState(false);
-  const [animationLock, setAnimationLock] = useState(false);
 
   const { toast } = useToast();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -209,35 +206,6 @@ export default function HomePage() {
       window.removeEventListener('teachmeet_activity_updated', loadActivities);
     };
   }, [authLoading, isAuthenticated, loadActivities, getStorageKeys]);
-
-
-  const handleComplexLogoAnimation = () => {
-    if (animationLock) return;
-
-    setAnimationLock(true);
-    
-    // Step 1: Animate text change to "MeetTeach"
-    setAnimateChars(false);
-    setTimeout(() => {
-      setLogoText('MeetTeach');
-      setAnimateChars(true);
-      
-      // Step 2: Hold for a short duration, then animate back to "TeachMeet"
-      setTimeout(() => {
-        setAnimateChars(false);
-        setTimeout(() => {
-          setLogoText('TeachMeet');
-          setAnimateChars(true);
-          
-          // Step 3: Unlock interaction after animation cycle completes
-          setTimeout(() => {
-            setAnimateChars(false);
-            setAnimationLock(false);
-          }, 1000); // Base duration for character reveal
-        }, 50);
-      }, 1500); // Duration to display "MeetTeach"
-    }, 50);
-  };
 
   const handleDismissItem = (itemIdToDismiss: string) => {
     const { dismissed: DISMISSED_ITEMS_KEY } = getStorageKeys();
@@ -377,14 +345,9 @@ export default function HomePage() {
         />
         <div className="relative z-10 flex w-full flex-col items-center text-center px-4 overflow-hidden">
           <Logo
-            text={logoText}
+            text="TeachMeet"
             size="medium"
-            className={cn(
-              'mb-8 text-center cursor-pointer',
-              animateChars && 'logo-animate-chars'
-            )}
-            onClick={handleComplexLogoAnimation}
-            animateChars={animateChars}
+            className="mb-8 text-center"
           />
           <div className="mt-8 p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center border">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
