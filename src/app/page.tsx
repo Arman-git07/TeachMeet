@@ -211,24 +211,32 @@ export default function HomePage() {
   }, [authLoading, isAuthenticated, loadActivities, getStorageKeys]);
 
 
-  const tmVisibleDuration = 350;
-  const characterAnimationTotalDuration = 1000;
-
   const handleComplexLogoAnimation = () => {
     if (animationLock) return;
 
     setAnimationLock(true);
+    
+    // Step 1: Animate text change to "MeetTeach"
     setAnimateChars(false);
-    setLogoText('TM');
-
     setTimeout(() => {
-      setLogoText('TeachMeet');
+      setLogoText('MeetTeach');
       setAnimateChars(true);
+      
+      // Step 2: Hold for a short duration, then animate back to "TeachMeet"
       setTimeout(() => {
         setAnimateChars(false);
-        setAnimationLock(false);
-      }, characterAnimationTotalDuration);
-    }, tmVisibleDuration);
+        setTimeout(() => {
+          setLogoText('TeachMeet');
+          setAnimateChars(true);
+          
+          // Step 3: Unlock interaction after animation cycle completes
+          setTimeout(() => {
+            setAnimateChars(false);
+            setAnimationLock(false);
+          }, 1000); // Base duration for character reveal
+        }, 50);
+      }, 1500); // Duration to display "MeetTeach"
+    }, 50);
   };
 
   const handleDismissItem = (itemIdToDismiss: string) => {
@@ -373,10 +381,10 @@ export default function HomePage() {
             size="medium"
             className={cn(
               'mb-8 text-center cursor-pointer',
-              animateChars && logoText === 'TeachMeet' && 'logo-animate-chars'
+              animateChars && 'logo-animate-chars'
             )}
             onClick={handleComplexLogoAnimation}
-            animateChars={true}
+            animateChars={animateChars}
           />
           <div className="mt-8 p-4 sm:p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md text-center border">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
