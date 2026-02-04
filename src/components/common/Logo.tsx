@@ -38,24 +38,23 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
     <h1
       data-testid="sidebar-logo"
       className={cn(
-        'text-gel-gradient select-none pb-2 inline-block',
+        'select-none pb-2 inline-block',
         sizeClasses[size],
         className
       )}
       style={{
         fontFamily: "'Oleo Script', system-ui",
         display: 'inline-block',
-        transform: 'scaleX(1.35)', // Horizontal stretch
+        transform: 'scaleX(1.4)', // Horizontal stretch
         transformOrigin: 'center',
-        letterSpacing: '-0.02em', // Tightened spacing to counteract scaleX gap
-        textShadow: `
-          1px 1px 0px hsl(var(--primary) / 0.8),
-          2px 2px 0px hsl(var(--primary) / 0.6),
-          3px 3px 0px hsl(var(--accent) / 0.4),
-          4px 4px 0px hsl(var(--accent) / 0.2),
-          0px 8px 20px hsl(var(--primary) / 0.3),
-          0px 12px 40px hsl(var(--accent) / 0.2)
-        `,
+        letterSpacing: '-0.06em', // Tightened spacing to create a cohesive unit
+        background: 'linear-gradient(to right, #32CD32, #00FFFF)', // Explicit Green to Cyan-Blue gradient
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        fontWeight: 'bold',
+        filter: `drop-shadow(1px 1px 0px #228B22) 
+                drop-shadow(2px 2px 0px #008B8B) 
+                drop-shadow(4px 4px 10px rgba(50, 205, 50, 0.3))`, // Subtle 3D depth using branding colors
       }}
       {...props}
     >
