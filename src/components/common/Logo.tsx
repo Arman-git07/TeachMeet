@@ -48,7 +48,7 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', animateCh
         transform: 'scaleX(1.4)', // Horizontal stretch
         transformOrigin: 'center',
         letterSpacing: '-0.06em', // Tightened spacing to create a cohesive unit
-        background: 'linear-gradient(to right, #32CD32, #00FFFF)', // Explicit Green to Cyan-Blue gradient
+        background: 'linear-gradient(to top, #32CD32, #00FFFF)', // Vertical gradient: Bottom (Green) to Top (Cyan)
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         fontWeight: 'bold',
