@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -103,7 +104,6 @@ const teacherApplicationSchema = z.object({
 
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
-// Isolated Helper Component for Creating/Editing Classrooms
 const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -125,10 +125,7 @@ const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSucces
   }, [classroomToEdit]);
 
   const handleSubmit = async () => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Not Authenticated' });
-      return;
-    }
+    if (!user) return;
     if (!title.trim()) {
       toast({ variant: 'destructive', title: 'Title is required' });
       return;
@@ -195,7 +192,6 @@ const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSucces
   );
 };
 
-// Isolated Helper Component for Teacher Application
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -256,10 +252,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
             });
 
             await batch.commit();
-            
-            // Notify other parts of the app
             window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-            
             toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });
             onSubmitted();
         } catch (error) {
@@ -349,7 +342,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                         </FormItem>
                     )} />
                      <DialogFooter className="sticky bottom-0 bg-background pt-4">
-                        <DialogClose asChild><Button variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                        <DialogClose asChild><Button variant="outline" type="button" disabled={isLoading}>Cancel</Button></DialogClose>
                         <Button type="submit" disabled={isLoading}>
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                             Submit Application

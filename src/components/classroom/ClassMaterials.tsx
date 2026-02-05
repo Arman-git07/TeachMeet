@@ -14,159 +14,52 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Loader2, Link as LinkIcon, Trash2, FileText } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import type { Material, DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
-
-const MaterialItem = memo(({ material, canDelete, onDeleteClick }: { material: Material; canDelete: boolean; onDeleteClick: () => void }) => {
-    return (
-        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group">
-            <a href={material.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 min-w-0 flex-grow">
-                {material.type === 'link' ? <LinkIcon className="h-5 w-5 text-accent flex-shrink-0" /> : <FileText className="h-5 w-5 text-primary flex-shrink-0" />}
-                <div className="min-w-0">
-                    <p className="text-sm font-medium truncate" title={material.name}>{material.name}</p>
-                    <p className="text-xs text-muted-foreground">Shared by {material.uploaderName}</p>
-                </div>
-            </a>
-            {canDelete && (
-                 <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader><AlertDialogTitle>Delete Material?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{material.name}". This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={onDeleteClick}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            )}
-        </div>
-    );
-});
-MaterialItem.displayName = 'MaterialItem';
+import type { Material } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 export function ClassMaterials() {
     const { classroomId, user, userRole } = useClassroom();
     const { toast } = useToast();
     const [materials, setMaterials] = useState<Material[]>([]);
-    const [materialFile, setMaterialFile] = useState<File | null>(null);
-    const [materialLink, setMaterialLink] = useState('');
-    const [materialName, setMaterialName] = useState('');
-    const [isUploading, setIsUploading] = useState(false);
+    const [file, setFile] = useState<File | null>(null);
+    const [link, setLink] = useState('');
+    const [linkName, setLinkName] = useState('');
+    const [loading, setLoading] = useState(false);
     const canUserManage = canManage(userRole);
 
     useEffect(() => {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'materials'), orderBy('uploadedAt', 'desc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        return onSnapshot(q, (snapshot) => {
             setMaterials(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Material)));
-        }, (error) => {
-            console.error("Error fetching materials:", error);
-            toast({ variant: 'destructive', title: "Error", description: "Could not fetch materials." });
         });
-        return unsubscribe;
-    }, [classroomId, toast]);
+    }, [classroomId]);
 
-    const handleDelete = useCallback(async (itemToDelete: DeletableItem | null) => {
-        if (!itemToDelete || !classroomId) return;
-        const { collectionName, item } = itemToDelete;
+    const handleUpload = async () => {
+        if (!file || !user || !classroomId) return;
+        setLoading(true);
         try {
-            if (item.storagePath) {
-                const fileRef = storageRef(storage, item.storagePath);
-                await deleteObject(fileRef).catch(err => {
-                    if (err.code !== 'storage/object-not-found') throw err;
-                });
-            }
-            await deleteDoc(doc(db, "classrooms", classroomId, collectionName, item.id));
-            toast({ title: "Item Deleted", description: "The material has been removed." });
-        } catch (error: any) {
-            console.error("Error deleting material:", error);
-            toast({ variant: 'destructive', title: "Deletion Failed", description: error.message });
-        }
-    }, [classroomId, toast]);
-
-    const handleMaterialUpload = useCallback(async () => {
-        if (!materialFile || !user) return;
-        setIsUploading(true);
-        const toastHandle = toast({ id: `material-upload-${Date.now()}`, title: "Uploading Material...", duration: Infinity });
-        
-        try {
-            const path = `classrooms/${classroomId}/materials/${Date.now()}-${materialFile.name}`;
+            const path = `classrooms/${classroomId}/materials/${Date.now()}-${file.name}`;
             const fileRef = storageRef(storage, path);
-            const uploadTask = uploadBytesResumable(fileRef, materialFile);
-
-            uploadTask.on('state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    if (toastHandle.update) {
-                        toastHandle.update({ description: `Upload is ${Math.round(progress)}% done` });
-                    }
-                },
-                (error) => {
-                    // Re-throw to be caught by the outer catch block
-                    throw error;
-                }
-            );
-
-            await uploadTask;
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-
+            const url = await getDownloadURL(await uploadBytesResumable(fileRef, file).then(s => s.ref));
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
-                name: materialFile.name, url, uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Anonymous', type: 'file', storagePath: path,
+                name: file.name, url, uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Teacher', type: 'file', storagePath: path,
             });
-            if (toastHandle.update) {
-                toastHandle.update({ title: "Material Uploaded!" });
-            }
-            setMaterialFile(null);
-        } catch (error: any) {
-            console.error("Failed to upload material:", error);
-            let title = "Upload Failed";
-            let description = "Could not upload the material. Please try again.";
-            if (error.code) {
-                if (error.code === 'storage/unauthorized' || error.code === 'permission-denied') {
-                    title = "Permission Denied";
-                    description = "You do not have permission to upload materials. Check security rules.";
-                } else if (error.code.includes('auth/requests-to-this-api')) {
-                    title = "API Key Configuration Error";
-                    description = "Could not connect to Firebase. Check API key configuration.";
-                }
-            }
-            if (toastHandle.update) {
-                toastHandle.update({ variant: 'destructive', title, description, duration: 9000 });
-            }
-        } finally {
-            setIsUploading(false);
-        }
-    }, [materialFile, user, classroomId, toast]);
+            toast({ title: "Uploaded!" });
+            setFile(null);
+        } catch (e) { toast({ variant: 'destructive', title: "Failed" }); } finally { setLoading(false); }
+    };
 
-    const handleLinkShare = useCallback(async () => {
-        if (!materialLink.trim() || !materialName.trim() || !user) return;
-        setIsUploading(true);
+    const handleShareLink = async () => {
+        if (!link.trim() || !linkName.trim() || !user || !classroomId) return;
+        setLoading(true);
         try {
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
-                name: materialName.trim(), url: materialLink.trim(), uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Anonymous', type: 'link', storagePath: '',
+                name: linkName.trim(), url: link.trim(), uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Teacher', type: 'link', storagePath: '',
             });
             toast({ title: "Link Shared!" });
-            setMaterialLink('');
-            setMaterialName('');
-        } catch (error: any) {
-            console.error("Link share failed:", error);
-            let description = "Could not share the link.";
-            if (error.code === 'permission-denied') {
-                description = "You do not have permission to share materials. Check security rules.";
-            }
-            toast({ variant: "destructive", title: "Sharing Failed", description });
-        } finally {
-            setIsUploading(false);
-        }
-    }, [materialLink, materialName, user, classroomId, toast]);
+            setLink(''); setLinkName('');
+        } catch (e) { toast({ variant: 'destructive', title: "Failed" }); } finally { setLoading(false); }
+    };
 
     return (
         <Card>
@@ -174,32 +67,29 @@ export function ClassMaterials() {
                 {canUserManage && (
                     <Card className="p-4 bg-muted/20">
                         <Tabs defaultValue="file">
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="file">Upload File</TabsTrigger>
-                                <TabsTrigger value="link">Share Link</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="file" className="pt-4">
-                                <div className="flex items-center gap-2">
-                                    <Input id="material-upload" type="file" onChange={(e) => setMaterialFile(e.target.files ? e.target.files[0] : null)} disabled={isUploading} className="flex-1 min-w-0"/>
-                                    <Button onClick={handleMaterialUpload} disabled={!materialFile || isUploading}>
-                                        {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Upload
-                                    </Button>
-                                </div>
+                            <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="file">File</TabsTrigger><TabsTrigger value="link">Link</TabsTrigger></TabsList>
+                            <TabsContent value="file" className="pt-4 flex gap-2">
+                                <Input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} disabled={loading} className="flex-1"/>
+                                <Button onClick={handleUpload} disabled={!file || loading}>{loading ? <Loader2 className="animate-spin"/> : <Upload className="h-4 w-4"/>}</Button>
                             </TabsContent>
                             <TabsContent value="link" className="pt-4 space-y-4">
-                                <Input placeholder="Link Name (e.g., React Docs)" value={materialName} onChange={(e) => setMaterialName(e.target.value)} disabled={isUploading} />
-                                <Input placeholder="https://example.com" value={materialLink} onChange={(e) => setMaterialLink(e.target.value)} disabled={isUploading} />
-                                <Button onClick={handleLinkShare} disabled={!materialLink || !materialName || isUploading}>
-                                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LinkIcon className="mr-2 h-4 w-4" />} Share Link
-                                </Button>
+                                <Input placeholder="Link Name (e.g., Maths Class Link, English Class Link)" value={linkName} onChange={(e) => setLinkName(e.target.value)} disabled={loading} />
+                                <Input placeholder="https://example.com" value={link} onChange={(e) => setLink(e.target.value)} disabled={loading} />
+                                <Button onClick={handleShareLink} disabled={!link || !linkName || loading} className="w-full">Share Link</Button>
                             </TabsContent>
                         </Tabs>
                     </Card>
                 )}
                 <div className="space-y-2">
-                    {materials.length > 0 ? materials.map(m => (
-                        <MaterialItem key={m.id} material={m} canDelete={canUserManage || user?.uid === m.uploaderId} onDeleteClick={() => handleDelete({ collectionName: 'materials', item: m })} />
-                    )) : <p className="text-muted-foreground text-center py-6">No materials shared yet.</p>}
+                    {materials.map(m => (
+                        <div key={m.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group">
+                            <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 truncate">
+                                {m.type === 'link' ? <LinkIcon className="h-4 w-4 text-accent" /> : <FileText className="h-4 w-4 text-primary" />}
+                                <span className="text-sm font-medium truncate">{m.name}</span>
+                            </a>
+                            {canUserManage && <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={async () => { if(m.storagePath) await deleteObject(storageRef(storage, m.storagePath)).catch(()=>{}); await deleteDoc(doc(db, "classrooms", classroomId!, "materials", m.id)); toast({title:"Deleted"}); }}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
+                        </div>
+                    ))}
                 </div>
             </CardContent>
         </Card>
