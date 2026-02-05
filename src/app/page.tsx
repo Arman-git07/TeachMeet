@@ -54,7 +54,6 @@ export interface JoinRequestActivityItem extends BaseActivityItem {
 
 export type ActivityItem = MeetingActivityItem | DocumentActivityItem | RecordingActivityItem | ChatMentionActivityItem | AnnouncementActivityItem | JoinRequestActivityItem;
 
-
 const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 const LATEST_ACTIVITY_KEY_PREFIX = 'teachmeet-latest-activity-';
@@ -71,9 +70,9 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   meeting: (id, item) => `/dashboard/meeting/prejoin?meetingId=${id}&topic=${encodeURIComponent(item.title)}&role=host`,
-  document: (id) => `/dashboard/documents`,
-  recording: (id) => `/dashboard/recordings`,
-  chatMention: (id, item) => `/dashboard/classrooms`,
+  document: () => `/dashboard/documents`,
+  recording: () => `/dashboard/recordings`,
+  chatMention: () => `/dashboard/classrooms`,
   announcement: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   joinRequest: (id, item) => `/dashboard/classrooms/${item.classroomId}/requests`,
 };
@@ -115,9 +114,7 @@ export default function HomePage() {
     if (dismissedItemsRaw) {
       try {
         const parsed = JSON.parse(dismissedItemsRaw);
-        if (Array.isArray(parsed)) {
-          dismissedItemIds = parsed;
-        }
+        if (Array.isArray(parsed)) dismissedItemIds = parsed;
       } catch (e) {
         localStorage.removeItem(DISMISSED_ITEMS_KEY);
       }
@@ -131,7 +128,7 @@ export default function HomePage() {
         let storedMeetings = JSON.parse(startedMeetingsRaw);
         if (Array.isArray(storedMeetings)) {
           const now = Date.now();
-          const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < TWO_HOURS_IN_MS));
+          const validMeetings = storedMeetings.filter(m => m && m.id && m.startedAt && (now - m.startedAt < TWO_HOURS_IN_MS));
           ongoingMeetings = validMeetings.map((m: any) => ({
             type: 'meeting',
             id: m.id,
@@ -150,7 +147,8 @@ export default function HomePage() {
         try {
             const parsed = JSON.parse(latestActivityRaw);
             if (Array.isArray(parsed)) {
-                otherActivities = parsed.filter(item => item && item.type && item.type !== 'privateMessage' && item.type !== 'publicChat');
+                // Ensure we pick up joinRequests explicitly
+                otherActivities = parsed.filter(item => item && item.type);
             }
         } catch (e) {
              localStorage.removeItem(LATEST_ACTIVITY_KEY);
@@ -214,10 +212,7 @@ export default function HomePage() {
     }
 
     setAllActivity(prev => prev.filter(item => item.id !== itemIdToDismiss));
-    toast({
-      title: "Notification Dismissed",
-      description: "The item has been removed from your list.",
-    });
+    toast({ title: "Notification Dismissed" });
   };
 
   const getNotificationText = (item: ActivityItem): string => {

@@ -58,13 +58,8 @@ import {
   BookOpen,
   Eye,
   School,
-  Clipboard,
-  ClipboardCheck,
-  GraduationCap,
-  Briefcase,
   PanelLeftOpen,
 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
@@ -78,7 +73,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { auth } from '@/lib/firebase';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type ActivityItem, type JoinRequestActivityItem } from '@/app/page';
-
 
 export interface Classroom {
   id: string;
@@ -100,14 +94,82 @@ export interface EnrolledClassroomInfo {
     classroomId: string;
 }
 
+const teacherApplicationSchema = z.object({
+    fullName: z.string().min(1, 'Full name is required'),
+    subject: z.string().min(1, 'Subject is required'),
+    mobile: z.string().regex(/^\+?[0-9\s-()]+$/, 'Please enter a valid mobile number').min(1, 'Mobile number is required'),
+    qualification: z.string().min(1, 'Qualification is required'),
+    experience: z.string().min(1, 'Experience is required'),
+    availability: z.string().min(1, 'Availability is required'),
+    message: z.string().optional(),
+    resume: z.any().optional(),
+});
 
-const CreateClassroomDialogContent = ({
-  onSuccess,
-  classroomToEdit,
-}: {
-  onSuccess: () => void;
-  classroomToEdit?: Classroom | null;
-}) => {
+type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
+
+async function submitTeacherApplication(classroomId: string, data: TeacherApplicationValues, resumeURL?: string) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not logged in");
+
+    const batch = writeBatch(db);
+    const classroomJoinReqRef = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
+
+    batch.set(classroomJoinReqRef, {
+        requesterId: user.uid,
+        studentName: data.fullName,
+        studentPhotoURL: user.photoURL || "",
+        role: "teacher",
+        status: "pending",
+        requestedAt: serverTimestamp(),
+        resumeURL: resumeURL || "",
+        applicationData: {
+            subject: data.subject,
+            qualification: data.qualification,
+            experience: data.experience,
+            availability: data.availability,
+            mobile: data.mobile,
+            message: data.message || ""
+        }
+    }, { merge: true });
+
+    const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
+    batch.set(userPendingRequestRef, { 
+        classroomId, 
+        requestedAt: serverTimestamp(),
+        role: 'teacher'
+    });
+
+    await batch.commit();
+
+    try {
+        const classroomSnap = await getDoc(doc(db, "classrooms", classroomId));
+        if (classroomSnap.exists()) {
+            const classroomData = classroomSnap.data();
+            const teacherId = classroomData.teacherId;
+            if (teacherId) {
+                const key = `teachmeet-latest-activity-${teacherId}`;
+                const raw = localStorage.getItem(key);
+                let acts = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(acts)) acts = [];
+                
+                const newNotification: JoinRequestActivityItem = {
+                    id: `joinReq-${Date.now()}-${user.uid}`,
+                    type: 'joinRequest',
+                    title: classroomData.title,
+                    timestamp: Date.now(),
+                    classroomId: classroomId,
+                    requesterName: data.fullName
+                };
+                
+                acts.unshift(newNotification);
+                localStorage.setItem(key, JSON.stringify(acts.slice(0, 20)));
+                window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+            }
+        }
+    } catch(e) {}
+}
+
+const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -197,79 +259,6 @@ const CreateClassroomDialogContent = ({
     </>
   );
 };
-
-
-const teacherApplicationSchema = z.object({
-    fullName: z.string().min(1, 'Full name is required'),
-    subject: z.string().min(1, 'Subject is required'),
-    mobile: z.string().regex(/^\+?[0-9\s-()]+$/, 'Please enter a valid mobile number').min(1, 'Mobile number is required'),
-    qualification: z.string().min(1, 'Qualification is required'),
-    experience: z.string().min(1, 'Experience is required'),
-    availability: z.string().min(1, 'Availability is required'),
-    message: z.string().optional(),
-    resume: z.any().optional(),
-});
-
-type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
-
-async function submitTeacherApplication(classroomId: string, data: TeacherApplicationValues, resumeURL?: string) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Not logged in");
-
-    const batch = writeBatch(db);
-    const classroomJoinReqRef = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
-
-    batch.set(classroomJoinReqRef, {
-        requesterId: user.uid,
-        studentName: data.fullName,
-        studentPhotoURL: user.photoURL || "",
-        role: "teacher",
-        status: "pending",
-        requestedAt: serverTimestamp(),
-        resumeURL: resumeURL || "",
-        applicationData: {
-            subject: data.subject,
-            qualification: data.qualification,
-            experience: data.experience,
-            availability: data.availability,
-            mobile: data.mobile,
-            message: data.message || ""
-        }
-    }, { merge: true });
-
-    const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
-    batch.set(userPendingRequestRef, { 
-        classroomId, 
-        requestedAt: serverTimestamp(),
-        role: 'teacher'
-    });
-
-    await batch.commit();
-
-    try {
-        const classroomSnap = await getDoc(doc(db, "classrooms", classroomId));
-        if (classroomSnap.exists()) {
-            const classroomData = classroomSnap.data();
-            const teacherId = classroomData.teacherId;
-            if (teacherId) {
-                const key = `teachmeet-latest-activity-${teacherId}`;
-                const raw = localStorage.getItem(key);
-                let acts = raw ? JSON.parse(raw) : [];
-                if (!Array.isArray(acts)) acts = [];
-                acts.unshift({
-                    id: `joinReq-${Date.now()}-${user.uid}`,
-                    type: 'joinRequest',
-                    title: classroomData.title,
-                    timestamp: Date.now(),
-                    classroomId: classroomId,
-                    requesterName: data.fullName
-                });
-                localStorage.setItem(key, JSON.stringify(acts.slice(0, 20)));
-                window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-            }
-        }
-    } catch(e) {}
-}
 
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
     const { user } = useAuth();
@@ -402,69 +391,49 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
     );
 };
 
-
 export default function ClassroomsPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
   
   const [myClasses, setMyClasses] = useState<Classroom[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<EnrolledClassroomInfo[]>([]);
   const [discoverClasses, setDiscoverClasses] = useState<Classroom[]>([]);
   const [pendingRequestIds, setPendingRequestIds] = useState<Set<string>>(new Set());
   
-  const [isLoadingMy, setIsLoadingMy] = useState(true);
-  const [isLoadingEnrolled, setIsLoadingEnrolled] = useState(true);
-  const [isLoadingDiscover, setIsLoadingDiscover] = useState(true);
-  const [isLoadingRequests, setIsLoadingRequests] = useState(true);
-
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isTeacherAppDialogOpen, setIsTeacherAppDialogOpen] = useState(false);
   const [selectedClassroomForApp, setSelectedClassroomForApp] = useState<Classroom | null>(null);
   const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [requestingToJoin, setRequestingToJoin] = useState<string | null>(null);
-  const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
-
 
   useEffect(() => {
-    if (!user) { setIsLoadingMy(false); setMyClasses([]); return; }
-    setIsLoadingMy(true);
+    if (!user) { setMyClasses([]); return; }
     return onSnapshot(query(collection(db, 'classrooms'), where('teacherId', '==', user.uid)), (snapshot) => {
         setMyClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
-        setIsLoadingMy(false);
     });
   }, [user]);
 
   useEffect(() => {
-    if (!user) { setIsLoadingEnrolled(false); setEnrolledClasses([]); return; }
-    setIsLoadingEnrolled(true);
+    if (!user) { setEnrolledClasses([]); return; }
     return onSnapshot(query(collection(db, 'users', user.uid, 'enrolled')), (snapshot) => {
         setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EnrolledClassroomInfo)));
-        setIsLoadingEnrolled(false);
     });
   }, [user]);
 
   useEffect(() => {
-    setIsLoadingDiscover(true);
     return onSnapshot(query(collection(db, 'classrooms'), where('isPublic', '==', true)), (snapshot) => {
         setDiscoverClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
-        setIsLoadingDiscover(false);
     });
   }, []);
   
   useEffect(() => {
-    if (!user) { setPendingRequestIds(new Set()); setIsLoadingRequests(false); return; }
-    setIsLoadingRequests(true);
+    if (!user) { setPendingRequestIds(new Set()); return; }
     return onSnapshot(query(collection(db, `users/${user.uid}/pendingJoinRequests`)), (snapshot) => {
         const newPendingIds = new Set<string>();
         snapshot.forEach((doc) => newPendingIds.add(doc.id));
         setPendingRequestIds(newPendingIds);
-        setIsLoadingRequests(false);
     });
   }, [user]);
-
 
   const handleEdit = (classroom: Classroom) => {
     setClassroomToEdit(classroom);
@@ -498,7 +467,6 @@ export default function ClassroomsPage() {
   
   const handleRequestToJoinStudent = useCallback(async (classroomId: string) => {
     if (!user) return;
-    setRequestingToJoin(classroomId);
     try {
         const batch = writeBatch(db);
         batch.set(doc(db, `classrooms/${classroomId}/joinRequests`, user.uid), {
@@ -514,14 +482,11 @@ export default function ClassroomsPage() {
         toast({ title: 'Request Sent!' });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Failed' });
-    } finally {
-        setRequestingToJoin(null);
     }
   }, [user, toast]);
   
   const handleCancelRequest = useCallback(async (classroomId: string) => {
     if (!user) return;
-    setCancelingRequest(classroomId);
     try {
         const batch = writeBatch(db);
         batch.delete(doc(db, `classrooms/${classroomId}/joinRequests/${user.uid}`));
@@ -530,22 +495,12 @@ export default function ClassroomsPage() {
         toast({ title: "Request Canceled" });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Failed' });
-    } finally {
-        setCancelingRequest(null);
     }
   }, [user, toast]);
-
 
   const handleOpenTeacherAppDialog = (classroom: Classroom) => {
     setSelectedClassroomForApp(classroom);
     setIsTeacherAppDialogOpen(true);
-  };
-
-  const copyClassId = (id: string) => {
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: 'Copied!' });
   };
 
   return (
@@ -553,7 +508,7 @@ export default function ClassroomsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
-          <h1 className="text-3xl font-bold">Classrooms</h1>
+          <h1 className="text-3xl font-bold text-foreground">Classrooms</h1>
         </div>
         { user && (
             <div className="flex flex-shrink-0 gap-2 w-full sm:w-auto">
