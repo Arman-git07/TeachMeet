@@ -251,7 +251,6 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
 
             await batch.commit();
             
-            // Broadcast event for activity feed
             window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
             
             toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });

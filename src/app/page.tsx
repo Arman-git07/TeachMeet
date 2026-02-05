@@ -58,19 +58,15 @@ export default function HomePage() {
   const [firestoreActivity, setFirestoreActivity] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { toast } = useToast();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const router = useRouter();
   const classUnsubsRef = useRef<(() => void)[]>([]);
   
   useEffect(() => {
     if (!user || !isAuthenticated) return;
     
-    // Listen to classrooms where user is the teacher to find join requests
     const qClassrooms = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
 
     const unsubClassrooms = onSnapshot(qClassrooms, (snapshot) => {
-        // Cleanup old sub-listeners
         classUnsubsRef.current.forEach(unsub => unsub());
         classUnsubsRef.current = [];
         
@@ -84,7 +80,7 @@ export default function HomePage() {
                 const requests = reqSnap.docs.map(doc => {
                     const data = doc.data();
                     return {
-                        id: `join-${classId}-${doc.id}`, // Unique ID for deduplication
+                        id: `join-${classId}-${doc.id}`, 
                         type: 'joinRequest',
                         title: classTitle,
                         timestamp: data.requestedAt?.toMillis() || Date.now(),
@@ -94,8 +90,6 @@ export default function HomePage() {
                 });
                 
                 activityMap[classId] = requests;
-                
-                // Aggregate all lists
                 const combined = Object.values(activityMap).flat();
                 setFirestoreActivity(combined);
             });
@@ -122,15 +116,12 @@ export default function HomePage() {
 
     const ongoing = started.filter((m:any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS).map((m:any) => ({ type: 'meeting', id: m.id, title: m.title || "Meeting", timestamp: m.startedAt }));
     
-    // Filter out join requests from localStorage because we fetch them live from Firestore
     const filteredLatest = latest.filter((item: any) => item.type !== 'joinRequest');
     
-    // Deduplicate and combine
     const combined = [...ongoing, ...filteredLatest, ...firestoreActivity]
         .filter(item => item && !dismissed.includes(item.id))
         .sort((a,b) => b.timestamp - a.timestamp);
 
-    // Final deduplication by ID
     const uniqueCombined = combined.filter((item, index, self) =>
         index === self.findIndex((t) => t.id === item.id)
     );

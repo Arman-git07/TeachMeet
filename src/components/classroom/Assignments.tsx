@@ -253,33 +253,63 @@ export function Assignments() {
                                                     <DialogHeader><DialogTitle>Submissions</DialogTitle></DialogHeader>
                                                     <ScrollArea className="max-h-[60vh] py-4">
                                                         <div className="space-y-4 px-1">
-                                                            {submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
-                                                                <Card key={sub.id} className="p-4 bg-muted/30">
-                                                                    <div className="flex justify-between items-center mb-3">
-                                                                        <p className="font-semibold">{sub.studentName}</p>
-                                                                        <Badge>{sub.grade != null ? `${sub.grade}/100` : "Pending"}</Badge>
-                                                                    </div>
-                                                                    <div className="flex gap-2 mb-4">
-                                                                        <Button asChild variant="outline" size="sm" className="h-8">
-                                                                            <a href={sub.submissionUrl} target="_blank" rel="noreferrer"><Eye className="mr-2 h-3 w-3"/>View</a>
-                                                                        </Button>
-                                                                        {assignment.answerKeyUrl && (
-                                                                            <Button size="sm" className="h-8" onClick={() => handleAiGrade(assignment, sub)} disabled={isProcessing === sub.id}>
-                                                                                {isProcessing === sub.id ? <Loader2 className="animate-spin h-3 w-3 mr-2"/> : <BrainCircuit className="h-3 w-3 mr-2"/>}
-                                                                                AI Check
+                                                            {submissions.filter(s => s.assignmentId === assignment.id).length === 0 ? (
+                                                                <div className="space-y-4">
+                                                                    <p className="text-center py-4 text-xs text-muted-foreground italic">No actual submissions yet. Below is a preview of how a submission looks:</p>
+                                                                    <Card className="p-4 bg-primary/5 border-dashed border-primary/20">
+                                                                        <div className="flex justify-between items-center mb-3">
+                                                                            <div>
+                                                                                <p className="font-semibold">Demo Student (Example)</p>
+                                                                                <p className="text-[10px] text-muted-foreground">Submitted: Just now</p>
+                                                                            </div>
+                                                                            <Badge variant="outline" className="text-primary border-primary/30">Demo</Badge>
+                                                                        </div>
+                                                                        <div className="flex gap-2 mb-4">
+                                                                            <Button variant="outline" size="sm" className="h-8 opacity-50 cursor-not-allowed">
+                                                                                <Eye className="mr-2 h-3 w-3"/>View
                                                                             </Button>
-                                                                        )}
-                                                                    </div>
-                                                                    <ManualGradeForm 
-                                                                        initialScore={sub.grade} 
-                                                                        initialFeedback={sub.feedback} 
-                                                                        onSave={(score, feedback) => handleManualGrade(assignment.id, sub, score, feedback)}
-                                                                        isSaving={isProcessing === sub.id}
-                                                                    />
-                                                                </Card>
-                                                            ))}
-                                                            {submissions.filter(s => s.assignmentId === assignment.id).length === 0 && (
-                                                                <p className="text-center py-8 text-muted-foreground">No submissions yet.</p>
+                                                                            {assignment.answerKeyUrl && (
+                                                                                <Button size="sm" className="h-8 bg-primary/40 cursor-not-allowed">
+                                                                                    <BrainCircuit className="h-3 w-3 mr-2"/>
+                                                                                    AI Check
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="space-y-2 border-t pt-3 opacity-50">
+                                                                            <div className="flex gap-2">
+                                                                                <Input placeholder="Score" className="h-8 text-xs" disabled />
+                                                                                <Button size="sm" className="h-8 px-4" disabled>Save</Button>
+                                                                            </div>
+                                                                            <Textarea placeholder="Feedback..." className="text-xs h-16 resize-none" disabled />
+                                                                        </div>
+                                                                    </Card>
+                                                                </div>
+                                                            ) : (
+                                                                submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
+                                                                    <Card key={sub.id} className="p-4 bg-muted/30">
+                                                                        <div className="flex justify-between items-center mb-3">
+                                                                            <p className="font-semibold">{sub.studentName}</p>
+                                                                            <Badge>{sub.grade != null ? `${sub.grade}/100` : "Pending"}</Badge>
+                                                                        </div>
+                                                                        <div className="flex gap-2 mb-4">
+                                                                            <Button asChild variant="outline" size="sm" className="h-8">
+                                                                                <a href={sub.submissionUrl} target="_blank" rel="noreferrer"><Eye className="mr-2 h-3 w-3"/>View</a>
+                                                                            </Button>
+                                                                            {assignment.answerKeyUrl && (
+                                                                                <Button size="sm" className="h-8" onClick={() => handleAiGrade(assignment, sub)} disabled={isProcessing === sub.id}>
+                                                                                    {isProcessing === sub.id ? <Loader2 className="animate-spin h-3 w-3 mr-2"/> : <BrainCircuit className="h-3 w-3 mr-2"/>}
+                                                                                    AI Check
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                        <ManualGradeForm 
+                                                                            initialScore={sub.grade} 
+                                                                            initialFeedback={sub.feedback} 
+                                                                            onSave={(score, feedback) => handleManualGrade(assignment.id, sub, score, feedback)}
+                                                                            isSaving={isProcessing === sub.id}
+                                                                        />
+                                                                    </Card>
+                                                                ))
                                                             )}
                                                         </div>
                                                     </ScrollArea>
