@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -175,7 +176,7 @@ export default function CheckingPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    {assignment?.answerKeyUrl || isDemo ? (
+                    {(assignment?.answerKeyUrl || isDemo) && (
                         <Button 
                             variant="secondary" 
                             className="rounded-lg"
@@ -185,7 +186,7 @@ export default function CheckingPage() {
                             {isAIGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BrainCircuit className="mr-2 h-4 w-4" />}
                             AI Check
                         </Button>
-                    ) : null}
+                    )}
                     <Button onClick={handleManualSave} disabled={isSaving} className="btn-gel rounded-lg">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
                         Save Grade
@@ -194,7 +195,6 @@ export default function CheckingPage() {
             </header>
 
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-                {/* Submission Preview Area */}
                 <Card className="lg:col-span-2 flex flex-col overflow-hidden shadow-lg border-border/50">
                     <CardHeader className="py-3 border-b bg-muted/20">
                         <CardTitle className="text-sm flex items-center gap-2">
@@ -223,7 +223,6 @@ export default function CheckingPage() {
                     </CardContent>
                 </Card>
 
-                {/* Grading Panel Area */}
                 <aside className="space-y-6 overflow-y-auto pr-1">
                     <Card className="shadow-lg border-border/50">
                         <CardHeader>
