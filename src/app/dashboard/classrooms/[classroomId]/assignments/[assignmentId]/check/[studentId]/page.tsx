@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -306,17 +306,27 @@ export default function CheckingPage() {
                                     <Eraser className="h-4 w-4" />
                                 </Button>
                                 <div className="w-px h-4 bg-border mx-1" />
-                                {["#ef4444", "#3b82f6", "#22c55e"].map(color => (
+                                {["#000000", "#ffffff", "#ef4444", "#3b82f6", "#22c55e"].map(color => (
                                     <button 
                                         key={color}
                                         onClick={() => { setDrawColor(color); setIsEraser(false); }}
                                         className={cn(
-                                            "w-5 h-5 rounded-full border border-black/10 transition-transform hover:scale-110",
+                                            "w-5 h-5 rounded-full border border-black/10 transition-transform hover:scale-110 shadow-sm",
                                             drawColor === color && !isEraser && "ring-2 ring-primary ring-offset-1"
                                         )}
                                         style={{ backgroundColor: color }}
+                                        title={color === '#000000' ? 'Black' : color === '#ffffff' ? 'White' : ''}
                                     />
                                 ))}
+                                <div className="relative w-6 h-6 rounded-full border border-black/10 overflow-hidden flex items-center justify-center bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 transition-transform hover:scale-110 shadow-sm" title="Choose custom color">
+                                    <input 
+                                        type="color" 
+                                        value={drawColor}
+                                        onChange={(e) => { setDrawColor(e.target.value); setIsEraser(false); }}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    />
+                                    <Palette className="h-3 w-3 text-white pointer-events-none drop-shadow-md" />
+                                </div>
                                 <div className="w-px h-4 bg-border mx-1" />
                                 <Button 
                                     size="sm" 
