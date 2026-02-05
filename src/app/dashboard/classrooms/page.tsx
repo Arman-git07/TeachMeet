@@ -102,7 +102,7 @@ const teacherApplicationSchema = z.object({
 
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
-const CreateClassroomForm = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
+function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -188,9 +188,9 @@ const CreateClassroomForm = ({ onSuccess, classroomToEdit }: { onSuccess: () => 
       </DialogFooter>
     </>
   );
-};
+}
 
-const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
+function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
@@ -350,7 +350,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
             </Form>
         </DialogContent>
     );
-};
+}
 
 export default function ClassroomsPage() {
   const { user, loading: authLoading } = useAuth();

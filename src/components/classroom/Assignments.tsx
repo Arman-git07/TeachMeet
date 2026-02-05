@@ -30,7 +30,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, BrainCircuit, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, BrainCircuit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Assignment, Submission, DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
@@ -145,7 +145,7 @@ export function Assignments() {
         try {
             if (item.storagePath) await deleteObject(storageRef(storage, item.storagePath)).catch(() => {});
             await deleteDoc(doc(db, "classrooms", classroomId, collectionName, item.id));
-            toast({ title: "Deleted" });
+            toast({ title: "Assignment Deleted" });
         } catch (error) {
             toast({ variant: 'destructive', title: "Deletion Failed" });
         }
@@ -181,31 +181,53 @@ export function Assignments() {
                                 <div><h3 className="font-semibold">{assignment.title}</h3><p className="text-xs text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleString()}</p></div>
                                 <div className="flex items-center gap-2">
                                     {canUserManage ? (
-                                        <Dialog>
-                                            <DialogTrigger asChild><Button variant="outline" size="sm">Grading</Button></DialogTrigger>
-                                            <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Submissions</DialogTitle></DialogHeader>
-                                                <ScrollArea className="max-h-[60vh] py-4 space-y-4">
-                                                    {submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
-                                                        <Card key={sub.id} className="p-4 bg-muted/30">
-                                                            <div className="flex justify-between items-center mb-2"><p className="font-semibold">{sub.studentName}</p><Badge>{sub.grade != null ? `${sub.grade}/100` : "Not Graded"}</Badge></div>
-                                                            <div className="flex gap-2 mb-2"><a href={sub.submissionUrl} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">View File</a></div>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                <Input type="number" placeholder="Score" value={manualGrade[sub.id] ?? sub.grade ?? ""} onChange={(e) => setManualGrade(prev => ({...prev, [sub.id]: parseInt(e.target.value)}))} className="h-8" />
-                                                                <Button size="sm" onClick={() => handleManualGradeSubmit(assignment.id, sub)} disabled={isSavingManual === sub.id}>Save</Button>
-                                                            </div>
-                                                            <Textarea placeholder="Feedback" value={manualFeedback[sub.id] ?? sub.feedback ?? ""} onChange={(e) => setManualGradeFeedback(prev => ({...prev, [sub.id]: e.target.value}))} className="mt-2 text-xs h-16" />
-                                                        </Card>
-                                                    ))}
-                                                </ScrollArea>
-                                            </DialogContent>
-                                        </Dialog>
+                                        <>
+                                            <Dialog>
+                                                <DialogTrigger asChild><Button variant="outline" size="sm">Grading</Button></DialogTrigger>
+                                                <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Submissions</DialogTitle></DialogHeader>
+                                                    <ScrollArea className="max-h-[60vh] py-4 space-y-4">
+                                                        {submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
+                                                            <Card key={sub.id} className="p-4 bg-muted/30">
+                                                                <div className="flex justify-between items-center mb-2"><p className="font-semibold">{sub.studentName}</p><Badge>{sub.grade != null ? `${sub.grade}/100` : "Not Graded"}</Badge></div>
+                                                                <div className="flex gap-2 mb-2"><a href={sub.submissionUrl} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">View File</a></div>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <Input type="number" placeholder="Score" value={manualGrade[sub.id] ?? sub.grade ?? ""} onChange={(e) => setManualGrade(prev => ({...prev, [sub.id]: parseInt(e.target.value)}))} className="h-8" />
+                                                                    <Button size="sm" onClick={() => handleManualGradeSubmit(assignment.id, sub)} disabled={isSavingManual === sub.id}>Save</Button>
+                                                                </div>
+                                                                <Textarea placeholder="Feedback" value={manualFeedback[sub.id] ?? sub.feedback ?? ""} onChange={(e) => setManualGradeFeedback(prev => ({...prev, [sub.id]: e.target.value}))} className="mt-2 text-xs h-16" />
+                                                            </Card>
+                                                        ))}
+                                                    </ScrollArea>
+                                                </DialogContent>
+                                            </Dialog>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Delete Assignment?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Are you sure you want to delete "{assignment.title}"? This action cannot be undone.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDelete('assignments', assignment)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                                            Delete
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </>
                                     ) : user && (userSub ? <Badge className="bg-green-100 text-green-700">Submitted: {userSub.grade ?? "Pending"}</Badge> : <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2"><Input type="file" required className="h-8 text-xs"/><Button size="sm" type="submit">Submit</Button></form>)}
-                                    {canUserManage && <Button variant="ghost" size="icon" onClick={() => handleDelete('assignments', assignment)}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
                                 </div>
                             </div>
                         </Card>
                     );
-                }) : <div className="text-center py-12 text-muted-foreground">No assignments.</div>}
+                }) : <div className="text-center py-12 text-muted-foreground">No active assignments.</div>}
             </CardContent>
         </Card>
     );
