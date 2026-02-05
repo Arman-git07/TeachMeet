@@ -30,7 +30,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, BrainCircuit } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, BrainCircuit, FileDown, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Assignment, Submission, DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
@@ -54,9 +54,7 @@ export function Assignments() {
     const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [manualGrade, setManualGrade] = useState<{ [key: string]: number }>({});
-    const [manualFeedback, setManualGradeFeedback] = useState<{ [key: string]: string }>({});
-    const [isSavingManual, setIsSavingManual] = useState<string | null>(null);
+    const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
     const canUserManage = canManage(userRole);
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
@@ -64,9 +62,10 @@ export function Assignments() {
     useEffect(() => {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'assignments'), orderBy('dueDate', 'desc'));
-        return onSnapshot(q, (snapshot) => {
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             setAssignments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Assignment)));
         });
+        return unsubscribe;
     }, [classroomId]);
 
     useEffect(() => {
@@ -82,7 +81,7 @@ export function Assignments() {
 
     const onAssignmentSubmit = useCallback(async (data: z.infer<typeof assignmentSchema>) => {
         if (!canUserManage || !user) return;
-        setIsSavingManual("creating");
+        setIsProcessing("creating");
         try {
             let answerKeyUrl = "";
             let storagePath = "";
@@ -95,7 +94,12 @@ export function Assignments() {
                 storagePath = path;
             }
             await addDoc(collection(db, 'classrooms', classroomId, 'assignments'), {
-                title: data.title, dueDate: Timestamp.fromDate(data.dueDate), answerKeyUrl, creatorId: user.uid, createdAt: serverTimestamp(), storagePath: storagePath || null,
+                title: data.title, 
+                dueDate: Timestamp.fromDate(data.dueDate), 
+                answerKeyUrl, 
+                creatorId: user.uid, 
+                createdAt: serverTimestamp(), 
+                storagePath: storagePath || null,
             });
             toast({ title: "Assignment Created!" });
             setIsDialogOpen(false);
@@ -103,7 +107,7 @@ export function Assignments() {
         } catch (error) {
             toast({ variant: 'destructive', title: "Creation Failed" });
         } finally {
-            setIsSavingManual(null);
+            setIsProcessing(null);
         }
     }, [canUserManage, user, classroomId, toast, assignmentForm]);
 
@@ -113,38 +117,84 @@ export function Assignments() {
         const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
         const file = fileInput?.files?.[0];
         if (!file) return;
+        
+        setIsProcessing(`submitting-${assignmentId}`);
         try {
             const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${assignmentId}/submissions/${user.uid}-${file.name}`);
             const url = await getDownloadURL(await uploadBytes(fileRef, file).then(s => s.ref));
             await setDoc(doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", user.uid), {
-                studentId: user.uid, studentName: user.displayName || 'Student', submittedAt: serverTimestamp(), submissionUrl: url, grade: null, feedback: null
+                studentId: user.uid, 
+                studentName: user.displayName || 'Student', 
+                submittedAt: serverTimestamp(), 
+                submissionUrl: url, 
+                grade: null, 
+                feedback: null,
+                assignmentId: assignmentId
             });
             toast({ title: "Submitted Successfully!" });
         } catch (error) {
             toast({ variant: 'destructive', title: "Submission Failed" });
+        } finally {
+            setIsProcessing(null);
         }
     }, [classroomId, user, toast]);
 
-    const handleManualGradeSubmit = async (assignmentId: string, submission: Submission) => {
-        const score = manualGrade[submission.id];
-        const feedback = manualFeedback[submission.id];
-        if (score === undefined) return;
-        setIsSavingManual(submission.id);
+    const handleAiGrade = async (assignment: Assignment, submission: Submission) => {
+        if (!canUserManage || !assignment.answerKeyUrl) return;
+        setIsProcessing(submission.id);
+        
         try {
-            await updateDoc(doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", submission.studentId), { grade: score, feedback: feedback || "" });
+            const [answerKeyRes, submissionRes] = await Promise.all([
+                fetch(assignment.answerKeyUrl),
+                fetch(submission.submissionUrl)
+            ]);
+            
+            const [answerKeyBlob, submissionBlob] = await Promise.all([
+                answerKeyRes.blob(),
+                submissionRes.blob()
+            ]);
+
+            const input: GradeAssignmentInput = {
+                teacherAssignmentDataUri: await fileToDataUri(new File([answerKeyBlob], "answerkey")),
+                studentSubmissionDataUri: await fileToDataUri(new File([submissionBlob], "submission"))
+            };
+
+            const result = await gradeAssignment(input);
+            
+            await updateDoc(doc(db, "classrooms", classroomId, "assignments", assignment.id, "submissions", submission.studentId), {
+                grade: result.score,
+                feedback: result.feedback
+            });
+            
+            toast({ title: "Grading Complete", description: `Scored ${result.score}/100` });
+        } catch (error) {
+            console.error("AI Grading failed:", error);
+            toast({ variant: "destructive", title: "AI Grading Failed" });
+        } finally {
+            setIsProcessing(null);
+        }
+    };
+
+    const handleManualGrade = async (assignmentId: string, submission: Submission, score: number, feedback: string) => {
+        setIsProcessing(submission.id);
+        try {
+            await updateDoc(doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", submission.studentId), {
+                grade: score,
+                feedback: feedback
+            });
             toast({ title: "Grade Saved" });
         } catch (error) {
             toast({ variant: "destructive", title: "Failed to save grade" });
         } finally {
-            setIsSavingManual(null);
+            setIsProcessing(null);
         }
     };
 
-    const handleDelete = useCallback(async (collectionName: string, item: any) => {
+    const handleDelete = useCallback(async (item: Assignment) => {
         if (!classroomId) return;
         try {
             if (item.storagePath) await deleteObject(storageRef(storage, item.storagePath)).catch(() => {});
-            await deleteDoc(doc(db, "classrooms", classroomId, collectionName, item.id));
+            await deleteDoc(doc(db, "classrooms", classroomId, 'assignments', item.id));
             toast({ title: "Assignment Deleted" });
         } catch (error) {
             toast({ variant: 'destructive', title: "Deletion Failed" });
@@ -156,17 +206,28 @@ export function Assignments() {
     return (
         <Card className="border-0 shadow-none bg-transparent">
             <CardHeader className="flex flex-row items-center justify-between px-0">
-                <div><CardTitle>Assignments</CardTitle><CardDescription>{canUserManage ? "Manage and grade assignments." : "Submit before the deadline."}</CardDescription></div>
+                <div>
+                    <CardTitle>Assignments</CardTitle>
+                    <CardDescription>{canUserManage ? "Manage and grade assignments." : "Submit before the deadline."}</CardDescription>
+                </div>
                 {canUserManage && (
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild><Button className="btn-gel"><PlusCircle className="mr-2 h-4 w-4"/>Create</Button></DialogTrigger>
                         <DialogContent>
                             <DialogHeader><DialogTitle>New Assignment</DialogTitle></DialogHeader>
                             <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
-                                <div className="space-y-2"><Label>Title</Label><Input {...assignmentForm.register('title')} /></div>
-                                <div className="space-y-2"><Label>Due Date</Label><Controller control={assignmentForm.control} name="dueDate" render={({ field }) => (<Input type="datetime-local" onChange={(e) => field.onChange(new Date(e.target.value))} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />)} /></div>
+                                <div className="space-y-2"><Label>Title</Label><Input {...assignmentForm.register('title')} placeholder="e.g., Algebra Quiz" /></div>
+                                <div className="space-y-2">
+                                    <Label>Due Date</Label>
+                                    <Controller control={assignmentForm.control} name="dueDate" render={({ field }) => (
+                                        <Input type="datetime-local" onChange={(e) => field.onChange(new Date(e.target.value))} value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ""} />
+                                    )} />
+                                </div>
                                 <div className="space-y-2"><Label>Answer Key (Optional)</Label><Input type="file" {...assignmentForm.register('answerKey')} /></div>
-                                <DialogFooter><Button type="submit" disabled={isSavingManual === "creating"}>Post Assignment</Button></DialogFooter>
+                                <DialogFooter><Button type="submit" disabled={isProcessing === "creating"}>
+                                    {isProcessing === "creating" ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null}
+                                    Post Assignment
+                                </Button></DialogFooter>
                             </form>
                         </DialogContent>
                     </Dialog>
@@ -178,57 +239,136 @@ export function Assignments() {
                     return (
                         <Card key={assignment.id} className="p-4 shadow-md rounded-xl">
                             <div className="flex justify-between items-start">
-                                <div><h3 className="font-semibold">{assignment.title}</h3><p className="text-xs text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleString()}</p></div>
+                                <div>
+                                    <h3 className="font-semibold">{assignment.title}</h3>
+                                    <p className="text-xs text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleString()}</p>
+                                    {assignment.answerKeyUrl && <Badge variant="secondary" className="mt-2 text-[10px]">AI-Grading Available</Badge>}
+                                </div>
                                 <div className="flex items-center gap-2">
                                     {canUserManage ? (
                                         <>
                                             <Dialog>
                                                 <DialogTrigger asChild><Button variant="outline" size="sm">Grading</Button></DialogTrigger>
-                                                <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Submissions</DialogTitle></DialogHeader>
-                                                    <ScrollArea className="max-h-[60vh] py-4 space-y-4">
-                                                        {submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
-                                                            <Card key={sub.id} className="p-4 bg-muted/30">
-                                                                <div className="flex justify-between items-center mb-2"><p className="font-semibold">{sub.studentName}</p><Badge>{sub.grade != null ? `${sub.grade}/100` : "Not Graded"}</Badge></div>
-                                                                <div className="flex gap-2 mb-2"><a href={sub.submissionUrl} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">View File</a></div>
-                                                                <div className="grid grid-cols-2 gap-2">
-                                                                    <Input type="number" placeholder="Score" value={manualGrade[sub.id] ?? sub.grade ?? ""} onChange={(e) => setManualGrade(prev => ({...prev, [sub.id]: parseInt(e.target.value)}))} className="h-8" />
-                                                                    <Button size="sm" onClick={() => handleManualGradeSubmit(assignment.id, sub)} disabled={isSavingManual === sub.id}>Save</Button>
-                                                                </div>
-                                                                <Textarea placeholder="Feedback" value={manualFeedback[sub.id] ?? sub.feedback ?? ""} onChange={(e) => setManualGradeFeedback(prev => ({...prev, [sub.id]: e.target.value}))} className="mt-2 text-xs h-16" />
-                                                            </Card>
-                                                        ))}
+                                                <DialogContent className="max-w-2xl">
+                                                    <DialogHeader><DialogTitle>Submissions</DialogTitle></DialogHeader>
+                                                    <ScrollArea className="max-h-[60vh] py-4">
+                                                        <div className="space-y-4 px-1">
+                                                            {submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
+                                                                <Card key={sub.id} className="p-4 bg-muted/30">
+                                                                    <div className="flex justify-between items-center mb-3">
+                                                                        <p className="font-semibold">{sub.studentName}</p>
+                                                                        <Badge>{sub.grade != null ? `${sub.grade}/100` : "Pending"}</Badge>
+                                                                    </div>
+                                                                    <div className="flex gap-2 mb-4">
+                                                                        <Button asChild variant="outline" size="sm" className="h-8">
+                                                                            <a href={sub.submissionUrl} target="_blank" rel="noreferrer"><Eye className="mr-2 h-3 w-3"/>View</a>
+                                                                        </Button>
+                                                                        {assignment.answerKeyUrl && (
+                                                                            <Button size="sm" className="h-8" onClick={() => handleAiGrade(assignment, sub)} disabled={isProcessing === sub.id}>
+                                                                                {isProcessing === sub.id ? <Loader2 className="animate-spin h-3 w-3 mr-2"/> : <BrainCircuit className="h-3 w-3 mr-2"/>}
+                                                                                AI Check
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                    <ManualGradeForm 
+                                                                        initialScore={sub.grade} 
+                                                                        initialFeedback={sub.feedback} 
+                                                                        onSave={(score, feedback) => handleManualGrade(assignment.id, sub, score, feedback)}
+                                                                        isSaving={isProcessing === sub.id}
+                                                                    />
+                                                                </Card>
+                                                            ))}
+                                                            {submissions.filter(s => s.assignmentId === assignment.id).length === 0 && (
+                                                                <p className="text-center py-8 text-muted-foreground">No submissions yet.</p>
+                                                            )}
+                                                        </div>
                                                     </ScrollArea>
                                                 </DialogContent>
                                             </Dialog>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70"><Trash2 className="h-4 w-4" /></Button>
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>Delete Assignment?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            Are you sure you want to delete "{assignment.title}"? This action cannot be undone.
-                                                        </AlertDialogDescription>
+                                                        <AlertDialogDescription>Are you sure? This will remove all student submissions as well.</AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
                                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDelete('assignments', assignment)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                                            Delete
-                                                        </AlertDialogAction>
+                                                        <AlertDialogAction onClick={() => handleDelete(assignment)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
                                             </AlertDialog>
                                         </>
-                                    ) : user && (userSub ? <Badge className="bg-green-100 text-green-700">Submitted: {userSub.grade ?? "Pending"}</Badge> : <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2"><Input type="file" required className="h-8 text-xs"/><Button size="sm" type="submit">Submit</Button></form>)}
+                                    ) : user && (
+                                        userSub ? (
+                                            <div className="flex flex-col items-end gap-2">
+                                                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Submitted</Badge>
+                                                {userSub.grade != null && (
+                                                    <Dialog>
+                                                        <DialogTrigger asChild><Button size="sm" variant="outline">View Grade</Button></DialogTrigger>
+                                                        <DialogContent>
+                                                            <DialogHeader><DialogTitle>Result: {assignment.title}</DialogTitle></DialogHeader>
+                                                            <div className="py-4 text-center space-y-4">
+                                                                <div className="text-4xl font-bold text-primary">{userSub.grade}/100</div>
+                                                                {userSub.feedback && <p className="text-sm bg-muted p-4 rounded-lg italic">"{userSub.feedback}"</p>}
+                                                                <Button asChild variant="link" className="text-xs">
+                                                                    <a href={userSub.submissionUrl} target="_blank" rel="noreferrer"><FileDown className="mr-2 h-4 w-4"/>Download My Submission</a>
+                                                                </Button>
+                                                            </div>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2">
+                                                <Input type="file" required className="h-9 text-xs" disabled={isProcessing === `submitting-${assignment.id}`}/>
+                                                <Button size="sm" type="submit" disabled={isProcessing === `submitting-${assignment.id}`}>
+                                                    {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-4 w-4"/> : "Submit"}
+                                                </Button>
+                                            </form>
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </Card>
                     );
-                }) : <div className="text-center py-12 text-muted-foreground">No active assignments.</div>}
+                }) : <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl"><p className="text-sm">No active assignments found.</p></div>}
             </CardContent>
         </Card>
+    );
+}
+
+function ManualGradeForm({ initialScore, initialFeedback, onSave, isSaving }: { initialScore?: number | null, initialFeedback?: string | null, onSave: (score: number, feedback: string) => void, isSaving: boolean }) {
+    const [score, setScore] = useState(initialScore?.toString() || "");
+    const [feedback, setFeedback] = useState(initialFeedback || "");
+
+    return (
+        <div className="space-y-2 border-t pt-3">
+            <div className="flex gap-2">
+                <Input 
+                    type="number" 
+                    placeholder="Score (0-100)" 
+                    value={score} 
+                    onChange={(e) => setScore(e.target.value)} 
+                    className="h-8 text-xs"
+                />
+                <Button 
+                    size="sm" 
+                    className="h-8 px-4" 
+                    onClick={() => onSave(parseInt(score), feedback)} 
+                    disabled={isSaving || !score}
+                >
+                    {isSaving ? <Loader2 className="animate-spin h-3 w-3"/> : "Save"}
+                </Button>
+            </div>
+            <Textarea 
+                placeholder="Feedback..." 
+                value={feedback} 
+                onChange={(e) => setFeedback(e.target.value)} 
+                className="text-xs h-16 resize-none"
+            />
+        </div>
     );
 }
