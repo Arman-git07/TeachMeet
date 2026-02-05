@@ -50,7 +50,7 @@ export default function CheckingPage() {
 
     // Drawing State
     const [isMarkupMode, setIsMarkupMode] = useState(false);
-    const [drawColor, setDrawColor] = useState("#ef4444"); // Red for corrections
+    const [drawColor, setDrawColor] = useState("#000000"); 
     const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -306,7 +306,7 @@ export default function CheckingPage() {
                                     <Eraser className="h-4 w-4" />
                                 </Button>
                                 <div className="w-px h-4 bg-border mx-1" />
-                                {["#000000", "#ffffff", "#ef4444", "#3b82f6", "#22c55e"].map(color => (
+                                {["#000000", "#ffffff"].map(color => (
                                     <button 
                                         key={color}
                                         onClick={() => { setDrawColor(color); setIsEraser(false); }}
