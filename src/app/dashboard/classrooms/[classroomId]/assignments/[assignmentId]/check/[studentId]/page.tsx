@@ -20,6 +20,7 @@ import { Slider } from '@/components/ui/slider';
 interface AssignmentData {
     title: string;
     answerKeyUrl?: string;
+    maxScore?: number;
 }
 
 interface SubmissionData {
@@ -44,6 +45,7 @@ export default function CheckingPage() {
     const [isSaving, setIsSaving] = useState(false);
 
     const [score, setScore] = useState<string>("");
+    const [maxScore, setMaxScore] = useState<string>("100");
     const [feedback, setFeedback] = useState<string>("");
 
     // Drawing State
@@ -60,7 +62,7 @@ export default function CheckingPage() {
 
     useEffect(() => {
         if (isDemo) {
-            setAssignment({ title: "Demo Assignment" });
+            setAssignment({ title: "Demo Assignment", maxScore: 100 });
             setSubmission({
                 studentName: "Demo Student",
                 submissionUrl: "https://picsum.photos/seed/doc/800/1200",
@@ -82,7 +84,9 @@ export default function CheckingPage() {
                 ]);
 
                 if (assignmentSnap.exists()) {
-                    setAssignment(assignmentSnap.data() as AssignmentData);
+                    const aData = assignmentSnap.data() as AssignmentData;
+                    setAssignment(aData);
+                    if (aData.maxScore) setMaxScore(aData.maxScore.toString());
                 }
                 if (submissionSnap.exists()) {
                     const data = submissionSnap.data() as SubmissionData;
@@ -193,12 +197,21 @@ export default function CheckingPage() {
         setIsSaving(true);
         try {
             const submissionRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId, 'submissions', studentId);
-            await updateDoc(submissionRef, {
-                grade: score ? parseInt(score) : null,
-                feedback: feedback || null
-            });
+            const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId);
+            
+            await Promise.all([
+                updateDoc(submissionRef, {
+                    grade: score ? parseInt(score) : null,
+                    feedback: feedback || null
+                }),
+                updateDoc(assignmentRef, {
+                    maxScore: maxScore ? parseInt(maxScore) : 100
+                })
+            ]);
+            
             toast({ title: "Grade Saved Successfully" });
         } catch (error) {
+            console.error("Save failed:", error);
             toast({ variant: 'destructive', title: "Save Failed" });
         } finally {
             setIsSaving(false);
@@ -239,7 +252,7 @@ export default function CheckingPage() {
                         {isMarkupMode ? "Exit Markup" : "Mark up"}
                     </Button>
                     <Button onClick={handleManualSave} disabled={isSaving} className="btn-gel rounded-lg">
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         Save Grade
                     </Button>
                 </div>
@@ -380,22 +393,32 @@ export default function CheckingPage() {
                     <Card className="shadow-lg border-border/50">
                         <CardHeader>
                             <CardTitle className="text-lg">Grading & Feedback</CardTitle>
-                            <CardDescription>Enter the final score and constructive comments.</CardDescription>
+                            <CardDescription>Enter the student's score and constructive comments.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="score">Final Score (0-100)</Label>
-                                <div className="relative">
+                                <Label htmlFor="score">Score</Label>
+                                <div className="relative flex items-center">
                                     <Input 
                                         id="score"
                                         type="number"
-                                        placeholder="e.g. 85"
+                                        placeholder="Earned"
                                         value={score}
                                         onChange={(e) => setScore(e.target.value)}
-                                        className="text-2xl font-bold h-12 pr-12 rounded-lg"
+                                        className="text-2xl font-bold h-12 pr-20 rounded-lg"
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">/ 100</span>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-muted-foreground font-medium">
+                                        <span className="text-lg">/</span>
+                                        <Input 
+                                            type="number"
+                                            value={maxScore}
+                                            onChange={(e) => setMaxScore(e.target.value)}
+                                            className="w-14 h-8 p-1 text-center bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-bold text-lg hover:bg-muted/50 transition-colors rounded"
+                                            title="Edit total possible marks"
+                                        />
+                                    </div>
                                 </div>
+                                <p className="text-[10px] text-muted-foreground">Click the number after the "/" to edit total marks.</p>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="feedback">Feedback</Label>
