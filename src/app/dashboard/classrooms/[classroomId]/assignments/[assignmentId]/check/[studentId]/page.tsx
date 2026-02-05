@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, BrainCircuit, Save, FileText, CheckCircle2, UserCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, BrainCircuit, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, Palette, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface AssignmentData {
     title: string;
@@ -27,6 +28,9 @@ interface SubmissionData {
     grade?: number | null;
     feedback?: string | null;
 }
+
+interface Point { x: number; y: number; }
+interface Path { points: Point[]; color: string; width: number; isEraser: boolean; }
 
 export default function CheckingPage() {
     const { classroomId, assignmentId, studentId } = useParams() as { classroomId: string; assignmentId: string; studentId: string };
@@ -42,6 +46,15 @@ export default function CheckingPage() {
 
     const [score, setScore] = useState<string>("");
     const [feedback, setFeedback] = useState<string>("");
+
+    // Drawing State
+    const [isMarkupMode, setIsMarkupMode] = useState(false);
+    const [drawColor, setDrawColor] = useState("#ef4444"); // Red for corrections
+    const [isEraser, setIsEraser] = useState(false);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [paths, setPaths] = useState<Path[]>([]);
+    const isDrawingRef = useRef(false);
 
     const isDemo = studentId === 'demo-student';
 
@@ -65,7 +78,7 @@ export default function CheckingPage() {
 
                 const [assignmentSnap, submissionSnap] = await Promise.all([
                     getDoc(assignmentRef),
-                    getDoc(submissionRef)
+                    getDoc(submissionSnap)
                 ]);
 
                 if (assignmentSnap.exists()) {
@@ -87,6 +100,90 @@ export default function CheckingPage() {
 
         fetchData();
     }, [classroomId, assignmentId, studentId, isDemo, toast]);
+
+    // Canvas Logic
+    const redraw = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        paths.forEach(path => {
+            if (path.points.length < 2) return;
+            ctx.beginPath();
+            ctx.strokeStyle = path.color;
+            ctx.lineWidth = path.width;
+            ctx.globalCompositeOperation = path.isEraser ? 'destination-out' : 'source-over';
+            ctx.moveTo(path.points[0].x, path.points[0].y);
+            for (let i = 1; i < path.points.length; i++) {
+                ctx.lineTo(path.points[i].x, path.points[i].y);
+            }
+            ctx.stroke();
+        });
+    }, [paths]);
+
+    useEffect(() => {
+        if (isMarkupMode) {
+            const handleResize = () => {
+                const canvas = canvasRef.current;
+                const container = containerRef.current;
+                if (canvas && container) {
+                    canvas.width = container.clientWidth;
+                    canvas.height = container.clientHeight;
+                    redraw();
+                }
+            };
+            handleResize();
+            window.addEventListener('resize', handleResize);
+            return () => window.removeEventListener('resize', handleResize);
+        }
+    }, [isMarkupMode, redraw]);
+
+    useEffect(() => {
+        redraw();
+    }, [redraw]);
+
+    const getPointerPos = (e: React.PointerEvent | PointerEvent) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    };
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (!isMarkupMode) return;
+        isDrawingRef.current = true;
+        const pos = getPointerPos(e);
+        const newPath: Path = {
+            points: [pos],
+            color: drawColor,
+            width: isEraser ? 20 : 3,
+            isEraser
+        };
+        setPaths(prev => [...prev, newPath]);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!isDrawingRef.current || !isMarkupMode) return;
+        const pos = getPointerPos(e);
+        setPaths(prev => {
+            const newPaths = [...prev];
+            const currentPath = newPaths[newPaths.length - 1];
+            currentPath.points.push(pos);
+            return newPaths;
+        });
+    };
+
+    const handlePointerUp = () => {
+        isDrawingRef.current = false;
+    };
 
     const handleManualSave = async () => {
         if (isDemo) {
@@ -176,6 +273,14 @@ export default function CheckingPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button 
+                        variant={isMarkupMode ? "default" : "outline"} 
+                        onClick={() => setIsMarkupMode(!isMarkupMode)}
+                        className="rounded-lg"
+                    >
+                        {isMarkupMode ? <X className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
+                        {isMarkupMode ? "Exit Markup" : "Mark up"}
+                    </Button>
                     {(assignment?.answerKeyUrl || isDemo) && (
                         <Button 
                             variant="secondary" 
@@ -195,31 +300,89 @@ export default function CheckingPage() {
             </header>
 
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-                <Card className="lg:col-span-2 flex flex-col overflow-hidden shadow-lg border-border/50">
-                    <CardHeader className="py-3 border-b bg-muted/20">
+                <Card className="lg:col-span-2 flex flex-col overflow-hidden shadow-lg border-border/50 relative">
+                    <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                         <CardTitle className="text-sm flex items-center gap-2">
                             <FileText className="h-4 w-4 text-primary" />
                             Submitted Work
                         </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-1 p-0 overflow-hidden bg-muted/10 relative">
-                        {isDemo ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                                <img 
-                                    src={submission?.submissionUrl} 
-                                    alt="Demo Submission" 
-                                    className="max-w-full max-h-full object-contain rounded-lg shadow-md mb-4"
-                                    data-ai-hint="student work"
-                                />
-                                <p className="text-sm font-medium">This is a simulated student submission for checking.</p>
+                        {isMarkupMode && (
+                            <div className="flex items-center gap-2 bg-background/80 p-1 rounded-lg border border-primary/20 backdrop-blur-sm">
+                                <Button 
+                                    size="sm" 
+                                    variant={!isEraser ? "secondary" : "ghost"} 
+                                    className="h-8 w-8 p-0 rounded-md"
+                                    onClick={() => setIsEraser(false)}
+                                    title="Pen"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                    size="sm" 
+                                    variant={isEraser ? "secondary" : "ghost"} 
+                                    className="h-8 w-8 p-0 rounded-md"
+                                    onClick={() => setIsEraser(true)}
+                                    title="Eraser"
+                                >
+                                    <Eraser className="h-4 w-4" />
+                                </Button>
+                                <div className="w-px h-4 bg-border mx-1" />
+                                {["#ef4444", "#3b82f6", "#22c55e"].map(color => (
+                                    <button 
+                                        key={color}
+                                        onClick={() => { setDrawColor(color); setIsEraser(false); }}
+                                        className={cn(
+                                            "w-5 h-5 rounded-full border border-black/10 transition-transform hover:scale-110",
+                                            drawColor === color && !isEraser && "ring-2 ring-primary ring-offset-1"
+                                        )}
+                                        style={{ backgroundColor: color }}
+                                    />
+                                ))}
+                                <div className="w-px h-4 bg-border mx-1" />
+                                <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-8 w-8 p-0 rounded-md text-destructive"
+                                    onClick={() => setPaths([])}
+                                    title="Clear marks"
+                                >
+                                    <RotateCcw className="h-4 w-4" />
+                                </Button>
                             </div>
-                        ) : (
-                            <iframe 
-                                src={submission?.submissionUrl} 
-                                className="w-full h-full border-none"
-                                title="Submission Preview"
-                            />
                         )}
+                    </CardHeader>
+                    <CardContent ref={containerRef} className="flex-1 p-0 overflow-hidden bg-muted/10 relative">
+                        <div className={cn("w-full h-full", isMarkupMode && "pointer-events-none")}>
+                            {isDemo ? (
+                                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                                    <img 
+                                        src={submission?.submissionUrl} 
+                                        alt="Demo Submission" 
+                                        className="max-w-full max-h-full object-contain rounded-lg shadow-md mb-4"
+                                        data-ai-hint="student work"
+                                    />
+                                    <p className="text-sm font-medium">This is a simulated student submission for checking.</p>
+                                </div>
+                            ) : (
+                                <iframe 
+                                    src={submission?.submissionUrl} 
+                                    className="w-full h-full border-none"
+                                    title="Submission Preview"
+                                />
+                            )}
+                        </div>
+                        
+                        <canvas 
+                            ref={canvasRef}
+                            className={cn(
+                                "absolute inset-0 z-10 touch-none",
+                                isMarkupMode ? "cursor-crosshair opacity-100" : "pointer-events-none opacity-0"
+                            )}
+                            onPointerDown={handlePointerDown}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            onPointerLeave={handlePointerUp}
+                        />
                     </CardContent>
                 </Card>
 
