@@ -7,13 +7,11 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, BrainCircuit, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, Palette, X, Settings2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -44,7 +42,6 @@ export default function CheckingPage() {
     const [submission, setSubmission] = useState<SubmissionData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [isAIGrading, setIsAiGrading] = useState(false);
 
     const [score, setScore] = useState<string>("");
     const [feedback, setFeedback] = useState<string>("");
@@ -81,7 +78,7 @@ export default function CheckingPage() {
 
                 const [assignmentSnap, submissionSnap] = await Promise.all([
                     getDoc(assignmentRef),
-                    getDoc(submissionSnap)
+                    getDoc(submissionRef)
                 ]);
 
                 if (assignmentSnap.exists()) {
@@ -208,49 +205,6 @@ export default function CheckingPage() {
         }
     };
 
-    const handleAICheck = async () => {
-        if (isDemo) {
-            setIsAiGrading(true);
-            setTimeout(() => {
-                setScore("85");
-                setFeedback("Excellent work on the demo assignment! Clear structure and correct logic throughout.");
-                setIsAiGrading(false);
-                toast({ title: "AI Grading Complete (Demo)" });
-            }, 2000);
-            return;
-        }
-
-        if (!assignment?.answerKeyUrl || !submission?.submissionUrl) {
-            toast({ variant: 'destructive', title: "Missing Data", description: "Answer key or submission file is missing for AI check." });
-            return;
-        }
-
-        setIsAiGrading(true);
-        try {
-            const [keyRes, subRes] = await Promise.all([fetch(assignment.answerKeyUrl), fetch(submission.submissionUrl)]);
-            const [keyBlob, subBlob] = await Promise.all([keyRes.blob(), subRes.blob()]);
-
-            const fileToUri = (file: Blob): Promise<string> => new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(file);
-            });
-
-            const result = await gradeAssignment({
-                teacherAssignmentDataUri: await fileToUri(keyBlob),
-                studentSubmissionDataUri: await fileToUri(subBlob)
-            });
-
-            setScore(result.score.toString());
-            setFeedback(result.feedback);
-            toast({ title: "AI Grading Complete", description: `Scored ${result.score}/100` });
-        } catch (error) {
-            toast({ variant: 'destructive', title: "AI Grading Failed" });
-        } finally {
-            setIsAiGrading(false);
-        }
-    };
-
     if (isLoading) {
         return (
             <div className="container mx-auto p-4 space-y-6">
@@ -284,17 +238,6 @@ export default function CheckingPage() {
                         {isMarkupMode ? <X className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
                         {isMarkupMode ? "Exit Markup" : "Mark up"}
                     </Button>
-                    {(assignment?.answerKeyUrl || isDemo) && (
-                        <Button 
-                            variant="secondary" 
-                            className="rounded-lg"
-                            onClick={handleAICheck}
-                            disabled={isAIGrading}
-                        >
-                            {isAIGrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BrainCircuit className="mr-2 h-4 w-4" />}
-                            AI Check
-                        </Button>
-                    )}
                     <Button onClick={handleManualSave} disabled={isSaving} className="btn-gel rounded-lg">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
                         Save Grade
