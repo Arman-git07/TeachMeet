@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette, Maximize, Minimize } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +60,10 @@ export default function CheckingPage() {
     const [score, setScore] = useState<string>("");
     const [maxScore, setMaxScore] = useState<string>("100");
     const [feedback, setFeedback] = useState<string>("");
+
+    // Fullscreen State
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const pageRef = useRef<HTMLDivElement>(null);
 
     // Drawing State
     const [isMarkupMode, setIsMarkupMode] = useState(false);
@@ -117,6 +121,23 @@ export default function CheckingPage() {
 
         fetchData();
     }, [classroomId, assignmentId, studentId, isDemo, toast]);
+
+    // Fullscreen Logic
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            pageRef.current?.requestFullscreen().catch(err => {
+                toast({ variant: 'destructive', title: "Fullscreen Error", description: err.message });
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
+    useEffect(() => {
+        const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', handleFsChange);
+        return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    }, []);
 
     // Canvas Logic
     const redraw = useCallback(() => {
@@ -265,18 +286,29 @@ export default function CheckingPage() {
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-8 flex flex-col h-full overflow-hidden">
+        <div ref={pageRef} className="container mx-auto p-4 md:p-8 flex flex-col h-full overflow-hidden bg-background">
             <header className="flex items-center justify-between mb-6 shrink-0">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
-                        <ArrowLeft className="h-5 w-5" />
-                    </Button>
+                    {!isFullscreen && (
+                        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                    )}
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Checking Page</h1>
                         <p className="text-sm text-muted-foreground">{assignment?.title} • {submission?.studentName}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button 
+                        variant="outline"
+                        onClick={toggleFullscreen}
+                        className="rounded-lg"
+                        title={isFullscreen ? "Exit Full Screen" : "Full Screen"}
+                    >
+                        {isFullscreen ? <Minimize className="mr-2 h-4 w-4" /> : <Maximize className="mr-2 h-4 w-4" />}
+                        {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+                    </Button>
                     <Button 
                         variant={isMarkupMode ? "default" : "outline"} 
                         onClick={() => setIsMarkupMode(!isMarkupMode)}
