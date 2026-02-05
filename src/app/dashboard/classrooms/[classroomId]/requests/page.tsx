@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -99,8 +100,8 @@ export default function JoinRequestsPage() {
                             text: `Hi ${request.studentName}, welcome to "${classroom.title}"!`,
                             type: 'text',
                             creatorName: 'System',
-                            creatorId: user.uid, // The user performing the action
-                            authorId: user.uid,  // The user performing the action, for security rules
+                            creatorId: user.uid, 
+                            authorId: user.uid, 
                             createdAt: serverTimestamp(),
                             vanishAt: vanishAt,
                         });
@@ -136,7 +137,8 @@ export default function JoinRequestsPage() {
     };
 
     const handleScheduleInterview = () => {
-        if (!selectedRequest?.applicationData?.mobile) {
+        const phone = selectedRequest?.applicationData?.mobile;
+        if (!phone) {
             toast({ variant: 'destructive', title: "Mobile Number Missing", description: "This applicant did not provide a mobile number." });
             return;
         }
@@ -145,7 +147,7 @@ export default function JoinRequestsPage() {
             return;
         }
         
-        const phoneNumber = selectedRequest.applicationData.mobile.replace(/\D/g, '');
+        const phoneNumber = phone.replace(/\D/g, '');
         const formattedDate = new Date(interviewDate).toLocaleString();
         const classroomTitle = classroom?.title || "our classroom";
         const message = `Hi ${selectedRequest.studentName}, I would like to schedule an interview for the teaching position in "${classroomTitle}" on TeachMeet.\n\nProposed Time: ${formattedDate}\n\nPlease let me know if this works for you.`;
