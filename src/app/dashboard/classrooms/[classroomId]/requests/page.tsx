@@ -34,7 +34,10 @@ import {
   DialogDescription,
   DialogTrigger,
   DialogClose,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 export default function JoinRequestsPage() {
     const { classroomId, classroom, user } = useClassroom();
@@ -42,6 +45,11 @@ export default function JoinRequestsPage() {
     const { toast } = useToast();
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
+    // Interview workflow states
+    const [selectedRequest, setSelectedRequest] = useState<JoinRequest | null>(null);
+    const [isInterviewDialogOpen, setIsInterviewDialogOpen] = useState(false);
+    const [interviewDate, setInterviewDate] = useState('');
 
     useEffect(() => {
         if (!classroomId) return;
@@ -118,6 +126,37 @@ export default function JoinRequestsPage() {
         }
     }, [classroomId, toast, classroom, user]);
 
+    const onApproveClick = (req: JoinRequest) => {
+        if (req.role === 'teacher') {
+            setSelectedRequest(req);
+            setIsInterviewDialogOpen(true);
+        } else {
+            handleRequest(req, 'approve');
+        }
+    };
+
+    const handleScheduleInterview = () => {
+        if (!selectedRequest?.applicationData?.mobile) {
+            toast({ variant: 'destructive', title: "Mobile Number Missing", description: "This applicant did not provide a mobile number." });
+            return;
+        }
+        if (!interviewDate) {
+            toast({ variant: 'destructive', title: "Date Missing", description: "Please select a date and time for the interview." });
+            return;
+        }
+        
+        const phoneNumber = selectedRequest.applicationData.mobile.replace(/\D/g, '');
+        const formattedDate = new Date(interviewDate).toLocaleString();
+        const classroomTitle = classroom?.title || "our classroom";
+        const message = `Hi ${selectedRequest.studentName}, I would like to schedule an interview for the teaching position in "${classroomTitle}" on TeachMeet.\n\nProposed Time: ${formattedDate}\n\nPlease let me know if this works for you.`;
+        
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        
+        setIsInterviewDialogOpen(false);
+        toast({ title: "Interview Invitation Sent", description: "WhatsApp has been opened with your invitation message." });
+    };
+
     const renderRequestList = (requests: JoinRequest[]) => {
         if (requests.length === 0) {
             return <p className="text-sm text-muted-foreground text-center py-8">There are no pending requests in this category.</p>;
@@ -136,7 +175,9 @@ export default function JoinRequestsPage() {
                                         <p className="text-xs capitalize text-muted-foreground">{req.role}</p>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => handleRequest(req, 'approve')} disabled={isProcessing === req.id}>{isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4" />}</Button>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => onApproveClick(req)} disabled={isProcessing === req.id}>
+                                            {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4" />}
+                                        </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" disabled={isProcessing === req.id}>
@@ -238,6 +279,44 @@ export default function JoinRequestsPage() {
                     </Tabs>
                 </CardContent>
             </Card>
+
+            <Dialog open={isInterviewDialogOpen} onOpenChange={setIsInterviewDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Interview Selection</DialogTitle>
+                        <DialogDescription>
+                            Do you want to interview {selectedRequest?.studentName} before adding them to the classroom?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="interview-date">Proposed Date & Time</Label>
+                            <Input 
+                                id="interview-date" 
+                                type="datetime-local" 
+                                value={interviewDate} 
+                                onChange={(e) => setInterviewDate(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => { if(selectedRequest) handleRequest(selectedRequest, 'approve'); setIsInterviewDialogOpen(false); }}
+                            className="w-full sm:w-auto"
+                        >
+                            No, Add Directly
+                        </Button>
+                        <Button 
+                            disabled={!interviewDate} 
+                            onClick={handleScheduleInterview}
+                            className="w-full sm:w-auto btn-gel"
+                        >
+                            Yes, Schedule (WhatsApp)
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }
