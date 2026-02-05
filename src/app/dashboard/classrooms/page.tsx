@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -31,12 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -53,9 +46,7 @@ import {
   query,
   where,
   writeBatch,
-  setDoc,
   getDocs,
-  collectionGroup,
   getDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -63,23 +54,14 @@ import {
   PlusCircle,
   Edit,
   Trash2,
-  Users,
-  LogIn,
   Loader2,
   BookOpen,
   Eye,
   School,
-  ArrowRight,
   Clipboard,
   ClipboardCheck,
-  UserPlus,
   GraduationCap,
   Briefcase,
-  FileUp,
-  Book,
-  Phone,
-  Clock,
-  Award,
   PanelLeftOpen,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,7 +70,7 @@ import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -158,12 +140,10 @@ const CreateClassroomDialogContent = ({
 
     try {
       if (classroomToEdit) {
-        // --- UPDATE EXISTING CLASSROOM ---
         const classroomRef = doc(db, 'classrooms', classroomToEdit.id);
         await updateDoc(classroomRef, { title, description, isPublic });
         toast({ title: 'Classroom Updated', description: `"${title}" has been successfully updated.` });
       } else {
-        // --- CREATE NEW CLASSROOM ---
         const classroomData = {
           title: title.trim(),
           description: description.trim(),
@@ -178,12 +158,10 @@ const CreateClassroomDialogContent = ({
         await addDoc(collection(db, 'classrooms'), classroomData);
         toast({ title: 'Classroom Created', description: `"${title}" has been successfully created.` });
       }
-      
       onSuccess();
-
     } catch (error) {
       console.error('Error saving classroom:', error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the classroom. Check Firestore rules and console for errors.' });
+      toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the classroom.' });
     } finally {
       setIsLoading(false);
     }
@@ -239,7 +217,6 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
     if (!user) throw new Error("Not logged in");
 
     const batch = writeBatch(db);
-
     const classroomJoinReqRef = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
 
     batch.set(classroomJoinReqRef, {
@@ -260,7 +237,6 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
         }
     }, { merge: true });
 
-    // Add marker to user's collection so the UI knows there is a pending request
     const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
     batch.set(userPendingRequestRef, { 
         classroomId, 
@@ -271,48 +247,28 @@ async function submitTeacherApplication(classroomId: string, data: TeacherApplic
     await batch.commit();
 
     try {
-        const classroomRef = doc(db, "classrooms", classroomId);
-        const classroomSnap = await getDoc(classroomRef);
-        if (!classroomSnap.exists()) return;
-
-        const classroomData = classroomSnap.data();
-        const teacherId = classroomData.teacherId;
-        const classroomTitle = classroomData.title;
-
-        if (teacherId) {
-            const LATEST_ACTIVITY_KEY = `teachmeet-latest-activity-${teacherId}`;
-            let activities: ActivityItem[] = [];
-            if (LATEST_ACTIVITY_KEY) {
-                try {
-                    const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-                    if (rawActivity) {
-                        const parsed = JSON.parse(rawActivity);
-                        if (Array.isArray(parsed)) {
-                            activities = parsed;
-                        } else {
-                           console.warn("Stored activity data is not an array, starting fresh.");
-                        }
-                    }
-                } catch (e) {
-                    console.error("Failed to parse activity data, starting fresh.", e);
-                }
+        const classroomSnap = await getDoc(doc(db, "classrooms", classroomId));
+        if (classroomSnap.exists()) {
+            const classroomData = classroomSnap.data();
+            const teacherId = classroomData.teacherId;
+            if (teacherId) {
+                const key = `teachmeet-latest-activity-${teacherId}`;
+                const raw = localStorage.getItem(key);
+                let acts = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(acts)) acts = [];
+                acts.unshift({
+                    id: `joinReq-${Date.now()}-${user.uid}`,
+                    type: 'joinRequest',
+                    title: classroomData.title,
+                    timestamp: Date.now(),
+                    classroomId: classroomId,
+                    requesterName: data.fullName
+                });
+                localStorage.setItem(key, JSON.stringify(acts.slice(0, 20)));
+                window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
             }
-
-            const newNotification: JoinRequestActivityItem = {
-                id: `joinReq-${Date.now()}-${user.uid}`,
-                type: 'joinRequest',
-                title: classroomTitle,
-                timestamp: Date.now(),
-                classroomId: classroomId,
-                requesterName: data.fullName || 'A new teacher'
-            };
-            activities.unshift(newNotification);
-            localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
-            window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
         }
-    } catch(e) {
-        console.error("Failed to create teacher join request notification", e);
-    }
+    } catch(e) {}
 }
 
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
@@ -335,13 +291,8 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
     });
 
     const onSubmit = async (data: TeacherApplicationValues) => {
-        if (!user) {
-            toast({ variant: 'destructive', title: 'Not Authenticated' });
-            return;
-        }
-
+        if (!user) return;
         setIsLoading(true);
-
         try {
             let resumeURL: string | undefined = undefined;
             if (data.resume && data.resume.length > 0) {
@@ -350,14 +301,11 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                 const snapshot = await uploadBytes(resumeRef, resumeFile);
                 resumeURL = await getDownloadURL(snapshot.ref);
             }
-            
             await submitTeacherApplication(classroom.id, data, resumeURL);
-
             toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });
             onSubmitted();
         } catch (error) {
-            console.error("Error sending teacher application:", error);
-            toast({ variant: 'destructive', title: 'Application Failed', description: "Could not send your application. Check Firestore rules and console for details." });
+            toast({ variant: 'destructive', title: 'Application Failed', description: "Could not send your application." });
         } finally {
             setIsLoading(false);
         }
@@ -383,7 +331,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                      <FormField control={form.control} name="subject" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Subject of Expertise</FormLabel>
-                            <FormControl><Input placeholder="e.g., Mathematics, React Development" {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><Input placeholder="e.g., Mathematics" {...field} disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -397,7 +345,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                     <FormField control={form.control} name="qualification" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Highest Qualification</FormLabel>
-                            <FormControl><Textarea placeholder="e.g., Ph.D. in Physics, B.S. in Computer Science" {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><Textarea placeholder="e.g., B.S. in Computer Science" {...field} disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -408,17 +356,11 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                         <FormItem>
                           <FormLabel>Teaching Experience</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select years of experience" />
-                              </SelectTrigger>
-                            </FormControl>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select years" /></SelectTrigger></FormControl>
                             <SelectContent>
                               <SelectItem value="Less than 1 year">Less than 1 year</SelectItem>
-                              <SelectItem value="1 year">1 year</SelectItem>
-                              <SelectItem value="2 years">2 years</SelectItem>
-                              <SelectItem value="3 years">3 years</SelectItem>
-                              <SelectItem value="4 years">4 years</SelectItem>
+                              <SelectItem value="1-3 years">1-3 years</SelectItem>
+                              <SelectItem value="3-5 years">3-5 years</SelectItem>
                               <SelectItem value="5+ years">5+ years</SelectItem>
                             </SelectContent>
                           </Select>
@@ -428,14 +370,14 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                     />
                      <FormField control={form.control} name="availability" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Time / Availability</FormLabel>
-                            <FormControl><Textarea placeholder="e.g., Weekdays 5-8 PM, Weekends all day" {...field} disabled={isLoading} /></FormControl>
+                            <FormLabel>Availability</FormLabel>
+                            <FormControl><Textarea placeholder="e.g., Weekdays 5-8 PM" {...field} disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
                     <FormField control={form.control} name="message" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Message to Owner (Optional)</FormLabel>
+                            <FormLabel>Message (Optional)</FormLabel>
                             <FormControl><Textarea placeholder="Introduce yourself..." {...field} disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
@@ -443,18 +385,10 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                      <FormField control={form.control} name="resume" render={({ field: { onChange, value, ...rest } }) => (
                         <FormItem>
                             <FormLabel>Resume/CV (Optional)</FormLabel>
-                            <FormControl>
-                                <Input 
-                                    type="file"
-                                    onChange={(e) => onChange(e.target.files)}
-                                    {...rest}
-                                    disabled={isLoading}
-                                 />
-                            </FormControl>
+                            <FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
-
                      <DialogFooter className="sticky bottom-0 bg-background pt-4">
                         <DialogClose asChild><Button variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
                         <Button type="submit" disabled={isLoading}>
@@ -494,78 +428,42 @@ export default function ClassroomsPage() {
   const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
 
 
-  // Fetch My Classes
   useEffect(() => {
-    if (!user || !user.uid) { 
-      setIsLoadingMy(false);
-      setMyClasses([]); 
-      return; 
-    }
+    if (!user) { setIsLoadingMy(false); setMyClasses([]); return; }
     setIsLoadingMy(true);
-    const q = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
+    return onSnapshot(query(collection(db, 'classrooms'), where('teacherId', '==', user.uid)), (snapshot) => {
         setMyClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
         setIsLoadingMy(false);
-    }, (error) => { console.error("My Classes fetch error:", error); setIsLoadingMy(false); });
-    return () => unsub();
+    });
   }, [user]);
 
-  // Fetch Enrolled Classes
   useEffect(() => {
-    if (!user || !user.uid) { 
-      setIsLoadingEnrolled(false);
-      setEnrolledClasses([]); 
-      return; 
-    }
+    if (!user) { setIsLoadingEnrolled(false); setEnrolledClasses([]); return; }
     setIsLoadingEnrolled(true);
-    const q = query(collection(db, 'users', user.uid, 'enrolled'));
-    const unsub = onSnapshot(q, (snapshot) => {
+    return onSnapshot(query(collection(db, 'users', user.uid, 'enrolled')), (snapshot) => {
         setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EnrolledClassroomInfo)));
         setIsLoadingEnrolled(false);
-    }, (error) => { console.error("Enrolled Classes fetch error:", error); setIsLoadingEnrolled(false); });
-    return () => unsub();
+    });
   }, [user]);
 
-  // Fetch public classes for discovery
   useEffect(() => {
     setIsLoadingDiscover(true);
-    const q = query(collection(db, 'classrooms'), where('isPublic', '==', true));
-    const unsub = onSnapshot(q, (snapshot) => {
+    return onSnapshot(query(collection(db, 'classrooms'), where('isPublic', '==', true)), (snapshot) => {
         setDiscoverClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
         setIsLoadingDiscover(false);
-    }, (error) => { 
-        console.error('Discover fetch error:', error); 
-        toast({ variant: 'destructive', title: 'Error', description: "Could not fetch public classes. Check Firestore rules."});
-        setIsLoadingDiscover(false); 
     });
-    return () => unsub();
-  }, [toast]);
+  }, []);
   
-  // Fetch pending requests for the current user
   useEffect(() => {
-    if (!user || !user.uid) {
-      setPendingRequestIds(new Set());
-      setIsLoadingRequests(false);
-      return;
-    }
+    if (!user) { setPendingRequestIds(new Set()); setIsLoadingRequests(false); return; }
     setIsLoadingRequests(true);
-    const q = query(collection(db, `users/${user.uid}/pendingJoinRequests`));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    return onSnapshot(query(collection(db, `users/${user.uid}/pendingJoinRequests`)), (snapshot) => {
         const newPendingIds = new Set<string>();
-        snapshot.forEach((doc) => {
-            newPendingIds.add(doc.id);
-        });
+        snapshot.forEach((doc) => newPendingIds.add(doc.id));
         setPendingRequestIds(newPendingIds);
         setIsLoadingRequests(false);
-    }, (error) => {
-        console.error("Error fetching pending requests:", error);
-        toast({ variant: 'destructive', title: 'Fetch Error', description: 'Could not get your pending join requests.' });
-        setIsLoadingRequests(false);
     });
-
-    return () => unsubscribe();
-  }, [user, toast]);
+  }, [user]);
 
 
   const handleEdit = (classroom: Classroom) => {
@@ -580,103 +478,58 @@ export default function ClassroomsPage() {
 
   const handleDelete = async () => {
     if (!classroomToDelete || !user) return;
-    if (user.uid !== classroomToDelete.creatorId) {
-        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only delete classrooms you created.' });
-        return;
-    }
-    
-    const toastId = `delete-${classroomToDelete.id}`;
-    toast({ id: toastId, title: 'Deleting Classroom...', description: `"${classroomToDelete.title}" and all its data will be permanently removed.` });
-    
     try {
         const classroomRef = doc(db, 'classrooms', classroomToDelete.id);
-        
-        // Comprehensive deletion of all subcollections
-        const subcollections = ['announcements', 'assignments', 'exams', 'materials', 'participants', 'joinRequests', 'teachers'];
-        for (const sub of subcollections) {
-            const subcollectionRef = collection(db, classroomRef.path, sub);
-            const snapshot = await getDocs(subcollectionRef);
+        const subs = ['announcements', 'assignments', 'exams', 'materials', 'participants', 'joinRequests', 'teachers'];
+        for (const sub of subs) {
+            const snap = await getDocs(collection(db, classroomRef.path, sub));
             const batch = writeBatch(db);
-            snapshot.docs.forEach(d => batch.delete(d.ref));
+            snap.docs.forEach(d => batch.delete(d.ref));
             await batch.commit();
         }
-
-        // Delete the main classroom document
         await deleteDoc(classroomRef);
-
-        toast.update(toastId, { title: 'Success', description: `Classroom "${classroomToDelete.title}" has been deleted.` });
+        toast({ title: 'Classroom Deleted' });
     } catch (error) {
-      console.error('Error deleting classroom:', error);
-      toast.update(toastId, { variant: 'destructive', title: 'Error', description: 'Could not delete the classroom. Check Firestore rules and console for errors.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete.' });
     } finally {
       setClassroomToDelete(null);
     }
   };
   
   const handleRequestToJoinStudent = useCallback(async (classroomId: string) => {
-    if (!user) {
-        toast({ variant: 'destructive', title: "Authentication required", description: "You must be signed in to join a class." });
-        return;
-    }
+    if (!user) return;
     setRequestingToJoin(classroomId);
     try {
         const batch = writeBatch(db);
-
-        // Add request to classroom's subcollection
-        const requestRef = doc(db, `classrooms/${classroomId}/joinRequests`, user.uid);
-        batch.set(requestRef, {
-            requesterId: user.uid, // Use requesterId for rules
-            studentName: user.displayName || 'Anonymous User',
+        batch.set(doc(db, `classrooms/${classroomId}/joinRequests`, user.uid), {
+            requesterId: user.uid,
+            studentName: user.displayName || 'Guest',
             studentPhotoURL: user.photoURL || '',
             status: 'pending',
             role: 'student',
             requestedAt: serverTimestamp()
         });
-
-        // Add a marker to the user's pending requests
-        const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
-        batch.set(userPendingRequestRef, { classroomId, requestedAt: serverTimestamp() });
-
+        batch.set(doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId), { classroomId, requestedAt: serverTimestamp() });
         await batch.commit();
-
-        toast({ title: 'Request Sent!', description: `Your request to join as a student has been sent.` });
+        toast({ title: 'Request Sent!' });
     } catch (error) {
-        console.error("Error sending join request:", error);
-        toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Check Firestore Rules for write permissions.' });
+        toast({ variant: 'destructive', title: 'Failed' });
     } finally {
         setRequestingToJoin(null);
     }
   }, [user, toast]);
   
   const handleCancelRequest = useCallback(async (classroomId: string) => {
-    if (!user) {
-        toast({ variant: 'destructive', title: "Authentication required", description: "You must be signed in to cancel a request." });
-        return;
-    }
+    if (!user) return;
     setCancelingRequest(classroomId);
-
     try {
         const batch = writeBatch(db);
-
-        // Define document paths clearly
-        const joinRequestPath = `classrooms/${classroomId}/joinRequests/${user.uid}`;
-        const pendingRequestMarkerPath = `users/${user.uid}/pendingJoinRequests/${classroomId}`;
-
-        // Schedule both documents for deletion
-        batch.delete(doc(db, joinRequestPath));
-        batch.delete(doc(db, pendingRequestMarkerPath));
-        
-        // Commit the atomic operation
+        batch.delete(doc(db, `classrooms/${classroomId}/joinRequests/${user.uid}`));
+        batch.delete(doc(db, `users/${user.uid}/pendingJoinRequests/${classroomId}`));
         await batch.commit();
-
-        toast({ title: "Request Canceled", description: "Your request to join the class has been withdrawn." });
-    } catch (error: any) {
-        console.error("Error canceling request:", error);
-        let description = 'Could not cancel the request. Please try again.';
-        if (error.code === 'permission-denied') {
-            description = 'Permission denied. Please check your Firestore rules.'
-        }
-        toast({ variant: 'destructive', title: 'Cancellation Failed', description });
+        toast({ title: "Request Canceled" });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Failed' });
     } finally {
         setCancelingRequest(null);
     }
@@ -692,211 +545,21 @@ export default function ClassroomsPage() {
     navigator.clipboard.writeText(id);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: 'Class code copied!' });
-  };
-
-  const renderMyClassroomCard = useCallback((classroom: Classroom) => (
-    <Card key={classroom.id}>
-        <CardHeader>
-            <CardTitle>{classroom.title}</CardTitle>
-            <CardDescription>{classroom.description || "No description."}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">Visibility: {classroom.isPublic ? 'Public' : 'Private'}</p>
-            <div className="flex items-center gap-2">
-                <Input value={classroom.id} readOnly className="text-xs font-mono"/>
-                <Button size="icon" variant="ghost" onClick={() => copyClassId(classroom.id)}>
-                    {copiedId === classroom.id ? <ClipboardCheck className="h-4 w-4 text-green-500" /> : <Clipboard className="h-4 w-4" />}
-                </Button>
-            </div>
-        </CardContent>
-        <CardFooter className="flex justify-between items-center">
-            <Button asChild><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class</Link></Button>
-            <div className="flex items-center">
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(classroom)}><Edit className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => setClassroomToDelete(classroom)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-            </div>
-        </CardFooter>
-    </Card>
-  ), [copiedId]);
-  
-  const renderEnrolledClassroomCard = useCallback((classroomInfo: EnrolledClassroomInfo) => (
-    <Card key={classroomInfo.id}>
-      <CardHeader>
-        <CardTitle>{classroomInfo.title}</CardTitle>
-        <CardDescription>{classroomInfo.description || "No description."}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">Taught by: {classroomInfo.teacherName}</p>
-      </CardContent>
-      <CardFooter>
-        <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroomInfo.classroomId}`}>Enter Class</Link></Button>
-      </CardFooter>
-    </Card>
-  ), []);
-
-  const renderDiscoverClassroomCard = useCallback((classroom: Classroom) => {
-    const isRequesting = requestingToJoin === classroom.id;
-    const isCanceling = cancelingRequest === classroom.id;
-    const isMyClass = user?.uid === classroom.teacherId;
-    const hasPendingRequest = pendingRequestIds.has(classroom.id);
-    const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === classroom.id);
-    
-    if (isEnrolled) {
-        return (
-            <Card key={classroom.id} className="flex flex-col">
-                <CardHeader>
-                    <CardTitle>{classroom.title}</CardTitle>
-                    <CardDescription>{classroom.description || "No description."}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                    <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
-                </CardContent>
-                <CardFooter className="flex-col items-stretch gap-2 pt-4">
-                    <Button asChild className="w-full">
-                        <Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class</Link>
-                    </Button>
-                </CardFooter>
-            </Card>
-        );
-    }
-    
-    if (isMyClass) {
-       return (
-          <Card key={classroom.id} className="flex flex-col">
-              <CardHeader>
-                  <CardTitle>{classroom.title}</CardTitle>
-                  <CardDescription>{classroom.description || "No description."}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                  <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
-              </CardContent>
-              <CardFooter className="flex-col items-stretch gap-2 pt-4">
-                 <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${classroom.id}`}>Enter Class</Link></Button>
-              </CardFooter>
-          </Card>
-        );
-    }
-
-    return (
-      <Card key={classroom.id} className="flex flex-col">
-          <CardHeader>
-              <CardTitle>{classroom.title}</CardTitle>
-              <CardDescription>{classroom.description || "No description."}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-grow">
-              <p className="text-sm text-muted-foreground">Taught by: {classroom.teacherName}</p>
-          </CardContent>
-          <CardFooter className="flex-col items-stretch gap-2 pt-4">
-            {user ? (
-                 isRequesting ? (
-                    <Button className="w-full" disabled>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Working...
-                    </Button>
-                ) : hasPendingRequest ? (
-                    <Button variant="destructive" className="w-full" onClick={() => handleCancelRequest(classroom.id)} disabled={isCanceling}>
-                        {isCanceling ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                        Cancel Request
-                    </Button>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Button variant="outline" onClick={() => handleRequestToJoinStudent(classroom.id)}>
-                            <GraduationCap className="mr-2 h-4 w-4"/>
-                            Join as Student
-                        </Button>
-                        <Button variant="outline" onClick={() => handleOpenTeacherAppDialog(classroom)}>
-                            <Briefcase className="mr-2 h-4 w-4"/>
-                             Join as Teacher
-                        </Button>
-                    </div>
-                )
-            ) : (
-                 <Button asChild className="w-full"><Link href="/auth/signin">Sign In to Join</Link></Button>
-            )}
-          </CardFooter>
-    </Card>
-    );
-  }, [user, requestingToJoin, cancelingRequest, handleRequestToJoinStudent, handleCancelRequest, pendingRequestIds, enrolledClasses]);
-
-  const renderSkeleton = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {[...Array(3)].map((_, i) => (
-        <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /><Skeleton className="h-4 w-full mt-2" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /></CardContent><CardFooter><Skeleton className="h-10 w-24" /></CardFooter></Card>
-      ))}
-    </div>
-  );
-
-  const MyClassesTab = () => {
-    if (isLoadingMy || authLoading) return renderSkeleton();
-    if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your classes.</p>;
-    if (myClasses.length === 0) return <p className="text-muted-foreground text-center py-10">You haven't created any classrooms yet.</p>;
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {myClasses.map(renderMyClassroomCard)}
-      </div>
-    );
-  };
-  
-  const EnrolledClassesTab = () => {
-    if (isLoadingEnrolled || authLoading) return renderSkeleton();
-    if (!user) return <p className="text-muted-foreground text-center py-10">Please sign in to see your enrolled classes.</p>;
-    if (enrolledClasses.length === 0) {
-       return (
-        <div className="text-center py-10">
-          <p className="text-muted-foreground">You are not enrolled in any classrooms.</p>
-          <p className="text-muted-foreground mt-2">Find one in the "Discover" tab or join one with a code!</p>
-        </div>
-      );
-    }
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {enrolledClasses.map(renderEnrolledClassroomCard)}
-      </div>
-    );
-  };
-
-  const DiscoverClassesTab = () => {
-    if (isLoadingDiscover || isLoadingRequests) return renderSkeleton();
-  
-    // Filter out classes the user is already enrolled in as a student or non-owner teacher.
-    // We still show classes the user owns.
-    const discoverableClasses = discoverClasses.filter(publicClass => {
-      if (!user) return true; // Show all public classes if not logged in
-      const isEnrolled = enrolledClasses.some(enrolled => enrolled.classroomId === publicClass.id);
-      return !isEnrolled;
-    });
-  
-    if (discoverableClasses.length === 0) {
-      return <p className="text-muted-foreground text-center py-10">No new public classrooms to discover right now.</p>;
-    }
-  
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {discoverableClasses.map(renderDiscoverClassroomCard)}
-      </div>
-    );
+    toast({ title: 'Copied!' });
   };
 
   return (
     <div className="container mx-auto p-4 md:p-8 flex flex-col h-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <SidebarTrigger className="md:hidden">
-            <PanelLeftOpen className="h-6 w-6" />
-          </SidebarTrigger>
+          <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
           <h1 className="text-3xl font-bold">Classrooms</h1>
         </div>
         { user && (
             <div className="flex flex-shrink-0 gap-2 w-full sm:w-auto">
-                <Button asChild variant="outline" className="flex-1 sm:flex-initial">
-                    <Link href="/dashboard/classrooms/join">Join a Class</Link>
-                </Button>
-                <Dialog open={isCreateDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setClassroomToEdit(null); setIsCreateDialogOpen(isOpen); }}>
-                  <DialogTrigger asChild>
-                    <Button onClick={handleCreateNew} className="flex-1 sm:flex-initial">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Create New
-                    </Button>
-                  </DialogTrigger>
+                <Button asChild variant="outline" className="flex-1 sm:flex-initial"><Link href="/dashboard/classrooms/join">Join a Class</Link></Button>
+                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                  <DialogTrigger asChild><Button onClick={handleCreateNew} className="flex-1 sm:flex-initial"><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
                   <DialogContent><CreateClassroomDialogContent onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
                 </Dialog>
             </div>
@@ -904,20 +567,12 @@ export default function ClassroomsPage() {
       </div>
 
       <Dialog open={isTeacherAppDialogOpen} onOpenChange={setIsTeacherAppDialogOpen}>
-        {selectedClassroomForApp && (
-            <TeacherApplicationDialog 
-                classroom={selectedClassroomForApp} 
-                onSubmitted={() => {
-                    setIsTeacherAppDialogOpen(false);
-                    // The onSnapshot listener will handle updating the UI, no need to manually set pending IDs here.
-                }} 
-            />
-        )}
+        {selectedClassroomForApp && <TeacherApplicationDialog classroom={selectedClassroomForApp} onSubmitted={() => setIsTeacherAppDialogOpen(false)} />}
       </Dialog>
 
       <AlertDialog open={!!classroomToDelete} onOpenChange={(isOpen) => !isOpen && setClassroomToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the classroom &quot;{classroomToDelete?.title}&quot; and ALL of its associated data (announcements, assignments, etc.). This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{classroomToDelete?.title}".</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -929,9 +584,47 @@ export default function ClassroomsPage() {
           <TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger>
         </TabsList>
         <div className="flex-1 overflow-y-auto mt-4">
-          <TabsContent value="discover"><DiscoverClassesTab /></TabsContent>
-          <TabsContent value="my-classes"><MyClassesTab /></TabsContent>
-          <TabsContent value="enrolled"><EnrolledClassesTab /></TabsContent>
+          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {discoverClasses.map(c => (
+                <Card key={c.id} className="flex flex-col">
+                    <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>By {c.teacherName}</CardDescription></CardHeader>
+                    <CardFooter className="mt-auto">
+                        {pendingRequestIds.has(c.id) ? (
+                            <Button variant="destructive" className="w-full" onClick={() => handleCancelRequest(c.id)}>Cancel Request</Button>
+                        ) : enrolledClasses.some(e => e.classroomId === c.id) || myClasses.some(m => m.id === c.id) ? (
+                            <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${c.id}`}>Enter</Link></Button>
+                        ) : (
+                            <div className="flex gap-2 w-full">
+                                <Button variant="outline" className="flex-1" onClick={() => handleRequestToJoinStudent(c.id)}>Join as Student</Button>
+                                <Button variant="outline" className="flex-1" onClick={() => handleOpenTeacherAppDialog(c)}>Join as Teacher</Button>
+                            </div>
+                        )}
+                    </CardFooter>
+                </Card>
+            ))}
+          </TabsContent>
+          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myClasses.map(c => (
+                <Card key={c.id}>
+                    <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>{c.id}</CardDescription></CardHeader>
+                    <CardFooter className="flex justify-between">
+                        <Button asChild><Link href={`/dashboard/classrooms/${c.id}`}>Enter</Link></Button>
+                        <div>
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(c)}><Edit className="h-4 w-4"/></Button>
+                            <Button variant="ghost" size="icon" onClick={() => setClassroomToDelete(c)}><Trash2 className="h-4 w-4"/></Button>
+                        </div>
+                    </CardFooter>
+                </Card>
+            ))}
+          </TabsContent>
+          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {enrolledClasses.map(c => (
+                <Card key={c.id}>
+                    <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>By {c.teacherName}</CardDescription></CardHeader>
+                    <CardFooter><Button asChild className="w-full"><Link href={`/dashboard/classrooms/${c.classroomId}`}>Enter</Link></Button></CardFooter>
+                </Card>
+            ))}
+          </TabsContent>
         </div>
       </Tabs>
     </div>

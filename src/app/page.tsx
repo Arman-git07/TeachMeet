@@ -119,7 +119,6 @@ export default function HomePage() {
           dismissedItemIds = parsed;
         }
       } catch (e) {
-        console.error("Failed to parse dismissed items, clearing.");
         localStorage.removeItem(DISMISSED_ITEMS_KEY);
       }
     }
@@ -133,21 +132,15 @@ export default function HomePage() {
         if (Array.isArray(storedMeetings)) {
           const now = Date.now();
           const validMeetings = storedMeetings.filter(meeting => meeting && meeting.id && meeting.startedAt && (now - meeting.startedAt < TWO_HOURS_IN_MS));
-          
-          if(validMeetings.length < storedMeetings.length) {
-            localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(validMeetings));
-          }
-
           ongoingMeetings = validMeetings.map((m: any) => ({
             type: 'meeting',
-            id: m.id, // Use the raw meetingId
+            id: m.id,
             title: m.title || "Ongoing Meeting",
             timestamp: m.startedAt,
           }));
         }
       } catch (e) {
-        console.error("Failed to parse started meetings from localStorage", e);
-        localStorage.removeItem(STARTED_MEETINGS_KEY); // Clear corrupted data
+        localStorage.removeItem(STARTED_MEETINGS_KEY);
       }
     }
     
@@ -157,11 +150,9 @@ export default function HomePage() {
         try {
             const parsed = JSON.parse(latestActivityRaw);
             if (Array.isArray(parsed)) {
-                // Filter out private messages and public chat, they are handled in-meeting
                 otherActivities = parsed.filter(item => item && item.type && item.type !== 'privateMessage' && item.type !== 'publicChat');
             }
         } catch (e) {
-             console.error("Failed to parse latest activity from localStorage", e);
              localStorage.removeItem(LATEST_ACTIVITY_KEY);
         }
     }
@@ -175,7 +166,6 @@ export default function HomePage() {
   }, [user, getStorageKeys]);
 
   useEffect(() => {
-    // Only load activities if the user is authenticated.
     if (authLoading) return;
     if (!isAuthenticated) {
         setIsLoading(false);
@@ -192,9 +182,7 @@ export default function HomePage() {
         }
     };
     
-    // Listen for changes from other tabs
     window.addEventListener('storage', handleStorageChange);
-    // Also listen for custom events dispatched from within the app
     window.addEventListener('teachmeet_meeting_started', loadActivities);
     window.addEventListener('teachmeet_meeting_ended', loadActivities);
     window.addEventListener('teachmeet_activity_updated', loadActivities);
@@ -217,7 +205,6 @@ export default function HomePage() {
         dismissedIds = dismissedIdsString ? JSON.parse(dismissedIdsString) : [];
         if (!Array.isArray(dismissedIds)) dismissedIds = [];
     } catch (e) {
-      console.error(`Error parsing dismissed items from ${DISMISSED_ITEMS_KEY}:`, e);
       dismissedIds = [];
     }
 
@@ -270,34 +257,26 @@ export default function HomePage() {
       return (
         <ul className="space-y-3 text-left">
           {allActivity.map((item) => {
-            if (!item || !item.type || !itemLinks[item.type]) {
-              console.warn("Skipping invalid activity item:", item);
-              return null;
-            }
+            if (!item || !item.type || !itemLinks[item.type]) return null;
             const Icon = itemIcons[item.type];
-            const rawId = item.id;
-            const link = itemLinks[item.type](rawId, item);
+            const link = itemLinks[item.type](item.id, item);
             const isMeeting = item.type === 'meeting';
 
             const handleClick = (e: React.MouseEvent) => {
               if (isMeeting) {
                 e.preventDefault();
-                if (!user) {
-                  router.push(`/auth/signin?redirect=${encodeURIComponent(link)}`);
-                } else {
-                  router.push(link);
-                }
+                router.push(link);
               }
             };
 
             return (
-              <li key={item.id} className="flex items-center gap-2">
+              <li key={item.id} className="flex items-center gap-2 animate-fade-in">
                 <Link
                   href={link}
                   onClick={handleClick}
-                  className="w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow"
+                  className="w-full justify-start text-base py-3 px-4 rounded-lg hover:border-primary flex items-center border border-border bg-card hover:bg-muted focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none flex-grow overflow-hidden"
                 >
-                  <Icon className="mr-3 h-5 w-5 text-primary/80" />
+                  <Icon className="mr-3 h-5 w-5 text-primary/80 flex-shrink-0" />
                   <span className="truncate flex-grow text-foreground">{getNotificationText(item)}</span>
                   {item.type === 'meeting' && (item as MeetingActivityItem).participants && (
                     <span className="text-xs text-muted-foreground ml-auto pl-2 flex items-center">
