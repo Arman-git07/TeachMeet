@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -32,6 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2, Loader2, BrainCircuit, CheckCircle2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Assignment, Submission, DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 

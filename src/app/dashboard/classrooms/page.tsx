@@ -102,7 +102,6 @@ const teacherApplicationSchema = z.object({
 
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
-// Separate component for creating/editing to keep the file organized and prevent nested return errors
 const CreateClassroomForm = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -191,7 +190,6 @@ const CreateClassroomForm = ({ onSuccess, classroomToEdit }: { onSuccess: () => 
   );
 };
 
-// Isolated Teacher Application Dialog Component
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
     const { user } = useAuth();
     const { toast } = useToast();

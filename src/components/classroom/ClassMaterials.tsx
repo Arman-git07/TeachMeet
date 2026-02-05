@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -14,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Loader2, Link as LinkIcon, Trash2, FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Material } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 export function ClassMaterials() {
