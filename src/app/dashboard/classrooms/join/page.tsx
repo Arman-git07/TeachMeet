@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -6,15 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, getDoc, writeBatch } from 'firebase/firestore';
+import { doc, serverTimestamp, getDoc, writeBatch } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Search, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { type ActivityItem, type JoinRequestActivityItem } from '@/app/page';
-
 
 interface FoundClassroom {
     id: string;
@@ -96,47 +93,14 @@ export default function JoinClassroomPage() {
             
             await batch.commit();
             
-            // --- NOTIFICATION LOGIC ---
-            if (foundClassroom.teacherId) {
-                const LATEST_ACTIVITY_KEY = `teachmeet-latest-activity-${foundClassroom.teacherId}`;
-                try {
-                    const rawActivity = localStorage.getItem(LATEST_ACTIVITY_KEY);
-                    let activities: ActivityItem[] = [];
-                    if (rawActivity) {
-                        try {
-                            const parsed = JSON.parse(rawActivity);
-                            if (Array.isArray(parsed)) {
-                                activities = parsed;
-                            } else {
-                                console.warn("Stored activity data is not an array, starting fresh.");
-                            }
-                        } catch (e) {
-                            console.error("Failed to parse activity data, starting fresh.", e);
-                        }
-                    }
-
-                    const newNotification: JoinRequestActivityItem = {
-                      id: `joinReq-${Date.now()}-${user.uid}`,
-                      type: 'joinRequest',
-                      title: foundClassroom.title,
-                      timestamp: Date.now(),
-                      classroomId: foundClassroom.id,
-                      requesterName: user.displayName || 'A new student'
-                    };
-                    activities.unshift(newNotification);
-                    localStorage.setItem(LATEST_ACTIVITY_KEY, JSON.stringify(activities.slice(0, 20)));
-                    window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-                } catch(e) {
-                    console.error("Failed to create join request notification", e);
-                }
-            }
-            // --- END NOTIFICATION LOGIC ---
+            // Dispatch event to notify dashboard or home feed
+            window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
 
             toast({ title: 'Request Sent!', description: 'Your request to join has been sent to the teacher.' });
             router.push('/dashboard/classrooms');
         } catch (error) {
             console.error("Error sending join request:", error);
-            toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request. Check console for permissions errors.' });
+            toast({ variant: 'destructive', title: 'Request Failed', description: 'Could not send join request.' });
         } finally {
             setIsJoining(false);
         }
@@ -168,7 +132,7 @@ export default function JoinClassroomPage() {
                         </div>
 
                         {foundClassroom && (
-                             <Card className="bg-muted/50 p-4">
+                             <Card className="bg-muted/50 p-4 mt-4">
                                 <CardTitle className="text-lg">{foundClassroom.title}</CardTitle>
                                 <CardDescription>Taught by {foundClassroom.teacherName}</CardDescription>
                                 <Button className="w-full mt-4" onClick={handleJoinRequest} disabled={isJoining}>

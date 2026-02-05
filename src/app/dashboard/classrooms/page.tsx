@@ -1,11 +1,9 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -104,7 +102,8 @@ const teacherApplicationSchema = z.object({
 
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
-const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
+// Separate component for creating/editing to keep the file organized and prevent nested return errors
+const CreateClassroomForm = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -192,6 +191,7 @@ const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSucces
   );
 };
 
+// Isolated Teacher Application Dialog Component
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -484,7 +484,7 @@ export default function ClassroomsPage() {
                 <Button asChild variant="outline" className="flex-1 sm:flex-initial"><Link href="/dashboard/classrooms/join">Join a Class</Link></Button>
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild><Button onClick={handleCreateNew} className="flex-1 sm:flex-initial"><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
-                  <DialogContent><CreateClassroomDialogContent onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
+                  <DialogContent><CreateClassroomForm onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
                 </Dialog>
             </div>
         )}

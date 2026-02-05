@@ -1,4 +1,3 @@
-
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -85,7 +84,7 @@ export default function HomePage() {
                 const requests = reqSnap.docs.map(doc => {
                     const data = doc.data();
                     return {
-                        id: doc.id,
+                        id: `join-${classId}-${doc.id}`, // Unique ID for deduplication
                         type: 'joinRequest',
                         title: classTitle,
                         timestamp: data.requestedAt?.toMillis() || Date.now(),
@@ -123,11 +122,20 @@ export default function HomePage() {
 
     const ongoing = started.filter((m:any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS).map((m:any) => ({ type: 'meeting', id: m.id, title: m.title || "Meeting", timestamp: m.startedAt }));
     
-    const combined = [...ongoing, ...latest, ...firestoreActivity]
+    // Filter out join requests from localStorage because we fetch them live from Firestore
+    const filteredLatest = latest.filter((item: any) => item.type !== 'joinRequest');
+    
+    // Deduplicate and combine
+    const combined = [...ongoing, ...filteredLatest, ...firestoreActivity]
         .filter(item => item && !dismissed.includes(item.id))
         .sort((a,b) => b.timestamp - a.timestamp);
 
-    setAllActivity(combined);
+    // Final deduplication by ID
+    const uniqueCombined = combined.filter((item, index, self) =>
+        index === self.findIndex((t) => t.id === item.id)
+    );
+
+    setAllActivity(uniqueCombined);
     setIsLoading(false);
   }, [user, firestoreActivity]);
 
