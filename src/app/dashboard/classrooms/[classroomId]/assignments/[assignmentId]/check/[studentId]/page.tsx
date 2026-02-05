@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, BrainCircuit, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, Palette, X } from 'lucide-react';
+import { ArrowLeft, Loader2, BrainCircuit, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, Palette, X, Settings2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Slider } from '@/components/ui/slider';
 
 interface AssignmentData {
     title: string;
@@ -50,6 +52,7 @@ export default function CheckingPage() {
     // Drawing State
     const [isMarkupMode, setIsMarkupMode] = useState(false);
     const [drawColor, setDrawColor] = useState("#ef4444"); // Red for corrections
+    const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -164,7 +167,7 @@ export default function CheckingPage() {
         const newPath: Path = {
             points: [pos],
             color: drawColor,
-            width: isEraser ? 20 : 3,
+            width: isEraser ? 20 : penSize,
             isEraser
         };
         setPaths(prev => [...prev, newPath]);
@@ -308,15 +311,35 @@ export default function CheckingPage() {
                         </CardTitle>
                         {isMarkupMode && (
                             <div className="flex items-center gap-2 bg-background/80 p-1 rounded-lg border border-primary/20 backdrop-blur-sm">
-                                <Button 
-                                    size="sm" 
-                                    variant={!isEraser ? "secondary" : "ghost"} 
-                                    className="h-8 w-8 p-0 rounded-md"
-                                    onClick={() => setIsEraser(false)}
-                                    title="Pen"
-                                >
-                                    <Pencil className="h-4 w-4" />
-                                </Button>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button 
+                                            size="sm" 
+                                            variant={!isEraser ? "secondary" : "ghost"} 
+                                            className="h-8 w-8 p-0 rounded-md"
+                                            onClick={() => setIsEraser(false)}
+                                            title="Pen settings"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-48 p-3" side="bottom" align="start">
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <Label className="text-xs font-semibold uppercase text-muted-foreground">Pen Size</Label>
+                                                <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{penSize}px</span>
+                                            </div>
+                                            <Slider 
+                                                value={[penSize]} 
+                                                onValueChange={(val) => setPenSize(val[0])} 
+                                                min={1} 
+                                                max={20} 
+                                                step={1} 
+                                                className="py-2"
+                                            />
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
                                 <Button 
                                     size="sm" 
                                     variant={isEraser ? "secondary" : "ghost"} 
