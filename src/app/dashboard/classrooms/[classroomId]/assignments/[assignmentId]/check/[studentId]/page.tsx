@@ -33,6 +33,19 @@ interface SubmissionData {
 interface Point { x: number; y: number; }
 interface Path { points: Point[]; color: string; width: number; isEraser: boolean; }
 
+// Helper function to calculate distance from point p to segment vw
+function distToSegment(p: Point, v: Point, w: Point): number {
+  const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+  if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const projectionX = v.x + t * (w.x - v.x);
+  const projectionY = v.y + t * (w.y - v.y);
+  return Math.hypot(p.x - projectionX, p.y - projectionY);
+}
+
+const ERASER_THRESHOLD = 15;
+
 export default function CheckingPage() {
     const { classroomId, assignmentId, studentId } = useParams() as { classroomId: string; assignmentId: string; studentId: string };
     const router = useRouter();
@@ -121,7 +134,7 @@ export default function CheckingPage() {
             ctx.beginPath();
             ctx.strokeStyle = path.color;
             ctx.lineWidth = path.width;
-            ctx.globalCompositeOperation = path.isEraser ? 'destination-out' : 'source-over';
+            ctx.globalCompositeOperation = 'source-over';
             ctx.moveTo(path.points[0].x, path.points[0].y);
             for (let i = 1; i < path.points.length; i++) {
                 ctx.lineTo(path.points[i].x, path.points[i].y);
@@ -163,24 +176,45 @@ export default function CheckingPage() {
 
     const handlePointerDown = (e: React.PointerEvent) => {
         if (!isMarkupMode) return;
-        isDrawingRef.current = true;
         const pos = getPointerPos(e);
+
+        if (isEraser) {
+            setPaths(prev => {
+                const next = [...prev];
+                // Find path to remove (check intersection with segments)
+                for (let i = next.length - 1; i >= 0; i--) {
+                    const path = next[i];
+                    for (let j = 0; j < path.points.length - 1; j++) {
+                        if (distToSegment(pos, path.points[j], path.points[j+1]) < ERASER_THRESHOLD + path.width / 2) {
+                            next.splice(i, 1);
+                            return next;
+                        }
+                    }
+                }
+                return prev;
+            });
+            return;
+        }
+
+        isDrawingRef.current = true;
         const newPath: Path = {
             points: [pos],
             color: drawColor,
-            width: isEraser ? 20 : penSize,
-            isEraser
+            width: penSize,
+            isEraser: false
         };
         setPaths(prev => [...prev, newPath]);
     };
 
     const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isDrawingRef.current || !isMarkupMode) return;
+        if (!isDrawingRef.current || !isMarkupMode || isEraser) return;
         const pos = getPointerPos(e);
         setPaths(prev => {
             const newPaths = [...prev];
             const currentPath = newPaths[newPaths.length - 1];
-            currentPath.points.push(pos);
+            if (currentPath) {
+                currentPath.points.push(pos);
+            }
             return newPaths;
         });
     };
