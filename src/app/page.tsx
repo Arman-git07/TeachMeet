@@ -10,6 +10,8 @@ import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement' | 'joinRequest';
 
@@ -79,6 +81,7 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
 
 export default function HomePage() {
   const [allActivity, setAllActivity] = useState<ActivityItem[]>([]);
+  const [firestoreActivity, setFirestoreActivity] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const { toast } = useToast();
@@ -93,6 +96,49 @@ export default function HomePage() {
         latest: `${LATEST_ACTIVITY_KEY_PREFIX}${user.uid}`,
     };
   }, [user]);
+
+  // Firestore Real-time Listener for Join Requests
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+
+    // Listen for join requests in classrooms the user owns
+    const qClassrooms = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
+    
+    const unsubClassrooms = onSnapshot(qClassrooms, (snapshot) => {
+        const classroomIds = snapshot.docs.map(doc => doc.id);
+        if (classroomIds.length === 0) {
+            setFirestoreActivity([]);
+            return;
+        }
+
+        // Set up listeners for each classroom's joinRequests
+        const classroomUnsubs = classroomIds.map(classId => {
+            const qRequests = query(collection(db, 'classrooms', classId, 'joinRequests'));
+            return onSnapshot(qRequests, (reqSnap) => {
+                const requests = reqSnap.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        type: 'joinRequest',
+                        title: snapshot.docs.find(c => c.id === classId)?.data().title || 'Classroom',
+                        timestamp: data.requestedAt?.toMillis() || Date.now(),
+                        classroomId: classId,
+                        requesterName: data.studentName || 'A new user'
+                    } as JoinRequestActivityItem;
+                });
+                
+                setFirestoreActivity(prev => {
+                    const filtered = prev.filter(a => !(a.type === 'joinRequest' && (a as JoinRequestActivityItem).classroomId === classId));
+                    return [...filtered, ...requests];
+                });
+            });
+        });
+
+        return () => classroomUnsubs.forEach(unsub => unsub());
+    });
+
+    return () => unsubClassrooms();
+  }, [user, isAuthenticated]);
   
   const loadActivities = useCallback(() => {
     if (!user) {
@@ -153,13 +199,13 @@ export default function HomePage() {
         }
     }
     
-    const combined = [...ongoingMeetings, ...otherActivities]
+    const combined = [...ongoingMeetings, ...otherActivities, ...firestoreActivity]
       .filter(item => item && item.id && !dismissedItemIds.includes(item.id))
       .sort((a, b) => b.timestamp - a.timestamp);
 
     setAllActivity(combined);
     setIsLoading(false);
-  }, [user, getStorageKeys]);
+  }, [user, getStorageKeys, firestoreActivity]);
 
   useEffect(() => {
     if (authLoading) return;

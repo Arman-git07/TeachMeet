@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -9,7 +8,7 @@ import { useClassroom } from '@/contexts/ClassroomContext';
 import { canPost } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +24,7 @@ import { DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import AnnouncementComposer from './AnnouncementComposer';
 import type { Announcement } from '@/app/dashboard/classrooms/[classroomId]/page';
 
-const AnnouncementItem = memo(({ announcement, canDelete, onDeleteClick }: { announcement: Announcement; canDelete: boolean; onDeleteClick: () => void }) => {
+const AnnouncementItem = memo(({ announcement, canDelete, onDeleteClick, isDeleting }: { announcement: Announcement; canDelete: boolean; onDeleteClick: () => void; isDeleting: boolean }) => {
     return (
         <div className="p-3 bg-muted/50 rounded-lg group relative">
             {announcement.text && <p className="text-sm">{announcement.text}</p>}
@@ -40,9 +39,10 @@ const AnnouncementItem = memo(({ announcement, canDelete, onDeleteClick }: { ann
                         <Button
                             variant="ghost"
                             size="icon"
+                            disabled={isDeleting}
                             className="absolute top-2 right-2 h-7 w-7 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                            <Trash2 className="h-4 w-4" />
+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                         </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -66,14 +66,14 @@ export function Announcements() {
     const { classroomId, user, userRole } = useClassroom();
     const { toast } = useToast();
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-    const [currentTime, setCurrentTime] = useState(new Date()); // State to trigger re-renders
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [currentTime, setCurrentTime] = useState(new Date()); 
     const canUserPost = canPost(userRole);
     
-    // Set up a timer to update the current time every minute
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
-        }, 60000); // 60,000 milliseconds = 1 minute
+        }, 60000); 
         return () => clearInterval(timer);
     }, []);
 
@@ -81,7 +81,6 @@ export function Announcements() {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'announcements'), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            // Fetch all announcements, filtering will happen in render
             const fetchedAnnouncements = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
             setAnnouncements(fetchedAnnouncements);
         }, (error) => {
@@ -94,6 +93,8 @@ export function Announcements() {
     const handleDelete = useCallback(async (itemToDelete: DeletableItem | null) => {
         if (!itemToDelete || !classroomId) return;
         const { collectionName, item } = itemToDelete;
+        setDeletingId(item.id);
+        
         try {
             if (item.storagePath) {
                 const fileRef = ref(storage, item.storagePath);
@@ -102,14 +103,15 @@ export function Announcements() {
                 });
             }
             await deleteDoc(doc(db, "classrooms", classroomId, collectionName, item.id));
-            toast({ title: "Item Deleted", description: "The announcement has been removed." });
+            toast({ title: "Announcement Deleted" });
         } catch (error: any) {
             console.error("Error deleting announcement:", error);
             toast({ variant: 'destructive', title: "Deletion Failed", description: error.message });
+        } finally {
+            setDeletingId(null);
         }
     }, [classroomId, toast]);
     
-    // Filter announcements based on the current time state
     const visibleAnnouncements = announcements.filter(a => !a.vanishAt || a.vanishAt.toDate() > currentTime);
 
     return (
@@ -120,6 +122,7 @@ export function Announcements() {
                     <AnnouncementItem
                         key={a.id}
                         announcement={a}
+                        isDeleting={deletingId === a.id}
                         canDelete={userRole === 'creator' || a.creatorId === user?.uid}
                         onDeleteClick={() => handleDelete({ collectionName: 'announcements', item: a })}
                     />

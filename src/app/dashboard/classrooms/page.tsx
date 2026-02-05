@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -64,16 +63,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { auth } from '@/lib/firebase';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { type ActivityItem, type JoinRequestActivityItem } from '@/app/page';
 
 export interface Classroom {
   id: string;
@@ -108,68 +104,7 @@ const teacherApplicationSchema = z.object({
 
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
-async function submitTeacherApplication(classroomId: string, data: TeacherApplicationValues, resumeURL?: string) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Not logged in");
-
-    const batch = writeBatch(db);
-    const classroomJoinReqRef = doc(db, "classrooms", classroomId, "joinRequests", user.uid);
-
-    batch.set(classroomJoinReqRef, {
-        requesterId: user.uid,
-        studentName: data.fullName,
-        studentPhotoURL: user.photoURL || "",
-        role: "teacher",
-        status: "pending",
-        requestedAt: serverTimestamp(),
-        resumeURL: resumeURL || "",
-        applicationData: {
-            subject: data.subject,
-            qualification: data.qualification,
-            experience: data.experience,
-            availability: data.availability,
-            mobile: data.mobile,
-            message: data.message || ""
-        }
-    }, { merge: true });
-
-    const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId);
-    batch.set(userPendingRequestRef, { 
-        classroomId, 
-        requestedAt: serverTimestamp(),
-        role: 'teacher'
-    });
-
-    await batch.commit();
-
-    try {
-        const classroomSnap = await getDoc(doc(db, "classrooms", classroomId));
-        if (classroomSnap.exists()) {
-            const classroomData = classroomSnap.data();
-            const teacherId = classroomData.teacherId;
-            if (teacherId) {
-                const key = `teachmeet-latest-activity-${teacherId}`;
-                const raw = localStorage.getItem(key);
-                let acts = raw ? JSON.parse(raw) : [];
-                if (!Array.isArray(acts)) acts = [];
-                
-                const newNotification: JoinRequestActivityItem = {
-                    id: `joinReq-${Date.now()}-${user.uid}`,
-                    type: 'joinRequest',
-                    title: classroomData.title,
-                    timestamp: Date.now(),
-                    classroomId: classroomId,
-                    requesterName: data.fullName
-                };
-                
-                acts.unshift(newNotification);
-                localStorage.setItem(key, JSON.stringify(acts.slice(0, 20)));
-                window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
-            }
-        }
-    } catch(e) {}
-}
-
+// Helper components moved to Section level for clarity and to prevent JSX syntax errors
 const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -205,7 +140,7 @@ const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSucces
       if (classroomToEdit) {
         const classroomRef = doc(db, 'classrooms', classroomToEdit.id);
         await updateDoc(classroomRef, { title, description, isPublic });
-        toast({ title: 'Classroom Updated', description: `"${title}" has been successfully updated.` });
+        toast({ title: 'Classroom Updated' });
       } else {
         const classroomData = {
           title: title.trim(),
@@ -219,12 +154,12 @@ const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSucces
           createdAt: serverTimestamp(),
         };
         await addDoc(collection(db, 'classrooms'), classroomData);
-        toast({ title: 'Classroom Created', description: `"${title}" has been successfully created.` });
+        toast({ title: 'Classroom Created' });
       }
       onSuccess();
     } catch (error) {
       console.error('Error saving classroom:', error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the classroom.' });
+      toast({ variant: 'destructive', title: 'Save Failed' });
     } finally {
       setIsLoading(false);
     }
@@ -273,7 +208,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
             subject: '',
             mobile: '',
             qualification: '',
-            experience: '',
+            experience: 'Less than 1 year',
             availability: '',
             message: '',
             resume: null,
@@ -291,10 +226,40 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                 const snapshot = await uploadBytes(resumeRef, resumeFile);
                 resumeURL = await getDownloadURL(snapshot.ref);
             }
-            await submitTeacherApplication(classroom.id, data, resumeURL);
+
+            const batch = writeBatch(db);
+            const classroomJoinReqRef = doc(db, "classrooms", classroom.id, "joinRequests", user.uid);
+
+            batch.set(classroomJoinReqRef, {
+                requesterId: user.uid,
+                studentName: data.fullName,
+                studentPhotoURL: user.photoURL || "",
+                role: "teacher",
+                status: "pending",
+                requestedAt: serverTimestamp(),
+                resumeURL: resumeURL || "",
+                applicationData: {
+                    subject: data.subject,
+                    qualification: data.qualification,
+                    experience: data.experience,
+                    availability: data.availability,
+                    mobile: data.mobile,
+                    message: data.message || ""
+                }
+            }, { merge: true });
+
+            const userPendingRequestRef = doc(db, `users/${user.uid}/pendingJoinRequests`, classroom.id);
+            batch.set(userPendingRequestRef, { 
+                classroomId: classroom.id, 
+                requestedAt: serverTimestamp(),
+                role: 'teacher'
+            });
+
+            await batch.commit();
             toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });
             onSubmitted();
         } catch (error) {
+            console.error("Teacher application failed:", error);
             toast({ variant: 'destructive', title: 'Application Failed', description: "Could not send your application." });
         } finally {
             setIsLoading(false);
@@ -327,7 +292,7 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
                     )} />
                      <FormField control={form.control} name="mobile" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Mobile Number</FormLabel>
+                            <FormLabel>Mobile Number (WhatsApp)</FormLabel>
                             <FormControl><Input type="tel" placeholder="Your contact number" {...field} disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
