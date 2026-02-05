@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
@@ -252,14 +251,38 @@ export function Exams() {
                                     </div>
                                     <div className="relative flex items-center my-4"><div className="flex-grow border-t"></div><span className="flex-shrink mx-4 text-xs text-muted-foreground">UPLOAD OR CREATE QUESTIONS</span><div className="flex-grow border-t"></div></div>
                                     <div><Label>Upload Exam Paper (optional)</Label><Input type="file" {...examForm.register('examFile')} /></div>
-                                    <div className="space-y-2"><Label>Questions</Label>
-                                        <ScrollArea className="h-72 w-full rounded-md border p-4">
+                                    
+                                    <div className="space-y-2 mt-6">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <Label className="text-sm font-semibold">Questions</Label>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    type="button" 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="h-8 px-2 text-[10px] font-bold uppercase tracking-wider"
+                                                    onClick={() => append({ type: 'qa', question: '', answer: '' })}
+                                                >
+                                                    <PlusCircle className="mr-1 h-3 w-3" /> Add Q/A
+                                                </Button>
+                                                <Button 
+                                                    type="button" 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="h-8 px-2 text-[10px] font-bold uppercase tracking-wider"
+                                                    onClick={() => append({ type: 'mcq', question: '', options: [{ text: '' }, { text: '' }], correctOptionIndex: 0 })}
+                                                >
+                                                    <PlusCircle className="mr-1 h-3 w-3" /> Add MCQ
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <ScrollArea className="h-72 w-full rounded-md border p-4 bg-muted/5">
                                             {fields.map((field, index) => (
-                                                <Card key={field.id} className="mb-4 p-4 space-y-3 relative">
+                                                <Card key={field.id} className="mb-4 p-4 space-y-3 relative shadow-sm border-border/50">
                                                     <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => remove(index)}><X className="h-4 w-4 text-destructive" /></Button>
-                                                    <h4 className="font-medium text-sm">Q{index + 1} ({field.type.toUpperCase()})</h4>
-                                                    <Input {...examForm.register(`questions.${index}.question`)} placeholder="Question Text" />
-                                                    {field.type === 'qa' && <Textarea {...examForm.register(`questions.${index}.answer`)} placeholder="Answer" />}
+                                                    <h4 className="font-medium text-xs text-primary uppercase tracking-tight">Q{index + 1} ({field.type.toUpperCase()})</h4>
+                                                    <Input {...examForm.register(`questions.${index}.question`)} placeholder="Question Text" className="bg-background" />
+                                                    {field.type === 'qa' && <Textarea {...examForm.register(`questions.${index}.answer`)} placeholder="Correct Answer (for reference)" className="bg-background text-sm" />}
                                                     {field.type === 'mcq' && (
                                                         <MCQQuestionEditor
                                                             nestIndex={index}
@@ -271,9 +294,14 @@ export function Exams() {
                                                     )}
                                                 </Card>
                                             ))}
+                                            {fields.length === 0 && (
+                                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-12">
+                                                    <PlusCircle className="h-8 w-8 mb-2 opacity-20" />
+                                                    <p className="text-sm">Click "Add" above to start building your exam.</p>
+                                                </div>
+                                            )}
                                         </ScrollArea>
                                         {examForm.formState.errors.questions && <p className="text-destructive text-sm">{examForm.formState.errors.questions.message}</p>}
-                                        <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => append({ type: 'qa', question: '', answer: '' })}>Add Q/A</Button><Button type="button" variant="outline" onClick={() => append({ type: 'mcq', question: '', options: [{ text: '' }, { text: '' }], correctOptionIndex: 0 })}>Add MCQ</Button></div>
                                     </div>
                                 </form>
                                 <DialogFooter className="p-6 pt-4 border-t flex-shrink-0"><DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose><Button type="submit" form="exam-form">Create Exam</Button></DialogFooter>
@@ -284,7 +312,7 @@ export function Exams() {
                 <CardContent>
                     <div className="space-y-3">
                         {exams.length > 0 ? exams.map(exam => (
-                            <div key={exam.id} className="p-4 border rounded-lg group flex justify-between items-start">
+                            <div key={exam.id} className="p-4 border rounded-lg group flex justify-between items-start hover:bg-muted/30 transition-colors">
                                 <div>
                                     <h4 className="font-semibold">{exam.title}</h4>
                                     <p className="text-sm text-muted-foreground">Scheduled: {new Date(exam.date.toDate()).toLocaleString()}</p>

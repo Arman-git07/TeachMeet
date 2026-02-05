@@ -47,7 +47,6 @@ import {
   where,
   writeBatch,
   getDocs,
-  getDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -104,7 +103,7 @@ const teacherApplicationSchema = z.object({
 
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
-// Helper components moved to Section level for clarity and to prevent JSX syntax errors
+// Isolated Helper Component for Creating/Editing Classrooms
 const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -196,6 +195,7 @@ const CreateClassroomDialogContent = ({ onSuccess, classroomToEdit }: { onSucces
   );
 };
 
+// Isolated Helper Component for Teacher Application
 const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Classroom; onSubmitted: () => void; }) => {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -256,6 +256,10 @@ const TeacherApplicationDialog = ({ classroom, onSubmitted }: { classroom: Class
             });
 
             await batch.commit();
+            
+            // Notify other parts of the app
+            window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
+            
             toast({ title: 'Application Sent!', description: 'Your request to join as a teacher has been sent.' });
             onSubmitted();
         } catch (error) {
@@ -443,8 +447,13 @@ export default function ClassroomsPage() {
             role: 'student',
             requestedAt: serverTimestamp()
         });
-        batch.set(doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId), { classroomId, requestedAt: serverTimestamp() });
+        batch.set(doc(db, `users/${user.uid}/pendingJoinRequests`, classroomId), { 
+            classroomId, 
+            requestedAt: serverTimestamp(),
+            role: 'student'
+        });
         await batch.commit();
+        window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
         toast({ title: 'Request Sent!' });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Failed' });
@@ -458,6 +467,7 @@ export default function ClassroomsPage() {
         batch.delete(doc(db, `classrooms/${classroomId}/joinRequests/${user.uid}`));
         batch.delete(doc(db, `users/${user.uid}/pendingJoinRequests/${classroomId}`));
         await batch.commit();
+        window.dispatchEvent(new CustomEvent('teachmeet_activity_updated'));
         toast({ title: "Request Canceled" });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Failed' });
