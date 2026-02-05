@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -29,10 +29,14 @@ export function ClassMaterials() {
     useEffect(() => {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'materials'), orderBy('uploadedAt', 'desc'));
-        return onSnapshot(q, (snapshot) => {
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             setMaterials(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Material)));
+        }, (error) => {
+            console.error("Error fetching materials:", error);
+            toast({ variant: 'destructive', title: "Error", description: "Could not fetch class materials." });
         });
-    }, [classroomId]);
+        return unsubscribe;
+    }, [classroomId, toast]);
 
     const handleUpload = async () => {
         if (!file || !user || !classroomId) return;
@@ -40,13 +44,28 @@ export function ClassMaterials() {
         try {
             const path = `classrooms/${classroomId}/materials/${Date.now()}-${file.name}`;
             const fileRef = storageRef(storage, path);
-            const url = await getDownloadURL(await uploadBytesResumable(fileRef, file).then(s => s.ref));
+            const uploadTask = uploadBytesResumable(fileRef, file);
+            
+            await uploadTask;
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
-                name: file.name, url, uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Teacher', type: 'file', storagePath: path,
+                name: file.name, 
+                url, 
+                uploadedAt: serverTimestamp(), 
+                uploaderId: user.uid, 
+                uploaderName: user.displayName || 'Teacher', 
+                type: 'file', 
+                storagePath: path,
             });
-            toast({ title: "Uploaded!" });
+            toast({ title: "Material Uploaded!" });
             setFile(null);
-        } catch (e) { toast({ variant: 'destructive', title: "Failed" }); } finally { setLoading(false); }
+        } catch (e) { 
+            console.error("Upload failed:", e);
+            toast({ variant: 'destructive', title: "Upload Failed" }); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const handleShareLink = async () => {
@@ -54,42 +73,98 @@ export function ClassMaterials() {
         setLoading(true);
         try {
             await addDoc(collection(db, 'classrooms', classroomId, 'materials'), {
-                name: linkName.trim(), url: link.trim(), uploadedAt: serverTimestamp(), uploaderId: user.uid, uploaderName: user.displayName || 'Teacher', type: 'link', storagePath: '',
+                name: linkName.trim(), 
+                url: link.trim(), 
+                uploadedAt: serverTimestamp(), 
+                uploaderId: user.uid, 
+                uploaderName: user.displayName || 'Teacher', 
+                type: 'link', 
+                storagePath: '',
             });
             toast({ title: "Link Shared!" });
-            setLink(''); setLinkName('');
-        } catch (e) { toast({ variant: 'destructive', title: "Failed" }); } finally { setLoading(false); }
+            setLink(''); 
+            setLinkName('');
+        } catch (e) { 
+            console.error("Link share failed:", e);
+            toast({ variant: 'destructive', title: "Failed to share link" }); 
+        } finally { 
+            setLoading(false); 
+        }
+    };
+
+    const handleDelete = async (material: Material) => {
+        if (!classroomId) return;
+        try {
+            if (material.storagePath) {
+                const fileRef = storageRef(storage, material.storagePath);
+                await deleteObject(fileRef).catch(err => {
+                    if (err.code !== 'storage/object-not-found') throw err;
+                });
+            }
+            await deleteDoc(doc(db, "classrooms", classroomId, "materials", material.id));
+            toast({ title: "Material Deleted" });
+        } catch (error) {
+            console.error("Delete failed:", error);
+            toast({ variant: 'destructive', title: "Deletion Failed" });
+        }
     };
 
     return (
-        <Card>
-            <CardContent className="space-y-4 pt-6">
+        <Card className="border-0 shadow-none bg-transparent">
+            <CardContent className="space-y-4 pt-6 px-0">
                 {canUserManage && (
-                    <Card className="p-4 bg-muted/20">
+                    <Card className="p-4 bg-muted/20 border-dashed">
                         <Tabs defaultValue="file">
-                            <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="file">File</TabsTrigger><TabsTrigger value="link">Link</TabsTrigger></TabsList>
-                            <TabsContent value="file" className="pt-4 flex gap-2">
-                                <Input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} disabled={loading} className="flex-1"/>
-                                <Button onClick={handleUpload} disabled={!file || loading}>{loading ? <Loader2 className="animate-spin"/> : <Upload className="h-4 w-4"/>}</Button>
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="file">Upload File</TabsTrigger>
+                                <TabsTrigger value="link">Share Link</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="file" className="pt-4 space-y-4">
+                                <div className="flex gap-2">
+                                    <Input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} disabled={loading} className="flex-1 rounded-lg" />
+                                    <Button onClick={handleUpload} disabled={!file || loading} className="rounded-lg">
+                                        {loading ? <Loader2 className="animate-spin h-4 w-4"/> : <Upload className="h-4 w-4"/>}
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground italic">Files are kept permanently until deleted.</p>
                             </TabsContent>
                             <TabsContent value="link" className="pt-4 space-y-4">
-                                <Input placeholder="Link Name (e.g., Maths Class Link, English Class Link)" value={linkName} onChange={(e) => setLinkName(e.target.value)} disabled={loading} />
-                                <Input placeholder="https://example.com" value={link} onChange={(e) => setLink(e.target.value)} disabled={loading} />
-                                <Button onClick={handleShareLink} disabled={!link || !linkName || loading} className="w-full">Share Link</Button>
+                                <Input placeholder="Link Name (e.g., Maths Class Link)" value={linkName} onChange={(e) => setLinkName(e.target.value)} disabled={loading} className="rounded-lg" />
+                                <Input placeholder="https://example.com" value={link} onChange={(e) => setLink(e.target.value)} disabled={loading} className="rounded-lg" />
+                                <Button onClick={handleShareLink} disabled={!link || !linkName || loading} className="w-full rounded-lg">Share Link</Button>
                             </TabsContent>
                         </Tabs>
                     </Card>
                 )}
-                <div className="space-y-2">
-                    {materials.map(m => (
-                        <div key={m.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group">
-                            <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 truncate">
-                                {m.type === 'link' ? <LinkIcon className="h-4 w-4 text-accent" /> : <FileText className="h-4 w-4 text-primary" />}
-                                <span className="text-sm font-medium truncate">{m.name}</span>
+                
+                <div className="grid gap-3">
+                    {materials.length > 0 ? materials.map(m => (
+                        <div key={m.id} className="flex items-center justify-between p-3 bg-card border rounded-xl group hover:shadow-sm transition-all">
+                            <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 truncate flex-1">
+                                <div className={cn("p-2 rounded-lg", m.type === 'link' ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary")}>
+                                    {m.type === 'link' ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                                </div>
+                                <div className="truncate">
+                                    <span className="text-sm font-medium block truncate">{m.name}</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase">{m.type} • Added by {m.uploaderName}</span>
+                                </div>
                             </a>
-                            {canUserManage && <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={async () => { if(m.storagePath) await deleteObject(storageRef(storage, m.storagePath)).catch(()=>{}); await deleteDoc(doc(db, "classrooms", classroomId!, "materials", m.id)); toast({title:"Deleted"}); }}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
+                            {(canUserManage || m.uploaderId === user?.uid) && (
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="opacity-0 group-hover:opacity-100 text-destructive/70 hover:text-destructive hover:bg-destructive/10" 
+                                    onClick={() => handleDelete(m)}
+                                >
+                                    <Trash2 className="h-4 w-4"/>
+                                </Button>
+                            )}
                         </div>
-                    ))}
+                    )) : (
+                        <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                            <p className="text-sm">No materials have been uploaded to this classroom yet.</p>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>

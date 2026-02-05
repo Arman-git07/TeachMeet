@@ -2,7 +2,7 @@
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -62,33 +62,53 @@ export default function HomePage() {
   const { toast } = useToast();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
+  const classUnsubsRef = useRef<(() => void)[]>([]);
   
   useEffect(() => {
     if (!user || !isAuthenticated) return;
+    
+    // Listen to classrooms where user is the teacher to find join requests
     const qClassrooms = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
-    let classUnsubs: (() => void)[] = [];
 
     const unsubClassrooms = onSnapshot(qClassrooms, (snapshot) => {
-        classUnsubs.forEach(unsub => unsub());
-        classUnsubs = [];
+        // Cleanup old sub-listeners
+        classUnsubsRef.current.forEach(unsub => unsub());
+        classUnsubsRef.current = [];
+        
+        const activityMap: Record<string, ActivityItem[]> = {};
+
         snapshot.docs.forEach(classDoc => {
             const classId = classDoc.id;
             const classTitle = classDoc.data().title;
-            const unsub = onSnapshot(query(collection(db, 'classrooms', classId, 'joinRequests')), (reqSnap) => {
-                const requests = reqSnap.docs.map(doc => ({
-                    id: doc.id,
-                    type: 'joinRequest',
-                    title: classTitle,
-                    timestamp: doc.data().requestedAt?.toMillis() || Date.now(),
-                    classroomId: classId,
-                    requesterName: doc.data().studentName || 'A new user'
-                } as JoinRequestActivityItem));
-                setFirestoreActivity(prev => [...prev.filter(a => !(a.type === 'joinRequest' && (a as JoinRequestActivityItem).classroomId === classId)), ...requests]);
+            
+            const unsubRequests = onSnapshot(query(collection(db, 'classrooms', classId, 'joinRequests')), (reqSnap) => {
+                const requests = reqSnap.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        type: 'joinRequest',
+                        title: classTitle,
+                        timestamp: data.requestedAt?.toMillis() || Date.now(),
+                        classroomId: classId,
+                        requesterName: data.studentName || 'A new user'
+                    } as JoinRequestActivityItem;
+                });
+                
+                activityMap[classId] = requests;
+                
+                // Aggregate all lists
+                const combined = Object.values(activityMap).flat();
+                setFirestoreActivity(combined);
             });
-            classUnsubs.push(unsub);
+            
+            classUnsubsRef.current.push(unsubRequests);
         });
     });
-    return () => { unsubClassrooms(); classUnsubs.forEach(u => u()); };
+
+    return () => { 
+        unsubClassrooms(); 
+        classUnsubsRef.current.forEach(u => u()); 
+    };
   }, [user, isAuthenticated]);
   
   const loadActivities = useCallback(() => {
@@ -102,7 +122,10 @@ export default function HomePage() {
     const latest = JSON.parse(localStorage.getItem(LATEST_KEY) || '[]');
 
     const ongoing = started.filter((m:any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS).map((m:any) => ({ type: 'meeting', id: m.id, title: m.title || "Meeting", timestamp: m.startedAt }));
-    const combined = [...ongoing, ...latest, ...firestoreActivity].filter(item => item && !dismissed.includes(item.id)).sort((a,b) => b.timestamp - a.timestamp);
+    
+    const combined = [...ongoing, ...latest, ...firestoreActivity]
+        .filter(item => item && !dismissed.includes(item.id))
+        .sort((a,b) => b.timestamp - a.timestamp);
 
     setAllActivity(combined);
     setIsLoading(false);
@@ -122,31 +145,53 @@ export default function HomePage() {
       <main className="flex-grow flex flex-col items-center justify-center pt-16 sm:pt-4 relative pb-[18rem]">
         <div className="relative z-10 flex w-full flex-col items-center text-center px-4">
           <Logo size="medium" className="mb-8" />
-          <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border">
-            <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center"><History className="mr-3 h-6 w-6" /> Latest Activity</h2>
-            {isLoading ? <div className="py-4"><Loader2 className="animate-spin h-6 w-6 mx-auto"/></div> : 
-              allActivity.length > 0 ? (
+          <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border border-border/50">
+            <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
+                <History className="mr-3 h-6 w-6" /> Latest Activity
+            </h2>
+            {isLoading ? (
+                <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
+            ) : allActivity.length > 0 ? (
                 <ul className="space-y-3 text-left">
                   {allActivity.map(item => {
                     const Icon = itemIcons[item.type as ActivityItemType];
                     const link = itemLinks[item.type as ActivityItemType](item.id, item);
                     return (
-                      <li key={item.id} className="flex items-center gap-2">
-                        <Link href={link} className="flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-colors flex items-center gap-3 truncate">
-                          <Icon className="h-5 w-5 text-primary/80 shrink-0" />
-                          <span className="truncate">{item.type === 'joinRequest' ? `${(item as any).requesterName} wants to join "${item.title}"` : item.title}</span>
+                      <li key={item.id} className="flex items-center gap-2 group">
+                        <Link href={link} className="flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm">
+                          <div className="p-2 bg-primary/10 rounded-full shrink-0">
+                            <Icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex flex-col truncate">
+                            <span className="text-sm font-medium truncate">
+                                {item.type === 'joinRequest' ? `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"` : item.title}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{item.type} • {new Date(item.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                          </div>
                         </Link>
-                        <Button variant="ghost" size="icon" onClick={() => {
-                            const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
-                            const d = JSON.parse(localStorage.getItem(key) || '[]');
-                            localStorage.setItem(key, JSON.stringify([...d, item.id]));
-                            setAllActivity(prev => prev.filter(i => i.id !== item.id));
-                        }}><XCircle className="h-5 w-5 text-muted-foreground"/></Button>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="rounded-full h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => {
+                                const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
+                                const d = JSON.parse(localStorage.getItem(key) || '[]');
+                                localStorage.setItem(key, JSON.stringify([...d, item.id]));
+                                setAllActivity(prev => prev.filter(i => i.id !== item.id));
+                            }}
+                        >
+                            <XCircle className="h-4 w-4"/>
+                        </Button>
                       </li>
                     );
                   })}
                 </ul>
-              ) : <p className="text-muted-foreground">No recent activity.</p>
+              ) : (
+                <div className="py-12 text-center text-muted-foreground">
+                    <p className="text-sm">No recent activity.</p>
+                    <p className="text-xs mt-1">Start a meeting or create a classroom to get started!</p>
+                </div>
+              )
             }
           </div>
         </div>
