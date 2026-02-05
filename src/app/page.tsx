@@ -100,7 +100,6 @@ export default function HomePage() {
         setAllActivity([]);
         return;
     }
-    setIsLoading(true);
     
     const { dismissed: DISMISSED_ITEMS_KEY, started: STARTED_MEETINGS_KEY, latest: LATEST_ACTIVITY_KEY } = getStorageKeys();
 
@@ -147,7 +146,6 @@ export default function HomePage() {
         try {
             const parsed = JSON.parse(latestActivityRaw);
             if (Array.isArray(parsed)) {
-                // Ensure we pick up joinRequests explicitly
                 otherActivities = parsed.filter(item => item && item.type);
             }
         } catch (e) {
