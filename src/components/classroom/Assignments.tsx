@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2, Loader2, BrainCircuit, FileDown, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 import type { Assignment, Submission, DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
 
@@ -265,8 +266,10 @@ export function Assignments() {
                                                                             <Badge variant="outline" className="text-primary border-primary/30">Demo</Badge>
                                                                         </div>
                                                                         <div className="flex gap-2 mb-4">
-                                                                            <Button variant="outline" size="sm" className="h-8 opacity-50 cursor-not-allowed">
-                                                                                <Eye className="mr-2 h-3 w-3"/>View
+                                                                            <Button asChild variant="outline" size="sm" className="h-8">
+                                                                                <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/demo-student`}>
+                                                                                    <Eye className="mr-2 h-3 w-3"/>View
+                                                                                </Link>
                                                                             </Button>
                                                                             {assignment.answerKeyUrl && (
                                                                                 <Button size="sm" className="h-8 bg-primary/40 cursor-not-allowed">
@@ -293,7 +296,9 @@ export function Assignments() {
                                                                         </div>
                                                                         <div className="flex gap-2 mb-4">
                                                                             <Button asChild variant="outline" size="sm" className="h-8">
-                                                                                <a href={sub.submissionUrl} target="_blank" rel="noreferrer"><Eye className="mr-2 h-3 w-3"/>View</a>
+                                                                                <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/${sub.studentId}`}>
+                                                                                    <Eye className="mr-2 h-3 w-3"/>View
+                                                                                </Link>
                                                                             </Button>
                                                                             {assignment.answerKeyUrl && (
                                                                                 <Button size="sm" className="h-8" onClick={() => handleAiGrade(assignment, sub)} disabled={isProcessing === sub.id}>
