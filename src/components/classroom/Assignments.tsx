@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, Timestamp, setDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -190,7 +190,10 @@ export function Assignments() {
                                             <Dialog>
                                                 <DialogTrigger asChild><Button variant="outline" size="sm">Submissions</Button></DialogTrigger>
                                                 <DialogContent className="max-w-md">
-                                                    <DialogHeader><DialogTitle>Student Submissions</DialogTitle><DialogDescription>Select a student to review their work.</DialogDescription></DialogHeader>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Student Submissions</DialogTitle>
+                                                        <DialogDescription>Select a student to review their work.</DialogDescription>
+                                                    </DialogHeader>
                                                     <ScrollArea className="max-h-[60vh] py-4">
                                                         <div className="space-y-3 px-1">
                                                             {submissions.filter(s => s.assignmentId === assignment.id).length === 0 ? (
