@@ -85,7 +85,7 @@ export default function CheckingPage() {
                 studentName: "Demo Student",
                 submissionUrl: demoType === 'image' 
                     ? "https://picsum.photos/seed/doc/800/2000" 
-                    : "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                    : "https://www.africau.edu/images/default/sample.pdf", // Use a reliable sample PDF
                 grade: null,
                 feedback: ""
             });
@@ -164,11 +164,14 @@ export default function CheckingPage() {
 
     useEffect(() => {
         updateCanvasSize();
-        const timer = setTimeout(updateCanvasSize, 500); // Buffer for rendering
+        // Multiple timers to handle slow loading iframes/images
+        const timer1 = setTimeout(updateCanvasSize, 500);
+        const timer2 = setTimeout(updateCanvasSize, 2000);
         window.addEventListener('resize', updateCanvasSize);
         return () => {
             window.removeEventListener('resize', updateCanvasSize);
-            clearTimeout(timer);
+            clearTimeout(timer1);
+            clearTimeout(timer2);
         };
     }, [isMarkupMode, isExpanded, demoType, updateCanvasSize]);
 
@@ -423,7 +426,7 @@ export default function CheckingPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="flex-1 p-0 overflow-auto bg-muted/10 relative" ref={containerRef}>
-                        <div className={cn("relative min-w-full inline-block", isMarkupMode && "cursor-crosshair")} ref={contentRef}>
+                        <div className={cn("relative min-w-full inline-block bg-white", isMarkupMode && "cursor-crosshair")} ref={contentRef}>
                             {isDemo && demoType === 'image' ? (
                                 <img 
                                     src={submission?.submissionUrl} 
@@ -433,12 +436,19 @@ export default function CheckingPage() {
                                     data-ai-hint="student work"
                                 />
                             ) : isPdf ? (
-                                <iframe 
-                                    src={submission?.submissionUrl} 
-                                    className="w-full h-[200vh] border-none block"
-                                    title="Submission Preview"
-                                    onLoad={updateCanvasSize}
-                                />
+                                <div className="w-full relative" style={{ height: '3000px' }}>
+                                    <iframe 
+                                        src={`${submission?.submissionUrl}#toolbar=0&navpanes=0`} 
+                                        className="w-full h-full border-none block"
+                                        title="Submission Preview"
+                                        onLoad={updateCanvasSize}
+                                    />
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/5">
+                                        <p className="bg-background/80 px-4 py-2 rounded-full text-xs font-medium shadow-sm border">
+                                            Scroll to view more pages. Enable "Mark up" to draw.
+                                        </p>
+                                    </div>
+                                </div>
                             ) : (
                                 <img 
                                     src={submission?.submissionUrl} 
