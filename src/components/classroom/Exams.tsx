@@ -14,7 +14,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogClose, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogClose, 
+  DialogTrigger, 
+  DialogDescription 
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2, X, ClipboardCheck, Clock, CheckCircle2, Loader2, Play } from 'lucide-react';
@@ -56,7 +76,8 @@ export function Exams() {
         if (!classroomId) return;
         const q = query(collection(db, 'classrooms', classroomId, 'exams'), orderBy('date', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setExams(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Exam)));
+            const fetchedExams = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Exam));
+            setExams(fetchedExams);
         });
         return unsubscribe;
     }, [classroomId]);
@@ -268,9 +289,33 @@ export function Exams() {
                                     <div className="flex justify-between items-start">
                                         <CardTitle className="text-lg leading-tight">{exam.title}</CardTitle>
                                         {canUserManage && (
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity" onClick={async () => { await deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id)); toast({ title: "Exam Deleted" }); }}>
-                                                <Trash2 className="h-4 w-4"/>
-                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Trash2 className="h-4 w-4"/>
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Are you sure you want to delete "{exam.title}"? This action cannot be undone and will remove all associated student scores.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction 
+                                                            onClick={async () => { 
+                                                                await deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id)); 
+                                                                toast({ title: "Exam Deleted" }); 
+                                                            }}
+                                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                        >
+                                                            Delete
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
