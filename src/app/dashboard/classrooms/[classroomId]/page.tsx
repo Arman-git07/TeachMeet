@@ -59,7 +59,8 @@ export type ExamQuestion = QAQuestion | MCQQuestion;
 export interface Exam { 
   id: string; 
   title: string; 
-  date: any; 
+  startDate: any; 
+  endDate: any; 
   type: 'file' | 'text'; 
   content?: ExamQuestion[];
   fileUrl?: string; 
