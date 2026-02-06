@@ -1,3 +1,4 @@
+
 /**
  * @description This ruleset enforces a strict authorization model for meetings and classrooms,
  *   including their join requests and participant lists. It prioritizes security by ensuring
@@ -92,6 +93,11 @@ service cloud.firestore {
         allow get, list: if true;
         allow create, update, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
       }
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid));
+        allow create: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid)) && request.resource.data.senderId == request.auth.uid;
+      }
     }
     
     /**
@@ -169,6 +175,12 @@ service cloud.firestore {
     
     function isTeacher(classroomId, userId) {
         return exists(/databases/$(database)/documents/classrooms/$(classroomId)/teachers/$(userId));
+    }
+
+    function isStudent(classroomId, userId) {
+        // Checking if user is in students array or has a participant doc
+        // For efficiency, we check if they are enrolled in the classroom
+        return exists(/databases/$(database)/documents/classrooms/$(classroomId)/participants/$(userId));
     }
     
     function canManageClassroom(classroomId, userId) {
