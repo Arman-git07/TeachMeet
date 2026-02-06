@@ -348,9 +348,18 @@ export function Assignments() {
                                                             <div className="py-4 text-center space-y-4">
                                                                 <div className="text-4xl font-bold text-primary">{userSub.grade}/100</div>
                                                                 {userSub.feedback && <p className="text-sm bg-muted p-4 rounded-lg italic">"{userSub.feedback}"</p>}
-                                                                <Button asChild variant="link" className="text-xs">
-                                                                    <a href={userSub.submissionUrl} target="_blank" rel="noreferrer"><FileDown className="mr-2 h-4 w-4"/>Download My Submission</a>
-                                                                </Button>
+                                                                <div className="grid grid-cols-1 gap-2">
+                                                                    <Button asChild variant="outline" size="sm" className="w-full">
+                                                                        <a href={userSub.submissionUrl} target="_blank" rel="noreferrer"><FileDown className="mr-2 h-4 w-4"/>Download My Original</a>
+                                                                    </Button>
+                                                                    {userSub.checkedUrl && (
+                                                                        <Button asChild className="w-full btn-gel" size="sm">
+                                                                            <a href={userSub.checkedUrl} target="_blank" rel="noreferrer">
+                                                                                <Eye className="mr-2 h-4 w-4"/>View Checked Work
+                                                                            </a>
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </DialogContent>
                                                     </Dialog>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -89,6 +88,7 @@ export interface Submission {
     submissionUrl: string;
     grade?: number;
     feedback?: string;
+    checkedUrl?: string;
     isGrading?: boolean;
     assignmentId: string;
 }

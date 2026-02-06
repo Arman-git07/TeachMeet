@@ -79,7 +79,8 @@ service cloud.firestore {
         
         match /submissions/{studentId} {
             allow get, list: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
-            allow create, update: if isSignedIn() && request.auth.uid == studentId;
+            allow create: if isSignedIn() && request.auth.uid == studentId;
+            allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
             allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
         }
       }

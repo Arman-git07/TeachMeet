@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -28,6 +29,7 @@ interface SubmissionData {
     submissionUrl: string;
     grade?: number | null;
     feedback?: string | null;
+    checkedUrl?: string | null;
 }
 
 interface Point { x: number; y: number; }
@@ -246,11 +248,53 @@ export default function CheckingPage() {
             const submissionRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId, 'submissions', studentId);
             const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId);
             
+            let checkedUrl = submission?.checkedUrl || null;
+            const canvas = canvasRef.current;
+
+            // Save and flatten markup if it exists
+            if (canvas && paths.length > 0) {
+                const isPdf = submission?.submissionUrl.toLowerCase().split('?')[0].endsWith('.pdf') || submission?.submissionUrl.includes('africau.edu');
+                
+                let blob: Blob | null = null;
+                
+                if (!isPdf) {
+                    // Merging logic for images
+                    const offscreen = document.createElement('canvas');
+                    offscreen.width = canvas.width;
+                    offscreen.height = canvas.height;
+                    const ctx = offscreen.getContext('2d');
+                    if (ctx) {
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+                        
+                        const img = document.querySelector('img[data-ai-hint="student work"]') as HTMLImageElement;
+                        if (img && img.complete) {
+                            ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
+                        }
+                        ctx.drawImage(canvas, 0, 0);
+                        blob = await new Promise<Blob | null>(resolve => offscreen.toBlob(resolve, 'image/png'));
+                    }
+                } else {
+                    // For PDFs, we save the markup layer as a transparent overlay for now
+                    blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+                }
+
+                if (blob) {
+                    const storagePath = `classrooms/${classroomId}/assignments/${assignmentId}/checked/${studentId}-${Date.now()}.png`;
+                    const fileRef = ref(storage, storagePath);
+                    await uploadBytes(fileRef, blob);
+                    checkedUrl = await getDownloadURL(fileRef);
+                }
+            }
+
+            const updateData: any = {
+                grade: score ? parseInt(score) : null,
+                feedback: feedback || null
+            };
+            if (checkedUrl) updateData.checkedUrl = checkedUrl;
+            
             await Promise.all([
-                updateDoc(submissionRef, {
-                    grade: score ? parseInt(score) : null,
-                    feedback: feedback || null
-                }),
+                updateDoc(submissionRef, updateData),
                 updateDoc(assignmentRef, {
                     maxScore: maxScore ? parseInt(maxScore) : 100
                 })
