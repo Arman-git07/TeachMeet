@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette, Maximize, Minimize } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette, Maximize, Minimize, FileType } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,25 +61,31 @@ export default function CheckingPage() {
     const [maxScore, setMaxScore] = useState<string>("100");
     const [feedback, setFeedback] = useState<string>("");
 
+    // Demo Mode Specifics
+    const isDemo = studentId === 'demo-student';
+    const [demoType, setDemoType] = useState<'image' | 'pdf'>('image');
+
     // Drawing State
     const [isMarkupMode, setIsMarkupMode] = useState(false);
     const [drawColor, setDrawColor] = useState("#000000"); 
     const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false); // Track if the assignment view is covering the page
+    const [isExpanded, setIsExpanded] = useState(false);
+    
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
     const [paths, setPaths] = useState<Path[]>([]);
     const isDrawingRef = useRef(false);
-
-    const isDemo = studentId === 'demo-student';
 
     useEffect(() => {
         if (isDemo) {
             setAssignment({ title: "Demo Assignment", maxScore: 100 });
             setSubmission({
                 studentName: "Demo Student",
-                submissionUrl: "https://picsum.photos/seed/doc/800/1200",
+                submissionUrl: demoType === 'image' 
+                    ? "https://picsum.photos/seed/doc/800/2000" 
+                    : "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
                 grade: null,
                 feedback: ""
             });
@@ -117,7 +123,7 @@ export default function CheckingPage() {
         };
 
         fetchData();
-    }, [classroomId, assignmentId, studentId, isDemo, toast]);
+    }, [classroomId, assignmentId, studentId, isDemo, toast, demoType]);
 
     // Canvas Logic
     const redraw = useCallback(() => {
@@ -144,26 +150,27 @@ export default function CheckingPage() {
         });
     }, [paths]);
 
-    // Handle resizing of canvas when expansion or markup mode changes
+    // Handle resizing of canvas to match the scrollable content
+    const updateCanvasSize = useCallback(() => {
+        const canvas = canvasRef.current;
+        const content = contentRef.current;
+        if (canvas && content) {
+            // Match the canvas to the actual scroll height/width of the content
+            canvas.width = content.scrollWidth;
+            canvas.height = content.scrollHeight;
+            redraw();
+        }
+    }, [redraw]);
+
     useEffect(() => {
-        const handleResize = () => {
-            const canvas = canvasRef.current;
-            const container = containerRef.current;
-            if (canvas && container) {
-                canvas.width = container.clientWidth;
-                canvas.height = container.clientHeight;
-                redraw();
-            }
-        };
-        handleResize();
-        // Use a small delay to catch layout shifts from expanding
-        const timer = setTimeout(handleResize, 100);
-        window.addEventListener('resize', handleResize);
+        updateCanvasSize();
+        const timer = setTimeout(updateCanvasSize, 500); // Buffer for rendering
+        window.addEventListener('resize', updateCanvasSize);
         return () => {
-            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('resize', updateCanvasSize);
             clearTimeout(timer);
         };
-    }, [isMarkupMode, isExpanded, redraw]);
+    }, [isMarkupMode, isExpanded, demoType, updateCanvasSize]);
 
     useEffect(() => {
         redraw();
@@ -186,7 +193,6 @@ export default function CheckingPage() {
         if (isEraser) {
             setPaths(prev => {
                 const next = [...prev];
-                // Find path to remove (check intersection with segments)
                 for (let i = next.length - 1; i >= 0; i--) {
                     const path = next[i];
                     for (let j = 0; j < path.points.length - 1; j++) {
@@ -269,6 +275,8 @@ export default function CheckingPage() {
         );
     }
 
+    const isPdf = submission?.submissionUrl.toLowerCase().endsWith('.pdf') || demoType === 'pdf';
+
     return (
         <div className="container mx-auto p-4 md:p-8 flex flex-col h-full overflow-hidden bg-background">
             <header className="flex items-center justify-between mb-6 shrink-0">
@@ -281,7 +289,28 @@ export default function CheckingPage() {
                         <p className="text-sm text-muted-foreground">{assignment?.title} • {submission?.studentName}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                    {isDemo && (
+                        <div className="flex bg-muted/50 rounded-lg p-1 border">
+                            <Button 
+                                variant={demoType === 'image' ? "secondary" : "ghost"} 
+                                size="sm" 
+                                className="h-8 rounded-md text-xs px-3"
+                                onClick={() => setDemoType('image')}
+                            >
+                                <FileType className="mr-1.5 h-3 w-3" /> Image Demo
+                            </Button>
+                            <Button 
+                                variant={demoType === 'pdf' ? "secondary" : "ghost"} 
+                                size="sm" 
+                                className="h-8 rounded-md text-xs px-3"
+                                onClick={() => setDemoType('pdf')}
+                            >
+                                <FileType className="mr-1.5 h-3 w-3" /> PDF Demo
+                            </Button>
+                        </div>
+                    )}
+                    <div className="h-8 w-px bg-border mx-1" />
                     <Button 
                         variant={isMarkupMode ? "default" : "outline"} 
                         onClick={() => setIsMarkupMode(!isMarkupMode)}
@@ -305,7 +334,7 @@ export default function CheckingPage() {
                     <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                         <CardTitle className="text-sm flex items-center gap-2">
                             <FileText className="h-4 w-4 text-primary" />
-                            Submitted Work
+                            Submitted Work {isDemo && `(${demoType.toUpperCase()})`}
                         </CardTitle>
                         <div className="flex items-center gap-2">
                             {isMarkupMode && (
@@ -393,38 +422,44 @@ export default function CheckingPage() {
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent ref={containerRef} className="flex-1 p-0 overflow-hidden bg-muted/10 relative">
-                        <div className={cn("w-full h-full", isMarkupMode && "pointer-events-none")}>
-                            {isDemo ? (
-                                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                                    <img 
-                                        src={submission?.submissionUrl} 
-                                        alt="Demo Submission" 
-                                        className="max-w-full max-h-full object-contain rounded-lg shadow-md mb-4"
-                                        data-ai-hint="student work"
-                                    />
-                                    <p className="text-sm font-medium">This is a simulated student submission for checking.</p>
-                                </div>
-                            ) : (
+                    <CardContent className="flex-1 p-0 overflow-auto bg-muted/10 relative" ref={containerRef}>
+                        <div className={cn("relative min-w-full inline-block", isMarkupMode && "cursor-crosshair")} ref={contentRef}>
+                            {isDemo && demoType === 'image' ? (
+                                <img 
+                                    src={submission?.submissionUrl} 
+                                    alt="Demo Submission" 
+                                    className="max-w-full h-auto shadow-md mx-auto block"
+                                    onLoad={updateCanvasSize}
+                                    data-ai-hint="student work"
+                                />
+                            ) : isPdf ? (
                                 <iframe 
                                     src={submission?.submissionUrl} 
-                                    className="w-full h-full border-none"
+                                    className="w-full h-[200vh] border-none block"
                                     title="Submission Preview"
+                                    onLoad={updateCanvasSize}
+                                />
+                            ) : (
+                                <img 
+                                    src={submission?.submissionUrl} 
+                                    className="max-w-full h-auto mx-auto block"
+                                    onLoad={updateCanvasSize}
+                                    alt="Submission"
                                 />
                             )}
+                            
+                            <canvas 
+                                ref={canvasRef}
+                                className={cn(
+                                    "absolute top-0 left-0 z-10 touch-none",
+                                    isMarkupMode ? "opacity-100" : "pointer-events-none opacity-0"
+                                )}
+                                onPointerDown={handlePointerDown}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerUp}
+                                onPointerLeave={handlePointerUp}
+                            />
                         </div>
-                        
-                        <canvas 
-                            ref={canvasRef}
-                            className={cn(
-                                "absolute inset-0 z-10 touch-none",
-                                isMarkupMode ? "cursor-crosshair opacity-100" : "pointer-events-none opacity-0"
-                            )}
-                            onPointerDown={handlePointerDown}
-                            onPointerMove={handlePointerMove}
-                            onPointerUp={handlePointerUp}
-                            onPointerLeave={handlePointerUp}
-                        />
                     </CardContent>
                 </Card>
 
