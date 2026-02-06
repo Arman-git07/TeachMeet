@@ -197,17 +197,7 @@ export function Assignments() {
                                                     <ScrollArea className="max-h-[60vh] py-4">
                                                         <div className="space-y-3 px-1">
                                                             {submissions.filter(s => s.assignmentId === assignment.id).length === 0 ? (
-                                                                <div className="space-y-4">
-                                                                    <p className="text-center py-4 text-xs text-muted-foreground italic">No actual submissions yet. Example preview below:</p>
-                                                                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-dashed">
-                                                                        <p className="font-medium text-sm">Demo Student</p>
-                                                                        <Button asChild variant="outline" size="sm" className="h-8 rounded-lg">
-                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/demo-student`}>
-                                                                                <Eye className="mr-2 h-3.5 w-3.5"/>View
-                                                                            </Link>
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
+                                                                <p className="text-center py-8 text-sm text-muted-foreground">No submissions yet.</p>
                                                             ) : (
                                                                 submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
                                                                     <div key={sub.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
