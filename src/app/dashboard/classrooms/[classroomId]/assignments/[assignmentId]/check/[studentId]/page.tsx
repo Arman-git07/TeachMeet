@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette, Maximize, Minimize, FileType } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette, Maximize, Minimize } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,10 +61,6 @@ export default function CheckingPage() {
     const [maxScore, setMaxScore] = useState<string>("100");
     const [feedback, setFeedback] = useState<string>("");
 
-    // Demo Mode Specifics
-    const isDemo = studentId === 'demo-student';
-    const [demoType, setDemoType] = useState<'image' | 'pdf'>('image');
-
     // Drawing State
     const [isMarkupMode, setIsMarkupMode] = useState(false);
     const [drawColor, setDrawColor] = useState("#000000"); 
@@ -78,14 +74,14 @@ export default function CheckingPage() {
     const [paths, setPaths] = useState<Path[]>([]);
     const isDrawingRef = useRef(false);
 
+    const isDemo = studentId === 'demo-student';
+
     useEffect(() => {
         if (isDemo) {
             setAssignment({ title: "Demo Assignment", maxScore: 100 });
             setSubmission({
                 studentName: "Demo Student",
-                submissionUrl: demoType === 'image' 
-                    ? "https://picsum.photos/seed/doc/800/2000" 
-                    : "https://www.africau.edu/images/default/sample.pdf", 
+                submissionUrl: "https://www.africau.edu/images/default/sample.pdf", 
                 grade: null,
                 feedback: ""
             });
@@ -123,7 +119,7 @@ export default function CheckingPage() {
         };
 
         fetchData();
-    }, [classroomId, assignmentId, studentId, isDemo, toast, demoType]);
+    }, [classroomId, assignmentId, studentId, isDemo, toast]);
 
     // Canvas Logic
     const redraw = useCallback(() => {
@@ -173,7 +169,7 @@ export default function CheckingPage() {
             clearTimeout(timer1);
             clearTimeout(timer2);
         };
-    }, [isMarkupMode, isExpanded, demoType, updateCanvasSize]);
+    }, [isMarkupMode, isExpanded, updateCanvasSize]);
 
     useEffect(() => {
         redraw();
@@ -196,16 +192,19 @@ export default function CheckingPage() {
         if (isEraser) {
             setPaths(prev => {
                 const next = [...prev];
+                let deletedAny = false;
                 for (let i = next.length - 1; i >= 0; i--) {
                     const path = next[i];
                     for (let j = 0; j < path.points.length - 1; j++) {
                         if (distToSegment(pos, path.points[j], path.points[j+1]) < ERASER_THRESHOLD + path.width / 2) {
                             next.splice(i, 1);
-                            return next;
+                            deletedAny = true;
+                            break;
                         }
                     }
+                    if (deletedAny) break;
                 }
-                return prev;
+                return deletedAny ? [...next] : prev;
             });
             return;
         }
@@ -278,7 +277,7 @@ export default function CheckingPage() {
         );
     }
 
-    const isPdf = submission?.submissionUrl.toLowerCase().endsWith('.pdf') || demoType === 'pdf';
+    const isPdf = submission?.submissionUrl.toLowerCase().split('?')[0].endsWith('.pdf') || submission?.submissionUrl.includes('africau.edu');
 
     return (
         <div className="container mx-auto p-4 md:p-8 flex flex-col h-full overflow-hidden bg-background">
@@ -293,27 +292,6 @@ export default function CheckingPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {isDemo && (
-                        <div className="flex bg-muted/50 rounded-lg p-1 border">
-                            <Button 
-                                variant={demoType === 'image' ? "secondary" : "ghost"} 
-                                size="sm" 
-                                className="h-8 rounded-md text-xs px-3"
-                                onClick={() => setDemoType('image')}
-                            >
-                                <FileType className="mr-1.5 h-3 w-3" /> Image Demo
-                            </Button>
-                            <Button 
-                                variant={demoType === 'pdf' ? "secondary" : "ghost"} 
-                                size="sm" 
-                                className="h-8 rounded-md text-xs px-3"
-                                onClick={() => setDemoType('pdf')}
-                            >
-                                <FileType className="mr-1.5 h-3 w-3" /> PDF Demo
-                            </Button>
-                        </div>
-                    )}
-                    <div className="h-8 w-px bg-border mx-1" />
                     <Button 
                         variant={isMarkupMode ? "default" : "outline"} 
                         onClick={() => setIsMarkupMode(!isMarkupMode)}
@@ -337,7 +315,7 @@ export default function CheckingPage() {
                     <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                         <CardTitle className="text-sm flex items-center gap-2">
                             <FileText className="h-4 w-4 text-primary" />
-                            Submitted Work {isDemo && `(${demoType.toUpperCase()})`}
+                            Submitted Work
                         </CardTitle>
                         <div className="flex items-center gap-2">
                             {isMarkupMode && (
@@ -427,16 +405,8 @@ export default function CheckingPage() {
                     </CardHeader>
                     <CardContent className="flex-1 p-0 overflow-auto bg-muted/10 relative" ref={containerRef}>
                         <div className={cn("relative min-w-full inline-block bg-white", isMarkupMode && "cursor-crosshair")} ref={contentRef}>
-                            {isDemo && demoType === 'image' ? (
-                                <img 
-                                    src={submission?.submissionUrl} 
-                                    alt="Demo Submission" 
-                                    className="max-w-full h-auto shadow-md mx-auto block"
-                                    onLoad={updateCanvasSize}
-                                    data-ai-hint="student work"
-                                />
-                            ) : isPdf ? (
-                                <div className="w-full relative" style={{ height: '3000px' }}>
+                            {isPdf ? (
+                                <div className="w-full relative" style={{ height: '8000px' }}>
                                     <iframe 
                                         src={`${submission?.submissionUrl}#toolbar=0&navpanes=0`} 
                                         className="w-full h-full border-none block"
@@ -455,6 +425,7 @@ export default function CheckingPage() {
                                     className="max-w-full h-auto mx-auto block"
                                     onLoad={updateCanvasSize}
                                     alt="Submission"
+                                    data-ai-hint="student work"
                                 />
                             )}
                             
