@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { useState, useEffect, useCallback } from 'react';
+import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
@@ -13,7 +13,6 @@ import * as z from 'zod';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import {
@@ -30,23 +29,15 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, BrainCircuit, FileDown, Eye } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, FileDown, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import type { Assignment, Submission, DeletableItem } from '@/app/dashboard/classrooms/[classroomId]/page';
-import { gradeAssignment, GradeAssignmentInput } from '@/ai/flows/grade-assignment-flow';
+import type { Assignment, Submission } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 const assignmentSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters long."),
   dueDate: z.date({ required_error: "A due date is required." }),
   answerKey: z.any().optional(),
-});
-
-const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
 });
 
 export function Assignments() {
@@ -140,57 +131,6 @@ export function Assignments() {
         }
     }, [classroomId, user, toast]);
 
-    const handleAiGrade = async (assignment: Assignment, submission: Submission) => {
-        if (!canUserManage || !assignment.answerKeyUrl) return;
-        setIsProcessing(submission.id);
-        
-        try {
-            const [answerKeyRes, submissionRes] = await Promise.all([
-                fetch(assignment.answerKeyUrl),
-                fetch(submission.submissionUrl)
-            ]);
-            
-            const [answerKeyBlob, submissionBlob] = await Promise.all([
-                answerKeyRes.blob(),
-                submissionRes.blob()
-            ]);
-
-            const input: GradeAssignmentInput = {
-                teacherAssignmentDataUri: await fileToDataUri(new File([answerKeyBlob], "answerkey")),
-                studentSubmissionDataUri: await fileToDataUri(new File([submissionBlob], "submission"))
-            };
-
-            const result = await gradeAssignment(input);
-            
-            await updateDoc(doc(db, "classrooms", classroomId, "assignments", assignment.id, "submissions", submission.studentId), {
-                grade: result.score,
-                feedback: result.feedback
-            });
-            
-            toast({ title: "Grading Complete", description: `Scored ${result.score}/100` });
-        } catch (error) {
-            console.error("AI Grading failed:", error);
-            toast({ variant: "destructive", title: "AI Grading Failed" });
-        } finally {
-            setIsProcessing(null);
-        }
-    };
-
-    const handleManualGrade = async (assignmentId: string, submission: Submission, score: number, feedback: string) => {
-        setIsProcessing(submission.id);
-        try {
-            await updateDoc(doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", submission.studentId), {
-                grade: score,
-                feedback: feedback
-            });
-            toast({ title: "Grade Saved" });
-        } catch (error) {
-            toast({ variant: "destructive", title: "Failed to save grade" });
-        } finally {
-            setIsProcessing(null);
-        }
-    };
-
     const handleDelete = useCallback(async (item: Assignment) => {
         if (!classroomId) return;
         try {
@@ -243,77 +183,41 @@ export function Assignments() {
                                 <div>
                                     <h3 className="font-semibold">{assignment.title}</h3>
                                     <p className="text-xs text-muted-foreground">Due: {new Date(assignment.dueDate.toDate()).toLocaleString()}</p>
-                                    {assignment.answerKeyUrl && <Badge variant="secondary" className="mt-2 text-[10px]">AI-Grading Available</Badge>}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {canUserManage ? (
                                         <>
                                             <Dialog>
-                                                <DialogTrigger asChild><Button variant="outline" size="sm">Grading</Button></DialogTrigger>
-                                                <DialogContent className="max-w-2xl">
-                                                    <DialogHeader><DialogTitle>Submissions</DialogTitle></DialogHeader>
+                                                <DialogTrigger asChild><Button variant="outline" size="sm">Submissions</Button></DialogTrigger>
+                                                <DialogContent className="max-w-md">
+                                                    <DialogHeader><DialogTitle>Student Submissions</DialogTitle><DialogDescription>Select a student to review their work.</DialogDescription></DialogHeader>
                                                     <ScrollArea className="max-h-[60vh] py-4">
-                                                        <div className="space-y-4 px-1">
+                                                        <div className="space-y-3 px-1">
                                                             {submissions.filter(s => s.assignmentId === assignment.id).length === 0 ? (
                                                                 <div className="space-y-4">
-                                                                    <p className="text-center py-4 text-xs text-muted-foreground italic">No actual submissions yet. Below is a preview of how a submission looks:</p>
-                                                                    <Card className="p-4 bg-primary/5 border-dashed border-primary/20">
-                                                                        <div className="flex justify-between items-center mb-3">
-                                                                            <div>
-                                                                                <p className="font-semibold">Demo Student (Example)</p>
-                                                                                <p className="text-[10px] text-muted-foreground">Submitted: Just now</p>
-                                                                            </div>
-                                                                            <Badge variant="outline" className="text-primary border-primary/30">Demo</Badge>
-                                                                        </div>
-                                                                        <div className="flex gap-2 mb-4">
-                                                                            <Button asChild variant="outline" size="sm" className="h-8">
-                                                                                <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/demo-student`}>
-                                                                                    <Eye className="mr-2 h-3 w-3"/>View
-                                                                                </Link>
-                                                                            </Button>
-                                                                            {assignment.answerKeyUrl && (
-                                                                                <Button size="sm" className="h-8 bg-primary/40 cursor-not-allowed">
-                                                                                    <BrainCircuit className="h-3 w-3 mr-2"/>
-                                                                                    AI Check
-                                                                                </Button>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="space-y-2 border-t pt-3 opacity-50">
-                                                                            <div className="flex gap-2">
-                                                                                <Input placeholder="Score" className="h-8 text-xs" disabled />
-                                                                                <Button size="sm" className="h-8 px-4" disabled>Save</Button>
-                                                                            </div>
-                                                                            <Textarea placeholder="Feedback..." className="text-xs h-16 resize-none" disabled />
-                                                                        </div>
-                                                                    </Card>
+                                                                    <p className="text-center py-4 text-xs text-muted-foreground italic">No actual submissions yet. Example preview below:</p>
+                                                                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-dashed">
+                                                                        <p className="font-medium text-sm">Demo Student</p>
+                                                                        <Button asChild variant="outline" size="sm" className="h-8 rounded-lg">
+                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/demo-student`}>
+                                                                                <Eye className="mr-2 h-3.5 w-3.5"/>View
+                                                                            </Link>
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
                                                             ) : (
                                                                 submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
-                                                                    <Card key={sub.id} className="p-4 bg-muted/30">
-                                                                        <div className="flex justify-between items-center mb-3">
-                                                                            <p className="font-semibold">{sub.studentName}</p>
-                                                                            <Badge>{sub.grade != null ? `${sub.grade}/100` : "Pending"}</Badge>
+                                                                    <div key={sub.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                                                                        <div className="flex flex-col">
+                                                                            <p className="font-medium text-sm">{sub.studentName}</p>
+                                                                            {sub.grade != null && <p className="text-[10px] text-primary font-bold">Graded: {sub.grade}/100</p>}
                                                                         </div>
-                                                                        <div className="flex gap-2 mb-4">
-                                                                            <Button asChild variant="outline" size="sm" className="h-8">
-                                                                                <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/${sub.studentId}`}>
-                                                                                    <Eye className="mr-2 h-3 w-3"/>View
-                                                                                </Link>
-                                                                            </Button>
-                                                                            {assignment.answerKeyUrl && (
-                                                                                <Button size="sm" className="h-8" onClick={() => handleAiGrade(assignment, sub)} disabled={isProcessing === sub.id}>
-                                                                                    {isProcessing === sub.id ? <Loader2 className="animate-spin h-3 w-3 mr-2"/> : <BrainCircuit className="h-3 w-3 mr-2"/>}
-                                                                                    AI Check
-                                                                                </Button>
-                                                                            )}
-                                                                        </div>
-                                                                        <ManualGradeForm 
-                                                                            initialScore={sub.grade} 
-                                                                            initialFeedback={sub.feedback} 
-                                                                            onSave={(score, feedback) => handleManualGrade(assignment.id, sub, score, feedback)}
-                                                                            isSaving={isProcessing === sub.id}
-                                                                        />
-                                                                    </Card>
+                                                                        <Button asChild variant="outline" size="sm" className="h-8 rounded-lg">
+                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/${sub.studentId}`}>
+                                                                                <Eye className="mr-2 h-3.5 w-3.5"/>View
+                                                                            </Link>
+                                                                        </Button>
+                                                                    </div>
                                                                 ))
                                                             )}
                                                         </div>
@@ -342,7 +246,7 @@ export function Assignments() {
                                                 <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Submitted</Badge>
                                                 {userSub.grade != null && (
                                                     <Dialog>
-                                                        <DialogTrigger asChild><Button size="sm" variant="outline">View Grade</Button></DialogTrigger>
+                                                        <DialogTrigger asChild><Button size="sm" variant="outline">View Result</Button></DialogTrigger>
                                                         <DialogContent>
                                                             <DialogHeader><DialogTitle>Result: {assignment.title}</DialogTitle></DialogHeader>
                                                             <div className="py-4 text-center space-y-4">
@@ -381,38 +285,5 @@ export function Assignments() {
                 }) : <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl"><p className="text-sm">No active assignments found.</p></div>}
             </CardContent>
         </Card>
-    );
-}
-
-function ManualGradeForm({ initialScore, initialFeedback, onSave, isSaving }: { initialScore?: number | null, initialFeedback?: string | null, onSave: (score: number, feedback: string) => void, isSaving: boolean }) {
-    const [score, setScore] = useState(initialScore?.toString() || "");
-    const [feedback, setFeedback] = useState(initialFeedback || "");
-
-    return (
-        <div className="space-y-2 border-t pt-3">
-            <div className="flex gap-2">
-                <Input 
-                    type="number" 
-                    placeholder="Score (0-100)" 
-                    value={score} 
-                    onChange={(e) => setScore(e.target.value)} 
-                    className="h-8 text-xs"
-                />
-                <Button 
-                    size="sm" 
-                    className="h-8 px-4" 
-                    onClick={() => onSave(parseInt(score), feedback)} 
-                    disabled={isSaving || !score}
-                >
-                    {isSaving ? <Loader2 className="animate-spin h-3 w-3"/> : "Save"}
-                </Button>
-            </div>
-            <Textarea 
-                placeholder="Feedback..." 
-                value={feedback} 
-                onChange={(e) => setFeedback(e.target.value)} 
-                className="text-xs h-16 resize-none"
-            />
-        </div>
     );
 }
