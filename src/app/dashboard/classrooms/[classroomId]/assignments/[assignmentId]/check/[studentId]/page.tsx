@@ -61,10 +61,6 @@ export default function CheckingPage() {
     const [maxScore, setMaxScore] = useState<string>("100");
     const [feedback, setFeedback] = useState<string>("");
 
-    // Fullscreen State
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const pageRef = useRef<HTMLDivElement>(null);
-
     // Drawing State
     const [isMarkupMode, setIsMarkupMode] = useState(false);
     const [drawColor, setDrawColor] = useState("#000000"); 
@@ -121,23 +117,6 @@ export default function CheckingPage() {
 
         fetchData();
     }, [classroomId, assignmentId, studentId, isDemo, toast]);
-
-    // Fullscreen Logic
-    const toggleFullscreen = () => {
-        if (!document.fullscreenElement) {
-            pageRef.current?.requestFullscreen().catch(err => {
-                toast({ variant: 'destructive', title: "Fullscreen Error", description: err.message });
-            });
-        } else {
-            document.exitFullscreen();
-        }
-    };
-
-    useEffect(() => {
-        const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
-        document.addEventListener('fullscreenchange', handleFsChange);
-        return () => document.removeEventListener('fullscreenchange', handleFsChange);
-    }, []);
 
     // Canvas Logic
     const redraw = useCallback(() => {
@@ -264,7 +243,7 @@ export default function CheckingPage() {
                 })
             ]);
             
-            toast({ title: "Grade Saved Successfully" });
+            toast({ title: "Marks Saved Successfully" });
         } catch (error) {
             console.error("Save failed:", error);
             toast({ variant: 'destructive', title: "Save Failed" });
@@ -286,29 +265,18 @@ export default function CheckingPage() {
     }
 
     return (
-        <div ref={pageRef} className="container mx-auto p-4 md:p-8 flex flex-col h-full overflow-hidden bg-background">
+        <div className="container mx-auto p-4 md:p-8 flex flex-col h-full overflow-hidden bg-background">
             <header className="flex items-center justify-between mb-6 shrink-0">
                 <div className="flex items-center gap-4">
-                    {!isFullscreen && (
-                        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                    )}
+                    <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Checking Page</h1>
                         <p className="text-sm text-muted-foreground">{assignment?.title} • {submission?.studentName}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button 
-                        variant="outline"
-                        onClick={toggleFullscreen}
-                        className="rounded-lg"
-                        title={isFullscreen ? "Exit Full Screen" : "Full Screen"}
-                    >
-                        {isFullscreen ? <Minimize className="mr-2 h-4 w-4" /> : <Maximize className="mr-2 h-4 w-4" />}
-                        {isFullscreen ? "Exit Full Screen" : "Full Screen"}
-                    </Button>
                     <Button 
                         variant={isMarkupMode ? "default" : "outline"} 
                         onClick={() => setIsMarkupMode(!isMarkupMode)}
@@ -319,7 +287,7 @@ export default function CheckingPage() {
                     </Button>
                     <Button onClick={handleManualSave} disabled={isSaving} className="btn-gel rounded-lg">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Save Grade
+                        Save Marks
                     </Button>
                 </div>
             </header>
@@ -458,10 +426,12 @@ export default function CheckingPage() {
                                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                                     <UserCircle className="h-6 w-6 text-primary" />
                                 </div>
-                                <div>
-                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Student Name</Label>
-                                    <p className="font-medium">{submission?.studentName}</p>
-                                </div>
+                                {submission?.studentName && (
+                                    <div>
+                                        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Student Name</Label>
+                                        <p className="font-medium">{submission.studentName}</p>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -494,7 +464,7 @@ export default function CheckingPage() {
                                         />
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground">Click the number after the "/" to edit total marks.</p>
+                                <p className="text-[10px] text-muted-foreground">Click the number after the "/" to edit total possible marks.</p>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="feedback">Feedback</Label>
