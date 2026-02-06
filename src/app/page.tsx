@@ -166,14 +166,9 @@ export default function HomePage() {
             {authLoading ? (
                 <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
             ) : !isAuthenticated ? (
-                <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-4">
-                    <p className="text-sm">Sign in to see your latest activity.</p>
-                    <Button asChild variant="outline" size="sm" className="rounded-lg">
-                        <Link href="/auth/signin">
-                            <LogIn className="mr-2 h-4 w-4" />
-                            Sign In
-                        </Link>
-                    </Button>
+                <div className="py-12 text-center text-muted-foreground">
+                    <p className="text-sm font-medium">No recent activity.</p>
+                    <p className="text-xs mt-1">Sign in to track your meetings and classes!</p>
                 </div>
             ) : isLoading ? (
                 <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
