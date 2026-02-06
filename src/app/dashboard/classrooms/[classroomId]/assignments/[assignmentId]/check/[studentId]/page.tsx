@@ -469,11 +469,11 @@ export default function CheckingPage() {
                     <Card className="shadow-lg border-border/50">
                         <CardHeader>
                             <CardTitle className="text-lg">Grading & Feedback</CardTitle>
-                            <CardDescription>Enter the student's score and constructive comments.</CardDescription>
+                            <CardDescription>Enter the student's marks and constructive comments.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="score">Score</Label>
+                                <Label htmlFor="score">Marks</Label>
                                 <div className="relative flex items-center">
                                     <Input 
                                         id="score"
