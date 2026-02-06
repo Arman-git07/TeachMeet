@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -59,6 +59,7 @@ import {
   Eye,
   School,
   PanelLeftOpen,
+  Search,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -388,6 +389,7 @@ export default function ClassroomsPage() {
   const [enrolledClasses, setEnrolledClasses] = useState<EnrolledClassroomInfo[]>([]);
   const [discoverClasses, setDiscoverClasses] = useState<Classroom[]>([]);
   const [pendingRequestIds, setPendingRequestIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isTeacherAppDialogOpen, setIsTeacherAppDialogOpen] = useState(false);
@@ -498,6 +500,10 @@ export default function ClassroomsPage() {
     setIsTeacherAppDialogOpen(true);
   };
 
+  const filteredDiscover = useMemo(() => discoverClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [discoverClasses, searchQuery]);
+  const filteredMyClasses = useMemo(() => myClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [myClasses, searchQuery]);
+  const filteredEnrolled = useMemo(() => enrolledClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [enrolledClasses, searchQuery]);
+
   return (
     <div className="container mx-auto p-4 md:p-8 flex flex-col h-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
@@ -528,14 +534,27 @@ export default function ClassroomsPage() {
       </AlertDialog>
 
       <Tabs defaultValue="discover" className="w-full flex-1 flex flex-col overflow-hidden">
-        <TabsList className="flex-shrink-0">
-          <TabsTrigger value="discover"><Eye className="mr-2 h-4 w-4" /> Discover</TabsTrigger>
-          <TabsTrigger value="my-classes"><School className="mr-2 h-4 w-4" /> My Classes</TabsTrigger>
-          <TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger>
-        </TabsList>
-        <div className="flex-1 overflow-y-auto mt-4">
-          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {discoverClasses.map(c => (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 flex-shrink-0">
+          <TabsList className="bg-muted/50 p-1 rounded-lg">
+            <TabsTrigger value="discover"><Eye className="mr-2 h-4 w-4" /> Discover</TabsTrigger>
+            <TabsTrigger value="my-classes"><School className="mr-2 h-4 w-4" /> My Classes</TabsTrigger>
+            <TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger>
+          </TabsList>
+          
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input 
+              placeholder="Search by name..." 
+              className="pl-9 h-10 rounded-xl bg-background border-border/50 focus:ring-primary"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-0">
+            {filteredDiscover.map(c => (
                 <Card key={c.id} className="flex flex-col">
                     <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>By {c.teacherName}</CardDescription></CardHeader>
                     <CardFooter className="mt-auto">
@@ -552,9 +571,14 @@ export default function ClassroomsPage() {
                     </CardFooter>
                 </Card>
             ))}
+            {filteredDiscover.length === 0 && (
+              <div className="col-span-full py-12 text-center text-muted-foreground">
+                No classrooms found matching "{searchQuery}"
+              </div>
+            )}
           </TabsContent>
-          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {myClasses.map(c => (
+          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-0">
+            {filteredMyClasses.map(c => (
                 <Card key={c.id}>
                     <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>{c.id}</CardDescription></CardHeader>
                     <CardFooter className="flex justify-between">
@@ -566,14 +590,24 @@ export default function ClassroomsPage() {
                     </CardFooter>
                 </Card>
             ))}
+            {filteredMyClasses.length === 0 && (
+              <div className="col-span-full py-12 text-center text-muted-foreground">
+                No classrooms found matching "{searchQuery}"
+              </div>
+            )}
           </TabsContent>
-          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {enrolledClasses.map(c => (
+          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-0">
+            {filteredEnrolled.map(c => (
                 <Card key={c.id}>
                     <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>By {c.teacherName}</CardDescription></CardHeader>
                     <CardFooter><Button asChild className="w-full"><Link href={`/dashboard/classrooms/${c.classroomId}`}>Enter</Link></Button></CardFooter>
                 </Card>
             ))}
+            {filteredEnrolled.length === 0 && (
+              <div className="col-span-full py-12 text-center text-muted-foreground">
+                No classrooms found matching "{searchQuery}"
+              </div>
+            )}
           </TabsContent>
         </div>
       </Tabs>
