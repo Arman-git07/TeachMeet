@@ -66,6 +66,7 @@ export default function CheckingPage() {
     const [drawColor, setDrawColor] = useState("#000000"); 
     const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false); // Track if the assignment view is covering the page
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [paths, setPaths] = useState<Path[]>([]);
@@ -143,22 +144,26 @@ export default function CheckingPage() {
         });
     }, [paths]);
 
+    // Handle resizing of canvas when expansion or markup mode changes
     useEffect(() => {
-        if (isMarkupMode) {
-            const handleResize = () => {
-                const canvas = canvasRef.current;
-                const container = containerRef.current;
-                if (canvas && container) {
-                    canvas.width = container.clientWidth;
-                    canvas.height = container.clientHeight;
-                    redraw();
-                }
-            };
-            handleResize();
-            window.addEventListener('resize', handleResize);
-            return () => window.removeEventListener('resize', handleResize);
-        }
-    }, [isMarkupMode, redraw]);
+        const handleResize = () => {
+            const canvas = canvasRef.current;
+            const container = containerRef.current;
+            if (canvas && container) {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+                redraw();
+            }
+        };
+        handleResize();
+        // Use a small delay to catch layout shifts from expanding
+        const timer = setTimeout(handleResize, 100);
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(timer);
+        };
+    }, [isMarkupMode, isExpanded, redraw]);
 
     useEffect(() => {
         redraw();
@@ -293,86 +298,100 @@ export default function CheckingPage() {
             </header>
 
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-                <Card className="lg:col-span-2 flex flex-col overflow-hidden shadow-lg border-border/50 relative">
+                <Card className={cn(
+                    "flex flex-col overflow-hidden shadow-lg border-border/50 relative transition-all duration-300",
+                    isExpanded ? "lg:col-span-3 h-full" : "lg:col-span-2"
+                )}>
                     <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                         <CardTitle className="text-sm flex items-center gap-2">
                             <FileText className="h-4 w-4 text-primary" />
                             Submitted Work
                         </CardTitle>
-                        {isMarkupMode && (
-                            <div className="flex items-center gap-2 bg-background/80 p-1 rounded-lg border border-primary/20 backdrop-blur-sm">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button 
-                                            size="sm" 
-                                            variant={!isEraser ? "secondary" : "ghost"} 
-                                            className="h-8 w-8 p-0 rounded-md"
-                                            onClick={() => setIsEraser(false)}
-                                            title="Pen settings"
-                                        >
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-48 p-3" side="bottom" align="start">
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between items-center">
-                                                <Label className="text-xs font-semibold uppercase text-muted-foreground">Pen Size</Label>
-                                                <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{penSize}px</span>
+                        <div className="flex items-center gap-2">
+                            {isMarkupMode && (
+                                <div className="flex items-center gap-2 bg-background/80 p-1 rounded-lg border border-primary/20 backdrop-blur-sm mr-2">
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button 
+                                                size="sm" 
+                                                variant={!isEraser ? "secondary" : "ghost"} 
+                                                className="h-8 w-8 p-0 rounded-md"
+                                                onClick={() => setIsEraser(false)}
+                                                title="Pen settings"
+                                            >
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-48 p-3" side="bottom" align="start">
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <Label className="text-xs font-semibold uppercase text-muted-foreground">Pen Size</Label>
+                                                    <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{penSize}px</span>
+                                                </div>
+                                                <Slider 
+                                                    value={[penSize]} 
+                                                    onValueChange={(val) => setPenSize(val[0])} 
+                                                    min={1} 
+                                                    max={20} 
+                                                    step={1} 
+                                                    className="py-2"
+                                                />
                                             </div>
-                                            <Slider 
-                                                value={[penSize]} 
-                                                onValueChange={(val) => setPenSize(val[0])} 
-                                                min={1} 
-                                                max={20} 
-                                                step={1} 
-                                                className="py-2"
-                                            />
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
-                                <Button 
-                                    size="sm" 
-                                    variant={isEraser ? "secondary" : "ghost"} 
-                                    className="h-8 w-8 p-0 rounded-md"
-                                    onClick={() => setIsEraser(true)}
-                                    title="Eraser"
-                                >
-                                    <Eraser className="h-4 w-4" />
-                                </Button>
-                                <div className="w-px h-4 bg-border mx-1" />
-                                {["#000000", "#ffffff"].map(color => (
-                                    <button 
-                                        key={color}
-                                        onClick={() => { setDrawColor(color); setIsEraser(false); }}
-                                        className={cn(
-                                            "w-5 h-5 rounded-full border border-black/10 transition-transform hover:scale-110 shadow-sm",
-                                            drawColor === color && !isEraser && "ring-2 ring-primary ring-offset-1"
-                                        )}
-                                        style={{ backgroundColor: color }}
-                                        title={color === '#000000' ? 'Black' : color === '#ffffff' ? 'White' : ''}
-                                    />
-                                ))}
-                                <div className="relative w-6 h-6 rounded-full border border-black/10 overflow-hidden flex items-center justify-center bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 transition-transform hover:scale-110 shadow-sm" title="Choose custom color">
-                                    <input 
-                                        type="color" 
-                                        value={drawColor}
-                                        onChange={(e) => { setDrawColor(e.target.value); setIsEraser(false); }}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    />
-                                    <Palette className="h-3 w-3 text-white pointer-events-none drop-shadow-md" />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <Button 
+                                        size="sm" 
+                                        variant={isEraser ? "secondary" : "ghost"} 
+                                        className="h-8 w-8 p-0 rounded-md"
+                                        onClick={() => setIsEraser(true)}
+                                        title="Eraser"
+                                    >
+                                        <Eraser className="h-4 w-4" />
+                                    </Button>
+                                    <div className="w-px h-4 bg-border mx-1" />
+                                    {["#000000", "#ffffff"].map(color => (
+                                        <button 
+                                            key={color}
+                                            onClick={() => { setDrawColor(color); setIsEraser(false); }}
+                                            className={cn(
+                                                "w-5 h-5 rounded-full border border-black/10 transition-transform hover:scale-110 shadow-sm",
+                                                drawColor === color && !isEraser && "ring-2 ring-primary ring-offset-1"
+                                            )}
+                                            style={{ backgroundColor: color }}
+                                            title={color === '#000000' ? 'Black' : color === '#ffffff' ? 'White' : ''}
+                                        />
+                                    ))}
+                                    <div className="relative w-6 h-6 rounded-full border border-black/10 overflow-hidden flex items-center justify-center bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 transition-transform hover:scale-110 shadow-sm" title="Choose custom color">
+                                        <input 
+                                            type="color" 
+                                            value={drawColor}
+                                            onChange={(e) => { setDrawColor(e.target.value); setIsEraser(false); }}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <Palette className="h-3 w-3 text-white pointer-events-none drop-shadow-md" />
+                                    </div>
+                                    <div className="w-px h-4 bg-border mx-1" />
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        className="h-8 w-8 p-0 rounded-md text-destructive"
+                                        onClick={() => setPaths([])}
+                                        title="Clear marks"
+                                    >
+                                        <RotateCcw className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <div className="w-px h-4 bg-border mx-1" />
-                                <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="h-8 w-8 p-0 rounded-md text-destructive"
-                                    onClick={() => setPaths([])}
-                                    title="Clear marks"
-                                >
-                                    <RotateCcw className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        )}
+                            )}
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => setIsExpanded(!isExpanded)} 
+                                className="h-8 w-8 rounded-md"
+                                title={isExpanded ? "Restore view" : "Expand to full page width"}
+                            >
+                                {isExpanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent ref={containerRef} className="flex-1 p-0 overflow-hidden bg-muted/10 relative">
                         <div className={cn("w-full h-full", isMarkupMode && "pointer-events-none")}>
@@ -409,81 +428,83 @@ export default function CheckingPage() {
                     </CardContent>
                 </Card>
 
-                <aside className="space-y-6 overflow-y-auto pr-1">
-                    <Card className="shadow-lg border-border/50">
-                        <CardHeader>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <CheckCircle2 className="h-5 w-5 text-primary" />
-                                Assignment Details
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Assignment Title</Label>
-                                <p className="font-semibold">{assignment?.title}</p>
-                            </div>
-                            <div className="flex items-center gap-3 pt-2 border-t">
-                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <UserCircle className="h-6 w-6 text-primary" />
+                {!isExpanded && (
+                    <aside className="space-y-6 overflow-y-auto pr-1 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <Card className="shadow-lg border-border/50">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                                    Assignment Details
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Assignment Title</Label>
+                                    <p className="font-semibold">{assignment?.title}</p>
                                 </div>
-                                {submission?.studentName && (
-                                    <div>
-                                        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Student Name</Label>
-                                        <p className="font-medium">{submission.studentName}</p>
+                                <div className="flex items-center gap-3 pt-2 border-t">
+                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <UserCircle className="h-6 w-6 text-primary" />
                                     </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    {submission?.studentName && (
+                                        <div>
+                                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Student Name</Label>
+                                            <p className="font-medium">{submission.studentName}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                    <Card className="shadow-lg border-border/50">
-                        <CardHeader>
-                            <CardTitle className="text-lg">Grading & Feedback</CardTitle>
-                            <CardDescription>Enter the student's marks and constructive comments.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="score">Marks</Label>
-                                <div className="relative flex items-center">
-                                    <Input 
-                                        id="score"
-                                        type="number"
-                                        placeholder="Earned"
-                                        value={score}
-                                        onChange={(e) => setScore(e.target.value)}
-                                        className="text-2xl font-bold h-12 pr-20 rounded-lg"
-                                    />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-muted-foreground font-medium">
-                                        <span className="text-lg">/</span>
+                        <Card className="shadow-lg border-border/50">
+                            <CardHeader>
+                                <CardTitle className="text-lg">Grading & Feedback</CardTitle>
+                                <CardDescription>Enter the student's marks and constructive comments.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="score">Marks</Label>
+                                    <div className="relative flex items-center">
                                         <Input 
+                                            id="score"
                                             type="number"
-                                            value={maxScore}
-                                            onChange={(e) => setMaxScore(e.target.value)}
-                                            className="w-14 h-8 p-1 text-center bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-bold text-lg hover:bg-muted/50 transition-colors rounded"
-                                            title="Edit total possible marks"
+                                            placeholder="Earned"
+                                            value={score}
+                                            onChange={(e) => setScore(e.target.value)}
+                                            className="text-2xl font-bold h-12 pr-20 rounded-lg"
                                         />
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-muted-foreground font-medium">
+                                            <span className="text-lg">/</span>
+                                            <Input 
+                                                type="number"
+                                                value={maxScore}
+                                                onChange={(e) => setMaxScore(e.target.value)}
+                                                className="w-14 h-8 p-1 text-center bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-bold text-lg hover:bg-muted/50 transition-colors rounded"
+                                                title="Edit total possible marks"
+                                            />
+                                        </div>
                                     </div>
+                                    <p className="text-[10px] text-muted-foreground">Click the number after the "/" to edit total possible marks.</p>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground">Click the number after the "/" to edit total possible marks.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="feedback">Feedback</Label>
-                                <Textarea 
-                                    id="feedback"
-                                    placeholder="Provide detailed feedback for the student..."
-                                    className="min-h-[150px] rounded-xl resize-none"
-                                    value={feedback}
-                                    onChange={(e) => setFeedback(e.target.value)}
-                                />
-                            </div>
-                        </CardContent>
-                        <CardFooter className="bg-muted/10 border-t py-4">
-                            <p className="text-[10px] text-muted-foreground italic">
-                                Note: Once saved, the student will be notified and can view their results immediately.
-                            </p>
-                        </CardFooter>
-                    </Card>
-                </aside>
+                                <div className="space-y-2">
+                                    <Label htmlFor="feedback">Feedback</Label>
+                                    <Textarea 
+                                        id="feedback"
+                                        placeholder="Provide detailed feedback for the student..."
+                                        className="min-h-[150px] rounded-xl resize-none"
+                                        value={feedback}
+                                        onChange={(e) => setFeedback(e.target.value)}
+                                    />
+                                </div>
+                            </CardContent>
+                            <CardFooter className="bg-muted/10 border-t py-4">
+                                <p className="text-[10px] text-muted-foreground italic">
+                                    Note: Once saved, the student will be notified and can view their results immediately.
+                                </p>
+                            </CardFooter>
+                        </Card>
+                    </aside>
+                )}
             </main>
         </div>
     );
