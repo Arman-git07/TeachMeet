@@ -1,3 +1,4 @@
+
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -5,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone, UserPlus } from 'lucide-react';
+import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone, UserPlus, LogIn } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -62,8 +63,12 @@ export default function HomePage() {
   const classUnsubsRef = useRef<(() => void)[]>([]);
   
   useEffect(() => {
-    if (!user || !isAuthenticated) return;
+    if (!user || !isAuthenticated) {
+        setIsLoading(false);
+        return;
+    }
     
+    setIsLoading(true);
     const qClassrooms = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
 
     const unsubClassrooms = onSnapshot(qClassrooms, (snapshot) => {
@@ -71,6 +76,11 @@ export default function HomePage() {
         classUnsubsRef.current = [];
         
         const activityMap: Record<string, ActivityItem[]> = {};
+
+        if (snapshot.empty) {
+            setFirestoreActivity([]);
+            setIsLoading(false);
+        }
 
         snapshot.docs.forEach(classDoc => {
             const classId = classDoc.id;
@@ -92,6 +102,7 @@ export default function HomePage() {
                 activityMap[classId] = requests;
                 const combined = Object.values(activityMap).flat();
                 setFirestoreActivity(combined);
+                setIsLoading(false);
             });
             
             classUnsubsRef.current.push(unsubRequests);
@@ -131,10 +142,14 @@ export default function HomePage() {
   }, [user, firestoreActivity]);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-        loadActivities();
-        window.addEventListener('teachmeet_activity_updated', loadActivities);
-        return () => window.removeEventListener('teachmeet_activity_updated', loadActivities);
+    if (!authLoading) {
+        if (isAuthenticated) {
+            loadActivities();
+            window.addEventListener('teachmeet_activity_updated', loadActivities);
+            return () => window.removeEventListener('teachmeet_activity_updated', loadActivities);
+        } else {
+            setIsLoading(false);
+        }
     }
   }, [authLoading, isAuthenticated, loadActivities]);
 
@@ -148,7 +163,19 @@ export default function HomePage() {
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
                 <History className="mr-3 h-6 w-6" /> Latest Activity
             </h2>
-            {isLoading ? (
+            {authLoading ? (
+                <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
+            ) : !isAuthenticated ? (
+                <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-4">
+                    <p className="text-sm">Sign in to see your latest activity.</p>
+                    <Button asChild variant="outline" size="sm" className="rounded-lg">
+                        <Link href="/auth/signin">
+                            <LogIn className="mr-2 h-4 w-4" />
+                            Sign In
+                        </Link>
+                    </Button>
+                </div>
+            ) : isLoading ? (
                 <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
             ) : allActivity.length > 0 ? (
                 <ul className="space-y-3 text-left">
