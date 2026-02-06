@@ -297,10 +297,10 @@ export default function CheckingPage() {
                 </div>
             </header>
 
-            <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
+            <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden relative">
                 <Card className={cn(
-                    "flex flex-col overflow-hidden shadow-lg border-border/50 relative transition-all duration-300",
-                    isExpanded ? "lg:col-span-3 h-full" : "lg:col-span-2"
+                    "flex flex-col overflow-hidden shadow-lg border-border/50 transition-all duration-300",
+                    isExpanded ? "absolute inset-0 z-50 bg-background" : "lg:col-span-2 relative"
                 )}>
                     <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                         <CardTitle className="text-sm flex items-center gap-2">
@@ -387,7 +387,7 @@ export default function CheckingPage() {
                                 size="icon" 
                                 onClick={() => setIsExpanded(!isExpanded)} 
                                 className="h-8 w-8 rounded-md"
-                                title={isExpanded ? "Restore view" : "Expand to full page width"}
+                                title={isExpanded ? "Restore view" : "Expand to full area"}
                             >
                                 {isExpanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                             </Button>
@@ -429,7 +429,7 @@ export default function CheckingPage() {
                 </Card>
 
                 {!isExpanded && (
-                    <aside className="space-y-6 overflow-y-auto pr-1 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <aside className="lg:col-span-1 space-y-6 overflow-y-auto pr-1 animate-in fade-in slide-in-from-right-4 duration-300 h-full">
                         <Card className="shadow-lg border-border/50">
                             <CardHeader>
                                 <CardTitle className="text-lg flex items-center gap-2">
