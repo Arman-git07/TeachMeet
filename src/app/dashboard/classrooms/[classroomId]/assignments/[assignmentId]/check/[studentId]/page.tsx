@@ -85,7 +85,7 @@ export default function CheckingPage() {
                 studentName: "Demo Student",
                 submissionUrl: demoType === 'image' 
                     ? "https://picsum.photos/seed/doc/800/2000" 
-                    : "https://www.africau.edu/images/default/sample.pdf", // Use a reliable sample PDF
+                    : "https://www.africau.edu/images/default/sample.pdf", 
                 grade: null,
                 feedback: ""
             });
@@ -462,7 +462,7 @@ export default function CheckingPage() {
                                 ref={canvasRef}
                                 className={cn(
                                     "absolute top-0 left-0 z-10 touch-none",
-                                    isMarkupMode ? "opacity-100" : "pointer-events-none opacity-0"
+                                    isMarkupMode ? "opacity-100" : "pointer-events-none opacity-100"
                                 )}
                                 onPointerDown={handlePointerDown}
                                 onPointerMove={handlePointerMove}
