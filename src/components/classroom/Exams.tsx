@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Loader2, Play, Eye, Upload, FileText } from 'lucide-react';
+import { PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Loader2, Play, Eye, Upload, FileText, CheckCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -458,7 +458,7 @@ export function Exams() {
                                         {userRole === 'student' ? (
                                             mySub ? (
                                                 <Button variant="outline" className="w-full" onClick={() => setIsViewingResults(mySub)}>
-                                                    <Eye className="mr-2 h-4 w-4" /> {mySub.grade != null ? "View Result" : "Waiting for Grading"}
+                                                    <Eye className="mr-2 h-4 w-4" /> {mySub.grade != null || mySub.percentage != null ? "View Result" : "Waiting for Grading"}
                                                 </Button>
                                             ) : isExpired ? (
                                                 <Button disabled variant="outline" className="w-full">Expired</Button>
@@ -470,34 +470,62 @@ export function Exams() {
                                                 </Button>
                                             )
                                         ) : (
-                                            <div className="w-full flex gap-2">
-                                                {exam.type === 'file' ? (
-                                                    <Dialog>
-                                                        <DialogTrigger asChild><Button variant="outline" className="flex-1">Submissions ({submissions[exam.id]?.length || 0})</Button></DialogTrigger>
-                                                        <DialogContent className="max-w-md">
-                                                            <DialogHeader><DialogTitle>Exam Submissions</DialogTitle></DialogHeader>
-                                                            <ScrollArea className="max-h-[60vh] py-4">
-                                                                <div className="space-y-2">
-                                                                    {(submissions[exam.id] || []).map(sub => (
-                                                                        <div key={sub.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                                                            <div>
-                                                                                <p className="text-sm font-medium">{sub.studentName}</p>
-                                                                                {sub.grade != null && <p className="text-[10px] text-primary font-bold">Grade: {sub.grade}%</p>}
-                                                                            </div>
-                                                                            <Button asChild variant="outline" size="sm">
-                                                                                <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/check/${sub.studentId}`}>Check</Link>
-                                                                            </Button>
-                                                                        </div>
-                                                                    ))}
-                                                                    {(submissions[exam.id] || []).length === 0 && <p className="text-center text-sm text-muted-foreground">No submissions yet.</p>}
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" className="w-full">
+                                                        Submissions ({submissions[exam.id]?.length || 0})
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="sm:max-w-2xl">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Submissions: {exam.title}</DialogTitle>
+                                                        <DialogDescription>
+                                                            {exam.type === 'file' 
+                                                                ? 'View uploaded papers and grade them using the markup tool.'
+                                                                : 'Overview of automatically graded student results.'}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <ScrollArea className="max-h-[60vh] mt-4">
+                                                        <div className="space-y-3 px-1">
+                                                            {(submissions[exam.id] || []).length === 0 ? (
+                                                                <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                                                                    <p>No student submissions yet.</p>
                                                                 </div>
-                                                            </ScrollArea>
-                                                        </DialogContent>
-                                                    </Dialog>
-                                                ) : (
-                                                    <Button variant="outline" className="flex-1" onClick={() => toast({ title: "Auto Exam", description: "This exam is graded automatically." })}>Summary View</Button>
-                                                )}
-                                            </div>
+                                                            ) : (
+                                                                (submissions[exam.id] || []).map(sub => (
+                                                                    <div key={sub.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border/50">
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="font-bold text-foreground truncate">{sub.studentName}</p>
+                                                                            <p className="text-[10px] text-muted-foreground uppercase">Submitted: {new Date(sub.submittedAt?.toDate()).toLocaleString()}</p>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-4">
+                                                                            {sub.percentage != null || sub.grade != null ? (
+                                                                                <Badge className="bg-primary/20 text-primary hover:bg-primary/20 border-none font-bold">
+                                                                                    {sub.percentage ?? sub.grade}%
+                                                                                </Badge>
+                                                                            ) : (
+                                                                                <Badge variant="outline">Pending</Badge>
+                                                                            )}
+                                                                            
+                                                                            {exam.type === 'file' ? (
+                                                                                <Button asChild size="sm" className="rounded-lg h-9">
+                                                                                    <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/check/${sub.studentId}`}>
+                                                                                        {sub.percentage != null ? "Edit Marks" : "Check Paper"}
+                                                                                    </Link>
+                                                                                </Button>
+                                                                            ) : (
+                                                                                <Button variant="ghost" size="sm" onClick={() => setIsViewingResults(sub)}>
+                                                                                    <Eye className="h-4 w-4 mr-1.5" /> Results
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </ScrollArea>
+                                                </DialogContent>
+                                            </Dialog>
                                         )}
                                     </CardFooter>
                                 </Card>
@@ -584,47 +612,51 @@ export function Exams() {
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Exam Results</DialogTitle>
-                        <DialogDescription>Your private marks and feedback.</DialogDescription>
+                        <DialogDescription>Detailed marks and feedback breakdown.</DialogDescription>
                     </DialogHeader>
                     {isViewingResults && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-center bg-primary/10 p-6 rounded-xl border border-primary/20">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium text-primary">Your Score</p>
-                                    <p className="text-3xl font-bold">{isViewingResults.score} / {isViewingResults.total || '100'}</p>
+                                    <p className="text-sm font-medium text-primary">Score Details</p>
+                                    <p className="text-3xl font-bold">{isViewingResults.score != null ? `${isViewingResults.score} / ${isViewingResults.total || '100'}` : 'Final Marks'}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-primary">Percentage</p>
-                                    <p className="text-4xl font-black text-primary">{isViewingResults.percentage || 0}%</p>
+                                    <p className="text-4xl font-black text-primary">{isViewingResults.percentage ?? isViewingResults.grade ?? 0}%</p>
                                 </div>
                             </div>
                             
                             {isViewingResults.checkedUrl && (
-                                <Button asChild className="w-full btn-gel">
-                                    <a href={isViewingResults.checkedUrl} target="_blank" rel="noreferrer">View Checked Paper (Markup)</a>
+                                <Button asChild className="w-full btn-gel h-12 rounded-xl text-lg">
+                                    <a href={isViewingResults.checkedUrl} target="_blank" rel="noreferrer">
+                                        <CheckCircle className="mr-2 h-5 w-5" /> View Checked Answer Sheet
+                                    </a>
                                 </Button>
                             )}
 
                             {isViewingResults.feedback && (
-                                <Card className="p-4 bg-muted/30">
+                                <Card className="p-4 bg-muted/30 border-none rounded-xl">
                                     <Label className="text-xs uppercase text-muted-foreground font-bold">Teacher's Feedback</Label>
-                                    <p className="mt-2 text-sm italic">"{isViewingResults.feedback}"</p>
+                                    <p className="mt-2 text-sm italic leading-relaxed">"{isViewingResults.feedback}"</p>
                                 </Card>
                             )}
                             
-                            <ScrollArea className="max-h-[40vh] pr-4">
-                                <div className="space-y-4">
-                                    {isViewingResults.results?.map((res: any, i: number) => (
-                                        <div key={i} className={cn("p-4 rounded-lg border", res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100")}>
-                                            <p className="font-semibold text-sm mb-3">Q{i+1}: {res.question}</p>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                                                <div><p className="text-muted-foreground uppercase font-bold">Your Answer</p><p className={cn("font-medium", res.isCorrect ? "text-green-700" : "text-red-700")}>{res.studentAnswer || '(Empty)'}</p></div>
-                                                {!res.isCorrect && <div><p className="text-muted-foreground uppercase font-bold">Correct Answer</p><p className="font-medium text-green-700">{res.correctAnswer}</p></div>}
+                            {isViewingResults.results && (
+                                <ScrollArea className="max-h-[40vh] pr-4">
+                                    <div className="space-y-4">
+                                        {isViewingResults.results?.map((res: any, i: number) => (
+                                            <div key={i} className={cn("p-4 rounded-lg border", res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100")}>
+                                                <p className="font-semibold text-sm mb-3">Q{i+1}: {res.question}</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                                                    <div><p className="text-muted-foreground uppercase font-bold">Your Answer</p><p className={cn("font-medium", res.isCorrect ? "text-green-700" : "text-red-700")}>{res.studentAnswer || '(Empty)'}</p></div>
+                                                    {!res.isCorrect && <div><p className="text-muted-foreground uppercase font-bold">Correct Answer</p><p className="font-medium text-green-700">{res.correctAnswer}</p></div>}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            )}
                         </div>
                     )}
                     <DialogFooter><DialogClose asChild><Button variant="secondary" className="rounded-lg">Close</Button></DialogClose></DialogFooter>
