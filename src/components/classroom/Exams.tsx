@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useState, useEffect, useCallback } from 'react';
+import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
 import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
@@ -37,22 +38,26 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Loader2, Play, Eye } from 'lucide-react';
+import { PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Loader2, Play, Eye, Upload, FileText } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
 import type { Exam } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 const examSchema = z.object({
     title: z.string().min(1, "Exam title is required"),
     startDate: z.date({ required_error: "Start date is required" }),
     endDate: z.date({ required_error: "End date is required" }),
+    type: z.enum(['text', 'file']),
     questions: z.array(z.object({
         type: z.enum(['qa', 'mcq']),
         question: z.string().min(1, 'Required'),
         answer: z.string().min(1, 'Correct answer is required for auto-grading'),
-        options: z.array(z.string()).optional(), // Only for MCQ
-    })).min(1, "At least one question is required"),
+        options: z.array(z.string()).optional(),
+    })).optional(),
+    examFile: z.any().optional(),
 }).refine(data => data.endDate > data.startDate, {
     message: "End date must be after start date",
     path: ["endDate"]
@@ -62,6 +67,7 @@ export function Exams() {
     const { classroomId, user, userRole } = useClassroom();
     const { toast } = useToast();
     const [exams, setExams] = useState<Exam[]>([]);
+    const [submissions, setSubmissions] = useState<Record<string, any[]>>({});
     const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>({});
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isTakingExam, setIsTakingExam] = useState<Exam | null>(null);
@@ -69,12 +75,13 @@ export function Exams() {
     const [examAnswers, setExamAnswers] = useState<Record<number, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [examType, setExamType] = useState<'text' | 'file'>('text');
 
     const canUserManage = canManage(userRole);
     
     const examForm = useForm<z.infer<typeof examSchema>>({ 
         resolver: zodResolver(examSchema),
-        defaultValues: { questions: [] }
+        defaultValues: { questions: [], type: 'text' }
     });
     
     const { fields, append, remove } = useFieldArray({ control: examForm.control, name: "questions" });
@@ -99,35 +106,62 @@ export function Exams() {
         
         const unsubs = exams.map(exam => {
             const subRef = doc(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions', user.uid);
-            return onSnapshot(subRef, (docSnap) => {
+            const unsubUser = onSnapshot(subRef, (docSnap) => {
                 if (docSnap.exists()) {
                     setUserSubmissions(prev => ({ ...prev, [exam.id]: docSnap.data() }));
                 }
             });
-        });
+
+            if (canUserManage) {
+                const allSubsQuery = query(collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions'));
+                const unsubAll = onSnapshot(allSubsQuery, (snap) => {
+                    setSubmissions(prev => ({ ...prev, [exam.id]: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+                });
+                return [unsubUser, unsubAll];
+            }
+            return [unsubUser];
+        }).flat();
         
         return () => unsubs.forEach(unsub => unsub());
-    }, [classroomId, user, exams]);
+    }, [classroomId, user, exams, canUserManage]);
 
     const onExamSubmit = useCallback(async (data: z.infer<typeof examSchema>) => {
-        if (!canUserManage || !user) return;
+        if (!canUserManage || !user || !classroomId) return;
+        setIsSubmitting(true);
         try {
+            let fileUrl = "";
+            let storagePath = "";
+
+            if (examType === 'file' && data.examFile?.[0]) {
+                const file = data.examFile[0];
+                const path = `classrooms/${classroomId}/exams/papers/${Date.now()}-${file.name}`;
+                const fileRef = storageRef(storage, path);
+                const snapshot = await uploadBytes(fileRef, file);
+                fileUrl = await getDownloadURL(snapshot.ref);
+                storagePath = path;
+            }
+
             await addDoc(collection(db, 'classrooms', classroomId, 'exams'), { 
                 title: data.title, 
-                startDate: data.startDate, 
-                endDate: data.endDate,
+                startDate: Timestamp.fromDate(data.startDate), 
+                endDate: Timestamp.fromDate(data.endDate),
                 authorId: user.uid, 
-                questions: data.questions, 
-                type: 'text', 
+                questions: examType === 'text' ? data.questions : null,
+                fileUrl: examType === 'file' ? fileUrl : null,
+                storagePath: examType === 'file' ? storagePath : null,
+                type: examType, 
                 createdAt: serverTimestamp() 
             });
-            toast({ title: "Exam Published!", description: "Students can now see and take this exam during the scheduled window." });
+
+            toast({ title: "Exam Published!" });
             setIsCreateDialogOpen(false);
             examForm.reset({ questions: [] });
         } catch (error) {
             toast({ variant: 'destructive', title: "Failed to create exam" });
+        } finally {
+            setIsSubmitting(false);
         }
-    }, [canUserManage, user, classroomId, toast, examForm]);
+    }, [canUserManage, user, classroomId, toast, examForm, examType]);
 
     const handleSubmitExam = async () => {
         if (!isTakingExam || !user || !classroomId) return;
@@ -151,8 +185,8 @@ export function Exams() {
             const percentage = Math.round((score / questions.length) * 100);
 
             await setDoc(doc(db, 'classrooms', classroomId, 'exams', isTakingExam.id, 'submissions', user.uid), {
-                userId: user.uid,
-                userName: user.displayName || 'Anonymous',
+                studentId: user.uid,
+                studentName: user.displayName || 'Anonymous',
                 submittedAt: serverTimestamp(),
                 score,
                 total: questions.length,
@@ -160,16 +194,43 @@ export function Exams() {
                 results
             });
 
-            toast({ 
-                title: "Exam Submitted!", 
-                description: `You scored ${score}/${questions.length} (${percentage}%).` 
-            });
-            
+            toast({ title: "Exam Submitted!" });
             setIsTakingExam(null);
             setExamAnswers({});
         } catch (error) {
-            console.error("Submit error:", error);
             toast({ variant: 'destructive', title: "Submission Failed" });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleFileUploadSubmission = async (e: React.FormEvent<HTMLFormElement>, examId: string) => {
+        e.preventDefault();
+        if (!user || !classroomId) return;
+        const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
+        const file = fileInput?.files?.[0];
+        if (!file) return;
+
+        setIsSubmitting(true);
+        try {
+            const path = `classrooms/${classroomId}/exams/submissions/${examId}/${user.uid}-${file.name}`;
+            const fileRef = storageRef(storage, path);
+            const snapshot = await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(snapshot.ref);
+
+            await setDoc(doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid), {
+                studentId: user.uid,
+                studentName: user.displayName || 'Anonymous',
+                submittedAt: serverTimestamp(),
+                submissionUrl: url,
+                storagePath: path,
+                grade: null,
+                feedback: null
+            });
+
+            toast({ title: "Answers Uploaded Successfully!" });
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Upload Failed" });
         } finally {
             setIsSubmitting(false);
         }
@@ -181,7 +242,7 @@ export function Exams() {
                 <CardHeader className="flex flex-row items-center justify-between px-0">
                     <div>
                         <CardTitle className="text-2xl">Exams</CardTitle>
-                        <CardDescription>Scheduled tests and assessments with automatic grading.</CardDescription>
+                        <CardDescription>Scheduled tests and assessments.</CardDescription>
                     </div>
                     {canUserManage && (
                         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -191,8 +252,18 @@ export function Exams() {
                             <DialogContent className="sm:max-w-3xl max-h-[90dvh] flex flex-col p-0">
                                 <DialogHeader className="p-6 pb-4 border-b">
                                     <DialogTitle>Exam Paper Builder</DialogTitle>
-                                    <DialogDescription>Add questions and correct answers for automatic checking.</DialogDescription>
+                                    <DialogDescription>Create an auto-grading exam or upload a question paper for manual grading.</DialogDescription>
                                 </DialogHeader>
+                                
+                                <div className="p-6 pb-0">
+                                    <Tabs value={examType} onValueChange={(v) => setExamType(v as any)} className="w-full">
+                                        <TabsList className="grid w-full grid-cols-2">
+                                            <TabsTrigger value="text">Built-in (Auto Grading)</TabsTrigger>
+                                            <TabsTrigger value="file">Upload Paper (Manual Grading)</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+                                </div>
+
                                 <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit)} className="flex-1 overflow-y-auto p-6 space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2 md:col-span-2">
@@ -213,101 +284,113 @@ export function Exams() {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <Label className="text-lg font-bold">Questions</Label>
-                                            <div className="flex gap-2">
-                                                <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'qa', question: '', answer: '' })}>
-                                                    <PlusCircle className="mr-1.5 h-4 w-4" /> Add Q/A
-                                                </Button>
-                                                <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'mcq', question: '', answer: '', options: ['', '', '', ''] })}>
-                                                    <PlusCircle className="mr-1.5 h-4 w-4" /> Add MCQ
-                                                </Button>
+                                    {examType === 'file' ? (
+                                        <div className="space-y-4 p-6 border-2 border-dashed rounded-xl bg-muted/30 text-center">
+                                            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                                                <Upload className="h-6 w-6 text-primary" />
+                                            </div>
+                                            <div>
+                                                <Label className="text-base font-bold">Upload Question Paper</Label>
+                                                <p className="text-sm text-muted-foreground mb-4">Upload PDF or Image. You will check student answers manually.</p>
+                                                <Input type="file" {...examForm.register('examFile')} className="max-w-xs mx-auto" />
                                             </div>
                                         </div>
-
-                                        {fields.length === 0 && (
-                                            <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground">
-                                                <ClipboardCheck className="mx-auto h-12 w-12 mb-2 opacity-20" />
-                                                <p>No questions added. Use the buttons above to start building.</p>
-                                            </div>
-                                        )}
-
-                                        {fields.map((field, index) => (
-                                            <Card key={field.id} className="relative overflow-hidden border-primary/10 shadow-sm">
-                                                <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-                                                <CardHeader className="py-3 flex flex-row items-center justify-between bg-muted/30">
-                                                    <Badge variant="outline" className="uppercase text-[10px]">
-                                                        {examForm.watch(`questions.${index}.type`) === 'mcq' ? 'Multiple Choice' : 'Short Answer'}
-                                                    </Badge>
-                                                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => remove(index)}>
-                                                        <Trash2 className="h-4 w-4"/>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-lg font-bold">Questions</Label>
+                                                <div className="flex gap-2">
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'qa', question: '', answer: '' })}>
+                                                        <PlusCircle className="mr-1.5 h-4 w-4" /> Add Q/A
                                                     </Button>
-                                                </CardHeader>
-                                                <CardContent className="pt-4 space-y-4">
-                                                    <div className="space-y-2">
-                                                        <Label className="text-xs font-bold text-muted-foreground uppercase">Question {index + 1}</Label>
-                                                        <Textarea 
-                                                            {...examForm.register(`questions.${index}.question` as const)} 
-                                                            placeholder="e.g., What is the unit of force?"
-                                                            className="resize-none"
-                                                        />
-                                                    </div>
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'mcq', question: '', answer: '', options: ['', '', '', ''] })}>
+                                                        <PlusCircle className="mr-1.5 h-4 w-4" /> Add MCQ
+                                                    </Button>
+                                                </div>
+                                            </div>
 
-                                                    {examForm.watch(`questions.${index}.type`) === 'mcq' && (
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                            {[0, 1, 2, 3].map((optIdx) => (
-                                                                <div key={optIdx} className="space-y-1">
-                                                                    <Label className="text-[10px] uppercase">Option {optIdx + 1}</Label>
-                                                                    <Input 
-                                                                        {...examForm.register(`questions.${index}.options.${optIdx}` as const)} 
-                                                                        placeholder={`Option ${optIdx + 1}`}
-                                                                    />
-                                                                </div>
-                                                            ))}
+                                            {fields.length === 0 && (
+                                                <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground">
+                                                    <ClipboardCheck className="mx-auto h-12 w-12 mb-2 opacity-20" />
+                                                    <p>No questions added yet.</p>
+                                                </div>
+                                            )}
+
+                                            {fields.map((field, index) => (
+                                                <Card key={field.id} className="relative overflow-hidden border-primary/10 shadow-sm">
+                                                    <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+                                                    <CardHeader className="py-3 flex flex-row items-center justify-between bg-muted/30">
+                                                        <Badge variant="outline" className="uppercase text-[10px]">
+                                                            {examForm.watch(`questions.${index}.type`) === 'mcq' ? 'Multiple Choice' : 'Short Answer'}
+                                                        </Badge>
+                                                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => remove(index)}>
+                                                            <Trash2 className="h-4 w-4"/>
+                                                        </Button>
+                                                    </CardHeader>
+                                                    <CardContent className="pt-4 space-y-4">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs font-bold text-muted-foreground uppercase">Question {index + 1}</Label>
+                                                            <Textarea 
+                                                                {...examForm.register(`questions.${index}.question` as const)} 
+                                                                placeholder="Type question here..."
+                                                                className="resize-none"
+                                                            />
                                                         </div>
-                                                    )}
 
-                                                    <div className="space-y-2 p-3 bg-primary/5 rounded-lg border border-primary/10">
-                                                        <Label className="text-xs font-bold text-primary uppercase flex items-center gap-1.5">
-                                                            <CheckCircle2 className="h-3.5 w-3.5" /> Correct Answer (System Only)
-                                                        </Label>
-                                                        {examForm.watch(`questions.${index}.type`) === 'mcq' ? (
-                                                            <Controller
-                                                                control={examForm.control}
-                                                                name={`questions.${index}.answer` as const}
-                                                                render={({ field }) => (
-                                                                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-4 mt-2">
-                                                                        {[0, 1, 2, 3].map(i => {
-                                                                            const val = examForm.watch(`questions.${index}.options.${i}`);
-                                                                            return (
-                                                                                <div key={i} className="flex items-center space-x-2">
-                                                                                    <RadioGroupItem value={val || `opt-${i}`} id={`q-${index}-opt-${i}`} disabled={!val} />
-                                                                                    <Label htmlFor={`q-${index}-opt-${i}`} className="text-sm">{val || `Option ${i+1}`}</Label>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </RadioGroup>
-                                                                )}
-                                                            />
-                                                        ) : (
-                                                            <Input 
-                                                                {...examForm.register(`questions.${index}.answer` as const)} 
-                                                                placeholder="The exact answer the system should look for..."
-                                                            />
+                                                        {examForm.watch(`questions.${index}.type`) === 'mcq' && (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                {[0, 1, 2, 3].map((optIdx) => (
+                                                                    <div key={optIdx}>
+                                                                        <Input 
+                                                                            {...examForm.register(`questions.${index}.options.${optIdx}` as const)} 
+                                                                            placeholder={`Option ${optIdx + 1}`}
+                                                                        />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
-                                                        <p className="text-[10px] text-muted-foreground italic mt-1">This answer will not be shown to students. It is used for automatic grading.</p>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
+
+                                                        <div className="space-y-2 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                                                            <Label className="text-xs font-bold text-primary uppercase flex items-center gap-1.5">
+                                                                <CheckCircle2 className="h-3.5 w-3.5" /> Correct Answer (System Only)
+                                                            </Label>
+                                                            {examForm.watch(`questions.${index}.type`) === 'mcq' ? (
+                                                                <Controller
+                                                                    control={examForm.control}
+                                                                    name={`questions.${index}.answer` as const}
+                                                                    render={({ field }) => (
+                                                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-4 mt-2">
+                                                                            {[0, 1, 2, 3].map(i => {
+                                                                                const val = examForm.watch(`questions.${index}.options.${i}`);
+                                                                                return (
+                                                                                    <div key={i} className="flex items-center space-x-2">
+                                                                                        <RadioGroupItem value={val || `opt-${i}`} id={`q-${index}-opt-${i}`} disabled={!val} />
+                                                                                        <Label htmlFor={`q-${index}-opt-${i}`} className="text-sm">{val || `Option ${i+1}`}</Label>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </RadioGroup>
+                                                                    )}
+                                                                />
+                                                            ) : (
+                                                                <Input 
+                                                                    {...examForm.register(`questions.${index}.answer` as const)} 
+                                                                    placeholder="Exact answer for auto-grading..."
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    )}
                                 </form>
                                 <DialogFooter className="p-6 border-t bg-muted/10">
                                     <DialogClose asChild>
                                         <Button variant="outline" type="button">Cancel</Button>
                                     </DialogClose>
-                                    <Button type="submit" form="exam-form" disabled={fields.length === 0}>
+                                    <Button type="submit" form="exam-form" disabled={isSubmitting || (examType === 'text' && fields.length === 0)}>
+                                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null}
                                         Publish Exam
                                     </Button>
                                 </DialogFooter>
@@ -326,10 +409,10 @@ export function Exams() {
                             const isExpired = end && currentTime > end;
 
                             return (
-                                <Card key={exam.id} className="shadow-md hover:shadow-lg transition-shadow border-border/50 group flex flex-col">
+                                <Card key={exam.id} className="shadow-md border-border/50 group flex flex-col">
                                     <CardHeader className="pb-2">
                                         <div className="flex justify-between items-start">
-                                            <CardTitle className="text-lg leading-tight">{exam.title}</CardTitle>
+                                            <CardTitle className="text-lg">{exam.title}</CardTitle>
                                             {canUserManage && (
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
@@ -340,9 +423,7 @@ export function Exams() {
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                Are you sure you want to delete "{exam.title}"? This action cannot be undone and will remove all associated student scores.
-                                                            </AlertDialogDescription>
+                                                            <AlertDialogDescription>Remove this exam and all student submissions?</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -351,7 +432,7 @@ export function Exams() {
                                                                     await deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id)); 
                                                                     toast({ title: "Exam Deleted" }); 
                                                                 }}
-                                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                                className="bg-destructive"
                                                             >
                                                                 Delete
                                                             </AlertDialogAction>
@@ -361,39 +442,62 @@ export function Exams() {
                                             )}
                                         </div>
                                         <div className="space-y-1 mt-2">
-                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-bold">
-                                                <Clock className="h-3 w-3" /> Starts: {start?.toLocaleString()}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-bold">
-                                                <Clock className="h-3 w-3" /> Ends: {end?.toLocaleString()}
-                                            </div>
+                                            <p className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+                                                <Clock className="h-3 w-3" /> {start?.toLocaleString()} - {end?.toLocaleString()}
+                                            </p>
+                                            <Badge variant="outline" className="text-[10px] h-5">{exam.type === 'file' ? 'Manual Grading' : 'Auto Grading'}</Badge>
                                         </div>
                                     </CardHeader>
                                     <CardContent className="flex-grow pt-2">
                                         {isLive && <Badge className="bg-green-500 hover:bg-green-500 animate-pulse">Live Now</Badge>}
                                         {isUpcoming && <Badge variant="secondary">Upcoming</Badge>}
                                         {isExpired && <Badge variant="outline">Ended</Badge>}
-                                        {mySub && <Badge className="ml-2 bg-primary/20 text-primary hover:bg-primary/20 border-none">Completed</Badge>}
+                                        {mySub && <Badge className="ml-2 bg-primary/20 text-primary hover:bg-primary/20">Submitted</Badge>}
                                     </CardContent>
                                     <CardFooter className="pt-2">
                                         {userRole === 'student' ? (
                                             mySub ? (
-                                                <Button variant="outline" className="w-full rounded-lg" onClick={() => setIsViewingResults(mySub)}>
-                                                    <Eye className="mr-2 h-4 w-4" /> View My Results
+                                                <Button variant="outline" className="w-full" onClick={() => setIsViewingResults(mySub)}>
+                                                    <Eye className="mr-2 h-4 w-4" /> {mySub.grade != null ? "View Result" : "Waiting for Grading"}
                                                 </Button>
                                             ) : isExpired ? (
-                                                <Button disabled variant="outline" className="w-full rounded-lg">Time Expired</Button>
+                                                <Button disabled variant="outline" className="w-full">Expired</Button>
                                             ) : isUpcoming ? (
-                                                <Button disabled variant="outline" className="w-full rounded-lg">Not Started</Button>
+                                                <Button disabled variant="outline" className="w-full">Upcoming</Button>
                                             ) : (
-                                                <Button className="w-full btn-gel rounded-lg" onClick={() => setIsTakingExam(exam)}>
+                                                <Button className="w-full btn-gel" onClick={() => setIsTakingExam(exam)}>
                                                     <Play className="mr-2 h-4 w-4" /> Start Exam
                                                 </Button>
                                             )
                                         ) : (
-                                            <Button variant="outline" className="w-full" onClick={() => toast({ title: "Teacher Review", description: "You can view all student scores in the classroom participants management area." })}>
-                                                Teacher View
-                                            </Button>
+                                            <div className="w-full flex gap-2">
+                                                {exam.type === 'file' ? (
+                                                    <Dialog>
+                                                        <DialogTrigger asChild><Button variant="outline" className="flex-1">Submissions ({submissions[exam.id]?.length || 0})</Button></DialogTrigger>
+                                                        <DialogContent className="max-w-md">
+                                                            <DialogHeader><DialogTitle>Exam Submissions</DialogTitle></DialogHeader>
+                                                            <ScrollArea className="max-h-[60vh] py-4">
+                                                                <div className="space-y-2">
+                                                                    {(submissions[exam.id] || []).map(sub => (
+                                                                        <div key={sub.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">{sub.studentName}</p>
+                                                                                {sub.grade != null && <p className="text-[10px] text-primary font-bold">Grade: {sub.grade}%</p>}
+                                                                            </div>
+                                                                            <Button asChild variant="outline" size="sm">
+                                                                                <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/check/${sub.studentId}`}>Check</Link>
+                                                                            </Button>
+                                                                        </div>
+                                                                    ))}
+                                                                    {(submissions[exam.id] || []).length === 0 && <p className="text-center text-sm text-muted-foreground">No submissions yet.</p>}
+                                                                </div>
+                                                            </ScrollArea>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                ) : (
+                                                    <Button variant="outline" className="flex-1" onClick={() => toast({ title: "Auto Exam", description: "This exam is graded automatically." })}>Summary View</Button>
+                                                )}
+                                            </div>
                                         )}
                                     </CardFooter>
                                 </Card>
@@ -401,116 +505,121 @@ export function Exams() {
                         }) : (
                             <div className="col-span-full text-center py-16 text-muted-foreground border-2 border-dashed rounded-2xl">
                                 <ClipboardCheck className="mx-auto h-16 w-16 mb-4 opacity-10" />
-                                <p className="text-lg font-medium">No exams scheduled yet.</p>
-                                <p className="text-sm">Teachers can create exams with specific start/end windows.</p>
+                                <p>No exams scheduled yet.</p>
                             </div>
                         )}
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Exam Taking Dialog */}
             <Dialog open={!!isTakingExam} onOpenChange={(open) => !open && !isSubmitting && setIsTakingExam(null)}>
-                <DialogContent className="sm:max-w-3xl max-h-[95dvh] flex flex-col p-0 overflow-hidden">
+                <DialogContent className="sm:max-w-3xl max-h-[95dvh] flex flex-col p-0">
                     <DialogHeader className="p-6 border-b bg-primary/5">
                         <DialogTitle className="text-2xl">{isTakingExam?.title}</DialogTitle>
-                        <DialogDescription>Please answer all questions. Your score will be calculated automatically upon submission.</DialogDescription>
+                        <DialogDescription>Submit your work before the deadline.</DialogDescription>
                     </DialogHeader>
                     
                     <ScrollArea className="flex-1 p-6 bg-muted/10">
-                        <div className="space-y-8 max-w-2xl mx-auto pb-12">
-                            {(isTakingExam as any)?.questions?.map((q: any, index: number) => (
-                                <div key={index} className="space-y-4 p-6 bg-background rounded-xl border shadow-sm relative">
-                                    <Badge className="absolute -top-3 left-4" variant="secondary">Question {index + 1}</Badge>
-                                    <p className="text-lg font-medium pt-2">{q.question}</p>
-                                    
-                                    {q.type === 'mcq' ? (
-                                        <RadioGroup onValueChange={(val) => setExamAnswers(prev => ({ ...prev, [index]: val }))} value={examAnswers[index]} className="space-y-3 mt-4">
-                                            {q.options?.map((opt: string, i: number) => (
-                                                <div key={i} className={cn(
-                                                    "flex items-center space-x-3 p-3 rounded-lg border hover:bg-primary/5 transition-colors cursor-pointer",
-                                                    examAnswers[index] === opt && "border-primary bg-primary/5"
-                                                )}>
-                                                    <RadioGroupItem value={opt} id={`exam-q-${index}-opt-${i}`} />
-                                                    <Label htmlFor={`exam-q-${index}-opt-${i}`} className="flex-grow cursor-pointer">{opt}</Label>
-                                                </div>
-                                            ))}
-                                        </RadioGroup>
-                                    ) : (
-                                        <div className="mt-4">
-                                            <Label className="text-xs uppercase text-muted-foreground mb-1 block">Your Answer</Label>
-                                            <Input 
-                                                value={examAnswers[index] || ''} 
-                                                onChange={(e) => setExamAnswers(prev => ({ ...prev, [index]: e.target.value }))}
-                                                placeholder="Type your answer here..."
-                                                className="rounded-lg h-12"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                        {isTakingExam?.type === 'file' ? (
+                            <div className="space-y-6 max-w-2xl mx-auto">
+                                <Card className="p-6">
+                                    <h3 className="font-bold flex items-center gap-2 mb-4"><FileText className="h-5 w-5 text-primary" /> Question Paper</h3>
+                                    <Button asChild className="w-full btn-gel">
+                                        <a href={isTakingExam.fileUrl} target="_blank" rel="noreferrer">Download / View Paper</a>
+                                    </Button>
+                                </Card>
+                                <Card className="p-6">
+                                    <h3 className="font-bold mb-2">Your Answer Sheet</h3>
+                                    <p className="text-sm text-muted-foreground mb-4">Upload your handwritten or typed answers here.</p>
+                                    <form onSubmit={(e) => handleFileUploadSubmission(e, isTakingExam.id)} className="space-y-4">
+                                        <Input type="file" required disabled={isSubmitting} />
+                                        <Button type="submit" className="w-full" disabled={isSubmitting}>
+                                            {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : "Upload & Submit"}
+                                        </Button>
+                                    </form>
+                                </Card>
+                            </div>
+                        ) : (
+                            <div className="space-y-8 max-w-2xl mx-auto pb-12">
+                                {(isTakingExam as any)?.questions?.map((q: any, index: number) => (
+                                    <div key={index} className="space-y-4 p-6 bg-background rounded-xl border shadow-sm relative">
+                                        <Badge className="absolute -top-3 left-4" variant="secondary">Question {index + 1}</Badge>
+                                        <p className="text-lg font-medium pt-2">{q.question}</p>
+                                        {q.type === 'mcq' ? (
+                                            <RadioGroup onValueChange={(val) => setExamAnswers(prev => ({ ...prev, [index]: val }))} value={examAnswers[index]} className="space-y-3 mt-4">
+                                                {q.options?.map((opt: string, i: number) => (
+                                                    <div key={i} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-primary/5 cursor-pointer">
+                                                        <RadioGroupItem value={opt} id={`exam-q-${index}-opt-${i}`} />
+                                                        <Label htmlFor={`exam-q-${index}-opt-${i}`} className="flex-grow cursor-pointer">{opt}</Label>
+                                                    </div>
+                                                ))}
+                                            </RadioGroup>
+                                        ) : (
+                                            <div className="mt-4">
+                                                <Label className="text-xs uppercase text-muted-foreground mb-1 block">Your Answer</Label>
+                                                <Input 
+                                                    value={examAnswers[index] || ''} 
+                                                    onChange={(e) => setExamAnswers(prev => ({ ...prev, [index]: e.target.value }))}
+                                                    placeholder="Type answer here..."
+                                                    className="rounded-lg h-12"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                <Button 
+                                    className="w-full btn-gel h-12 text-lg rounded-xl" 
+                                    onClick={handleSubmitExam} 
+                                    disabled={isSubmitting || Object.keys(examAnswers).length < ((isTakingExam as any)?.questions?.length || 0)}
+                                >
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Submit All Answers"}
+                                </Button>
+                            </div>
+                        )}
                     </ScrollArea>
-
-                    <DialogFooter className="p-6 t border-t bg-background">
-                        <Button 
-                            variant="ghost" 
-                            onClick={() => setIsTakingExam(null)} 
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button 
-                            className="btn-gel px-8 rounded-lg" 
-                            onClick={handleSubmitExam} 
-                            disabled={isSubmitting || Object.keys(examAnswers).length < ((isTakingExam as any)?.questions?.length || 0)}
-                        >
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ClipboardCheck className="mr-2 h-4 w-4" />}
-                            Submit Exam
-                        </Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Results Viewing Dialog */}
             <Dialog open={!!isViewingResults} onOpenChange={(open) => !open && setIsViewingResults(null)}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Exam Results</DialogTitle>
-                        <DialogDescription>Only you can see these results.</DialogDescription>
+                        <DialogDescription>Your private marks and feedback.</DialogDescription>
                     </DialogHeader>
                     {isViewingResults && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-center bg-primary/10 p-6 rounded-xl border border-primary/20">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium text-primary">Your Total Score</p>
-                                    <p className="text-3xl font-bold">{isViewingResults.score} / {isViewingResults.total}</p>
+                                    <p className="text-sm font-medium text-primary">Your Score</p>
+                                    <p className="text-3xl font-bold">{isViewingResults.score} / {isViewingResults.total || '100'}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-primary">Percentage</p>
-                                    <p className="text-4xl font-black text-primary">{isViewingResults.percentage}%</p>
+                                    <p className="text-4xl font-black text-primary">{isViewingResults.percentage || 0}%</p>
                                 </div>
                             </div>
                             
-                            <ScrollArea className="max-h-[50vh] pr-4">
+                            {isViewingResults.checkedUrl && (
+                                <Button asChild className="w-full btn-gel">
+                                    <a href={isViewingResults.checkedUrl} target="_blank" rel="noreferrer">View Checked Paper (Markup)</a>
+                                </Button>
+                            )}
+
+                            {isViewingResults.feedback && (
+                                <Card className="p-4 bg-muted/30">
+                                    <Label className="text-xs uppercase text-muted-foreground font-bold">Teacher's Feedback</Label>
+                                    <p className="mt-2 text-sm italic">"{isViewingResults.feedback}"</p>
+                                </Card>
+                            )}
+                            
+                            <ScrollArea className="max-h-[40vh] pr-4">
                                 <div className="space-y-4">
                                     {isViewingResults.results?.map((res: any, i: number) => (
-                                        <div key={i} className={cn(
-                                            "p-4 rounded-lg border",
-                                            res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
-                                        )}>
+                                        <div key={i} className={cn("p-4 rounded-lg border", res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100")}>
                                             <p className="font-semibold text-sm mb-3">Q{i+1}: {res.question}</p>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                                                <div className="space-y-1">
-                                                    <p className="text-muted-foreground uppercase font-bold">Your Answer</p>
-                                                    <p className={cn("font-medium", res.isCorrect ? "text-green-700" : "text-red-700")}>{res.studentAnswer || '(No answer provided)'}</p>
-                                                </div>
-                                                {!res.isCorrect && (
-                                                    <div className="space-y-1">
-                                                        <p className="text-muted-foreground uppercase font-bold">Correct Answer</p>
-                                                        <p className="font-medium text-green-700">{res.correctAnswer}</p>
-                                                    </div>
-                                                )}
+                                                <div><p className="text-muted-foreground uppercase font-bold">Your Answer</p><p className={cn("font-medium", res.isCorrect ? "text-green-700" : "text-red-700")}>{res.studentAnswer || '(Empty)'}</p></div>
+                                                {!res.isCorrect && <div><p className="text-muted-foreground uppercase font-bold">Correct Answer</p><p className="font-medium text-green-700">{res.correctAnswer}</p></div>}
                                             </div>
                                         </div>
                                     ))}
@@ -518,9 +627,7 @@ export function Exams() {
                             </ScrollArea>
                         </div>
                     )}
-                    <DialogFooter>
-                        <DialogClose asChild><Button variant="secondary" className="rounded-lg">Close</Button></DialogClose>
-                    </DialogFooter>
+                    <DialogFooter><DialogClose asChild><Button variant="secondary" className="rounded-lg">Close</Button></DialogClose></DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
