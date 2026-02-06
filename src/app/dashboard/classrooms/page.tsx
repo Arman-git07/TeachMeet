@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -46,6 +47,7 @@ import {
   where,
   writeBatch,
   getDocs,
+  setDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -136,6 +138,9 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         await updateDoc(classroomRef, { title, description, isPublic });
         toast({ title: 'Classroom Updated' });
       } else {
+        const batch = writeBatch(db);
+        const classroomRef = doc(collection(db, 'classrooms'));
+        
         const classroomData = {
           title: title.trim(),
           description: description.trim(),
@@ -147,7 +152,28 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
           teachers: [{ uid: user.uid, name: user.displayName || 'Creator' }],
           createdAt: serverTimestamp(),
         };
-        await addDoc(collection(db, 'classrooms'), classroomData);
+        
+        batch.set(classroomRef, classroomData);
+
+        // Crucial Fix: Add the creator to participants and teachers sub-collections
+        // so that chat and other restricted features work immediately.
+        batch.set(doc(db, 'classrooms', classroomRef.id, 'participants', user.uid), {
+            uid: user.uid,
+            name: user.displayName || 'Creator',
+            photoURL: user.photoURL || '',
+            role: 'creator',
+            joinedAt: serverTimestamp(),
+        });
+
+        batch.set(doc(db, 'classrooms', classroomRef.id, 'teachers', user.uid), {
+            uid: user.uid,
+            name: user.displayName || 'Creator',
+            subject: 'Class Owner',
+            availability: 'Always',
+            addedAt: serverTimestamp(),
+        });
+
+        await batch.commit();
         toast({ title: 'Classroom Created' });
       }
       onSuccess();

@@ -95,6 +95,7 @@ service cloud.firestore {
       }
 
       match /messages/{messageId} {
+        // Chat messages are accessible by managers and approved participants
         allow read: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid));
         allow create: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid)) && request.resource.data.senderId == request.auth.uid;
       }
@@ -143,22 +144,6 @@ service cloud.firestore {
     }
 
     /**
-     * System Blocked Users Collection (Admin Only)
-     */
-    match /systemBlockedUsers/{userId} {
-        allow read, write: if false; // In a real app, you would restrict this to admin UIDs
-    }
-    
-    /**
-     * Reports Collection (Authenticated Users)
-     */
-    match /reports/{reportId} {
-        allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
-        allow read: if false; // Should only be readable by admins
-    }
-
-
-    /**
      * Helper Functions
      */
     function isSignedIn() {
@@ -178,8 +163,6 @@ service cloud.firestore {
     }
 
     function isStudent(classroomId, userId) {
-        // Checking if user is in students array or has a participant doc
-        // For efficiency, we check if they are enrolled in the classroom
         return exists(/databases/$(database)/documents/classrooms/$(classroomId)/participants/$(userId));
     }
     

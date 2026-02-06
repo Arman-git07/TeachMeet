@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -18,12 +18,10 @@ import { Input } from '@/components/ui/input';
 import { Mail, Lock, User, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useState } from 'react';
 import { Checkbox } from '../ui/checkbox';
-import { cn } from '@/lib/utils';
-import { isTemporaryEmail } from '@/lib/disposableEmailCheck';
-
 
 const formSchema = z.object({
   profileName: z.string().min(1, { message: 'Profile name is required.' }),
@@ -95,8 +93,18 @@ export function SignUpForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       
       if (userCredential.user) {
+        // 1. Update Auth Profile
         await updateProfile(userCredential.user, {
           displayName: values.profileName,
+        });
+        
+        // 2. Create User Document in Firestore (Crucial for Chat/Mentions)
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+            name: values.profileName,
+            email: values.email,
+            dateOfBirth: values.dateOfBirth || null,
+            photoURL: null,
+            createdAt: serverTimestamp(),
         });
         
         await sendEmailVerification(userCredential.user);
@@ -111,46 +119,14 @@ export function SignUpForm() {
       }
       
     } catch (error: any) {
-      if (error.code === 'auth/network-request-failed') {
-        toast({
-          variant: "destructive",
-          title: "Network Error",
-          description: "Could not connect to authentication services. This might be a network issue or a missing API configuration. Please check the developer console for details.",
-          duration: 7000,
-        });
-        setIsLoading(false);
-        return;
-      }
-      if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-         toast({
-          variant: "destructive",
-          title: "API Key Error",
-          description: "Authentication is blocked by your API key settings. Ensure the 'Identity Toolkit API' is enabled and allowed by your key.",
-          duration: 7000,
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const knownErrorCodes = [
-        'auth/email-already-in-use',
-        'auth/invalid-email',
-        'auth/weak-password'
-      ];
-
-      if (knownErrorCodes.includes(error.code)) {
-        console.info(`Handled Sign Up Error: ${error.code}`);
-      } else {
-        console.error("Unexpected Sign Up Error:", error);
-      }
-      
+      console.error("Sign Up Error:", error);
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "This email address is already in use. Please try another.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "The email address is not valid.";
+        errorMessage = "This email address is already in use.";
       } else if (error.code === 'auth/weak-password') {
-        errorMessage = "The password is too weak. Please choose a stronger password.";
+        errorMessage = "The password is too weak.";
+      } else if (error.code === 'permission-denied') {
+        errorMessage = "Data permission error. Account created but profile could not be saved.";
       }
       toast({
         variant: "destructive",
@@ -164,8 +140,8 @@ export function SignUpForm() {
   
   if (isVerificationSent) {
     return (
-      <div className="text-center space-y-6">
-        <Mail className="mx-auto h-12 w-12 text-primary" />
+      <div className="text-center space-y-6 bg-card p-8 rounded-2xl shadow-lg border border-border/50">
+        <Mail className="mx-auto h-12 w-12 text-primary animate-bounce" />
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">Verify Your Email</h2>
         <p className="text-muted-foreground">
           We've sent a verification link to your email address. Please click the link in the email to activate your account.
@@ -183,7 +159,7 @@ export function SignUpForm() {
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 bg-card p-6 rounded-2xl shadow-lg border border-border/50">
           <FormField
             control={form.control}
             name="profileName"
@@ -304,7 +280,7 @@ export function SignUpForm() {
           <Button type="submit" className="w-full btn-gel text-base py-3 rounded-lg mt-6" disabled={isLoading}>
             {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-sm text-muted-foreground mt-4">
             Already have an account?{' '}
             <Link href="/auth/signin" className="font-medium text-accent hover:text-accent/80 hover:underline">
               Sign In
@@ -315,5 +291,3 @@ export function SignUpForm() {
     </>
   );
 }
-
-    

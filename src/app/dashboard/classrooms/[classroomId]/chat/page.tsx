@@ -2,15 +2,14 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, MessageSquare, AtSign, Loader2, Mic, StopCircle, Volume2 } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams, useParams } from "next/navigation";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/components/ui/popover";
 import { db, storage } from "@/lib/firebase";
@@ -38,10 +37,9 @@ interface Participant {
 }
 
 export default function ClassroomChatPage() {
-  const { classroomId } = useParams() as { classroomId: string };
+  const params = useParams();
+  const classroomId = params?.classroomId as string;
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const topic = searchParams.get('topic') || "Classroom Chat";
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -53,51 +51,36 @@ export default function ClassroomChatPage() {
   
   const [isRecording, setIsRecording] = useState(false);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fetch Participants
+  // Fetch Participants for Mentions
   useEffect(() => {
-    async function fetchParticipants() {
-      if (!classroomId) return;
-      setIsLoadingParticipants(true);
-      try {
-        const classroomRef = doc(db, 'classrooms', classroomId);
-        const classroomSnap = await getDoc(classroomRef);
-
-        if (classroomSnap.exists()) {
-          const classroomData = classroomSnap.data();
-          const studentIds: string[] = classroomData.students || [];
-          const teacherData: any[] = classroomData.teachers || [];
-          
-          const allUserIds = [...new Set([...studentIds, ...teacherData.map(t => t.uid)])];
-
-          const profilesPromises = allUserIds.map(async (uid) => {
-            const userRef = doc(db, 'users', uid);
-            const userSnap = await getDoc(userRef);
-            if (userSnap.exists()) {
-              return { id: userSnap.id, ...userSnap.data() } as Participant;
-            }
-            return null;
-          });
-
-          const profiles = (await Promise.all(profilesPromises)).filter(p => p !== null) as Participant[];
-          setParticipants(profiles);
-        }
-      } catch (error) {
-        console.error("Failed to fetch participants:", error);
-      } finally {
+    if (!classroomId) return;
+    setIsLoadingParticipants(true);
+    
+    // Fetch from the participants subcollection directly for accurate classroom context
+    const unsub = onSnapshot(collection(db, 'classrooms', classroomId, 'participants'), (snapshot) => {
+        const list = snapshot.docs.map(doc => ({
+            id: doc.id,
+            name: doc.data().name || 'Anonymous',
+            photoURL: doc.data().photoURL
+        } as Participant));
+        setParticipants(list);
         setIsLoadingParticipants(false);
-      }
-    }
+    }, (err) => {
+        console.error("Mentions fetch failed:", err);
+        setIsLoadingParticipants(false);
+    });
 
-    fetchParticipants();
+    return () => unsub();
   }, [classroomId]);
 
-  // Real-time Messages
+  // Real-time Messages Listener
   useEffect(() => {
     if (!classroomId) return;
 
@@ -117,16 +100,24 @@ export default function ClassroomChatPage() {
         } as ChatMessage;
       });
       setMessages(fetchedMessages);
+      
+      // Auto-scroll to bottom
+      setTimeout(() => {
+        if (scrollViewportRef.current) {
+            scrollViewportRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }, 100);
+    }, (error) => {
+        console.error("Chat sync error:", error);
+        toast({ 
+            variant: 'destructive', 
+            title: "Chat Disconnected", 
+            description: "You may not have permission to view this chat. Ensure you are an approved member." 
+        });
     });
 
     return () => unsubscribe();
-  }, [classroomId, user]);
-
-  useEffect(() => {
-    if (scrollViewportRef.current) {
-        scrollViewportRef.current.scrollTo({ top: scrollViewportRef.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [messages]);
+  }, [classroomId, user, toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -164,9 +155,10 @@ export default function ClassroomChatPage() {
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !user || !classroomId) return;
+    if (!inputValue.trim() || !user || !classroomId || isSending) return;
 
     const textToSend = inputValue.trim();
+    setIsSending(true);
     setInputValue("");
     setShowMentions(false);
 
@@ -178,9 +170,18 @@ export default function ClassroomChatPage() {
         text: textToSend,
         timestamp: serverTimestamp(),
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to send message:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not send message." });
+      setInputValue(textToSend); // Restore input on failure
+      toast({ 
+        variant: 'destructive', 
+        title: "Message Failed", 
+        description: error.message?.includes('permission-denied') 
+            ? "You don't have permission to chat in this room." 
+            : "Could not send message. Please check your connection." 
+      });
+    } finally {
+      setIsSending(false);
     }
   };
   
@@ -210,7 +211,8 @@ export default function ClassroomChatPage() {
         toast({ id: toastId, title: "Sending voice note..." });
 
         try {
-          const audioRef = ref(storage, `classrooms/${classroomId}/audio/${user?.uid}-${Date.now()}.webm`);
+          const audioPath = `classrooms/${classroomId}/audio/${user?.uid}-${Date.now()}.webm`;
+          const audioRef = ref(storage, audioPath);
           await uploadBytes(audioRef, audioBlob);
           const audioUrl = await getDownloadURL(audioRef);
 
@@ -223,7 +225,7 @@ export default function ClassroomChatPage() {
           });
           toast.update(toastId, { title: "Voice note sent!" });
         } catch (error) {
-          console.error("Upload failed:", error);
+          console.error("Voice note upload failed:", error);
           toast.update(toastId, { variant: 'destructive', title: "Upload Failed" });
         }
       };
@@ -243,8 +245,8 @@ export default function ClassroomChatPage() {
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground truncate" title={topic}>
-              {topic} Chat
+            <h1 className="text-xl font-semibold text-foreground truncate">
+              Classroom Chat
             </h1>
           </div>
           <Button asChild variant="outline" size="sm" className="rounded-lg">
@@ -258,9 +260,9 @@ export default function ClassroomChatPage() {
 
       <main className="flex-grow flex flex-col overflow-hidden">
         <Card className="w-full h-full max-w-full shadow-none rounded-none border-0 flex flex-col">
-          <CardContent className="flex-grow p-0 overflow-hidden">
+          <CardContent className="flex-grow p-0 overflow-hidden bg-background">
             <ScrollArea className="h-full">
-                <div className="p-4 md:p-6 space-y-4" ref={scrollViewportRef}>
+                <div className="p-4 md:p-6 space-y-4">
                   {hasMicPermission === false && (
                     <Alert variant="destructive">
                       <AlertTitle>Microphone Access Denied</AlertTitle>
@@ -282,13 +284,13 @@ export default function ClassroomChatPage() {
                           "max-w-[75%] p-3 rounded-xl shadow-sm",
                           msg.isMe
                             ? "bg-primary text-primary-foreground rounded-br-none"
-                            : "bg-card text-card-foreground rounded-bl-none"
+                            : "bg-card text-card-foreground rounded-bl-none border"
                         )}
                       >
                         {!msg.isMe && <p className="text-[10px] font-bold mb-1 opacity-80 uppercase tracking-tight">{msg.senderName}</p>}
                         {msg.text && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>}
                         {msg.audioUrl && (
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 py-1 px-2 bg-black/5 rounded-lg">
                             <Volume2 className="h-4 w-4 opacity-70" />
                             <audio src={msg.audioUrl} controls className="h-8 max-w-[200px]" />
                           </div>
@@ -305,10 +307,11 @@ export default function ClassroomChatPage() {
                       )}
                     </div>
                   ))}
+                  <div ref={scrollViewportRef} />
                 </div>
               </ScrollArea>
           </CardContent>
-          <CardFooter className="p-4 border-t bg-background">
+          <CardFooter className="p-4 border-t bg-card">
             <div className="w-full relative">
                 <Popover open={showMentions} onOpenChange={setShowMentions}>
                   <PopoverAnchor asChild>
@@ -318,7 +321,7 @@ export default function ClassroomChatPage() {
                         value={inputValue}
                         onChange={handleInputChange}
                         placeholder="Type a message..."
-                        className="flex-grow rounded-xl border-border/80 focus:ring-primary text-sm min-h-[44px] max-h-[150px] py-3 shadow-inner"
+                        className="flex-grow rounded-xl border-border/80 focus:ring-primary text-sm min-h-[44px] max-h-[150px] py-3 shadow-inner resize-none"
                         rows={1}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
@@ -326,11 +329,18 @@ export default function ClassroomChatPage() {
                             handleSendMessage();
                           }
                         }}
+                        disabled={isSending}
                       />
                       <div className="flex flex-col gap-2 shrink-0">
-                        {inputValue.trim() ? (
-                          <Button type="button" size="icon" className="rounded-full btn-gel w-11 h-11" onClick={handleSendMessage}>
-                            <Send className="h-5 w-5" />
+                        {inputValue.trim() || isSending ? (
+                          <Button 
+                            type="button" 
+                            size="icon" 
+                            className="rounded-full btn-gel w-11 h-11" 
+                            onClick={handleSendMessage}
+                            disabled={!inputValue.trim() || isSending}
+                          >
+                            {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                           </Button>
                         ) : (
                           <Button 
@@ -345,10 +355,12 @@ export default function ClassroomChatPage() {
                       </div>
                     </div>
                   </PopoverAnchor>
-                  <PopoverContent onOpenAutoFocus={(e) => e.preventDefault()} className="w-72 p-1 space-y-1 max-h-60 overflow-y-auto rounded-xl">
+                  <PopoverContent onOpenAutoFocus={(e) => e.preventDefault()} className="w-72 p-1 space-y-1 max-h-60 overflow-y-auto rounded-xl shadow-xl">
                     <p className="text-[10px] font-bold uppercase text-muted-foreground px-3 py-2 border-b">Mention Someone</p>
                     {isLoadingParticipants ? (
                         <div className="flex items-center justify-center p-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground"/></div>
+                    ) : participants.length === 0 ? (
+                        <p className="text-xs text-center py-4 text-muted-foreground">No participants to mention</p>
                     ) : (
                       participants.map((p) => (
                         <Button
