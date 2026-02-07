@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Loader2, Play, Eye, Upload, FileText, CheckCircle } from 'lucide-react';
+import { PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Loader2, Play, Eye, Upload, CheckCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -74,6 +74,9 @@ export function Exams() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [examType, setExamType] = useState<'text' | 'file'>('text');
+
+    const [reschedulingExam, setReschedulingExam] = useState<Exam | null>(null);
+    const [rescheduleValue, setRescheduleValue] = useState("");
 
     const canUserManage = canManage(userRole);
     
@@ -200,6 +203,23 @@ export function Exams() {
         }
     }, [canUserManage, user, classroomId, toast, examForm, examType]);
 
+    const handleReschedule = async () => {
+        if (!reschedulingExam || !rescheduleValue || !classroomId) return;
+        setIsSubmitting(true);
+        try {
+            const examRef = doc(db, 'classrooms', classroomId, 'exams', reschedulingExam.id);
+            await updateDoc(examRef, {
+                endDate: Timestamp.fromDate(new Date(rescheduleValue))
+            });
+            toast({ title: "Deadline Updated" });
+            setReschedulingExam(null);
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Update Failed" });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleOpenResults = async (sub: any, examId: string) => {
         setIsViewingResults(sub);
         if (user && sub.studentId === user.uid && !sub.seenAt && (sub.grade != null || sub.percentage != null)) {
@@ -277,10 +297,10 @@ export function Exams() {
                                                 <Label className="text-base sm:text-lg font-bold">Questions</Label>
                                                 <div className="flex gap-2">
                                                     <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'qa', question: '', answer: '' })} className="text-[10px] sm:text-xs">
-                                                        <PlusCircle className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" /> Add Q/A
+                                                        <PlusCircle className="mr-1.5 h-3 w-3 sm:h-4 w-4" /> Add Q/A
                                                     </Button>
                                                     <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'mcq', question: '', answer: '', options: ['', '', '', ''] })} className="text-[10px] sm:text-xs">
-                                                        <PlusCircle className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" /> Add MCQ
+                                                        <PlusCircle className="mr-1.5 h-3 w-3 sm:h-4 w-4" /> Add MCQ
                                                     </Button>
                                                 </div>
                                             </div>
@@ -395,34 +415,51 @@ export function Exams() {
                             return (
                                 <Card key={exam.id} className="shadow-md border-border/50 group flex flex-col">
                                     <CardHeader className="pb-2">
-                                        <div className="flex justify-between items-start">
-                                            <CardTitle className="text-lg">{exam.title}</CardTitle>
+                                        <div className="flex justify-between items-start gap-2">
+                                            <CardTitle className="text-lg truncate flex-1">{exam.title}</CardTitle>
                                             {canUserManage && (
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <Trash2 className="h-4 w-4"/>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    {(userRole === 'creator' || exam.authorId === user?.uid) && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            title="Reschedule Deadline"
+                                                            onClick={() => {
+                                                                setReschedulingExam(exam);
+                                                                const d = exam.endDate?.toDate();
+                                                                if (d) setRescheduleValue(format(d, "yyyy-MM-dd'T'HH:mm"));
+                                                            }}
+                                                        >
+                                                            <Clock className="h-4 w-4"/>
                                                         </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent className="rounded-xl">
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
-                                                            <AlertDialogDescription>Remove this exam and all student submissions?</AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction 
-                                                                onClick={async () => { 
-                                                                    await deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id)); 
-                                                                    toast({ title: "Exam Deleted" }); 
-                                                                }}
-                                                                className="bg-destructive rounded-lg"
-                                                            >
-                                                                Delete
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
+                                                    )}
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <Trash2 className="h-4 w-4"/>
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent className="rounded-xl">
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
+                                                                <AlertDialogDescription>Remove this exam and all student submissions?</AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction 
+                                                                    onClick={async () => { 
+                                                                        await deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id)); 
+                                                                        toast({ title: "Exam Deleted" }); 
+                                                                    }}
+                                                                    className="bg-destructive rounded-lg"
+                                                                >
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
                                             )}
                                         </div>
                                         <div className="space-y-1 mt-2">
@@ -581,6 +618,34 @@ export function Exams() {
                         </div>
                     )}
                     <DialogFooter className="p-4 sm:p-6 border-t sm:border-none"><DialogClose asChild><Button variant="secondary" className="w-full sm:w-auto rounded-lg">Close</Button></DialogClose></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!reschedulingExam} onOpenChange={(open) => !open && setReschedulingExam(null)}>
+                <DialogContent className="sm:max-w-md w-[95vw] rounded-xl">
+                    <DialogHeader>
+                        <DialogTitle>Reschedule Exam Deadline</DialogTitle>
+                        <DialogDescription>Update the closing date and time for "{reschedulingExam?.title}".</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 sm:py-6 space-y-4">
+                        <div className="space-y-2">
+                            <Label>New End Date & Time</Label>
+                            <Input 
+                                type="datetime-local" 
+                                value={rescheduleValue} 
+                                onChange={(e) => setRescheduleValue(e.target.value)} 
+                                className="rounded-lg"
+                            />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic">Students already taking the exam will be cut off at this new time.</p>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setReschedulingExam(null)} className="rounded-lg">Cancel</Button>
+                        <Button onClick={handleReschedule} disabled={isSubmitting || !rescheduleValue} className="rounded-lg btn-gel">
+                            {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null}
+                            Update Deadline
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
