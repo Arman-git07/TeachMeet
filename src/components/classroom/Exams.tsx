@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -450,8 +449,8 @@ export function Exams() {
                                                                     onClick={() => { 
                                                                         const examRef = doc(db, "classrooms", classroomId!, "exams", exam.id);
                                                                         deleteDoc(examRef).catch(async (err) => {
-                                                                            const pErr = new FirestorePermissionError({ path: examRef.path, operation: 'delete' });
-                                                                            errorEmitter.emit('permission-error', pErr);
+                                                                            const pError = new FirestorePermissionError({ path: examRef.path, operation: 'delete' });
+                                                                            errorEmitter.emit('permission-error', pError);
                                                                         });
                                                                         toast({ title: "Exam Deleted" }); 
                                                                     }}
@@ -482,7 +481,7 @@ export function Exams() {
                                         {userRole === 'student' ? (
                                             mySub === undefined ? (
                                                 <Button disabled variant="outline" className="w-full">
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking status...
+                                                    Start Exam
                                                 </Button>
                                             ) : mySub ? (
                                                 isExpired ? (
@@ -494,7 +493,7 @@ export function Exams() {
                                                         <Button disabled variant="outline" className="w-full">
                                                             <CheckCircle2 className="mr-2 h-4 w-4 text-primary" /> Submitted
                                                         </Button>
-                                                        <p className="text-[9px] text-muted-foreground italic text-center">Results will be visible once the exam ends.</p>
+                                                        <p className="text-[9px] text-muted-foreground italic text-center font-medium">Wait for result till exam ends.</p>
                                                     </div>
                                                 )
                                             ) : isExpired ? (
@@ -532,7 +531,7 @@ export function Exams() {
                                                                 </div>
                                                             ) : (
                                                                 examSubmissions.map(sub => (
-                                                                    <div key={sub.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-xl border border-border/50 gap-3">
+                                                                    <div key={sub.id} className="flex flex-col sm:row sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-xl border border-border/50 gap-3">
                                                                         <div className="flex-1 min-w-0">
                                                                             <p className="font-bold text-foreground truncate">{sub.studentName}</p>
                                                                             <p className="text-[10px] text-muted-foreground uppercase">
