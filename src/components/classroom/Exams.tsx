@@ -503,7 +503,7 @@ export function Exams() {
                                             mySub ? (
                                                 isExpired ? (
                                                     <Button variant="outline" className="w-full" onClick={() => handleOpenResults(mySub, exam.id)}>
-                                                        <Eye className="mr-2 h-4 w-4" /> View Result
+                                                        <Eye className="mr-2 h-4 w-4" /> View Checked Paper
                                                     </Button>
                                                 ) : (
                                                     <div className="w-full flex flex-col items-center gap-1">
@@ -617,13 +617,12 @@ export function Exams() {
                                 </div>
                             </div>
                             
-                            {isViewingResults.checkedUrl && (
-                                <Button asChild className="w-full btn-gel h-10 sm:h-12 rounded-xl text-base sm:text-lg">
-                                    <a href={isViewingResults.checkedUrl} target="_blank" rel="noreferrer">
-                                        <CheckCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> View Checked Answer Sheet
-                                    </a>
-                                </Button>
-                            )}
+                            <Button asChild className="w-full btn-gel h-10 sm:h-12 rounded-xl text-base sm:text-lg">
+                                <a href={isViewingResults.checkedUrl || "https://www.africau.edu/images/default/sample.pdf"} target="_blank" rel="noreferrer">
+                                    <CheckCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> 
+                                    View Checked Answer Sheet {!isViewingResults.checkedUrl && "(Demo)"}
+                                </a>
+                            </Button>
 
                             {isViewingResults.feedback && (
                                 <Card className="p-3 sm:p-4 bg-muted/30 border-none rounded-xl">
