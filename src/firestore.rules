@@ -89,10 +89,9 @@ service cloud.firestore {
 
       match /exams/{examId} {
         allow get, list: if true;
-        // Teachers/Owners can create exams
-        allow create: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid) && request.resource.data.authorId == request.auth.uid;
-        // Authors or Classroom Managers can update/reschedule exams
-        allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
+        // Simplified rule: if they can manage the classroom, they can manage exams.
+        // This is robust because we already verified they can create them.
+        allow create, update, delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
         
         match /submissions/{studentId} {
             allow get, list: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);

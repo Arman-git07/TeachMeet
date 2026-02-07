@@ -224,7 +224,7 @@ export function Exams() {
             console.error("Reschedule failed:", error);
             let description = "Could not update the deadline.";
             if (error.code === 'permission-denied') {
-                description = "Insufficient permissions. Only the exam author or classroom owner can change deadlines.";
+                description = "Insufficient permissions. Ensure you are authorized to manage this classroom.";
             }
             toast({ variant: 'destructive', title: "Update Failed", description });
         } finally {
