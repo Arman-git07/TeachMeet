@@ -6,7 +6,6 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/hooks/useAuth';
-import { useClassroom } from '@/contexts/ClassroomContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -149,6 +148,9 @@ export default function TakeExamPage() {
             <Button onClick={() => router.back()}>Go Back</Button>
         </div>
     );
+
+    // Safeguard for exam data access
+    if (!exam) return null;
 
     const start = exam.startDate?.toDate();
     const end = exam.endDate?.toDate();
