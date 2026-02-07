@@ -211,7 +211,7 @@ export function Exams() {
             await updateDoc(examRef, {
                 endDate: Timestamp.fromDate(new Date(rescheduleValue))
             });
-            toast({ title: "Deadline Updated" });
+            toast({ title: "Deadline Updated", description: "The exam is now live if the new time is in the future." });
             setReschedulingExam(null);
         } catch (error) {
             toast({ variant: 'destructive', title: "Update Failed" });
