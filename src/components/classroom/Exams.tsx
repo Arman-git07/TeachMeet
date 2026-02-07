@@ -46,6 +46,8 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import type { Exam } from '@/app/dashboard/classrooms/[classroomId]/page';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const examSchema = z.object({
     title: z.string().min(1, "Exam title is required"),
@@ -148,15 +150,11 @@ export function Exams() {
                     }));
 
                     if (latestSeenAt > 0 && (now - latestSeenAt > dayInMs)) {
-                        try {
-                            await deleteDoc(doc(db, "classrooms", classroomId, "exams", exam.id));
-                            toast({ 
-                                title: "Exam Auto-Removed", 
-                                description: `"${exam.title}" has been cleaned up as all results were viewed over 24 hours ago.` 
-                            });
-                        } catch (err) {
-                            console.error("Auto-cleanup failed:", err);
-                        }
+                        const examRef = doc(db, "classrooms", classroomId, "exams", exam.id);
+                        deleteDoc(examRef).catch(async (err) => {
+                            const pErr = new FirestorePermissionError({ path: examRef.path, operation: 'delete' });
+                            errorEmitter.emit('permission-error', pErr);
+                        });
                     }
                 }
             }
@@ -164,7 +162,7 @@ export function Exams() {
 
         const cleanupTimer = setTimeout(checkAndCleanupExams, 10000);
         return () => clearTimeout(cleanupTimer);
-    }, [exams, submissions, classroomId, canUserManage, toast]);
+    }, [exams, submissions, classroomId, canUserManage]);
 
     const onExamSubmit = useCallback(async (data: z.infer<typeof examSchema>) => {
         if (!canUserManage || !user || !classroomId) return;
@@ -182,7 +180,7 @@ export function Exams() {
                 storagePath = path;
             }
 
-            await addDoc(collection(db, 'classrooms', classroomId, 'exams'), { 
+            const newExamData = { 
                 title: data.title, 
                 startDate: Timestamp.fromDate(data.startDate), 
                 endDate: Timestamp.fromDate(data.endDate),
@@ -192,55 +190,65 @@ export function Exams() {
                 storagePath: examType === 'file' ? storagePath : null,
                 type: examType, 
                 createdAt: serverTimestamp() 
-            });
+            };
+
+            addDoc(collection(db, 'classrooms', classroomId, 'exams'), newExamData)
+                .catch(async (error) => {
+                    const pError = new FirestorePermissionError({
+                        path: `classrooms/${classroomId}/exams`,
+                        operation: 'create',
+                        requestResourceData: newExamData
+                    });
+                    errorEmitter.emit('permission-error', pError);
+                });
 
             toast({ title: "Exam Published!" });
             setIsCreateDialogOpen(false);
             examForm.reset({ questions: [] });
         } catch (error) {
-            toast({ variant: 'destructive', title: "Failed to create exam" });
+            console.error("Exam setup error:", error);
+            toast({ variant: 'destructive', title: "Setup Failed", description: "Please check your questions and try again." });
         } finally {
             setIsSubmitting(false);
         }
     }, [canUserManage, user, classroomId, toast, examForm, examType]);
 
-    const handleReschedule = async () => {
+    const handleReschedule = () => {
         if (!reschedulingExam || !rescheduleValue || !classroomId) return;
+        
         setIsSubmitting(true);
-        try {
-            const newEndDate = new Date(rescheduleValue);
-            const examRef = doc(db, 'classrooms', classroomId, 'exams', reschedulingExam.id);
-            
-            await updateDoc(examRef, {
-                endDate: Timestamp.fromDate(newEndDate)
+        const newEndDate = new Date(rescheduleValue);
+        const examRef = doc(db, 'classrooms', classroomId, 'exams', reschedulingExam.id);
+        const updateData = { endDate: Timestamp.fromDate(newEndDate) };
+
+        updateDoc(examRef, updateData)
+            .catch(async (serverError) => {
+                const pError = new FirestorePermissionError({
+                    path: examRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                });
+                errorEmitter.emit('permission-error', pError);
+            })
+            .finally(() => {
+                setIsSubmitting(false);
             });
-            
-            toast({ 
-                title: "Deadline Updated", 
-                description: newEndDate > currentTime ? "The exam is now live for students." : "The deadline has been updated." 
-            });
-            setReschedulingExam(null);
-        } catch (error: any) {
-            console.error("Reschedule failed:", error);
-            let description = "Could not update the deadline.";
-            if (error.code === 'permission-denied') {
-                description = "Insufficient permissions. Ensure you are authorized to manage this classroom.";
-            }
-            toast({ variant: 'destructive', title: "Update Failed", description });
-        } finally {
-            setIsSubmitting(false);
-        }
+        
+        toast({ 
+            title: "Updating Deadline...", 
+            description: "The schedule will update shortly." 
+        });
+        setReschedulingExam(null);
     };
 
     const handleOpenResults = async (sub: any, examId: string) => {
         setIsViewingResults(sub);
         if (user && sub.studentId === user.uid && !sub.seenAt && (sub.grade != null || sub.percentage != null)) {
-            try {
-                const subRef = doc(db, 'classrooms', classroomId!, 'exams', examId, 'submissions', user.uid);
-                await updateDoc(subRef, { seenAt: serverTimestamp() });
-            } catch (err) {
-                console.error("Error marking as seen:", err);
-            }
+            const subRef = doc(db, 'classrooms', classroomId!, 'exams', examId, 'submissions', user.uid);
+            updateDoc(subRef, { seenAt: serverTimestamp() }).catch(async (err) => {
+                const pErr = new FirestorePermissionError({ path: subRef.path, operation: 'update', requestResourceData: { seenAt: 'serverTimestamp' } });
+                errorEmitter.emit('permission-error', pErr);
+            });
         }
     };
 
@@ -460,8 +468,12 @@ export function Exams() {
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
                                                                 <AlertDialogAction 
-                                                                    onClick={async () => { 
-                                                                        await deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id)); 
+                                                                    onClick={() => { 
+                                                                        const examRef = doc(db, "classrooms", classroomId!, "exams", exam.id);
+                                                                        deleteDoc(examRef).catch(async (err) => {
+                                                                            const pErr = new FirestorePermissionError({ path: examRef.path, operation: 'delete' });
+                                                                            errorEmitter.emit('permission-error', pErr);
+                                                                        });
                                                                         toast({ title: "Exam Deleted" }); 
                                                                     }}
                                                                     className="bg-destructive rounded-lg"
