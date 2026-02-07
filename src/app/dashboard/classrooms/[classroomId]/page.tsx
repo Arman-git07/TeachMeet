@@ -92,6 +92,8 @@ export interface Submission {
     checkedUrl?: string;
     isGrading?: boolean;
     assignmentId: string;
+    seenAt?: any;
+    percentage?: number;
 }
 
 export type DeletableItem = {

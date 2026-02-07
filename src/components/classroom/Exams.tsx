@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
@@ -125,6 +125,47 @@ export function Exams() {
         return () => unsubs.forEach(unsub => unsub());
     }, [classroomId, user, exams, canUserManage]);
 
+    // Auto-cleanup logic: If all submitted students have seen their results, delete after 24h
+    useEffect(() => {
+        if (!canUserManage || !classroomId || exams.length === 0) return;
+
+        const checkAndCleanupExams = async () => {
+            const now = Date.now();
+            const dayInMs = 24 * 60 * 60 * 1000;
+
+            for (const exam of exams) {
+                const subs = submissions[exam.id] || [];
+                if (subs.length === 0) continue;
+
+                // Condition: Every student who submitted has seen their graded marks/paper
+                const allSeen = subs.every(s => (s.grade != null || s.percentage != null) && s.seenAt);
+                
+                if (allSeen) {
+                    const latestSeenAt = Math.max(...subs.map(s => {
+                        const t = s.seenAt;
+                        if (!t) return 0;
+                        return t.toDate ? t.toDate().getTime() : (t instanceof Date ? t.getTime() : 0);
+                    }));
+
+                    if (latestSeenAt > 0 && (now - latestSeenAt > dayInMs)) {
+                        try {
+                            await deleteDoc(doc(db, "classrooms", classroomId, "exams", exam.id));
+                            toast({ 
+                                title: "Exam Auto-Removed", 
+                                description: `"${exam.title}" has been cleaned up as all results were viewed over 24 hours ago.` 
+                            });
+                        } catch (err) {
+                            console.error("Auto-cleanup failed:", err);
+                        }
+                    }
+                }
+            }
+        };
+
+        const cleanupTimer = setTimeout(checkAndCleanupExams, 10000);
+        return () => clearTimeout(cleanupTimer);
+    }, [exams, submissions, classroomId, canUserManage, toast]);
+
     const onExamSubmit = useCallback(async (data: z.infer<typeof examSchema>) => {
         if (!canUserManage || !user || !classroomId) return;
         setIsSubmitting(true);
@@ -233,6 +274,19 @@ export function Exams() {
             toast({ variant: 'destructive', title: "Upload Failed" });
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleOpenResults = async (sub: any, examId: string) => {
+        setIsViewingResults(sub);
+        // If the current user is the student and result is graded, mark as seen
+        if (user && sub.studentId === user.uid && !sub.seenAt && (sub.grade != null || sub.percentage != null)) {
+            try {
+                const subRef = doc(db, 'classrooms', classroomId!, 'exams', examId, 'submissions', user.uid);
+                await updateDoc(subRef, { seenAt: serverTimestamp() });
+            } catch (err) {
+                console.error("Error marking as seen:", err);
+            }
         }
     };
 
@@ -408,6 +462,9 @@ export function Exams() {
                             const isUpcoming = start && currentTime < start;
                             const isExpired = end && currentTime > end;
 
+                            const examSubmissions = submissions[exam.id] || [];
+                            const seenCount = examSubmissions.filter(s => s.seenAt).length;
+
                             return (
                                 <Card key={exam.id} className="shadow-md border-border/50 group flex flex-col">
                                     <CardHeader className="pb-2">
@@ -457,7 +514,7 @@ export function Exams() {
                                     <CardFooter className="pt-2">
                                         {userRole === 'student' ? (
                                             mySub ? (
-                                                <Button variant="outline" className="w-full" onClick={() => setIsViewingResults(mySub)}>
+                                                <Button variant="outline" className="w-full" onClick={() => handleOpenResults(mySub, exam.id)}>
                                                     <Eye className="mr-2 h-4 w-4" /> {mySub.grade != null || mySub.percentage != null ? "View Result" : "Waiting for Grading"}
                                                 </Button>
                                             ) : isExpired ? (
@@ -473,7 +530,7 @@ export function Exams() {
                                             <Dialog>
                                                 <DialogTrigger asChild>
                                                     <Button variant="outline" className="w-full">
-                                                        Submissions ({submissions[exam.id]?.length || 0})
+                                                        Submissions ({examSubmissions.length}){examSubmissions.length > 0 && ` • ${seenCount} seen`}
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="sm:max-w-2xl">
@@ -487,16 +544,19 @@ export function Exams() {
                                                     </DialogHeader>
                                                     <ScrollArea className="max-h-[60vh] mt-4">
                                                         <div className="space-y-3 px-1">
-                                                            {(submissions[exam.id] || []).length === 0 ? (
+                                                            {examSubmissions.length === 0 ? (
                                                                 <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
                                                                     <p>No student submissions yet.</p>
                                                                 </div>
                                                             ) : (
-                                                                (submissions[exam.id] || []).map(sub => (
+                                                                examSubmissions.map(sub => (
                                                                     <div key={sub.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border/50">
                                                                         <div className="flex-1 min-w-0">
                                                                             <p className="font-bold text-foreground truncate">{sub.studentName}</p>
-                                                                            <p className="text-[10px] text-muted-foreground uppercase">Submitted: {new Date(sub.submittedAt?.toDate()).toLocaleString()}</p>
+                                                                            <p className="text-[10px] text-muted-foreground uppercase">
+                                                                                Submitted: {new Date(sub.submittedAt?.toDate()).toLocaleString()}
+                                                                                {sub.seenAt && ` • Seen: ${new Date(sub.seenAt.toDate()).toLocaleString()}`}
+                                                                            </p>
                                                                         </div>
                                                                         <div className="flex items-center gap-4">
                                                                             {sub.percentage != null || sub.grade != null ? (
@@ -514,7 +574,7 @@ export function Exams() {
                                                                                     </Link>
                                                                                 </Button>
                                                                             ) : (
-                                                                                <Button variant="ghost" size="sm" onClick={() => setIsViewingResults(sub)}>
+                                                                                <Button variant="ghost" size="sm" onClick={() => handleOpenResults(sub, exam.id)}>
                                                                                     <Eye className="h-4 w-4 mr-1.5" /> Results
                                                                                 </Button>
                                                                             )}
