@@ -25,9 +25,9 @@ service cloud.firestore {
       match /joinRequests/{requestId} {
         // Host can list requests. User can read their own request.
         allow get, list: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
-        allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
         allow update: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
-        allow delete: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || resource.data.requesterId == request.auth.uid);
+        allow delete: if isSignedIn() && (isOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
       }
 
       match /participants/{userId} {
@@ -52,7 +52,6 @@ service cloud.firestore {
         // Allow user to update their own request (e.g., withdraw).
         allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
         // Allow user to delete their own request by checking their auth UID against the document ID.
-        // This is more robust than checking resource.data, which requires a separate 'get' permission.
         allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
       }
       

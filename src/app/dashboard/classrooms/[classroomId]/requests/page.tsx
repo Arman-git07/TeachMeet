@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, query, onSnapshot, orderBy, doc, writeBatch, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, doc, writeBatch, arrayUnion, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useClassroom } from '@/contexts/ClassroomContext';
 import { useToast } from '@/hooks/use-toast';
@@ -67,10 +67,11 @@ export default function JoinRequestsPage() {
 
         try {
             if (action === 'deny') {
+                // Deny logic: relatively simple batch
                 batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
                 batch.delete(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId));
-                toast({ title: 'Request Denied' });
             } else {
+                // 1. Add user to the main participants list
                 batch.set(doc(db, `classrooms/${classroomId}/participants`, request.requesterId), {
                     uid: request.requesterId, 
                     name: request.studentName, 
@@ -80,6 +81,8 @@ export default function JoinRequestsPage() {
                 });
 
                 const classroomRef = doc(db, 'classrooms', classroomId);
+                
+                // 2. Add to specific role structures
                 if (request.role === 'teacher') {
                      batch.update(classroomRef, { 
                         teachers: arrayUnion({ 
@@ -98,19 +101,40 @@ export default function JoinRequestsPage() {
                     batch.update(classroomRef, { students: arrayUnion(request.requesterId) });
                 }
 
+                // 3. Mark enrollment on the user's side
                 if (classroom) {
                     batch.set(doc(db, `users/${request.requesterId}/enrolled`, classroomId), {
                         classroomId, title: classroom.title, description: classroom.description, teacherName: classroom.teacherName, enrolledAt: serverTimestamp()
                     });
                 }
                 
+                // 4. Delete the request document from the classroom
                 batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
-                batch.delete(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId));
-                toast({ title: 'Request Approved!', description: `${request.studentName} has been added.` });
+                
+                // Note: We move the cleanup of user's private pending list outside the main batch
+                // to avoid transaction complexity limits (insufficient permissions errors).
             }
+            
             await batch.commit();
+
+            // 5. Finalize cleanup outside the batch
+            if (request.requesterId) {
+                deleteDoc(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId))
+                    .catch(err => console.warn("Failed to clean up user's pending join request record:", err));
+            }
+
+            if (action === 'deny') {
+                toast({ title: 'Request Denied' });
+            } else {
+                toast({ title: 'Request Approved!', description: `${request.studentName} has been added to the class.` });
+            }
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Action Failed', description: error.message });
+            console.error("Join request action failed:", error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Action Failed', 
+                description: error.message || "An unexpected error occurred. Please check security rules." 
+            });
         } finally {
             setIsProcessing(null);
         }
