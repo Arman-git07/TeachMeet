@@ -208,15 +208,25 @@ export function Exams() {
         if (!reschedulingExam || !rescheduleValue || !classroomId) return;
         setIsSubmitting(true);
         try {
+            const newEndDate = new Date(rescheduleValue);
             const examRef = doc(db, 'classrooms', classroomId, 'exams', reschedulingExam.id);
+            
             await updateDoc(examRef, {
-                endDate: Timestamp.fromDate(new Date(rescheduleValue))
+                endDate: Timestamp.fromDate(newEndDate)
             });
-            toast({ title: "Deadline Updated", description: "The exam is now live if the new time is in the future." });
+            
+            toast({ 
+                title: "Deadline Updated", 
+                description: newEndDate > currentTime ? "The exam is now live for students." : "The deadline has been updated." 
+            });
             setReschedulingExam(null);
         } catch (error: any) {
             console.error("Reschedule failed:", error);
-            toast({ variant: 'destructive', title: "Update Failed", description: error.message || "Could not update the deadline. Please check permissions." });
+            let description = "Could not update the deadline.";
+            if (error.code === 'permission-denied') {
+                description = "Insufficient permissions. Only the exam author or classroom owner can change deadlines.";
+            }
+            toast({ variant: 'destructive', title: "Update Failed", description });
         } finally {
             setIsSubmitting(false);
         }

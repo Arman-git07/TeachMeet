@@ -89,12 +89,16 @@ service cloud.firestore {
 
       match /exams/{examId} {
         allow get, list: if true;
+        // Teachers/Owners can create exams
         allow create: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid) && request.resource.data.authorId == request.auth.uid;
+        // Authors or Classroom Managers can update/reschedule exams
         allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
         
         match /submissions/{studentId} {
             allow get, list: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
+            // Students can submit/update their own work
             allow create, update: if isSignedIn() && request.auth.uid == studentId;
+            // Managers can manage/grade submissions
             allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
         }
       }
