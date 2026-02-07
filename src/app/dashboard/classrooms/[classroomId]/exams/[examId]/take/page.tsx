@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, FileText, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export default function TakeExamPage() {
     const { classroomId, examId } = useParams() as { classroomId: string; examId: string };
@@ -26,10 +26,13 @@ export default function TakeExamPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [examAnswers, setExamAnswers] = useState<Record<number, string>>({});
-    const [currentTime, setCurrentTime] = useState(new Date());
+    const [currentTime, setCurrentTime] = useState<Date | null>(null);
     const [hasSubmitted, setHasSubmitted] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
     useEffect(() => {
+        // Initialize clock on client only to prevent hydration mismatch
+        setCurrentTime(new Date());
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
@@ -38,6 +41,8 @@ export default function TakeExamPage() {
         if (!classroomId || !examId || !user) return;
 
         const fetchData = async () => {
+            setIsLoading(true);
+            setFetchError(null);
             try {
                 // Check if already submitted
                 const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
@@ -49,21 +54,22 @@ export default function TakeExamPage() {
                 // Get exam details
                 const examRef = doc(db, 'classrooms', classroomId, 'exams', examId);
                 const examSnap = await getDoc(examRef);
+                
                 if (examSnap.exists()) {
                     setExam({ id: examSnap.id, ...examSnap.data() });
                 } else {
-                    toast({ variant: 'destructive', title: "Error", description: "Exam not found." });
-                    router.back();
+                    setFetchError("Exam not found. It may have been deleted by the teacher.");
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Fetch failed:", error);
+                setFetchError(error.message || "An error occurred while loading the exam.");
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchData();
-    }, [classroomId, examId, user, toast, router]);
+    }, [classroomId, examId, user]);
 
     const handleSubmitBuiltIn = async () => {
         if (!exam || !user || !classroomId) return;
@@ -84,7 +90,7 @@ export default function TakeExamPage() {
                 };
             });
 
-            const percentage = Math.round((score / questions.length) * 100);
+            const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
 
             await setDoc(doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid), {
                 studentId: user.uid,
@@ -138,102 +144,175 @@ export default function TakeExamPage() {
         }
     };
 
-    if (isLoading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    // --- State-based Renders ---
+
+    if (isLoading || !currentTime) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground animate-pulse">Loading exam details...</p>
+            </div>
+        );
+    }
+
+    if (fetchError) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
+                <AlertTriangle className="h-16 w-16 text-destructive opacity-50" />
+                <div className="space-y-2">
+                    <h1 className="text-2xl font-bold">Unable to Load Exam</h1>
+                    <p className="text-muted-foreground max-w-md">{fetchError}</p>
+                </div>
+                <Button onClick={() => router.back()} variant="outline">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+                </Button>
+            </div>
+        );
+    }
     
-    if (hasSubmitted) return (
-        <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
-            <CheckCircle className="h-16 w-16 text-primary" />
-            <h1 className="text-2xl font-bold">Already Submitted</h1>
-            <p className="text-muted-foreground">You have already completed this exam.</p>
-            <Button onClick={() => router.back()}>Go Back</Button>
-        </div>
-    );
+    if (hasSubmitted) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
+                <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+                    <CheckCircle className="h-12 w-12 text-primary" />
+                </div>
+                <div className="space-y-2">
+                    <h1 className="text-3xl font-bold">Exam Completed</h1>
+                    <p className="text-muted-foreground">You have already submitted your response for this assessment.</p>
+                </div>
+                <Button onClick={() => router.back()} className="rounded-xl px-8">Return to Classroom</Button>
+            </div>
+        );
+    }
 
-    // Safeguard for exam data access
-    if (!exam) return null;
+    // Safety check for critical properties
+    if (!exam || !exam.startDate || !exam.endDate) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
+                <h1 className="text-2xl font-bold">Incomplete Exam Data</h1>
+                <p className="text-muted-foreground">This exam is missing schedule information.</p>
+                <Button onClick={() => router.back()}>Go Back</Button>
+            </div>
+        );
+    }
 
-    const start = exam.startDate?.toDate();
-    const end = exam.endDate?.toDate();
-    const isLive = start && end && currentTime >= start && currentTime <= end;
+    const start = exam.startDate.toDate();
+    const end = exam.endDate.toDate();
+    const isLive = currentTime >= start && currentTime <= end;
 
-    if (!isLive) return (
-        <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
-            <h1 className="text-2xl font-bold">Exam Not Active</h1>
-            <p className="text-muted-foreground">This exam is either upcoming or has already ended.</p>
-            <Button onClick={() => router.back()}>Go Back</Button>
-        </div>
-    );
+    if (!isLive) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
+                <Clock className="h-16 w-16 text-primary opacity-50" />
+                <div className="space-y-2">
+                    <h1 className="text-2xl font-bold">Exam Session Not Active</h1>
+                    <p className="text-muted-foreground">
+                        {currentTime < start 
+                            ? `This exam is scheduled to start at ${start.toLocaleString()}.` 
+                            : `This exam ended at ${end.toLocaleString()}.`}
+                    </p>
+                </div>
+                <Button onClick={() => router.back()} variant="outline">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Return to Classroom
+                </Button>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto p-4 md:p-8 flex flex-col h-full bg-background overflow-hidden">
             <header className="flex items-center justify-between mb-6 shrink-0">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
-                        <ArrowLeft />
+                        <ArrowLeft className="h-5 w-5" />
                     </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{exam.title}</h1>
-                        <p className="text-sm text-muted-foreground">Deadline: {end?.toLocaleString()}</p>
+                    <div className="min-w-0">
+                        <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">{exam.title}</h1>
+                        <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" /> 
+                            Ends: {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
                     </div>
                 </div>
+                <Badge className="bg-green-500 hover:bg-green-500 animate-pulse hidden sm:inline-flex">Live Session</Badge>
             </header>
 
             <main className="flex-1 min-h-0">
                 <ScrollArea className="h-full pr-4">
                     {exam.type === 'file' ? (
                         <div className="space-y-6 max-w-3xl mx-auto pb-12">
-                            <Card className="p-6">
-                                <h3 className="font-bold flex items-center gap-2 mb-4"><FileText className="h-5 w-5 text-primary" /> Question Paper</h3>
-                                <Button asChild className="w-full btn-gel">
+                            <Card className="p-6 shadow-lg border-primary/10">
+                                <h3 className="font-bold flex items-center gap-2 mb-4">
+                                    <FileText className="h-5 w-5 text-primary" /> 
+                                    Question Paper
+                                </h3>
+                                <Button asChild className="w-full btn-gel h-12 text-lg rounded-xl">
                                     <a href={exam.fileUrl} target="_blank" rel="noreferrer">Download / View Paper</a>
                                 </Button>
                             </Card>
-                            <Card className="p-6">
+                            <Card className="p-6 shadow-lg border-primary/10">
                                 <h3 className="font-bold mb-2">Your Answer Sheet</h3>
-                                <p className="text-sm text-muted-foreground mb-4">Upload your handwritten or typed answers here.</p>
+                                <p className="text-sm text-muted-foreground mb-6">Upload your handwritten or typed answers here before the deadline.</p>
                                 <form onSubmit={handleFileUploadSubmission} className="space-y-4">
-                                    <Input type="file" required disabled={isSubmitting} />
-                                    <Button type="submit" className="w-full" disabled={isSubmitting}>
-                                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : "Upload & Submit"}
+                                    <div className="p-4 border-2 border-dashed rounded-xl bg-muted/30 text-center hover:bg-muted/50 transition-colors cursor-pointer relative">
+                                        <Input type="file" required disabled={isSubmitting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                        <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                                        <p className="text-sm font-medium">Click or drag your file here to upload</p>
+                                        <p className="text-xs text-muted-foreground mt-1">PDF or Image preferred</p>
+                                    </div>
+                                    <Button type="submit" className="w-full h-12 text-lg rounded-xl btn-gel" disabled={isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5"/> : "Upload & Finalize Submission"}
                                     </Button>
                                 </form>
                             </Card>
                         </div>
                     ) : (
                         <div className="space-y-8 max-w-3xl mx-auto pb-12">
-                            {exam.questions?.map((q: any, index: number) => (
-                                <div key={index} className="space-y-4 p-6 bg-background rounded-xl border shadow-sm relative">
+                            {exam.questions?.length > 0 ? exam.questions.map((q: any, index: number) => (
+                                <div key={index} className="space-y-4 p-6 bg-card rounded-xl border shadow-sm relative group hover:border-primary/30 transition-colors">
                                     <Badge className="absolute -top-3 left-4" variant="secondary">Question {index + 1}</Badge>
-                                    <p className="text-lg font-medium pt-2">{q.question}</p>
+                                    <p className="text-lg font-medium pt-2 leading-relaxed">{q.question}</p>
                                     {q.type === 'mcq' ? (
                                         <RadioGroup onValueChange={(val) => setExamAnswers(prev => ({ ...prev, [index]: val }))} value={examAnswers[index]} className="space-y-3 mt-4">
                                             {q.options?.map((opt: string, i: number) => (
-                                                <div key={i} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-primary/5 cursor-pointer">
-                                                    <RadioGroupItem value={opt} id={`exam-q-${index}-opt-${i}`} />
-                                                    <Label htmlFor={`exam-q-${index}-opt-${i}`} className="flex-grow cursor-pointer">{opt}</Label>
+                                                <div key={i} className={cn(
+                                                    "flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer",
+                                                    examAnswers[index] === opt ? "bg-primary/5 border-primary ring-1 ring-primary" : "hover:bg-muted/50"
+                                                )}>
+                                                    <RadioGroupItem value={opt} id={`exam-q-${index}-opt-${i}`} className="h-5 w-5" />
+                                                    <Label htmlFor={`exam-q-${index}-opt-${i}`} className="flex-grow cursor-pointer text-base font-normal">{opt}</Label>
                                                 </div>
                                             ))}
                                         </RadioGroup>
                                     ) : (
                                         <div className="mt-4">
-                                            <Label className="text-xs uppercase text-muted-foreground mb-1 block">Your Answer</Label>
+                                            <Label className="text-xs uppercase text-muted-foreground mb-2 block font-bold tracking-wider">Your Response</Label>
                                             <Input 
                                                 value={examAnswers[index] || ''} 
                                                 onChange={(e) => setExamAnswers(prev => ({ ...prev, [index]: e.target.value }))}
-                                                placeholder="Type answer here..."
-                                                className="rounded-lg h-12"
+                                                placeholder="Type your answer here..."
+                                                className="rounded-lg h-14 text-base focus:ring-primary shadow-inner"
                                             />
                                         </div>
                                     )}
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <p>No questions found in this exam.</p>
+                                </div>
+                            )}
                             <Button 
-                                className="w-full btn-gel h-12 text-lg rounded-xl" 
+                                className="w-full btn-gel h-14 text-xl rounded-2xl shadow-xl hover:shadow-primary/20 transition-all mt-8" 
                                 onClick={handleSubmitBuiltIn} 
-                                disabled={isSubmitting || Object.keys(examAnswers).length < (exam.questions?.length || 0)}
+                                disabled={isSubmitting || (exam.questions?.length > 0 && Object.keys(examAnswers).length < exam.questions.length)}
                             >
-                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Submit All Answers"}
+                                {isSubmitting ? <Loader2 className="mr-2 h-6 w-6 animate-spin"/> : "Submit All Answers"}
                             </Button>
+                            {(exam.questions?.length > 0 && Object.keys(examAnswers).length < exam.questions.length) && (
+                                <p className="text-center text-xs text-muted-foreground animate-pulse">
+                                    Answer all {exam.questions.length} questions to enable submission.
+                                </p>
+                            )}
                         </div>
                     )}
                 </ScrollArea>
@@ -241,3 +320,11 @@ export default function TakeExamPage() {
         </div>
     );
 }
+
+const Clock = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+);
+
+const Upload = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+);
