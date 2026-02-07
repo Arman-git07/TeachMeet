@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -38,12 +39,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Loader2, Play, Eye, Upload, CheckCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
+import { Loader2, PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Play, Eye, Upload, CheckCircle } from 'lucide-react';
 import type { Exam } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -110,9 +111,8 @@ export function Exams() {
         const unsubs = exams.map(exam => {
             const subRef = doc(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions', user.uid);
             const unsubUser = onSnapshot(subRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    setUserSubmissions(prev => ({ ...prev, [exam.id]: docSnap.data() }));
-                }
+                // Distinguished null (no submission) from undefined (loading)
+                setUserSubmissions(prev => ({ ...prev, [exam.id]: docSnap.exists() ? docSnap.data() : null }));
             });
 
             if (canUserManage) {
@@ -480,7 +480,11 @@ export function Exams() {
                                     </CardContent>
                                     <CardFooter className="pt-2">
                                         {userRole === 'student' ? (
-                                            mySub ? (
+                                            mySub === undefined ? (
+                                                <Button disabled variant="outline" className="w-full">
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking status...
+                                                </Button>
+                                            ) : mySub ? (
                                                 isExpired ? (
                                                     <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
                                                         <Eye className="mr-2 h-4 w-4" /> View Results & Paper

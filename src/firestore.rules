@@ -81,9 +81,13 @@ service cloud.firestore {
         allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.creatorId == request.auth.uid);
         
         match /submissions/{studentId} {
+            // Priority check for studentId to allow "short-circuiting" and efficiency
             allow get, list: if isSignedIn() && (studentId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
-            allow create, update: if isSignedIn() && request.auth.uid == studentId;
-            allow delete: if isSignedIn() && (studentId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
+            allow create: if isSignedIn() && request.auth.uid == studentId;
+            // Only allow teacher updates for grading. Students cannot edit after submission.
+            allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid));
+            // Only allow teachers to delete submissions.
+            allow delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
         }
       }
 
@@ -93,9 +97,13 @@ service cloud.firestore {
         allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
         
         match /submissions/{studentId} {
+            // Priority check for studentId
             allow get, list: if isSignedIn() && (studentId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
-            allow create, update: if isSignedIn() && request.auth.uid == studentId;
-            allow delete: if isSignedIn() && (studentId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
+            allow create: if isSignedIn() && request.auth.uid == studentId;
+            // Only allow teacher updates for grading. Students cannot edit after submission.
+            allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid));
+            // Only allow teachers to delete submissions.
+            allow delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
         }
       }
 

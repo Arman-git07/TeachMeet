@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -46,7 +47,7 @@ export default function TakeExamPage() {
         setIsLoading(true);
         setFetchError(null);
 
-        // 1. Listen for submission status
+        // 1. Listen for submission status - Real-time protection against re-takes
         const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
         const unsubSub = onSnapshot(subRef, (docSnap) => {
             if (docSnap.exists()) {
@@ -217,6 +218,7 @@ export default function TakeExamPage() {
         );
     }
     
+    // Strict block for students who have already submitted
     if (hasSubmitted) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
