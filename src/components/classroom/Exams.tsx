@@ -225,22 +225,22 @@ export function Exams() {
                             <DialogTrigger asChild>
                                 <Button className="btn-gel"><PlusCircle className="mr-2 h-4 w-4" /> Create Exam</Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-3xl max-h-[90dvh] flex flex-col p-0">
-                                <DialogHeader className="p-6 pb-4 border-b">
+                            <DialogContent className="sm:max-w-3xl w-[95vw] sm:w-full max-h-[95dvh] sm:max-h-[90dvh] flex flex-col p-0 overflow-hidden">
+                                <DialogHeader className="p-4 sm:p-6 pb-2 sm:pb-4 border-b">
                                     <DialogTitle>Exam Paper Builder</DialogTitle>
-                                    <DialogDescription>Create an auto-grading exam or upload a question paper for manual grading.</DialogDescription>
+                                    <DialogDescription className="text-xs sm:text-sm">Create an auto-grading exam or upload a question paper for manual grading.</DialogDescription>
                                 </DialogHeader>
                                 
-                                <div className="p-6 pb-0">
+                                <div className="p-4 sm:p-6 pb-0">
                                     <Tabs value={examType} onValueChange={(v) => setExamType(v as any)} className="w-full">
                                         <TabsList className="grid w-full grid-cols-2">
-                                            <TabsTrigger value="text">Built-in (Auto Grading)</TabsTrigger>
-                                            <TabsTrigger value="file">Upload Paper (Manual Grading)</TabsTrigger>
+                                            <TabsTrigger value="text" className="text-xs sm:text-sm">Built-in (Auto Grading)</TabsTrigger>
+                                            <TabsTrigger value="file" className="text-xs sm:text-sm">Upload Paper (Manual)</TabsTrigger>
                                         </TabsList>
                                     </Tabs>
                                 </div>
 
-                                <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit)} className="flex-1 overflow-y-auto p-6 space-y-6">
+                                <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit)} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2 md:col-span-2">
                                             <Label>Exam Title</Label>
@@ -261,87 +261,89 @@ export function Exams() {
                                     </div>
 
                                     {examType === 'file' ? (
-                                        <div className="space-y-4 p-6 border-2 border-dashed rounded-xl bg-muted/30 text-center">
-                                            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                                                <Upload className="h-6 w-6 text-primary" />
+                                        <div className="space-y-4 p-4 sm:p-6 border-2 border-dashed rounded-xl bg-muted/30 text-center">
+                                            <div className="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                                                <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                                             </div>
                                             <div>
-                                                <Label className="text-base font-bold">Upload Question Paper</Label>
-                                                <p className="text-sm text-muted-foreground mb-4">Upload PDF or Image. You will check student answers manually.</p>
-                                                <Input type="file" {...examForm.register('examFile')} className="max-w-xs mx-auto" />
+                                                <Label className="text-sm sm:text-base font-bold">Upload Question Paper</Label>
+                                                <p className="text-xs sm:text-sm text-muted-foreground mb-4">Upload PDF or Image. You will check student answers manually.</p>
+                                                <Input type="file" {...examForm.register('examFile')} className="max-w-xs mx-auto text-xs sm:text-sm" />
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <Label className="text-lg font-bold">Questions</Label>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <Label className="text-base sm:text-lg font-bold">Questions</Label>
                                                 <div className="flex gap-2">
-                                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'qa', question: '', answer: '' })}>
-                                                        <PlusCircle className="mr-1.5 h-4 w-4" /> Add Q/A
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'qa', question: '', answer: '' })} className="text-[10px] sm:text-xs">
+                                                        <PlusCircle className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" /> Add Q/A
                                                     </Button>
-                                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'mcq', question: '', answer: '', options: ['', '', '', ''] })}>
-                                                        <PlusCircle className="mr-1.5 h-4 w-4" /> Add MCQ
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ type: 'mcq', question: '', answer: '', options: ['', '', '', ''] })} className="text-[10px] sm:text-xs">
+                                                        <PlusCircle className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" /> Add MCQ
                                                     </Button>
                                                 </div>
                                             </div>
 
                                             {fields.length === 0 && (
-                                                <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground">
-                                                    <ClipboardCheck className="mx-auto h-12 w-12 mb-2 opacity-20" />
-                                                    <p>No questions added yet.</p>
+                                                <div className="text-center py-8 sm:py-12 border-2 border-dashed rounded-xl text-muted-foreground">
+                                                    <ClipboardCheck className="mx-auto h-10 w-10 sm:h-12 sm:w-12 mb-2 opacity-20" />
+                                                    <p className="text-sm">No questions added yet.</p>
                                                 </div>
                                             )}
 
                                             {fields.map((field, index) => (
                                                 <Card key={field.id} className="relative overflow-hidden border-primary/10 shadow-sm">
                                                     <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-                                                    <CardHeader className="py-3 flex flex-row items-center justify-between bg-muted/30">
-                                                        <Badge variant="outline" className="uppercase text-[10px]">
+                                                    <CardHeader className="py-2 sm:py-3 px-3 sm:px-4 flex flex-row items-center justify-between bg-muted/30">
+                                                        <Badge variant="outline" className="uppercase text-[9px] sm:text-[10px]">
                                                             {examForm.watch(`questions.${index}.type`) === 'mcq' ? 'Multiple Choice' : 'Short Answer'}
                                                         </Badge>
-                                                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => remove(index)}>
-                                                            <Trash2 className="h-4 w-4"/>
+                                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 sm:h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => remove(index)}>
+                                                            <Trash2 className="h-3.5 w-3.5 sm:h-4 w-4"/>
                                                         </Button>
                                                     </CardHeader>
-                                                    <CardContent className="pt-4 space-y-4">
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs font-bold text-muted-foreground uppercase">Question {index + 1}</Label>
+                                                    <CardContent className="pt-3 sm:pt-4 px-3 sm:px-4 space-y-3 sm:space-y-4">
+                                                        <div className="space-y-1 sm:space-y-2">
+                                                            <Label className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase">Question {index + 1}</Label>
                                                             <Textarea 
                                                                 {...examForm.register(`questions.${index}.question` as const)} 
                                                                 placeholder="Type question here..."
-                                                                className="resize-none"
+                                                                className="resize-none text-sm"
+                                                                rows={2}
                                                             />
                                                         </div>
 
                                                         {examForm.watch(`questions.${index}.type`) === 'mcq' && (
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                                                 {[0, 1, 2, 3].map((optIdx) => (
                                                                     <div key={optIdx}>
                                                                         <Input 
                                                                             {...examForm.register(`questions.${index}.options.${optIdx}` as const)} 
                                                                             placeholder={`Option ${optIdx + 1}`}
+                                                                            className="text-sm h-9"
                                                                         />
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         )}
 
-                                                        <div className="space-y-2 p-3 bg-primary/5 rounded-lg border border-primary/10">
-                                                            <Label className="text-xs font-bold text-primary uppercase flex items-center gap-1.5">
-                                                                <CheckCircle2 className="h-3.5 w-3.5" /> Correct Answer (System Only)
+                                                        <div className="space-y-1 sm:space-y-2 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10">
+                                                            <Label className="text-[10px] sm:text-xs font-bold text-primary uppercase flex items-center gap-1.5">
+                                                                <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Correct Answer
                                                             </Label>
                                                             {examForm.watch(`questions.${index}.type`) === 'mcq' ? (
                                                                 <Controller
                                                                     control={examForm.control}
                                                                     name={`questions.${index}.answer` as const}
                                                                     render={({ field }) => (
-                                                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-4 mt-2">
+                                                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-2 sm:gap-4 mt-1 sm:mt-2">
                                                                             {[0, 1, 2, 3].map(i => {
                                                                                 const val = examForm.watch(`questions.${index}.options.${i}`);
                                                                                 return (
-                                                                                    <div key={i} className="flex items-center space-x-2">
-                                                                                        <RadioGroupItem value={val || `opt-${i}`} id={`q-${index}-opt-${i}`} disabled={!val} />
-                                                                                        <Label htmlFor={`q-${index}-opt-${i}`} className="text-sm">{val || `Option ${i+1}`}</Label>
+                                                                                    <div key={i} className="flex items-center space-x-1.5">
+                                                                                        <RadioGroupItem value={val || `opt-${i}`} id={`q-${index}-opt-${i}`} disabled={!val} className="h-3.5 w-3.5" />
+                                                                                        <Label htmlFor={`q-${index}-opt-${i}`} className="text-xs sm:text-sm">{val || `Opt ${i+1}`}</Label>
                                                                                     </div>
                                                                                 );
                                                                             })}
@@ -352,6 +354,7 @@ export function Exams() {
                                                                 <Input 
                                                                     {...examForm.register(`questions.${index}.answer` as const)} 
                                                                     placeholder="Exact answer for auto-grading..."
+                                                                    className="text-sm h-9"
                                                                 />
                                                             )}
                                                         </div>
@@ -361,14 +364,16 @@ export function Exams() {
                                         </div>
                                     )}
                                 </form>
-                                <DialogFooter className="p-6 border-t bg-muted/10">
-                                    <DialogClose asChild>
-                                        <Button variant="outline" type="button">Cancel</Button>
-                                    </DialogClose>
-                                    <Button type="submit" form="exam-form" disabled={isSubmitting || (examType === 'text' && fields.length === 0)}>
-                                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null}
-                                        Publish Exam
-                                    </Button>
+                                <DialogFooter className="p-4 sm:p-6 border-t bg-muted/10">
+                                    <div className="flex flex-col-reverse sm:flex-row w-full sm:justify-end gap-2">
+                                        <DialogClose asChild>
+                                            <Button variant="outline" type="button" className="w-full sm:w-auto">Cancel</Button>
+                                        </DialogClose>
+                                        <Button type="submit" form="exam-form" disabled={isSubmitting || (examType === 'text' && fields.length === 0)} className="w-full sm:w-auto">
+                                            {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null}
+                                            Publish Exam
+                                        </Button>
+                                    </div>
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
@@ -399,19 +404,19 @@ export function Exams() {
                                                             <Trash2 className="h-4 w-4"/>
                                                         </Button>
                                                     </AlertDialogTrigger>
-                                                    <AlertDialogContent>
+                                                    <AlertDialogContent className="rounded-xl">
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
                                                             <AlertDialogDescription>Remove this exam and all student submissions?</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
                                                             <AlertDialogAction 
                                                                 onClick={async () => { 
                                                                     await deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id)); 
                                                                     toast({ title: "Exam Deleted" }); 
                                                                 }}
-                                                                className="bg-destructive"
+                                                                className="bg-destructive rounded-lg"
                                                             >
                                                                 Delete
                                                             </AlertDialogAction>
@@ -457,7 +462,7 @@ export function Exams() {
                                                         Submissions ({examSubmissions.length}){examSubmissions.length > 0 && ` • ${seenCount} seen`}
                                                     </Button>
                                                 </DialogTrigger>
-                                                <DialogContent className="sm:max-w-2xl">
+                                                <DialogContent className="sm:max-w-2xl w-[95vw] sm:w-full">
                                                     <DialogHeader>
                                                         <DialogTitle>Submissions: {exam.title}</DialogTitle>
                                                         <DialogDescription>
@@ -474,15 +479,15 @@ export function Exams() {
                                                                 </div>
                                                             ) : (
                                                                 examSubmissions.map(sub => (
-                                                                    <div key={sub.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border/50">
+                                                                    <div key={sub.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-xl border border-border/50 gap-3">
                                                                         <div className="flex-1 min-w-0">
                                                                             <p className="font-bold text-foreground truncate">{sub.studentName}</p>
                                                                             <p className="text-[10px] text-muted-foreground uppercase">
-                                                                                Submitted: {new Date(sub.submittedAt?.toDate()).toLocaleString()}
+                                                                                Sub: {new Date(sub.submittedAt?.toDate()).toLocaleString()}
                                                                                 {sub.seenAt && ` • Seen: ${new Date(sub.seenAt.toDate()).toLocaleString()}`}
                                                                             </p>
                                                                         </div>
-                                                                        <div className="flex items-center gap-4">
+                                                                        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
                                                                             {sub.percentage != null || sub.grade != null ? (
                                                                                 <Badge className="bg-primary/20 text-primary hover:bg-primary/20 border-none font-bold">
                                                                                     {sub.percentage ?? sub.grade}%
@@ -492,7 +497,7 @@ export function Exams() {
                                                                             )}
                                                                             
                                                                             {exam.type === 'file' ? (
-                                                                                <Button asChild size="sm" className="rounded-lg h-9">
+                                                                                <Button asChild size="sm" className="rounded-lg h-8 sm:h-9">
                                                                                     <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/check/${sub.studentId}`}>
                                                                                         {sub.percentage != null ? "Edit Marks" : "Check Paper"}
                                                                                     </Link>
@@ -525,46 +530,46 @@ export function Exams() {
             </Card>
 
             <Dialog open={!!isViewingResults} onOpenChange={(open) => !open && setIsViewingResults(null)}>
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="sm:max-w-2xl w-[95vw] sm:w-full">
                     <DialogHeader>
                         <DialogTitle>Exam Results</DialogTitle>
                         <DialogDescription>Detailed marks and feedback breakdown.</DialogDescription>
                     </DialogHeader>
                     {isViewingResults && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-center bg-primary/10 p-6 rounded-xl border border-primary/20">
+                        <div className="space-y-6 overflow-hidden">
+                            <div className="flex justify-between items-center bg-primary/10 p-4 sm:p-6 rounded-xl border border-primary/20">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium text-primary">Score Details</p>
-                                    <p className="text-3xl font-bold">{isViewingResults.score != null ? `${isViewingResults.score} / ${isViewingResults.total || '100'}` : 'Final Marks'}</p>
+                                    <p className="text-xs sm:text-sm font-medium text-primary">Score Details</p>
+                                    <p className="text-xl sm:text-3xl font-bold">{isViewingResults.score != null ? `${isViewingResults.score} / ${isViewingResults.total || '100'}` : 'Final Marks'}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-sm font-medium text-primary">Percentage</p>
-                                    <p className="text-4xl font-black text-primary">{isViewingResults.percentage ?? isViewingResults.grade ?? 0}%</p>
+                                    <p className="text-xs sm:text-sm font-medium text-primary">Percentage</p>
+                                    <p className="text-2xl sm:text-4xl font-black text-primary">{isViewingResults.percentage ?? isViewingResults.grade ?? 0}%</p>
                                 </div>
                             </div>
                             
                             {isViewingResults.checkedUrl && (
-                                <Button asChild className="w-full btn-gel h-12 rounded-xl text-lg">
+                                <Button asChild className="w-full btn-gel h-10 sm:h-12 rounded-xl text-base sm:text-lg">
                                     <a href={isViewingResults.checkedUrl} target="_blank" rel="noreferrer">
-                                        <CheckCircle className="mr-2 h-5 w-5" /> View Checked Answer Sheet
+                                        <CheckCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> View Checked Answer Sheet
                                     </a>
                                 </Button>
                             )}
 
                             {isViewingResults.feedback && (
-                                <Card className="p-4 bg-muted/30 border-none rounded-xl">
-                                    <Label className="text-xs uppercase text-muted-foreground font-bold">Teacher's Feedback</Label>
-                                    <p className="mt-2 text-sm italic leading-relaxed">"{isViewingResults.feedback}"</p>
+                                <Card className="p-3 sm:p-4 bg-muted/30 border-none rounded-xl">
+                                    <Label className="text-[10px] sm:text-xs uppercase text-muted-foreground font-bold">Teacher's Feedback</Label>
+                                    <p className="mt-1 sm:mt-2 text-sm italic leading-relaxed">"{isViewingResults.feedback}"</p>
                                 </Card>
                             )}
                             
                             {isViewingResults.results && (
-                                <ScrollArea className="max-h-[40vh] pr-4">
-                                    <div className="space-y-4">
+                                <ScrollArea className="max-h-[40vh] pr-2 sm:pr-4">
+                                    <div className="space-y-3 sm:space-y-4">
                                         {isViewingResults.results?.map((res: any, i: number) => (
-                                            <div key={i} className={cn("p-4 rounded-lg border", res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100")}>
-                                                <p className="font-semibold text-sm mb-3">Q{i+1}: {res.question}</p>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                                            <div key={i} className={cn("p-3 sm:p-4 rounded-lg border", res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100")}>
+                                                <p className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Q{i+1}: {res.question}</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-[10px] sm:text-xs">
                                                     <div><p className="text-muted-foreground uppercase font-bold">Your Answer</p><p className={cn("font-medium", res.isCorrect ? "text-green-700" : "text-red-700")}>{res.studentAnswer || '(Empty)'}</p></div>
                                                     {!res.isCorrect && <div><p className="text-muted-foreground uppercase font-bold">Correct Answer</p><p className="font-medium text-green-700">{res.correctAnswer}</p></div>}
                                                 </div>
@@ -575,7 +580,7 @@ export function Exams() {
                             )}
                         </div>
                     )}
-                    <DialogFooter><DialogClose asChild><Button variant="secondary" className="rounded-lg">Close</Button></DialogClose></DialogFooter>
+                    <DialogFooter className="p-4 sm:p-6 border-t sm:border-none"><DialogClose asChild><Button variant="secondary" className="w-full sm:w-auto rounded-lg">Close</Button></DialogClose></DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
