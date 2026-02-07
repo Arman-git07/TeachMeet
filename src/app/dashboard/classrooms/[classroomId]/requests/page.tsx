@@ -35,9 +35,10 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export default function JoinRequestsPage() {
-    const { classroomId, classroom, user } = useClassroom();
+    const { classroomId, classroom, user, userRole } = useClassroom();
     const router = useRouter();
     const { toast } = useToast();
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
@@ -46,6 +47,8 @@ export default function JoinRequestsPage() {
     const [selectedRequest, setSelectedRequest] = useState<JoinRequest | null>(null);
     const [isInterviewDialogOpen, setIsInterviewDialogOpen] = useState(false);
     const [interviewDate, setInterviewDate] = useState('');
+
+    const isCreator = userRole === 'creator';
 
     useEffect(() => {
         if (!classroomId) return;
@@ -257,18 +260,22 @@ export default function JoinRequestsPage() {
                 </CardHeader>
                 <CardContent className="flex-grow flex flex-col p-0">
                     <Tabs defaultValue="students" className="flex-1 flex flex-col">
-                        <TabsList className="grid w-full grid-cols-2 rounded-none bg-muted/50">
+                        <TabsList className={cn("grid w-full rounded-none bg-muted/50", isCreator ? "grid-cols-2" : "grid-cols-1")}>
                             <TabsTrigger value="students" className="data-[state=active]:bg-background data-[state=active]:shadow-none border-b-2 data-[state=active]:border-primary rounded-none">
                                 Students <Badge className="ml-2 bg-primary/20 text-primary hover:bg-primary/20 border-none">{studentRequests.length}</Badge>
                             </TabsTrigger>
-                            <TabsTrigger value="teachers" className="data-[state=active]:bg-background data-[state=active]:shadow-none border-b-2 data-[state=active]:border-primary rounded-none">
-                                Teachers <Badge className="ml-2 bg-secondary/20 text-secondary hover:bg-secondary/20 border-none">{teacherRequests.length}</Badge>
-                            </TabsTrigger>
+                            {isCreator && (
+                                <TabsTrigger value="teachers" className="data-[state=active]:bg-background data-[state=active]:shadow-none border-b-2 data-[state=active]:border-primary rounded-none">
+                                    Teachers <Badge className="ml-2 bg-secondary/20 text-secondary hover:bg-secondary/20 border-none">{teacherRequests.length}</Badge>
+                                </TabsTrigger>
+                            )}
                         </TabsList>
                         <ScrollArea className="flex-1">
                             <div className="p-4 md:p-6">
                                 <TabsContent value="students" className="mt-0">{renderRequestList(studentRequests)}</TabsContent>
-                                <TabsContent value="teachers" className="mt-0">{renderRequestList(teacherRequests)}</TabsContent>
+                                {isCreator && (
+                                    <TabsContent value="teachers" className="mt-0">{renderRequestList(teacherRequests)}</TabsContent>
+                                )}
                             </div>
                         </ScrollArea>
                     </Tabs>
