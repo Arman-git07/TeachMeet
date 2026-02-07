@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -43,7 +44,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
-import { Loader2, PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Play, Eye, Upload, CheckCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Play, Eye, Upload, CheckCircle, Search } from 'lucide-react';
 import type { Exam } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -104,25 +105,34 @@ export function Exams() {
         return unsubscribe;
     }, [classroomId]);
 
+    // Submissions Sync Effect
     useEffect(() => {
         if (!classroomId || !user || exams.length === 0) return;
         
-        const unsubs = exams.map(exam => {
+        const unsubs: (() => void)[] = [];
+
+        exams.forEach(exam => {
+            // 1. Personal Submission Listener (for students to check their own status)
             const subRef = doc(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions', user.uid);
             const unsubUser = onSnapshot(subRef, (docSnap) => {
-                // Distinguished null (no submission) from undefined (loading)
                 setUserSubmissions(prev => ({ ...prev, [exam.id]: docSnap.exists() ? docSnap.data() : null }));
+            }, (err) => {
+                console.warn(`Submission listener failed for exam ${exam.id}:`, err);
             });
+            unsubs.push(unsubUser);
 
+            // 2. All Submissions Listener (for teachers to see all student work)
             if (canUserManage) {
-                const allSubsQuery = query(collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions'));
+                const allSubsQuery = query(collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions'), orderBy('submittedAt', 'desc'));
                 const unsubAll = onSnapshot(allSubsQuery, (snap) => {
-                    setSubmissions(prev => ({ ...prev, [exam.id]: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+                    const examSubs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setSubmissions(prev => ({ ...prev, [exam.id]: examSubs }));
+                }, (err) => {
+                    console.error(`Submissions aggregate listener failed for exam ${exam.id}:`, err);
                 });
-                return [unsubUser, unsubAll];
+                unsubs.push(unsubAll);
             }
-            return [unsubUser];
-        }).flat();
+        });
         
         return () => unsubs.forEach(unsub => unsub());
     }, [classroomId, user, exams, canUserManage]);
@@ -531,7 +541,7 @@ export function Exams() {
                                                                 </div>
                                                             ) : (
                                                                 examSubmissions.map(sub => (
-                                                                    <div key={sub.id} className="flex flex-col sm:row sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-xl border border-border/50 gap-3">
+                                                                    <div key={sub.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-xl border border-border/50 gap-3">
                                                                         <div className="flex-1 min-w-0">
                                                                             <p className="font-bold text-foreground truncate">{sub.studentName}</p>
                                                                             <p className="text-[10px] text-muted-foreground uppercase">
