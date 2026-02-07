@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, CheckCircle, AlertTriangle, Clock, Upload, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function TakeExamPage() {
@@ -169,6 +169,14 @@ export default function TakeExamPage() {
         }
     };
 
+    const handleSkipQuestion = (index: number) => {
+        setExamAnswers(prev => {
+            const next = { ...prev };
+            delete next[index];
+            return next;
+        });
+    };
+
     if (isLoading || !currentTime) {
         return (
             <div className="h-full flex flex-col items-center justify-center space-y-4">
@@ -241,7 +249,7 @@ export default function TakeExamPage() {
             <main className="flex-1 min-h-0">
                 <ScrollArea className="h-full pr-4">
                     {exam.type === 'file' ? (
-                        <div className="space-y-6 max-w-3xl mx-auto pb-12">
+                        <div className="space-y-6 max-w-3xl mx-auto pb-12 pt-6">
                             <Card className="p-6 shadow-lg border-primary/10">
                                 <h3 className="font-bold flex items-center gap-2 mb-4">
                                     <FileText className="h-5 w-5 text-primary" /> 
@@ -268,14 +276,33 @@ export default function TakeExamPage() {
                             </Card>
                         </div>
                     ) : (
-                        <div className="space-y-8 max-w-3xl mx-auto pb-12">
+                        <div className="space-y-10 max-w-3xl mx-auto pb-12 pt-10">
                             {exam.questions?.length > 0 ? exam.questions.map((q: any, index: number) => (
                                 <div key={index} className="space-y-4 p-6 bg-card rounded-xl border shadow-sm relative group hover:border-primary/30 transition-colors">
-                                    <Badge className="absolute -top-3 left-4" variant="secondary">Question {index + 1}</Badge>
-                                    <p className="text-lg font-medium pt-2 leading-relaxed">{q.question}</p>
+                                    <Badge className="absolute -top-3 left-4 px-3 py-1 shadow-md bg-secondary text-secondary-foreground" variant="secondary">
+                                        Question {index + 1}
+                                    </Badge>
+                                    
+                                    <div className="flex justify-between items-start gap-4">
+                                        <p className="text-lg font-medium pt-2 leading-relaxed flex-1">{q.question}</p>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 text-[10px] uppercase font-bold tracking-wider rounded-lg text-muted-foreground hover:text-destructive hover:border-destructive transition-colors"
+                                            onClick={() => handleSkipQuestion(index)}
+                                            title="Clear answer and skip this question"
+                                        >
+                                            <Trash2 className="h-3 w-3 mr-1.5" /> Skip
+                                        </Button>
+                                    </div>
+
                                     {q.type === 'mcq' ? (
-                                        <RadioGroup onValueChange={(val) => setExamAnswers(prev => ({ ...prev, [index]: val }))} value={examAnswers[index]} className="space-y-3 mt-4">
-                                            {q.options?.filter((opt: string) => opt.trim() !== "").map((opt: string, i: number) => (
+                                        <RadioGroup 
+                                            onValueChange={(val) => setExamAnswers(prev => ({ ...prev, [index]: val }))} 
+                                            value={examAnswers[index] || ""} 
+                                            className="space-y-3 mt-4"
+                                        >
+                                            {q.options?.filter((opt: string) => opt && opt.trim() !== "").map((opt: string, i: number) => (
                                                 <div key={i} className={cn(
                                                     "flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer",
                                                     examAnswers[index] === opt ? "bg-primary/5 border-primary ring-1 ring-primary" : "hover:bg-muted/50"
@@ -311,7 +338,7 @@ export default function TakeExamPage() {
                             </Button>
                             
                             <p className="text-center text-xs text-muted-foreground animate-pulse">
-                                You can skip any questions if you&apos;re unsure. Skipped questions will be marked as incorrect.
+                                Skipped questions will be marked as incorrect. You can return to any question before submitting.
                             </p>
                         </div>
                     )}
@@ -320,11 +347,3 @@ export default function TakeExamPage() {
         </div>
     );
 }
-
-const Clock = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-);
-
-const Upload = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-);
