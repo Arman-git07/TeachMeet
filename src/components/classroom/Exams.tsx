@@ -122,11 +122,9 @@ export function Exams() {
 
             // 2. All Submissions Listener (for teachers to see all student work)
             if (canUserManage) {
-                // IMPORTANT: Removing 'orderBy' to ensure visibility even during pending server timestamps
                 const allSubsQuery = collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions');
                 const unsubAll = onSnapshot(allSubsQuery, (snap) => {
                     const examSubs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    // Sort locally to maintain UX without requiring a composite index or strict timestamp presence
                     examSubs.sort((a: any, b: any) => {
                         const timeA = a.submittedAt?.toMillis() || Date.now();
                         const timeB = b.submittedAt?.toMillis() || Date.now();
@@ -181,10 +179,11 @@ export function Exams() {
                 createdAt: serverTimestamp() 
             };
 
-            addDoc(collection(db, 'classrooms', classroomId, 'exams'), newExamData)
+            const examsRef = collection(db, 'classrooms', classroomId, 'exams');
+            addDoc(examsRef, newExamData)
                 .catch(async (error) => {
                     const pError = new FirestorePermissionError({
-                        path: `classrooms/${classroomId}/exams`,
+                        path: examsRef.path,
                         operation: 'create',
                         requestResourceData: newExamData
                     });
@@ -203,7 +202,6 @@ export function Exams() {
     }, [canUserManage, user, classroomId, toast, examForm, examType]);
 
     const onValidationError = useCallback((errors: any) => {
-        console.error("Form Validation Errors:", errors);
         const errorMessages = Object.values(errors).map((e: any) => e.message).filter(Boolean);
         toast({
             variant: "destructive",
@@ -234,8 +232,8 @@ export function Exams() {
             });
         
         toast({ 
-            title: "Updating Deadline...", 
-            description: "The schedule will update shortly." 
+            title: "Deadline Updated", 
+            description: "The exam schedule has been updated successfully." 
         });
         setReschedulingExam(null);
     };

@@ -87,7 +87,14 @@ service cloud.firestore {
       match /exams/{examId} {
         allow get, list: if true;
         allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
-        allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
+        allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
+        
+        match /submissions/{studentId} {
+            allow get, list: if isSignedIn() && (studentId == request.auth.uid || isTeacher(classroomId, request.auth.uid) || isClassroomOwner(classroomId, request.auth.uid));
+            allow create: if isSignedIn() && request.auth.uid == studentId;
+            allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid));
+            allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid));
+        }
       }
 
       match /teachers/{teacherId} {
