@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -123,12 +122,24 @@ export function Exams() {
 
             // 2. All Submissions Listener (for teachers to see all student work)
             if (canUserManage) {
-                const allSubsQuery = query(collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions'), orderBy('submittedAt', 'desc'));
+                // IMPORTANT: Removing 'orderBy' to ensure visibility even during pending server timestamps
+                const allSubsQuery = collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions');
                 const unsubAll = onSnapshot(allSubsQuery, (snap) => {
                     const examSubs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    // Sort locally to maintain UX without requiring a composite index or strict timestamp presence
+                    examSubs.sort((a: any, b: any) => {
+                        const timeA = a.submittedAt?.toMillis() || Date.now();
+                        const timeB = b.submittedAt?.toMillis() || Date.now();
+                        return timeB - timeA;
+                    });
                     setSubmissions(prev => ({ ...prev, [exam.id]: examSubs }));
                 }, (err) => {
                     console.error(`Submissions aggregate listener failed for exam ${exam.id}:`, err);
+                    const pError = new FirestorePermissionError({
+                        path: `classrooms/${classroomId}/exams/${exam.id}/submissions`,
+                        operation: 'list'
+                    });
+                    errorEmitter.emit('permission-error', pError);
                 });
                 unsubs.push(unsubAll);
             }
