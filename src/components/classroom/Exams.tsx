@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -213,8 +214,9 @@ export function Exams() {
             });
             toast({ title: "Deadline Updated", description: "The exam is now live if the new time is in the future." });
             setReschedulingExam(null);
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Update Failed" });
+        } catch (error: any) {
+            console.error("Reschedule failed:", error);
+            toast({ variant: 'destructive', title: "Update Failed", description: error.message || "Could not update the deadline. Please check permissions." });
         } finally {
             setIsSubmitting(false);
         }
