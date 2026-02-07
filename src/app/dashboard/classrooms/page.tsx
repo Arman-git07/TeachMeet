@@ -500,7 +500,25 @@ export default function ClassroomsPage() {
     setIsTeacherAppDialogOpen(true);
   };
 
-  const filteredDiscover = useMemo(() => discoverClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [discoverClasses, searchQuery]);
+  const filteredDiscover = useMemo(() => {
+    const filtered = discoverClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    // Priority Sorting: Owned > Enrolled > Others
+    return [...filtered].sort((a, b) => {
+      const aIsOwned = a.teacherId === user?.uid;
+      const bIsOwned = b.teacherId === user?.uid;
+      if (aIsOwned && !bIsOwned) return -1;
+      if (!aIsOwned && bIsOwned) return 1;
+
+      const aIsEnrolled = enrolledClasses.some(e => e.classroomId === a.id);
+      const bIsEnrolled = enrolledClasses.some(e => e.classroomId === b.id);
+      if (aIsEnrolled && !bIsEnrolled) return -1;
+      if (!aIsEnrolled && bIsEnrolled) return 1;
+
+      return 0;
+    });
+  }, [discoverClasses, searchQuery, user, enrolledClasses]);
+
   const filteredMyClasses = useMemo(() => myClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [myClasses, searchQuery]);
   const filteredEnrolled = useMemo(() => enrolledClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [enrolledClasses, searchQuery]);
 
