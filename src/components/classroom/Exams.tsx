@@ -52,7 +52,7 @@ const examSchema = z.object({
     title: z.string().min(1, "Exam title is required"),
     startDate: z.date({ required_error: "Start date is required" }),
     endDate: z.date({ required_error: "End date is required" }),
-    type: z.enum(['text', 'file']),
+    type: z.enum(['text', 'file']).optional(),
     questions: z.array(z.object({
         type: z.enum(['qa', 'mcq']),
         question: z.string().min(1, 'Required'),
@@ -135,7 +135,12 @@ export function Exams() {
             let fileUrl = "";
             let storagePath = "";
 
-            if (examType === 'file' && data.examFile?.[0]) {
+            if (examType === 'file') {
+                if (!data.examFile?.[0]) {
+                    toast({ variant: 'destructive', title: "File Required", description: "Please upload a question paper for manual mode." });
+                    setIsSubmitting(false);
+                    return;
+                }
                 const file = data.examFile[0];
                 const path = `classrooms/${classroomId}/exams/papers/${Date.now()}-${file.name}`;
                 const fileRef = storageRef(storage, path);
@@ -171,11 +176,21 @@ export function Exams() {
             examForm.reset({ questions: [] });
         } catch (error) {
             console.error("Exam setup error:", error);
-            toast({ variant: 'destructive', title: "Setup Failed", description: "Please check your questions and try again." });
+            toast({ variant: 'destructive', title: "Setup Failed", description: "An unexpected error occurred during publishing." });
         } finally {
             setIsSubmitting(false);
         }
     }, [canUserManage, user, classroomId, toast, examForm, examType]);
+
+    const onValidationError = useCallback((errors: any) => {
+        console.error("Form Validation Errors:", errors);
+        const errorMessages = Object.values(errors).map((e: any) => e.message).filter(Boolean);
+        toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: errorMessages[0] || "Please fill in all required fields correctly.",
+        });
+    }, [toast]);
 
     const handleReschedule = () => {
         if (!reschedulingExam || !rescheduleValue || !classroomId) return;
@@ -244,7 +259,7 @@ export function Exams() {
                                     </Tabs>
                                 </div>
 
-                                <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit)} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+                                <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit, onValidationError)} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2 md:col-span-2">
                                             <Label>Exam Title</Label>
