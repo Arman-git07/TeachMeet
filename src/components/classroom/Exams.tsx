@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -502,9 +501,18 @@ export function Exams() {
                                     <CardFooter className="pt-2">
                                         {userRole === 'student' ? (
                                             mySub ? (
-                                                <Button variant="outline" className="w-full" onClick={() => handleOpenResults(mySub, exam.id)}>
-                                                    <Eye className="mr-2 h-4 w-4" /> {mySub.grade != null || mySub.percentage != null ? "View Result" : "Waiting for Grading"}
-                                                </Button>
+                                                isExpired ? (
+                                                    <Button variant="outline" className="w-full" onClick={() => handleOpenResults(mySub, exam.id)}>
+                                                        <Eye className="mr-2 h-4 w-4" /> View Result
+                                                    </Button>
+                                                ) : (
+                                                    <div className="w-full flex flex-col items-center gap-1">
+                                                        <Button disabled variant="outline" className="w-full">
+                                                            <CheckCircle2 className="mr-2 h-4 w-4 text-primary" /> Submitted
+                                                        </Button>
+                                                        <p className="text-[9px] text-muted-foreground italic text-center">Results will be visible once the exam ends.</p>
+                                                    </div>
+                                                )
                                             ) : isExpired ? (
                                                 <Button disabled variant="outline" className="w-full">Expired</Button>
                                             ) : isUpcoming ? (

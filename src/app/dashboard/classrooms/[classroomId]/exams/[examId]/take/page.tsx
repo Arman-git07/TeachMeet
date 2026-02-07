@@ -16,6 +16,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, FileText, CheckCircle, AlertTriangle, Clock, Upload, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function TakeExamPage() {
     const { classroomId, examId } = useParams() as { classroomId: string; examId: string };
@@ -96,44 +98,48 @@ export default function TakeExamPage() {
         }
     }, [exam, currentTime, classroomId, router, toast, hasSubmitted]);
 
-    const handleSubmitBuiltIn = async () => {
+    const handleSubmitBuiltIn = () => {
         if (!exam || !user || !classroomId) return;
         setIsSubmitting(true);
 
-        try {
-            const questions = exam.questions || [];
-            let score = 0;
-            const results = questions.map((q: any, index: number) => {
-                const studentAnswer = examAnswers[index] || "";
-                const isCorrect = studentAnswer.trim().toLowerCase() === q.answer.trim().toLowerCase();
-                if (isCorrect) score++;
-                return {
-                    question: q.question,
-                    studentAnswer,
-                    correctAnswer: q.answer,
-                    isCorrect
-                };
+        const questions = exam.questions || [];
+        let score = 0;
+        const results = questions.map((q: any, index: number) => {
+            const studentAnswer = examAnswers[index] || "";
+            const isCorrect = studentAnswer.trim().toLowerCase() === q.answer.trim().toLowerCase();
+            if (isCorrect) score++;
+            return {
+                question: q.question,
+                studentAnswer,
+                correctAnswer: q.answer,
+                isCorrect
+            };
+        });
+
+        const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
+        const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
+        const subData = {
+            studentId: user.uid,
+            studentName: user.displayName || 'Anonymous',
+            submittedAt: serverTimestamp(),
+            score,
+            total: questions.length,
+            percentage,
+            results
+        };
+
+        setDoc(subRef, subData)
+            .catch(async (error) => {
+                const pError = new FirestorePermissionError({
+                    path: subRef.path,
+                    operation: 'create',
+                    requestResourceData: subData
+                });
+                errorEmitter.emit('permission-error', pError);
             });
 
-            const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
-
-            await setDoc(doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid), {
-                studentId: user.uid,
-                studentName: user.displayName || 'Anonymous',
-                submittedAt: serverTimestamp(),
-                score,
-                total: questions.length,
-                percentage,
-                results
-            });
-
-            toast({ title: "Exam Submitted Successfully!" });
-            router.replace(`/dashboard/classrooms/${classroomId}`);
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Submission Failed" });
-        } finally {
-            setIsSubmitting(false);
-        }
+        toast({ title: "Exam Submitted Successfully!" });
+        router.replace(`/dashboard/classrooms/${classroomId}`);
     };
 
     const handleFileUploadSubmission = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -150,7 +156,8 @@ export default function TakeExamPage() {
             const snapshot = await uploadBytes(fileRef, file);
             const url = await getDownloadURL(snapshot.ref);
 
-            await setDoc(doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid), {
+            const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
+            const subData = {
                 studentId: user.uid,
                 studentName: user.displayName || 'Anonymous',
                 submittedAt: serverTimestamp(),
@@ -158,13 +165,22 @@ export default function TakeExamPage() {
                 storagePath: path,
                 grade: null,
                 feedback: null
-            });
+            };
+
+            setDoc(subRef, subData)
+                .catch(async (error) => {
+                    const pError = new FirestorePermissionError({
+                        path: subRef.path,
+                        operation: 'create',
+                        requestResourceData: subData
+                    });
+                    errorEmitter.emit('permission-error', pError);
+                });
 
             toast({ title: "Answers Uploaded Successfully!" });
             router.replace(`/dashboard/classrooms/${classroomId}`);
         } catch (error) {
             toast({ variant: 'destructive', title: "Upload Failed" });
-        } finally {
             setIsSubmitting(false);
         }
     };
