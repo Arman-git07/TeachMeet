@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -53,7 +52,6 @@ export default function TakeExamPage() {
             }
         }, (err) => {
             console.error("Submission check failed:", err);
-            // Ignore permission errors on submission check if the doc doesn't exist yet
         });
 
         // 2. Listen for exam details
@@ -63,12 +61,14 @@ export default function TakeExamPage() {
                 setExam({ id: docSnap.id, ...docSnap.data() });
                 setFetchError(null);
             } else {
-                setFetchError("Exam not found. It may have been deleted by the teacher.");
+                // EXAM DELETED
+                toast({ title: "Exam Unavailable", description: "The exam has been removed by the teacher." });
+                router.replace(`/dashboard/classrooms/${classroomId}`);
             }
             setIsLoading(false);
         }, (err) => {
             console.error("Exam load failed:", err);
-            setFetchError("Missing or insufficient permissions. Please ensure you are logged in and enrolled in this class.");
+            setFetchError("Missing or insufficient permissions. Please ensure you are logged in and enrolled.");
             setIsLoading(false);
         });
 
@@ -76,7 +76,25 @@ export default function TakeExamPage() {
             unsubSub();
             unsubExam();
         };
-    }, [classroomId, examId, user]);
+    }, [classroomId, examId, user, router, toast]);
+
+    // Handle redirection for ended exams in real-time
+    useEffect(() => {
+        if (!exam || !currentTime || !classroomId || hasSubmitted) return;
+
+        const start = exam.startDate?.toDate();
+        const end = exam.endDate?.toDate();
+
+        if (start && end) {
+            if (currentTime < start) {
+                toast({ title: "Session Not Started", description: "This exam is scheduled for later." });
+                router.replace(`/dashboard/classrooms/${classroomId}`);
+            } else if (currentTime > end) {
+                toast({ title: "Time's Up!", description: "The exam session has ended." });
+                router.replace(`/dashboard/classrooms/${classroomId}`);
+            }
+        }
+    }, [exam, currentTime, classroomId, router, toast, hasSubmitted]);
 
     const handleSubmitBuiltIn = async () => {
         if (!exam || !user || !classroomId) return;
@@ -155,7 +173,7 @@ export default function TakeExamPage() {
         return (
             <div className="h-full flex flex-col items-center justify-center space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground animate-pulse">Loading exam details...</p>
+                <p className="text-sm text-muted-foreground animate-pulse">Entering exam room...</p>
             </div>
         );
     }
@@ -168,8 +186,8 @@ export default function TakeExamPage() {
                     <h1 className="text-2xl font-bold">Unable to Load Exam</h1>
                     <p className="text-muted-foreground max-w-md">{fetchError}</p>
                 </div>
-                <Button onClick={() => router.back()} variant="outline">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+                <Button onClick={() => router.replace(`/dashboard/classrooms/${classroomId}`)} variant="outline">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Return to Classroom
                 </Button>
             </div>
         );
@@ -185,7 +203,7 @@ export default function TakeExamPage() {
                     <h1 className="text-3xl font-bold">Exam Completed</h1>
                     <p className="text-muted-foreground">You have already submitted your response for this assessment.</p>
                 </div>
-                <Button onClick={() => router.back()} className="rounded-xl px-8">Return to Classroom</Button>
+                <Button onClick={() => router.replace(`/dashboard/classrooms/${classroomId}`)} className="rounded-xl px-8">Return to Classroom</Button>
             </div>
         );
     }
@@ -193,35 +211,14 @@ export default function TakeExamPage() {
     if (!exam || !exam.startDate || !exam.endDate) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
-                <h1 className="text-2xl font-bold">Incomplete Exam Data</h1>
-                <p className="text-muted-foreground">This exam is missing schedule information.</p>
-                <Button onClick={() => router.back()}>Go Back</Button>
+                <h1 className="text-2xl font-bold">Error</h1>
+                <p className="text-muted-foreground">Invalid exam configuration.</p>
+                <Button onClick={() => router.replace(`/dashboard/classrooms/${classroomId}`)}>Go Back</Button>
             </div>
         );
     }
 
-    const start = exam.startDate.toDate();
     const end = exam.endDate.toDate();
-    const isLive = currentTime >= start && currentTime <= end;
-
-    if (!isLive) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
-                <Clock className="h-16 w-16 text-primary opacity-50" />
-                <div className="space-y-2">
-                    <h1 className="text-2xl font-bold">Exam Session Not Active</h1>
-                    <p className="text-muted-foreground">
-                        {currentTime < start 
-                            ? `This exam is scheduled to start at ${start.toLocaleString()}.` 
-                            : `This exam ended at ${end.toLocaleString()}.`}
-                    </p>
-                </div>
-                <Button onClick={() => router.back()} variant="outline">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Return to Classroom
-                </Button>
-            </div>
-        );
-    }
 
     return (
         <div className="container mx-auto p-4 md:p-8 flex flex-col h-full bg-background overflow-hidden">
