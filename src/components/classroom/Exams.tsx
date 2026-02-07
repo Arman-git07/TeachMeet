@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
@@ -70,9 +70,7 @@ export function Exams() {
     const [submissions, setSubmissions] = useState<Record<string, any[]>>({});
     const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>({});
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-    const [isTakingExam, setIsTakingExam] = useState<Exam | null>(null);
     const [isViewingResults, setIsViewingResults] = useState<any | null>(null);
-    const [examAnswers, setExamAnswers] = useState<Record<number, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [examType, setExamType] = useState<'text' | 'file'>('text');
@@ -125,7 +123,6 @@ export function Exams() {
         return () => unsubs.forEach(unsub => unsub());
     }, [classroomId, user, exams, canUserManage]);
 
-    // Auto-cleanup logic: If all submitted students have seen their results, delete after 24h
     useEffect(() => {
         if (!canUserManage || !classroomId || exams.length === 0) return;
 
@@ -137,7 +134,6 @@ export function Exams() {
                 const subs = submissions[exam.id] || [];
                 if (subs.length === 0) continue;
 
-                // Condition: Every student who submitted has seen their graded marks/paper
                 const allSeen = subs.every(s => (s.grade != null || s.percentage != null) && s.seenAt);
                 
                 if (allSeen) {
@@ -204,82 +200,8 @@ export function Exams() {
         }
     }, [canUserManage, user, classroomId, toast, examForm, examType]);
 
-    const handleSubmitExam = async () => {
-        if (!isTakingExam || !user || !classroomId) return;
-        setIsSubmitting(true);
-
-        try {
-            const questions = (isTakingExam as any).questions || [];
-            let score = 0;
-            const results = questions.map((q: any, index: number) => {
-                const studentAnswer = examAnswers[index] || "";
-                const isCorrect = studentAnswer.trim().toLowerCase() === q.answer.trim().toLowerCase();
-                if (isCorrect) score++;
-                return {
-                    question: q.question,
-                    studentAnswer,
-                    correctAnswer: q.answer,
-                    isCorrect
-                };
-            });
-
-            const percentage = Math.round((score / questions.length) * 100);
-
-            await setDoc(doc(db, 'classrooms', classroomId, 'exams', isTakingExam.id, 'submissions', user.uid), {
-                studentId: user.uid,
-                studentName: user.displayName || 'Anonymous',
-                submittedAt: serverTimestamp(),
-                score,
-                total: questions.length,
-                percentage,
-                results
-            });
-
-            toast({ title: "Exam Submitted!" });
-            setIsTakingExam(null);
-            setExamAnswers({});
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Submission Failed" });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleFileUploadSubmission = async (e: React.FormEvent<HTMLFormElement>, examId: string) => {
-        e.preventDefault();
-        if (!user || !classroomId) return;
-        const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
-        const file = fileInput?.files?.[0];
-        if (!file) return;
-
-        setIsSubmitting(true);
-        try {
-            const path = `classrooms/${classroomId}/exams/submissions/${examId}/${user.uid}-${file.name}`;
-            const fileRef = storageRef(storage, path);
-            const snapshot = await uploadBytes(fileRef, file);
-            const url = await getDownloadURL(snapshot.ref);
-
-            await setDoc(doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid), {
-                studentId: user.uid,
-                studentName: user.displayName || 'Anonymous',
-                submittedAt: serverTimestamp(),
-                submissionUrl: url,
-                storagePath: path,
-                grade: null,
-                feedback: null
-            });
-
-            toast({ title: "Answers Uploaded Successfully!" });
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Upload Failed" });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
     const handleOpenResults = async (sub: any, examId: string) => {
         setIsViewingResults(sub);
-        // If the current user is the student and result is graded, mark as seen
         if (user && sub.studentId === user.uid && !sub.seenAt && (sub.grade != null || sub.percentage != null)) {
             try {
                 const subRef = doc(db, 'classrooms', classroomId!, 'exams', examId, 'submissions', user.uid);
@@ -522,8 +444,10 @@ export function Exams() {
                                             ) : isUpcoming ? (
                                                 <Button disabled variant="outline" className="w-full">Upcoming</Button>
                                             ) : (
-                                                <Button className="w-full btn-gel" onClick={() => setIsTakingExam(exam)}>
-                                                    <Play className="mr-2 h-4 w-4" /> Start Exam
+                                                <Button asChild className="w-full btn-gel">
+                                                    <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/take`}>
+                                                        <Play className="mr-2 h-4 w-4" /> Start Exam
+                                                    </Link>
                                                 </Button>
                                             )
                                         ) : (
@@ -599,74 +523,6 @@ export function Exams() {
                     </div>
                 </CardContent>
             </Card>
-
-            <Dialog open={!!isTakingExam} onOpenChange={(open) => !open && !isSubmitting && setIsTakingExam(null)}>
-                <DialogContent className="sm:max-w-3xl max-h-[95dvh] flex flex-col p-0">
-                    <DialogHeader className="p-6 border-b bg-primary/5">
-                        <DialogTitle className="text-2xl">{isTakingExam?.title}</DialogTitle>
-                        <DialogDescription>Submit your work before the deadline.</DialogDescription>
-                    </DialogHeader>
-                    
-                    <ScrollArea className="flex-1 p-6 bg-muted/10">
-                        {isTakingExam?.type === 'file' ? (
-                            <div className="space-y-6 max-w-2xl mx-auto">
-                                <Card className="p-6">
-                                    <h3 className="font-bold flex items-center gap-2 mb-4"><FileText className="h-5 w-5 text-primary" /> Question Paper</h3>
-                                    <Button asChild className="w-full btn-gel">
-                                        <a href={isTakingExam.fileUrl} target="_blank" rel="noreferrer">Download / View Paper</a>
-                                    </Button>
-                                </Card>
-                                <Card className="p-6">
-                                    <h3 className="font-bold mb-2">Your Answer Sheet</h3>
-                                    <p className="text-sm text-muted-foreground mb-4">Upload your handwritten or typed answers here.</p>
-                                    <form onSubmit={(e) => handleFileUploadSubmission(e, isTakingExam.id)} className="space-y-4">
-                                        <Input type="file" required disabled={isSubmitting} />
-                                        <Button type="submit" className="w-full" disabled={isSubmitting}>
-                                            {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : "Upload & Submit"}
-                                        </Button>
-                                    </form>
-                                </Card>
-                            </div>
-                        ) : (
-                            <div className="space-y-8 max-w-2xl mx-auto pb-12">
-                                {(isTakingExam as any)?.questions?.map((q: any, index: number) => (
-                                    <div key={index} className="space-y-4 p-6 bg-background rounded-xl border shadow-sm relative">
-                                        <Badge className="absolute -top-3 left-4" variant="secondary">Question {index + 1}</Badge>
-                                        <p className="text-lg font-medium pt-2">{q.question}</p>
-                                        {q.type === 'mcq' ? (
-                                            <RadioGroup onValueChange={(val) => setExamAnswers(prev => ({ ...prev, [index]: val }))} value={examAnswers[index]} className="space-y-3 mt-4">
-                                                {q.options?.map((opt: string, i: number) => (
-                                                    <div key={i} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-primary/5 cursor-pointer">
-                                                        <RadioGroupItem value={opt} id={`exam-q-${index}-opt-${i}`} />
-                                                        <Label htmlFor={`exam-q-${index}-opt-${i}`} className="flex-grow cursor-pointer">{opt}</Label>
-                                                    </div>
-                                                ))}
-                                            </RadioGroup>
-                                        ) : (
-                                            <div className="mt-4">
-                                                <Label className="text-xs uppercase text-muted-foreground mb-1 block">Your Answer</Label>
-                                                <Input 
-                                                    value={examAnswers[index] || ''} 
-                                                    onChange={(e) => setExamAnswers(prev => ({ ...prev, [index]: e.target.value }))}
-                                                    placeholder="Type answer here..."
-                                                    className="rounded-lg h-12"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                <Button 
-                                    className="w-full btn-gel h-12 text-lg rounded-xl" 
-                                    onClick={handleSubmitExam} 
-                                    disabled={isSubmitting || Object.keys(examAnswers).length < ((isTakingExam as any)?.questions?.length || 0)}
-                                >
-                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Submit All Answers"}
-                                </Button>
-                            </div>
-                        )}
-                    </ScrollArea>
-                </DialogContent>
-            </Dialog>
 
             <Dialog open={!!isViewingResults} onOpenChange={(open) => !open && setIsViewingResults(null)}>
                 <DialogContent className="sm:max-w-2xl">
