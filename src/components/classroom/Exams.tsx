@@ -128,41 +128,6 @@ export function Exams() {
         return () => unsubs.forEach(unsub => unsub());
     }, [classroomId, user, exams, canUserManage]);
 
-    useEffect(() => {
-        if (!canUserManage || !classroomId || exams.length === 0) return;
-
-        const checkAndCleanupExams = async () => {
-            const now = Date.now();
-            const dayInMs = 24 * 60 * 60 * 1000;
-
-            for (const exam of exams) {
-                const subs = submissions[exam.id] || [];
-                if (subs.length === 0) continue;
-
-                const allSeen = subs.every(s => (s.grade != null || s.percentage != null) && s.seenAt);
-                
-                if (allSeen) {
-                    const latestSeenAt = Math.max(...subs.map(s => {
-                        const t = s.seenAt;
-                        if (!t) return 0;
-                        return t.toDate ? t.toDate().getTime() : (t instanceof Date ? t.getTime() : 0);
-                    }));
-
-                    if (latestSeenAt > 0 && (now - latestSeenAt > dayInMs)) {
-                        const examRef = doc(db, "classrooms", classroomId, "exams", exam.id);
-                        deleteDoc(examRef).catch(async (err) => {
-                            const pErr = new FirestorePermissionError({ path: examRef.path, operation: 'delete' });
-                            errorEmitter.emit('permission-error', pErr);
-                        });
-                    }
-                }
-            }
-        };
-
-        const cleanupTimer = setTimeout(checkAndCleanupExams, 10000);
-        return () => clearTimeout(cleanupTimer);
-    }, [exams, submissions, classroomId, canUserManage]);
-
     const onExamSubmit = useCallback(async (data: z.infer<typeof examSchema>) => {
         if (!canUserManage || !user || !classroomId) return;
         setIsSubmitting(true);
@@ -502,8 +467,8 @@ export function Exams() {
                                         {userRole === 'student' ? (
                                             mySub ? (
                                                 isExpired ? (
-                                                    <Button variant="outline" className="w-full" onClick={() => handleOpenResults(mySub, exam.id)}>
-                                                        <Eye className="mr-2 h-4 w-4" /> View Checked Paper
+                                                    <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
+                                                        <Eye className="mr-2 h-4 w-4" /> View Results & Paper
                                                     </Button>
                                                 ) : (
                                                     <div className="w-full flex flex-col items-center gap-1">
