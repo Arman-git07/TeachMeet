@@ -275,7 +275,7 @@ export default function TakeExamPage() {
                                     <p className="text-lg font-medium pt-2 leading-relaxed">{q.question}</p>
                                     {q.type === 'mcq' ? (
                                         <RadioGroup onValueChange={(val) => setExamAnswers(prev => ({ ...prev, [index]: val }))} value={examAnswers[index]} className="space-y-3 mt-4">
-                                            {q.options?.map((opt: string, i: number) => (
+                                            {q.options?.filter((opt: string) => opt.trim() !== "").map((opt: string, i: number) => (
                                                 <div key={i} className={cn(
                                                     "flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer",
                                                     examAnswers[index] === opt ? "bg-primary/5 border-primary ring-1 ring-primary" : "hover:bg-muted/50"
