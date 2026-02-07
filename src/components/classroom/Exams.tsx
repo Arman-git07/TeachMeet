@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
 import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
