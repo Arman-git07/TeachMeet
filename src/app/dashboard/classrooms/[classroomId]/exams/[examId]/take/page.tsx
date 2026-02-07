@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function TakeExamPage() {
     const { classroomId, examId } = useParams() as { classroomId: string; examId: string };
@@ -40,35 +42,40 @@ export default function TakeExamPage() {
     useEffect(() => {
         if (!classroomId || !examId || !user) return;
 
-        const fetchData = async () => {
-            setIsLoading(true);
-            setFetchError(null);
-            try {
-                // Check if already submitted
-                const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
-                const subSnap = await getDoc(subRef);
-                if (subSnap.exists()) {
-                    setHasSubmitted(true);
-                }
+        setIsLoading(true);
+        setFetchError(null);
 
-                // Get exam details
-                const examRef = doc(db, 'classrooms', classroomId, 'exams', examId);
-                const examSnap = await getDoc(examRef);
-                
-                if (examSnap.exists()) {
-                    setExam({ id: examSnap.id, ...examSnap.data() });
-                } else {
-                    setFetchError("Exam not found. It may have been deleted by the teacher.");
-                }
-            } catch (error: any) {
-                console.error("Fetch failed:", error);
-                setFetchError(error.message || "An error occurred while loading the exam.");
-            } finally {
-                setIsLoading(false);
+        // 1. Listen for submission status
+        const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
+        const unsubSub = onSnapshot(subRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setHasSubmitted(true);
             }
-        };
+        }, (err) => {
+            console.error("Submission check failed:", err);
+            // Ignore permission errors on submission check if the doc doesn't exist yet
+        });
 
-        fetchData();
+        // 2. Listen for exam details
+        const examRef = doc(db, 'classrooms', classroomId, 'exams', examId);
+        const unsubExam = onSnapshot(examRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setExam({ id: docSnap.id, ...docSnap.data() });
+                setFetchError(null);
+            } else {
+                setFetchError("Exam not found. It may have been deleted by the teacher.");
+            }
+            setIsLoading(false);
+        }, (err) => {
+            console.error("Exam load failed:", err);
+            setFetchError("Missing or insufficient permissions. Please ensure you are logged in and enrolled in this class.");
+            setIsLoading(false);
+        });
+
+        return () => {
+            unsubSub();
+            unsubExam();
+        };
     }, [classroomId, examId, user]);
 
     const handleSubmitBuiltIn = async () => {
@@ -144,8 +151,6 @@ export default function TakeExamPage() {
         }
     };
 
-    // --- State-based Renders ---
-
     if (isLoading || !currentTime) {
         return (
             <div className="h-full flex flex-col items-center justify-center space-y-4">
@@ -185,7 +190,6 @@ export default function TakeExamPage() {
         );
     }
 
-    // Safety check for critical properties
     if (!exam || !exam.startDate || !exam.endDate) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
