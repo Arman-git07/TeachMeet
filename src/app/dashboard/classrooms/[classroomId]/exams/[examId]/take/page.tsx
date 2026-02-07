@@ -305,15 +305,14 @@ export default function TakeExamPage() {
                             <Button 
                                 className="w-full btn-gel h-14 text-xl rounded-2xl shadow-xl hover:shadow-primary/20 transition-all mt-8" 
                                 onClick={handleSubmitBuiltIn} 
-                                disabled={isSubmitting || (exam.questions?.length > 0 && Object.keys(examAnswers).length < exam.questions.length)}
+                                disabled={isSubmitting}
                             >
                                 {isSubmitting ? <Loader2 className="mr-2 h-6 w-6 animate-spin"/> : "Submit All Answers"}
                             </Button>
-                            {(exam.questions?.length > 0 && Object.keys(examAnswers).length < exam.questions.length) && (
-                                <p className="text-center text-xs text-muted-foreground animate-pulse">
-                                    Answer all {exam.questions.length} questions to enable submission.
-                                </p>
-                            )}
+                            
+                            <p className="text-center text-xs text-muted-foreground animate-pulse">
+                                You can skip any questions if you&apos;re unsure. Skipped questions will be marked as incorrect.
+                            </p>
                         </div>
                     )}
                 </ScrollArea>
