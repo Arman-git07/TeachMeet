@@ -117,6 +117,8 @@ export function Exams() {
                 setUserSubmissions(prev => ({ ...prev, [exam.id]: docSnap.exists() ? docSnap.data() : null }));
             }, (err) => {
                 console.warn(`Submission listener failed for exam ${exam.id}:`, err);
+                // Fallback to null (no submission) to prevent UI hang
+                setUserSubmissions(prev => ({ ...prev, [exam.id]: null }));
             });
             unsubs.push(unsubUser);
 
@@ -370,7 +372,6 @@ export function Exams() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {exams.map(exam => {
                             const mySub = userSubmissions[exam.id];
-                            const subLoaded = mySub !== undefined;
                             
                             const start = exam.startDate?.toDate();
                             const end = exam.endDate?.toDate();
@@ -412,11 +413,7 @@ export function Exams() {
                                     </CardContent>
                                     <CardFooter className="pt-2">
                                         {isStudent ? (
-                                            !subLoaded ? (
-                                                <Button disabled variant="outline" className="w-full">
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking...
-                                                </Button>
-                                            ) : mySub ? (
+                                            mySub ? (
                                                 isExpired ? (
                                                     <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
                                                         <Eye className="mr-2 h-4 w-4" /> View Results & Paper
