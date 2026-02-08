@@ -125,19 +125,9 @@ export function Exams() {
                 const allSubsQuery = collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions');
                 const unsubAll = onSnapshot(allSubsQuery, (snap) => {
                     const examSubs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    examSubs.sort((a: any, b: any) => {
-                        const timeA = a.submittedAt?.toMillis() || Date.now();
-                        const timeB = b.submittedAt?.toMillis() || Date.now();
-                        return timeB - timeA;
-                    });
                     setSubmissions(prev => ({ ...prev, [exam.id]: examSubs }));
                 }, (err) => {
                     console.error(`Submissions aggregate listener failed for exam ${exam.id}:`, err);
-                    const pError = new FirestorePermissionError({
-                        path: `classrooms/${classroomId}/exams/${exam.id}/submissions`,
-                        operation: 'list'
-                    });
-                    errorEmitter.emit('permission-error', pError);
                 });
                 unsubs.push(unsubAll);
             }
@@ -498,11 +488,8 @@ export function Exams() {
                                     </CardContent>
                                     <CardFooter className="pt-2">
                                         {userRole === 'student' ? (
-                                            mySub === undefined ? (
-                                                <Button disabled variant="outline" className="w-full">
-                                                    Start Exam
-                                                </Button>
-                                            ) : mySub ? (
+                                            mySub ? (
+                                                // Submitted Case
                                                 isExpired ? (
                                                     <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
                                                         <Eye className="mr-2 h-4 w-4" /> View Results & Paper
@@ -510,21 +497,24 @@ export function Exams() {
                                                 ) : (
                                                     <div className="w-full flex flex-col items-center gap-1">
                                                         <Button disabled variant="outline" className="w-full">
-                                                            <CheckCircle2 className="mr-2 h-4 w-4 text-primary" /> Submitted
+                                                            <Play className="mr-2 h-4 w-4" /> Start Exam
                                                         </Button>
                                                         <p className="text-[9px] text-muted-foreground italic text-center font-medium">Wait for result till exam ends.</p>
                                                     </div>
                                                 )
-                                            ) : isExpired ? (
-                                                <Button disabled variant="outline" className="w-full">Expired</Button>
-                                            ) : isUpcoming ? (
-                                                <Button disabled variant="outline" className="w-full">Upcoming</Button>
                                             ) : (
-                                                <Button asChild className="w-full btn-gel">
-                                                    <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/take`}>
-                                                        <Play className="mr-2 h-4 w-4" /> Start Exam
-                                                    </Link>
-                                                </Button>
+                                                // Not Submitted Case
+                                                isExpired ? (
+                                                    <Button disabled variant="outline" className="w-full">Expired</Button>
+                                                ) : isUpcoming ? (
+                                                    <Button disabled variant="outline" className="w-full">Upcoming</Button>
+                                                ) : (
+                                                    <Button asChild className="w-full btn-gel">
+                                                        <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/take`}>
+                                                            <Play className="mr-2 h-4 w-4" /> Start Exam
+                                                        </Link>
+                                                    </Button>
+                                                )
                                             )
                                         ) : (
                                             <Dialog>
