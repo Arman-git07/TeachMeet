@@ -117,7 +117,6 @@ export function Exams() {
                 setUserSubmissions(prev => ({ ...prev, [exam.id]: docSnap.exists() ? docSnap.data() : null }));
             }, (err) => {
                 console.warn(`Submission listener failed for exam ${exam.id}:`, err);
-                // Fallback to null (no submission) to prevent UI hang
                 setUserSubmissions(prev => ({ ...prev, [exam.id]: null }));
             });
             unsubs.push(unsubUser);
@@ -372,6 +371,7 @@ export function Exams() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {exams.map(exam => {
                             const mySub = userSubmissions[exam.id];
+                            const hasSubmitted = !!mySub;
                             
                             const start = exam.startDate?.toDate();
                             const end = exam.endDate?.toDate();
@@ -409,11 +409,11 @@ export function Exams() {
                                         {isLive && <Badge className="bg-green-500 hover:bg-green-500 animate-pulse">Live Now</Badge>}
                                         {isUpcoming && <Badge variant="secondary">Upcoming</Badge>}
                                         {isExpired && <Badge variant="outline">Ended</Badge>}
-                                        {mySub && <Badge className="ml-2 bg-primary/20 text-primary">Submitted</Badge>}
+                                        {hasSubmitted && <Badge className="ml-2 bg-primary/20 text-primary">Submitted</Badge>}
                                     </CardContent>
                                     <CardFooter className="pt-2">
                                         {isStudent ? (
-                                            mySub ? (
+                                            hasSubmitted ? (
                                                 isExpired ? (
                                                     <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
                                                         <Eye className="mr-2 h-4 w-4" /> View Results & Paper
@@ -421,16 +421,16 @@ export function Exams() {
                                                 ) : (
                                                     <div className="w-full flex flex-col items-center gap-1">
                                                         <Button disabled variant="outline" className="w-full">
-                                                            <Play className="mr-2 h-4 w-4" /> Start Exam
+                                                            <CheckCircle className="mr-2 h-4 w-4" /> Submitted
                                                         </Button>
-                                                        <p className="text-[9px] text-muted-foreground italic text-center font-medium">Wait for result till exam ends.</p>
+                                                        <p className="text-[10px] text-muted-foreground italic text-center font-medium">Wait for result till exam ends.</p>
                                                     </div>
                                                 )
                                             ) : (
                                                 isExpired ? (
                                                     <Button disabled variant="outline" className="w-full">Expired</Button>
                                                 ) : isUpcoming ? (
-                                                    <Button disabled variant="outline" className="w-full">Upcoming</Button>
+                                                    <Button disabled variant="outline" className="w-full"><Clock className="mr-2 h-4 w-4"/> Upcoming</Button>
                                                 ) : (
                                                     <Button asChild className="w-full btn-gel">
                                                         <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/take`}>
