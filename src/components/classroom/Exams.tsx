@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -105,23 +105,29 @@ export function Exams() {
         return unsubscribe;
     }, [classroomId]);
 
+    // Track submission listeners by exam ID to prevent flickering and redundant fetches
+    const examIdsKey = useMemo(() => exams.map(e => e.id).sort().join(','), [exams]);
+
     useEffect(() => {
         if (!classroomId || !user || exams.length === 0) return;
         
         const unsubs: (() => void)[] = [];
 
         exams.forEach(exam => {
-            // 1. Student's own submission status
+            // 1. Student's own submission status listener
             const subRef = doc(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions', user.uid);
             const unsubUser = onSnapshot(subRef, (docSnap) => {
-                setUserSubmissions(prev => ({ ...prev, [exam.id]: docSnap.exists() ? docSnap.data() : null }));
+                setUserSubmissions(prev => ({ 
+                    ...prev, 
+                    [exam.id]: docSnap.exists() ? docSnap.data() : null 
+                }));
             }, (err) => {
                 console.warn(`Submission listener failed for exam ${exam.id}:`, err);
                 setUserSubmissions(prev => ({ ...prev, [exam.id]: null }));
             });
             unsubs.push(unsubUser);
 
-            // 2. All submissions for managers
+            // 2. All submissions listener for managers/teachers
             if (isManager) {
                 const allSubsQuery = collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions');
                 const unsubAll = onSnapshot(allSubsQuery, (snap) => {
@@ -135,7 +141,7 @@ export function Exams() {
         });
         
         return () => unsubs.forEach(unsub => unsub());
-    }, [classroomId, user, exams, isManager]);
+    }, [classroomId, user?.uid, examIdsKey, isManager]);
 
     const onExamSubmit = useCallback(async (data: z.infer<typeof examSchema>) => {
         if (!isManager || !user || !classroomId) return;
@@ -414,19 +420,21 @@ export function Exams() {
                                     <CardFooter className="pt-2">
                                         {isStudent ? (
                                             hasSubmitted ? (
+                                                // 1. Student has already submitted -> STRICTLY DISABLE START EXAM
                                                 isExpired ? (
                                                     <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
                                                         <Eye className="mr-2 h-4 w-4" /> View Results & Paper
                                                     </Button>
                                                 ) : (
                                                     <div className="w-full flex flex-col items-center gap-1">
-                                                        <Button disabled variant="outline" className="w-full">
-                                                            <CheckCircle className="mr-2 h-4 w-4" /> Submitted
+                                                        <Button disabled variant="outline" className="w-full border-primary/20 text-primary font-bold bg-primary/5">
+                                                            <CheckCircle className="mr-2 h-4 w-4" /> Already Submitted
                                                         </Button>
                                                         <p className="text-[10px] text-muted-foreground italic text-center font-medium">Wait for result till exam ends.</p>
                                                     </div>
                                                 )
                                             ) : (
+                                                // 2. Student hasn't submitted yet -> ALLOW START IF LIVE
                                                 isExpired ? (
                                                     <Button disabled variant="outline" className="w-full">Expired</Button>
                                                 ) : isUpcoming ? (
@@ -506,7 +514,7 @@ export function Exams() {
                             
                             <Button asChild className="w-full btn-gel h-12 rounded-xl text-lg">
                                 <a href={isViewingResults.checkedUrl || "https://www.africau.edu/images/default/sample.pdf"} target="_blank" rel="noreferrer">
-                                    <CheckCircle className="mr-2 h-5 w-5" /> View Checked Answer Sheet
+                                    <CheckCircle className="mr-2 h-5 w-5" /> View Checked Answer Sheet (Demo)
                                 </a>
                             </Button>
 
