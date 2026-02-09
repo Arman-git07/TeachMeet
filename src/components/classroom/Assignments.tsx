@@ -287,7 +287,14 @@ export function Assignments() {
                         <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
                                 <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-3 font-bold">Submitted</Badge>
-                                <Button size="sm" variant="outline" className="h-8 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-100/50">Modify</Button>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-8 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-100/50"
+                                    onClick={() => toast({ title: "Modify Feature (Demo)", description: "Clicking this allows you to upload a new file to replace your previous submission." })}
+                                >
+                                    Modify
+                                </Button>
                             </div>
                             <p className="text-[9px] text-blue-600/60 font-bold uppercase tracking-tighter">Handed In • Awaiting Check</p>
                         </div>
