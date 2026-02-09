@@ -77,6 +77,7 @@ export interface Assignment {
   dueDate: any;
   answerKeyUrl: string;
   creatorId: string;
+  creatorName?: string;
   storagePath?: string;
   uploaderId?: string;
 }
