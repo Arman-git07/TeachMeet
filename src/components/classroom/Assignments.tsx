@@ -103,6 +103,7 @@ export function Assignments() {
                 dueDate: Timestamp.fromDate(data.dueDate), 
                 answerKeyUrl, 
                 creatorId: user.uid,
+                // @ts-ignore
                 creatorName: user.displayName || 'Teacher',
                 createdAt: serverTimestamp(), 
                 updatedAt: serverTimestamp(),
@@ -350,7 +351,7 @@ export function Assignments() {
                                                     <Badge variant="destructive" className="font-bold flex items-center gap-1.5">
                                                         <AlertCircle className="h-3 w-3" /> Time Over
                                                     </Badge>
-                                                    <p className="text-[10px] text-muted-foreground font-medium">Contact to @{teacherName}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-medium">connect to @{teacherName}</p>
                                                 </div>
                                             ) : (
                                                 <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2">
