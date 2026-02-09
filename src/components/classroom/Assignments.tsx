@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, Timestamp, setDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, deleteDoc, doc, Timestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useClassroom } from '@/contexts/ClassroomContext';
@@ -29,7 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, FileDown, Eye } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { Assignment, Submission } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -47,6 +47,10 @@ export function Assignments() {
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
+    // Rescheduling state
+    const [reschedulingAssignment, setReschedulingAssignment] = useState<Assignment | null>(null);
+    const [rescheduleValue, setRescheduleValue] = useState("");
 
     const canUserManage = canManage(userRole);
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
@@ -91,6 +95,7 @@ export function Assignments() {
                 answerKeyUrl, 
                 creatorId: user.uid, 
                 createdAt: serverTimestamp(), 
+                updatedAt: serverTimestamp(),
                 storagePath: storagePath || null,
             });
             toast({ title: "Assignment Created!" });
@@ -142,6 +147,28 @@ export function Assignments() {
         }
     }, [classroomId, toast]);
 
+    const handleReschedule = async () => {
+        if (!reschedulingAssignment || !rescheduleValue || !classroomId) return;
+        
+        setIsProcessing("rescheduling");
+        const newDueDate = new Date(rescheduleValue);
+        const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', reschedulingAssignment.id);
+
+        try {
+            await updateDoc(assignmentRef, { 
+                dueDate: Timestamp.fromDate(newDueDate),
+                updatedAt: serverTimestamp() 
+            });
+            toast({ title: "Assignment Rescheduled Successfully" });
+            setReschedulingAssignment(null);
+        } catch (error) {
+            console.error("Reschedule failed:", error);
+            toast({ variant: 'destructive', title: "Reschedule Failed", description: "You might not have permission to modify this assignment." });
+        } finally {
+            setIsProcessing(null);
+        }
+    };
+
     const visibleAssignments = assignments.filter(a => canUserManage || new Date(a.dueDate.toDate()) > new Date());
 
     return (
@@ -177,6 +204,8 @@ export function Assignments() {
             <CardContent className="px-0 space-y-4">
                 {visibleAssignments.length > 0 ? visibleAssignments.map(assignment => {
                     const userSub = submissions.find(s => s.assignmentId === assignment.id && s.studentId === user?.uid);
+                    const canEdit = userRole === 'creator' || assignment.creatorId === user?.uid;
+
                     return (
                         <Card key={assignment.id} className="p-4 shadow-md rounded-xl">
                             <div className="flex justify-between items-start">
@@ -217,6 +246,23 @@ export function Assignments() {
                                                     </ScrollArea>
                                                 </DialogContent>
                                             </Dialog>
+                                            
+                                            {canEdit && (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-8 w-8 text-muted-foreground"
+                                                    onClick={() => {
+                                                        setReschedulingAssignment(assignment);
+                                                        const d = assignment.dueDate?.toDate();
+                                                        if (d) setRescheduleValue(format(d, "yyyy-MM-dd'T'HH:mm"));
+                                                    }}
+                                                    title="Reschedule Assignment"
+                                                >
+                                                    <Clock className="h-4 w-4" />
+                                                </Button>
+                                            )}
+
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70"><Trash2 className="h-4 w-4" /></Button>
@@ -273,10 +319,35 @@ export function Assignments() {
                                     )}
                                 </div>
                             </div>
+                            {userSub?.feedback && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {userSub.feedback}</p>}
                         </Card>
                     );
                 }) : <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl"><p className="text-sm">No active assignments found.</p></div>}
             </CardContent>
+
+            <Dialog open={!!reschedulingAssignment} onOpenChange={(open) => !open && setReschedulingAssignment(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Reschedule Assignment</DialogTitle>
+                        <DialogDescription>Update the due date for "{reschedulingAssignment?.title}".</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-6 space-y-4">
+                        <Label>New Due Date & Time</Label>
+                        <Input 
+                            type="datetime-local" 
+                            value={rescheduleValue} 
+                            onChange={(e) => setRescheduleValue(e.target.value)} 
+                            disabled={isProcessing === "rescheduling"}
+                        />
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setReschedulingAssignment(null)} disabled={isProcessing === "rescheduling"}>Cancel</Button>
+                        <Button onClick={handleReschedule} disabled={isProcessing === "rescheduling" || !rescheduleValue} className="btn-gel">
+                            {isProcessing === "rescheduling" ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : "Update Due Date"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }
