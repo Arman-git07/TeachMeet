@@ -248,8 +248,8 @@ export function Assignments() {
 
                                         <div className="grid grid-cols-1 gap-3">
                                             <Button asChild variant="outline" className="w-full rounded-xl h-12">
-                                                <a href="https://www.africau.edu/images/default/sample.pdf" target="_blank" rel="noreferrer">
-                                                    <FileDown className="mr-2 h-5 w-5"/> Download Original
+                                                <a href="https://picsum.photos/seed/checked/800/1200" target="_blank" rel="noreferrer">
+                                                    <FileDown className="mr-2 h-5 w-5"/> Download Graded Paper
                                                 </a>
                                             </Button>
                                             <Button asChild className="w-full btn-gel rounded-xl h-12 text-lg">
