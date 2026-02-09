@@ -220,7 +220,7 @@ export function Assignments() {
                             </p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                            <Badge className="bg-green-500 text-white hover:bg-green-500 border-none px-3">Checked & Graded</Badge>
+                            <Badge className="bg-primary/20 text-primary hover:bg-primary/20 border-none px-3 font-bold">Checked & Graded</Badge>
                             <Dialog>
                                 <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-lg h-8 shadow-sm">View Result</Button></DialogTrigger>
                                 <DialogContent className="sm:max-w-md">
@@ -265,12 +265,12 @@ export function Assignments() {
                 </Card>
 
                 {/* Demo Submitted (Awaiting Check) Assignment */}
-                <Card className="p-4 shadow-md rounded-xl border-blue-200 bg-blue-50/30 animate-in fade-in slide-in-from-top-4 duration-700">
+                <Card className="p-4 shadow-md rounded-xl border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="flex justify-between items-start">
                         <div>
                             <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-blue-700">Demo: Physics Project</h3>
-                                <Badge variant="secondary" className="text-[10px] h-4 uppercase font-bold tracking-widest bg-blue-100 text-blue-700 border-none">Sample</Badge>
+                                <h3 className="font-semibold text-primary">Demo: Physics Project</h3>
+                                <Badge variant="secondary" className="text-[10px] h-4 uppercase font-bold tracking-widest bg-primary/10 text-primary border-none">Sample</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                 <Clock className="h-3 w-3" /> Due: Tomorrow, 5:00 PM
@@ -278,19 +278,19 @@ export function Assignments() {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
-                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-3 font-bold">Submitted</Badge>
+                                <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none px-3 font-bold">Submitted</Badge>
                                 <div className="relative overflow-hidden rounded-lg">
                                     <Button 
                                         size="sm" 
                                         variant="outline" 
-                                        className="h-8 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-100/50"
+                                        className="h-8 rounded-lg border-primary/20 text-primary hover:bg-primary/10"
                                         onClick={() => toast({ title: "Modify Feature (Demo)", description: "In a real assignment, this would open the file picker to replace your submission." })}
                                     >
                                         Modify
                                     </Button>
                                 </div>
                             </div>
-                            <p className="text-[9px] text-blue-600/60 font-bold uppercase tracking-tighter">Handed In • Awaiting Check</p>
+                            <p className="text-[9px] text-primary/60 font-bold uppercase tracking-tighter">Handed In • Awaiting Check</p>
                         </div>
                     </div>
                 </Card>
@@ -385,7 +385,7 @@ export function Assignments() {
                                                     <Badge variant="outline" className="border-primary/20 text-primary font-bold bg-primary/5">Already Submitted</Badge>
                                                 ) : (
                                                     <div className="flex items-center gap-2">
-                                                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Submitted</Badge>
+                                                        <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none font-bold px-3">Submitted</Badge>
                                                         <div className="relative">
                                                             <input 
                                                                 type="file" 
@@ -396,7 +396,7 @@ export function Assignments() {
                                                                     if (file) handleStudentSubmission(file, assignment.id);
                                                                 }}
                                                             />
-                                                            <Button size="sm" variant="outline" className="rounded-lg h-8" disabled={isProcessing === `submitting-${assignment.id}`}>
+                                                            <Button size="sm" variant="outline" className="rounded-lg h-8 border-primary/20 text-primary hover:bg-primary/5" disabled={isProcessing === `submitting-${assignment.id}`}>
                                                                 {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-3.5 w-3.5"/> : <Edit3 className="mr-1.5 h-3.5 w-3.5"/>}
                                                                 Modify
                                                             </Button>
@@ -404,7 +404,7 @@ export function Assignments() {
                                                     </div>
                                                 )}
                                                 {userSub.grade != null && (
-                                                    <Button asChild size="sm" variant="outline">
+                                                    <Button asChild size="sm" variant="outline" className="rounded-lg border-primary/20 text-primary hover:bg-primary/5">
                                                         <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/result/${user.uid}`}>
                                                             View Result
                                                         </Link>
