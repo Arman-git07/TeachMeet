@@ -34,7 +34,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -43,7 +42,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
-import { Loader2, PlusCircle, Trash2, ClipboardCheck, Clock, CheckCircle2, Play, Eye, Upload, CheckCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Clock, CheckCircle2, Play, Eye, Upload, CheckCircle } from 'lucide-react';
 import type { Exam } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -72,7 +71,7 @@ export function Exams() {
     const [submissions, setSubmissions] = useState<Record<string, any[]>>({});
     const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>({});
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-    const [isViewingResults, setIsViewingResults] = useState<any | null>(null);
+    const [activeResult, setActiveResult] = useState<{ sub: any, examId: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [examType, setExamType] = useState<'text' | 'file'>('text');
@@ -166,26 +165,18 @@ export function Exams() {
                 storagePath: examType === 'file' ? storagePath : null,
                 type: examType, 
                 createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp() // Set initial updatedAt
+                updatedAt: serverTimestamp()
             };
 
             const examsRef = collection(db, 'classrooms', classroomId, 'exams');
-            addDoc(examsRef, newExamData)
-                .catch(async (error) => {
-                    const pError = new FirestorePermissionError({
-                        path: examsRef.path,
-                        operation: 'create',
-                        requestResourceData: newExamData
-                    });
-                    errorEmitter.emit('permission-error', pError);
-                });
+            addDoc(examsRef, newExamData);
 
             toast({ title: "Exam Published!" });
             setIsCreateDialogOpen(false);
             examForm.reset({ questions: [] });
         } catch (error) {
             console.error("Exam setup error:", error);
-            toast({ variant: 'destructive', title: "Setup Failed", description: "Could not publish the exam." });
+            toast({ variant: 'destructive', title: "Setup Failed" });
         } finally {
             setIsSubmitting(false);
         }
@@ -199,7 +190,7 @@ export function Exams() {
         const examRef = doc(db, 'classrooms', classroomId, 'exams', reschedulingExam.id);
         const updateData = { 
             endDate: Timestamp.fromDate(newEndDate),
-            updatedAt: serverTimestamp() // CRITICAL: Track update for logical notifications
+            updatedAt: serverTimestamp()
         };
 
         try {
@@ -214,14 +205,13 @@ export function Exams() {
                 requestResourceData: updateData
             });
             errorEmitter.emit('permission-error', pError);
-            toast({ variant: 'destructive', title: "Update Failed", description: "You don't have permission or the server is busy." });
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleOpenResults = async (sub: any, examId: string) => {
-        setIsViewingResults(sub);
+        setActiveResult({ sub, examId });
         if (user && sub.studentId === user.uid && !sub.seenAt && (sub.grade != null || sub.percentage != null)) {
             const subRef = doc(db, 'classrooms', classroomId!, 'exams', examId, 'submissions', user.uid);
             updateDoc(subRef, { seenAt: serverTimestamp() }).catch(async (err) => {
@@ -391,8 +381,7 @@ export function Exams() {
                                                         <Clock className="h-4 w-4"/>
                                                     </Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
-                                                        const examRef = doc(db, "classrooms", classroomId!, "exams", exam.id);
-                                                        deleteDoc(examRef);
+                                                        deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id));
                                                         toast({ title: "Exam Deleted" }); 
                                                     }}><Trash2 className="h-4 w-4"/></Button>
                                                 </div>
@@ -482,42 +471,42 @@ export function Exams() {
                 </CardContent>
             </Card>
 
-            <Dialog open={!!isViewingResults} onOpenChange={(open) => !open && setIsViewingResults(null)}>
+            <Dialog open={!!activeResult} onOpenChange={(open) => !open && setActiveResult(null)}>
                 <DialogContent className="sm:max-w-2xl w-[95vw]">
                     <DialogHeader>
                         <DialogTitle>Exam Results</DialogTitle>
                         <DialogDescription>Your marks and feedback breakdown.</DialogDescription>
                     </DialogHeader>
-                    {isViewingResults && (
+                    {activeResult && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-center bg-primary/10 p-4 rounded-xl border border-primary/20">
                                 <div>
                                     <p className="text-sm font-medium text-primary">Total Score</p>
-                                    <p className="text-3xl font-bold">{isViewingResults.score != null ? `${isViewingResults.score} / ${isViewingResults.total || '100'}` : 'Final Marks'}</p>
+                                    <p className="text-3xl font-bold">{activeResult.sub.score != null ? `${activeResult.sub.score} / ${activeResult.sub.total || '100'}` : 'Final Marks'}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-primary">Percentage</p>
-                                    <p className="text-4xl font-black text-primary">{isViewingResults.percentage ?? isViewingResults.grade ?? 0}%</p>
+                                    <p className="text-4xl font-black text-primary">{activeResult.sub.percentage ?? activeResult.sub.grade ?? 0}%</p>
                                 </div>
                             </div>
                             
                             <Button asChild className="w-full btn-gel h-12 rounded-xl text-lg">
-                                <a href={isViewingResults.checkedUrl || "https://www.africau.edu/images/default/sample.pdf"} target="_blank" rel="noreferrer">
-                                    <CheckCircle className="mr-2 h-5 w-5" /> View Checked Answer Sheet (Demo)
-                                </a>
+                                <Link href={`/dashboard/classrooms/${classroomId}/exams/${activeResult.examId}/result/${activeResult.sub.studentId}`}>
+                                    <CheckCircle className="mr-2 h-5 w-5" /> View Checked Answer Sheet
+                                </Link>
                             </Button>
 
-                            {isViewingResults.feedback && (
+                            {activeResult.sub.feedback && (
                                 <div className="p-4 bg-muted/30 rounded-xl">
                                     <p className="text-xs uppercase text-muted-foreground font-bold">Feedback</p>
-                                    <p className="mt-2 text-sm italic">"{isViewingResults.feedback}"</p>
+                                    <p className="mt-2 text-sm italic">"{activeResult.sub.feedback}"</p>
                                 </div>
                             )}
                             
-                            {isViewingResults.results && (
+                            {activeResult.sub.results && (
                                 <ScrollArea className="max-h-[40vh]">
                                     <div className="space-y-3">
-                                        {isViewingResults.results.map((res: any, i: number) => (
+                                        {activeResult.sub.results.map((res: any, i: number) => (
                                             <div key={i} className={cn("p-3 rounded-lg border", res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100")}>
                                                 <p className="font-semibold text-sm mb-2">Q{i+1}: {res.question}</p>
                                                 <div className="grid grid-cols-2 gap-4 text-xs">
