@@ -187,9 +187,35 @@ export default function ExamCheckingPage() {
         try {
             const submissionRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', studentId);
             let checkedUrl = submission?.checkedUrl || null;
+            const canvas = canvasRef.current;
 
-            if (canvasRef.current && paths.length > 0) {
-                const blob = await new Promise<Blob | null>(resolve => canvasRef.current!.toBlob(resolve, 'image/png'));
+            if (canvas && paths.length > 0) {
+                const isPdf = submission?.submissionUrl.toLowerCase().split('?')[0].endsWith('.pdf') || submission?.submissionUrl.includes('sample.pdf');
+                
+                let blob: Blob | null = null;
+                
+                if (!isPdf) {
+                    // Merging logic for images - flattened markup onto work
+                    const offscreen = document.createElement('canvas');
+                    offscreen.width = canvas.width;
+                    offscreen.height = canvas.height;
+                    const ctx = offscreen.getContext('2d');
+                    if (ctx) {
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+                        
+                        const img = document.querySelector('img[alt="Submission"]') as HTMLImageElement;
+                        if (img && img.complete) {
+                            ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
+                        }
+                        ctx.drawImage(canvas, 0, 0);
+                        blob = await new Promise<Blob | null>(resolve => offscreen.toBlob(resolve, 'image/png'));
+                    }
+                } else {
+                    // For PDFs, we save the markup layer as a transparent overlay
+                    blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+                }
+
                 if (blob) {
                     const storagePath = `classrooms/${classroomId}/exams/checked/${studentId}-${Date.now()}.png`;
                     const fileRef = ref(storage, storagePath);
@@ -200,7 +226,7 @@ export default function ExamCheckingPage() {
 
             await updateDoc(submissionRef, {
                 percentage: percentage ? parseInt(percentage) : null,
-                score: percentage ? parseInt(percentage) : null, // Manual exams use percentage as score
+                score: percentage ? parseInt(percentage) : null,
                 feedback: feedback || null,
                 checkedUrl
             });
@@ -208,6 +234,7 @@ export default function ExamCheckingPage() {
             toast({ title: "Exam Graded Successfully" });
             router.back();
         } catch (error) {
+            console.error("Save failed:", error);
             toast({ variant: 'destructive', title: "Save Failed" });
         } finally {
             setIsSaving(false);

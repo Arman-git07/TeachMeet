@@ -113,7 +113,7 @@ export default function ExamResultPage() {
 
         // Title
         doc.setFontSize(22);
-        doc.setTextColor(50, 205, 50); // Primary color (RGB for TeachMeet green)
+        doc.setTextColor(50, 205, 50); // Primary color
         doc.text("TeachMeet Exam Result", margin, y);
         y += 15;
 
@@ -164,7 +164,6 @@ export default function ExamResultPage() {
                 doc.setTextColor(0, 0, 0);
                 doc.text(`${i + 1}. ${res.question}`, margin, y);
                 y += 6;
-                // Correct way to set text color in RGB
                 if (res.isCorrect) doc.setTextColor(0, 150, 0);
                 else doc.setTextColor(200, 0, 0);
                 doc.text(`   Status: ${res.isCorrect ? 'Correct' : 'Incorrect'}`, margin, y);
@@ -178,7 +177,7 @@ export default function ExamResultPage() {
         }
 
         doc.save(`${submission.studentName}_${exam.title}_Result.pdf`);
-        toast({ title: "Report Downloaded", description: "Exam result has been saved to your device." });
+        toast({ title: "Report Downloaded" });
     };
 
     if (isLoading) {
@@ -198,7 +197,6 @@ export default function ExamResultPage() {
 
     const isExamEnded = exam?.endDate?.toDate() < new Date();
 
-    // Guard: If not teacher and exam is still active, block result access
     if (!isTeacher && !isExamEnded) {
         return (
             <div className="container mx-auto p-4 md:p-8 flex flex-col items-center justify-center h-full min-h-[600px] space-y-6 text-center animate-in fade-in zoom-in duration-300">
@@ -208,12 +206,8 @@ export default function ExamResultPage() {
                 <div className="space-y-2">
                     <h2 className="text-3xl font-bold tracking-tight text-foreground">Results Pending</h2>
                     <p className="text-muted-foreground max-w-md mx-auto">
-                        This exam session is still active. To maintain exam integrity, detailed results and checked papers are released only once the session ends.
+                        This exam session is still active. Results will be released once the session ends.
                     </p>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-xl border border-border/50 max-w-xs w-full">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1 tracking-widest">Release Time</p>
-                    <p className="text-sm font-semibold">{exam?.endDate?.toDate().toLocaleString([], { dateStyle: 'long', timeStyle: 'short' })}</p>
                 </div>
                 <Button onClick={() => router.back()} variant="outline" className="rounded-xl px-8 h-12">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Return to Classroom
@@ -223,7 +217,7 @@ export default function ExamResultPage() {
     }
 
     const displayUrl = submission.checkedUrl || submission.submissionUrl || "https://www.africau.edu/images/default/sample.pdf";
-    const isPdf = displayUrl.toLowerCase().includes('.pdf') || displayUrl.includes('sample.pdf');
+    const isPdf = displayUrl.toLowerCase().split('?')[0].endsWith('.pdf') || displayUrl.includes('sample.pdf');
     const isTextExam = exam?.type === 'text';
 
     return (
@@ -259,9 +253,6 @@ export default function ExamResultPage() {
                     <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="rounded-lg">
                         <FileDown className="mr-2 h-4 w-4" /> Download to Device
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex rounded-lg">
-                        <Printer className="mr-2 h-4 w-4" /> Print
-                    </Button>
                     {!isTextExam && (
                         <Button asChild size="sm" className="btn-gel rounded-lg">
                             <a href={displayUrl} target="_blank" rel="noreferrer">
@@ -278,35 +269,27 @@ export default function ExamResultPage() {
                         <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                             <CardTitle className="text-sm flex items-center gap-2">
                                 <FileText className="h-4 w-4 text-primary" />
-                                {isTextExam ? "Exam Paper & Responses" : (submission.checkedUrl ? "Checked Answer Sheet" : "Student Submission")}
+                                {isTextExam ? "Exam Paper & Responses" : (submission.checkedUrl ? "Graded & Checked Answer Sheet" : "Student Submission")}
                             </CardTitle>
-                            {submission.checkedUrl && <Badge className="bg-primary/20 text-primary border-none">Graded & Marked</Badge>}
+                            {submission.checkedUrl && <Badge className="bg-primary/20 text-primary border-primary/20">Graded & Marked</Badge>}
                         </CardHeader>
                         <CardContent className="flex-1 p-0 overflow-auto bg-white relative">
                             {isTextExam ? (
                                 <div className="p-6 space-y-8 max-w-3xl mx-auto">
-                                    {isEditing && (
-                                        <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-3 mb-6">
-                                            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                            <p className="text-xs text-primary/80 leading-relaxed">
-                                                <b>Teacher Edit Mode:</b> You can manually override the "Correct/Incorrect" status for each question. Student answers are read-only.
-                                            </p>
-                                        </div>
-                                    )}
                                     {(isEditing ? editResults : submission.results || []).map((res: any, i: number) => (
                                         <div key={i} className={cn(
-                                            "p-6 rounded-2xl border transition-all relative",
+                                            "p-6 rounded-2xl border transition-all",
                                             res.isCorrect ? "bg-green-50/30 border-green-100" : "bg-red-50/30 border-red-100"
                                         )}>
                                             <div className="flex justify-between items-start gap-4 mb-4">
                                                 <div className="flex items-center gap-3">
                                                     <span className={cn(
-                                                        "flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold shadow-sm",
+                                                        "flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
                                                         res.isCorrect ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                                                     )}>
                                                         {i + 1}
                                                     </span>
-                                                    <p className="text-lg font-bold leading-tight text-foreground">{res.question}</p>
+                                                    <p className="text-lg font-bold text-foreground">{res.question}</p>
                                                 </div>
                                                 {isEditing ? (
                                                     <Button 
@@ -329,17 +312,14 @@ export default function ExamResultPage() {
                                             <div className="grid grid-cols-1 gap-4 ml-11">
                                                 <div className="space-y-1.5">
                                                     <Label className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Student Answer</Label>
-                                                    <div className={cn(
-                                                        "font-medium text-base p-4 rounded-xl border shadow-sm",
-                                                        res.isCorrect ? "bg-white text-green-800 border-green-100" : "bg-white text-red-800 border-red-100"
-                                                    )}>
-                                                        {res.studentAnswer || <span className="italic opacity-30">No response provided</span>}
+                                                    <div className="font-medium text-base p-4 rounded-xl border bg-white shadow-sm">
+                                                        {res.studentAnswer || <span className="italic opacity-30">No response</span>}
                                                     </div>
                                                 </div>
                                                 
                                                 <div className="space-y-1.5 opacity-80">
                                                     <Label className="text-[10px] text-green-600 uppercase font-black tracking-widest">Marked Correct Answer</Label>
-                                                    <p className="font-bold text-sm text-green-700 bg-green-50/50 p-3 rounded-lg border border-green-100/50">
+                                                    <p className="font-bold text-sm text-green-700">
                                                         {res.correctAnswer}
                                                     </p>
                                                 </div>
@@ -375,22 +355,10 @@ export default function ExamResultPage() {
                             <div className="flex justify-between items-end bg-muted/30 p-4 rounded-xl border">
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Score</p>
-                                    {isEditing && !isTextExam ? (
-                                        <div className="flex items-center gap-1">
-                                            <Input 
-                                                type="number" 
-                                                value={editScore} 
-                                                onChange={(e) => setEditScore(e.target.value)} 
-                                                className="w-16 h-8 text-xl font-black p-1"
-                                            />
-                                            <span className="text-xl font-black">/ {submission.total || '100'}</span>
-                                        </div>
-                                    ) : (
-                                        <p className="text-3xl font-black">
-                                            {isEditing && isTextExam ? editResults.filter(r => r.isCorrect).length : (submission.score != null ? submission.score : 'N/A')} 
-                                            <span className="text-muted-foreground font-normal text-sm ml-1">/ {submission.total || (isTextExam ? editResults.length : '100')}</span>
-                                        </p>
-                                    )}
+                                    <p className="text-3xl font-black">
+                                        {isEditing && isTextExam ? editResults.filter(r => r.isCorrect).length : (submission.score != null ? submission.score : 'N/A')} 
+                                        <span className="text-muted-foreground font-normal text-sm ml-1">/ {submission.total || (isTextExam ? editResults.length : '100')}</span>
+                                    </p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Grade (%)</p>
@@ -408,12 +376,12 @@ export default function ExamResultPage() {
                                     <Textarea 
                                         value={editFeedback} 
                                         onChange={(e) => setEditFeedback(e.target.value)} 
-                                        placeholder="Enter constructive feedback for the student..."
-                                        className="min-h-[150px] rounded-xl resize-none italic text-sm border-primary/20"
+                                        placeholder="Enter feedback..."
+                                        className="min-h-[150px] rounded-xl resize-none italic text-sm"
                                     />
                                 ) : (
                                     <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 italic text-sm text-foreground/80 leading-relaxed min-h-[100px]">
-                                        {submission.feedback ? `"${submission.feedback}"` : "The teacher has not provided detailed feedback yet."}
+                                        {submission.feedback ? `"${submission.feedback}"` : "No feedback provided yet."}
                                     </div>
                                 )}
                             </div>
@@ -435,21 +403,12 @@ export default function ExamResultPage() {
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-bold">Submitted At</p>
                                         <p className="font-semibold text-xs">
-                                            {submission.submittedAt?.toDate ? submission.submittedAt.toDate().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Pending'}
+                                            {submission.submittedAt?.toDate ? submission.submittedAt.toDate().toLocaleString() : 'Pending'}
                                         </p>
                                     </div>
                                 </div>
                             </div>
                         </CardContent>
-                        {isEditing && (
-                            <CardFooter className="bg-primary/5 border-t p-4 flex flex-col gap-2">
-                                <Button onClick={handleSaveEdits} disabled={isSaving} className="w-full btn-gel h-12 rounded-xl text-lg">
-                                    {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                    Finalize Grading
-                                </Button>
-                                <p className="text-[10px] text-primary/70 text-center font-medium">Results will be visible to the student once the exam session ends.</p>
-                            </CardFooter>
-                        )}
                     </Card>
                 </aside>
             </main>
