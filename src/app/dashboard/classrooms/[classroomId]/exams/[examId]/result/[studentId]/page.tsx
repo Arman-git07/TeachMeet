@@ -6,7 +6,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, FileText, CheckCircle2, UserCircle, Download, Printer, Save, Edit3, X, CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle2, UserCircle, Download, Printer, Save, Edit3, X, CheckCircle, AlertTriangle, Info, Clock, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -114,6 +114,32 @@ export default function ExamResultPage() {
                 <h2 className="text-xl font-bold">Result Not Found</h2>
                 <p className="text-muted-foreground">The requested exam result could not be retrieved.</p>
                 <Button onClick={() => router.back()}>Go Back</Button>
+            </div>
+        );
+    }
+
+    const isExamEnded = exam?.endDate?.toDate() < new Date();
+
+    // Guard: If not teacher and exam is still active, block result access
+    if (!isTeacher && !isExamEnded) {
+        return (
+            <div className="container mx-auto p-4 md:p-8 flex flex-col items-center justify-center h-full min-h-[600px] space-y-6 text-center animate-in fade-in zoom-in duration-300">
+                <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Clock className="h-12 w-12 text-primary animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                    <h2 className="text-3xl font-bold tracking-tight text-foreground">Results Pending</h2>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                        This exam session is still active. To maintain exam integrity, detailed results and checked papers are released only once the session ends.
+                    </p>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-xl border border-border/50 max-w-xs w-full">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1 tracking-widest">Release Time</p>
+                    <p className="text-sm font-semibold">{exam?.endDate?.toDate().toLocaleString([], { dateStyle: 'long', timeStyle: 'short' })}</p>
+                </div>
+                <Button onClick={() => router.back()} variant="outline" className="rounded-xl px-8 h-12">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Return to Classroom
+                </Button>
             </div>
         );
     }
@@ -340,7 +366,7 @@ export default function ExamResultPage() {
                                     {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
                                     Finalize Grading
                                 </Button>
-                                <p className="text-[10px] text-primary/70 text-center font-medium">Results will be updated for the student immediately.</p>
+                                <p className="text-[10px] text-primary/70 text-center font-medium">Results will be visible to the student once the exam session ends.</p>
                             </CardFooter>
                         )}
                     </Card>
