@@ -151,43 +151,6 @@ export function ClassMaterials() {
                 )}
                 
                 <div className="grid gap-3">
-                    {/* Demo Class Materials */}
-                    <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-xl group hover:shadow-sm transition-all">
-                        <div className="flex items-center gap-3 truncate flex-1">
-                            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                                <FileText className="h-4 w-4" />
-                            </div>
-                            <div className="truncate">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium block truncate">Demo: Physics Lecture Notes</span>
-                                    <Badge variant="outline" className="text-[8px] h-4 px-1 border-primary/30 text-primary font-bold">SAMPLE</Badge>
-                                </div>
-                                <span className="text-[10px] text-muted-foreground uppercase">file • Added by Admin</span>
-                            </div>
-                        </div>
-                        <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
-                            <Link href={`/dashboard/classrooms/${classroomId}/materials/demo-physics`}>View</Link>
-                        </Button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-xl group hover:shadow-sm transition-all">
-                        <div className="flex items-center gap-3 truncate flex-1">
-                            <div className="p-2 rounded-lg bg-accent/10 text-accent">
-                                <LinkIcon className="h-4 w-4" />
-                            </div>
-                            <div className="truncate">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium block truncate">Demo: Recommended Reading</span>
-                                    <Badge variant="outline" className="text-[8px] h-4 px-1 border-primary/30 text-primary font-bold">SAMPLE</Badge>
-                                </div>
-                                <span className="text-[10px] text-muted-foreground uppercase">link • Added by Admin</span>
-                            </div>
-                        </div>
-                        <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
-                            <Link href={`/dashboard/classrooms/${classroomId}/materials/demo-reading`}>Open</Link>
-                        </Button>
-                    </div>
-
                     {/* Real Class Materials */}
                     {materials.map(m => (
                         <div key={m.id} className="flex items-center justify-between p-3 bg-card border rounded-xl group hover:shadow-sm transition-all">
@@ -232,7 +195,7 @@ export function ClassMaterials() {
                     
                     {materials.length === 0 && (
                         <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl mt-2">
-                            <p className="text-sm">No other materials have been uploaded yet.</p>
+                            <p className="text-sm">No materials have been uploaded yet.</p>
                         </div>
                     )}
                 </div>
