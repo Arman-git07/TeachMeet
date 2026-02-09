@@ -182,7 +182,7 @@ export default function ExamResultPage() {
                                         <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-3 mb-6">
                                             <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                                             <p className="text-xs text-primary/80 leading-relaxed">
-                                                <b>Teacher Edit Mode:</b> You can modify the student's text responses or manually override the "Correct/Incorrect" status for each question.
+                                                <b>Teacher Edit Mode:</b> You can manually override the "Correct/Incorrect" status for each question. Student answers are read-only.
                                             </p>
                                         </div>
                                     )}
@@ -222,24 +222,12 @@ export default function ExamResultPage() {
                                             <div className="grid grid-cols-1 gap-4 ml-11">
                                                 <div className="space-y-1.5">
                                                     <Label className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Student Answer</Label>
-                                                    {isEditing ? (
-                                                        <Input 
-                                                            value={res.studentAnswer || ""} 
-                                                            onChange={(e) => {
-                                                                const next = [...editResults];
-                                                                next[i].studentAnswer = e.target.value;
-                                                                setEditResults(next);
-                                                            }}
-                                                            className="bg-white rounded-lg border-border/50 h-12 text-base font-medium"
-                                                        />
-                                                    ) : (
-                                                        <div className={cn(
-                                                            "font-medium text-base p-4 rounded-xl border shadow-sm",
-                                                            res.isCorrect ? "bg-white text-green-800 border-green-100" : "bg-white text-red-800 border-red-100"
-                                                        )}>
-                                                            {res.studentAnswer || <span className="italic opacity-30">No response provided</span>}
-                                                        </div>
-                                                    )}
+                                                    <div className={cn(
+                                                        "font-medium text-base p-4 rounded-xl border shadow-sm",
+                                                        res.isCorrect ? "bg-white text-green-800 border-green-100" : "bg-white text-red-800 border-red-100"
+                                                    )}>
+                                                        {res.studentAnswer || <span className="italic opacity-30">No response provided</span>}
+                                                    </div>
                                                 </div>
                                                 
                                                 <div className="space-y-1.5 opacity-80">
