@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -35,6 +34,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -381,10 +381,31 @@ export function Exams() {
                                                     }}>
                                                         <Clock className="h-4 w-4"/>
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
-                                                        deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id));
-                                                        toast({ title: "Exam Deleted" }); 
-                                                    }}><Trash2 className="h-4 w-4"/></Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Are you sure you want to delete "{exam.title}"? This will also remove all student submissions and results. This action cannot be undone.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction 
+                                                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                                    onClick={() => {
+                                                                        deleteDoc(doc(db, "classrooms", classroomId!, "exams", exam.id));
+                                                                        toast({ title: "Exam Deleted" }); 
+                                                                    }}
+                                                                >
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
                                                 </div>
                                             )}
                                         </div>
@@ -450,7 +471,7 @@ export function Exams() {
                                                 )
                                             ) : (
                                                 isExpired ? (
-                                                    <Button disabled variant="outline" className="w-full">Expired</Button>
+                                                    <Button disabled variant="outline" className="w-full">Ended</Button>
                                                 ) : isUpcoming ? (
                                                     <Button disabled variant="outline" className="w-full"><Clock className="mr-2 h-4 w-4"/> Upcoming</Button>
                                                 ) : (
