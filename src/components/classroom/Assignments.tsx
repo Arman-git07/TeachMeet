@@ -29,7 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3 } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { Assignment, Submission } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -102,7 +102,8 @@ export function Assignments() {
                 title: data.title, 
                 dueDate: Timestamp.fromDate(data.dueDate), 
                 answerKeyUrl, 
-                creatorId: user.uid, 
+                creatorId: user.uid,
+                creatorName: user.displayName || 'Teacher',
                 createdAt: serverTimestamp(), 
                 updatedAt: serverTimestamp(),
                 storagePath: storagePath || null,
@@ -183,14 +184,6 @@ export function Assignments() {
         }
     };
 
-    const visibleAssignments = assignments.filter(a => {
-        if (canUserManage) return true;
-        const isDeadlinePassed = new Date(a.dueDate.toDate()) < currentTime;
-        const hasSubmitted = submissions.some(s => s.assignmentId === a.id && s.studentId === user?.uid);
-        // Students see assignments if not expired OR if they have already submitted them
-        return !isDeadlinePassed || hasSubmitted;
-    });
-
     return (
         <Card className="border-0 shadow-none bg-transparent">
             <CardHeader className="flex flex-row items-center justify-between px-0">
@@ -222,11 +215,13 @@ export function Assignments() {
                 )}
             </CardHeader>
             <CardContent className="px-0 space-y-4">
-                {visibleAssignments.length > 0 ? visibleAssignments.map(assignment => {
+                {assignments.length > 0 ? assignments.map(assignment => {
                     const userSub = submissions.find(s => s.assignmentId === assignment.id && s.studentId === user?.uid);
                     const canEdit = userRole === 'creator' || assignment.creatorId === user?.uid;
                     const isDeadlinePassed = new Date(assignment.dueDate.toDate()) < currentTime;
                     const isModifying = modifyingAssignments.has(assignment.id);
+                    // @ts-ignore
+                    const teacherName = assignment.creatorName || "Teacher";
 
                     return (
                         <Card key={assignment.id} className="p-4 shadow-md rounded-xl">
@@ -350,12 +345,21 @@ export function Assignments() {
                                                 )}
                                             </div>
                                         ) : (
-                                            <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2">
-                                                <Input type="file" required className="h-9 text-xs" disabled={isProcessing === `submitting-${assignment.id}`}/>
-                                                <Button size="sm" type="submit" disabled={isProcessing === `submitting-${assignment.id}`}>
-                                                    {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-4 w-4"/> : "Submit"}
-                                                </Button>
-                                            </form>
+                                            isDeadlinePassed ? (
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <Badge variant="destructive" className="font-bold flex items-center gap-1.5">
+                                                        <AlertCircle className="h-3 w-3" /> Time Over
+                                                    </Badge>
+                                                    <p className="text-[10px] text-muted-foreground font-medium">Contact to @{teacherName}</p>
+                                                </div>
+                                            ) : (
+                                                <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2">
+                                                    <Input type="file" required className="h-9 text-xs" disabled={isProcessing === `submitting-${assignment.id}`}/>
+                                                    <Button size="sm" type="submit" disabled={isProcessing === `submitting-${assignment.id}`}>
+                                                        {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-4 w-4"/> : "Submit"}
+                                                    </Button>
+                                                </form>
+                                            )
                                         )
                                     )}
                                 </div>
