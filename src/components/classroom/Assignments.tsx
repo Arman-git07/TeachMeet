@@ -29,7 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { Assignment, Submission } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -103,7 +103,6 @@ export function Assignments() {
                 dueDate: Timestamp.fromDate(data.dueDate), 
                 answerKeyUrl, 
                 creatorId: user.uid,
-                // @ts-ignore
                 creatorName: user.displayName || 'Teacher',
                 createdAt: serverTimestamp(), 
                 updatedAt: serverTimestamp(),
@@ -216,16 +215,72 @@ export function Assignments() {
                 )}
             </CardHeader>
             <CardContent className="px-0 space-y-4">
+                {/* Demo Checked Assignment */}
+                <Card className="p-4 shadow-md rounded-xl border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-primary">Demo: History Essay</h3>
+                                <Badge variant="secondary" className="text-[10px] h-4 uppercase font-bold tracking-widest bg-primary/10 text-primary border-none">Sample</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Clock className="h-3 w-3" /> Due: 1/1/2024, 12:00 PM (Ended)
+                            </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                            <Badge className="bg-green-500 text-white hover:bg-green-500 border-none px-3">Checked & Graded</Badge>
+                            <Dialog>
+                                <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-lg h-8 shadow-sm">View Result</Button></DialogTrigger>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary"/> Exam Result</DialogTitle>
+                                        <DialogDescription>Sample view of a graded assignment.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="py-6 text-center space-y-6">
+                                        <div className="flex flex-col items-center">
+                                            <p className="text-sm text-muted-foreground uppercase font-black tracking-widest mb-1">Final Score</p>
+                                            <div className="text-6xl font-black text-primary drop-shadow-sm">92<span className="text-2xl text-muted-foreground font-normal">/100</span></div>
+                                        </div>
+                                        
+                                        <div className="p-4 bg-muted/50 rounded-xl border italic text-sm text-foreground/80 leading-relaxed shadow-inner">
+                                            "Great analysis of the French Revolution! Your points on the social causes were very well-argued. I've highlighted some areas where you could improve your citations in the checked version."
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-3">
+                                            <Button asChild variant="outline" className="w-full rounded-xl h-12">
+                                                <a href="https://www.africau.edu/images/default/sample.pdf" target="_blank" rel="noreferrer">
+                                                    <FileDown className="mr-2 h-5 w-5"/> Download Original
+                                                </a>
+                                            </Button>
+                                            <Button asChild className="w-full btn-gel rounded-xl h-12 text-lg">
+                                                <a href="https://picsum.photos/seed/checked/800/1200" target="_blank" rel="noreferrer">
+                                                    <Eye className="mr-2 h-5 w-5"/> View Checked Work
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <DialogClose asChild><Button variant="ghost" className="w-full">Close Preview</Button></DialogClose>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-3 border-t pt-3 flex items-start gap-2">
+                        <span className="font-bold text-foreground shrink-0">Teacher Feedback:</span>
+                        <span className="italic">"Great analysis of the French Revolution! Your points on the social causes..."</span>
+                    </p>
+                </Card>
+
                 {assignments.length > 0 ? assignments.map(assignment => {
                     const userSub = submissions.find(s => s.assignmentId === assignment.id && s.studentId === user?.uid);
                     const canEdit = userRole === 'creator' || assignment.creatorId === user?.uid;
                     const isDeadlinePassed = new Date(assignment.dueDate.toDate()) < currentTime;
                     const isModifying = modifyingAssignments.has(assignment.id);
-                    // @ts-ignore
                     const teacherName = assignment.creatorName || "Teacher";
 
                     return (
-                        <Card key={assignment.id} className="p-4 shadow-md rounded-xl">
+                        <Card key={assignment.id} className="p-4 shadow-md rounded-xl group">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <h3 className="font-semibold">{assignment.title}</h3>
@@ -368,7 +423,13 @@ export function Assignments() {
                             {userSub?.feedback && !isModifying && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {userSub.feedback}</p>}
                         </Card>
                     );
-                }) : <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl"><p className="text-sm">No active assignments found.</p></div>}
+                }) : null}
+                
+                {assignments.length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                        <p className="text-sm">No active assignments found.</p>
+                    </div>
+                )}
             </CardContent>
 
             <Dialog open={!!reschedulingAssignment} onOpenChange={(open) => !open && setReschedulingAssignment(null)}>
