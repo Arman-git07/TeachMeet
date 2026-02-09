@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,11 +8,12 @@ import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/c
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Phone } from 'lucide-react';
+import { Clock, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
 import type { SubjectTeacher } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 export function SubjectTeachers() {
-    const { classroomId } = useClassroom();
+    const { classroomId, classroom } = useClassroom();
     const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
 
     useEffect(() => {
@@ -44,7 +44,11 @@ export function SubjectTeachers() {
                                     </div>
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                     <Button size="sm"><Phone className="mr-2 h-4 w-4"/>Contact</Button>
+                                     <Button size="sm" asChild className="rounded-lg">
+                                        <Link href={`/dashboard/classrooms/${classroomId}/chat?topic=${encodeURIComponent(classroom?.title || '')}`}>
+                                            <MessageSquare className="mr-2 h-4 w-4"/>Private Chat
+                                        </Link>
+                                     </Button>
                                 </div>
                             </div>
                         </Card>

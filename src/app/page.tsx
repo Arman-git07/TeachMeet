@@ -102,7 +102,6 @@ export default function HomePage() {
   const submissionSubsRef = useRef<Record<string, () => void>>({});
   const personalSubsRef = useRef<(() => void)[]>([]);
 
-  // Track classrooms where the user has any management or student role
   const [allClassroomIds, setAllClassroomIds] = useState<Record<string, { title: string, role: 'teacher' | 'student' }>>({});
 
   useEffect(() => {
@@ -111,7 +110,6 @@ export default function HomePage() {
     return () => clearInterval(ticker);
   }, []);
 
-  // 1. Discover all relevant classrooms (Managed and Enrolled)
   useEffect(() => {
     if (!user || !isAuthenticated) {
         setAllClassroomIds({});
@@ -137,7 +135,6 @@ export default function HomePage() {
             setAllClassroomIds(prev => {
                 const next = { ...prev };
                 snap.docs.forEach(d => {
-                    // Only set as student if not already a teacher (teacher has higher priority)
                     if (!next[d.id]) {
                         next[d.id] = { title: d.data().title, role: 'student' };
                     }
@@ -153,14 +150,12 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated]);
 
-  // 2. Listen to Activity in all discovered classrooms
   useEffect(() => {
     if (!user || !isAuthenticated || Object.keys(allClassroomIds).length === 0) return;
 
     Object.keys(allClassroomIds).forEach(classId => {
         const classInfo = allClassroomIds[classId];
         
-        // Setup listeners for assignments, materials, announcements, exams
         const categories: {cat: ActivityItemType, col: string, order: string}[] = [
             { cat: 'assignment', col: 'assignments', order: 'dueDate' },
             { cat: 'material', col: 'materials', order: 'uploadedAt' },
@@ -224,7 +219,6 @@ export default function HomePage() {
             }
         });
 
-        // 3. Teacher-Specific: Join Requests and Submissions
         if (classInfo.role === 'teacher') {
             const jrKey = `join-${classId}`;
             if (!managedSubsRef.current[jrKey]) {
@@ -241,13 +235,11 @@ export default function HomePage() {
                 });
             }
 
-            // Listen for SUBMISSIONS across all assignments in this class
             const subKey = `subs-${classId}`;
             if (!submissionSubsRef.current[subKey]) {
                 submissionSubsRef.current[subKey] = onSnapshot(
                     query(collection(db, 'classrooms', classId, 'assignments'), orderBy('createdAt', 'desc'), limit(5)),
                     (assignmentsSnap) => {
-                        // For each recent assignment, listen to its submissions
                         assignmentsSnap.docs.forEach(aDoc => {
                             const aId = aDoc.id;
                             const subPath = `classrooms/${classId}/assignments/${aId}/submissions`;
@@ -259,7 +251,7 @@ export default function HomePage() {
                                     (subSnap) => {
                                         const subItems = subSnap.docs.map(sDoc => {
                                             const sData = sDoc.data();
-                                            if (sData.grade != null) return null; // Don't show if already graded
+                                            if (sData.grade != null) return null;
 
                                             return {
                                                 id: `sub-${sDoc.id}`,
@@ -294,7 +286,6 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated, allClassroomIds]);
 
-  // 4. Listen to Personal Library
   useEffect(() => {
     if (!user || !isAuthenticated) return;
 
@@ -332,7 +323,6 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated]);
 
-  // 5. Logical Meeting Validator
   useEffect(() => {
     if (!user || !isAuthenticated) return;
     const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
@@ -346,19 +336,12 @@ export default function HomePage() {
     });
   }, [user, isAuthenticated, activityChunks]);
 
-  // Derived flat list of firestore activity
-  const firestoreActivity = useMemo(() => {
-    return Object.values(activityChunks).flat();
-  }, [activityChunks]);
-
-  // Helper to find raw exam data from chunks for status checking
   const examsFromChunks = useMemo(() => {
       return Object.entries(activityChunks)
         .filter(([key]) => key.startsWith('exam-'))
         .flatMap(([_, items]) => items.map(i => ({ id: i.id, rawId: i.id.split('-').pop(), endTs: (i as any).endTs })));
   }, [activityChunks]);
 
-  // Combine everything for the UI
   const allActivity = useMemo(() => {
     if (!user) return [];
     
@@ -367,6 +350,8 @@ export default function HomePage() {
 
     const dismissed = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
     const started = JSON.parse(localStorage.getItem(STARTED_KEY) || '[]');
+
+    const firestoreActivity = Object.values(activityChunks).flat();
 
     const ongoingMeetings = started
         .filter((m: any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS && validMeetings[m.id] !== false)
@@ -378,7 +363,12 @@ export default function HomePage() {
         }));
     
     const combined = [...ongoingMeetings, ...firestoreActivity]
-        .filter(item => item && !dismissed.includes(item.id))
+        .filter(item => {
+            if (!item || dismissed.includes(item.id)) return false;
+            // Logical Guard: If item belongs to a classroom, ensure classroom still exists in user's known set
+            if (item.classroomId && !allClassroomIds[item.classroomId]) return false;
+            return true;
+        })
         .map(item => {
             const newItem = { ...item };
             if (newItem.type === 'exam') {
@@ -400,7 +390,7 @@ export default function HomePage() {
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, firestoreActivity, validMeetings, examsFromChunks, allClassroomIds]);
+  }, [user, activityChunks, validMeetings, examsFromChunks, allClassroomIds]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);
