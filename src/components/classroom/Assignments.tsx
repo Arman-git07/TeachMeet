@@ -13,7 +13,7 @@ import * as z from 'zod';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -29,6 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle, Sparkles, CheckCircle, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -311,39 +312,39 @@ export function Assignments() {
                                 <div className="flex items-center gap-2">
                                     {canUserManage ? (
                                         <>
-                                            <Dialog>
-                                                <DialogTrigger asChild><Button variant="outline" size="sm">Submissions</Button></DialogTrigger>
-                                                <DialogContent className="max-w-md">
-                                                    <DialogHeader>
-                                                        <DialogTitle>Student Submissions</DialogTitle>
-                                                        <DialogDescription>Select a student to review their work.</DialogDescription>
-                                                    </DialogHeader>
-                                                    <ScrollArea className="max-h-[60vh] py-4">
-                                                        <div className="space-y-3 px-1">
-                                                            {submissions.filter(s => s.assignmentId === assignment.id).length === 0 ? (
-                                                                <p className="text-center py-8 text-sm text-muted-foreground">No submissions yet.</p>
-                                                            ) : (
-                                                                submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
-                                                                    <div key={sub.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-                                                                        <div className="flex flex-col">
-                                                                            <p className="font-medium text-sm">{sub.studentName}</p>
-                                                                            {sub.grade != null && <p className="text-[10px] text-primary font-bold">Graded: {sub.grade}/100</p>}
-                                                                        </div>
-                                                                        <Button asChild variant="outline" size="sm" className="h-8 rounded-lg">
-                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/result/${sub.studentId}`}>
-                                                                                <Eye className="mr-2 h-3.5 w-3.5"/>View Result
-                                                                            </Link>
-                                                                        </Button>
-                                                                    </div>
-                                                                ))
-                                                            )}
-                                                        </div>
-                                                    </ScrollArea>
-                                                </DialogContent>
-                                            </Dialog>
-                                            
-                                            {canEdit && (
+                                            {canEdit ? (
                                                 <>
+                                                    <Dialog>
+                                                        <DialogTrigger asChild><Button variant="outline" size="sm">Submissions</Button></DialogTrigger>
+                                                        <DialogContent className="max-w-md">
+                                                            <DialogHeader>
+                                                                <DialogTitle>Student Submissions</DialogTitle>
+                                                                <DialogDescription>Select a student to review their work.</DialogDescription>
+                                                            </DialogHeader>
+                                                            <ScrollArea className="max-h-[60vh] py-4">
+                                                                <div className="space-y-3 px-1">
+                                                                    {submissions.filter(s => s.assignmentId === assignment.id).length === 0 ? (
+                                                                        <p className="text-center py-8 text-sm text-muted-foreground">No submissions yet.</p>
+                                                                    ) : (
+                                                                        submissions.filter(s => s.assignmentId === assignment.id).map(sub => (
+                                                                            <div key={sub.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                                                                                <div className="flex flex-col">
+                                                                                    <p className="font-medium text-sm">{sub.studentName}</p>
+                                                                                    {sub.grade != null && <p className="text-[10px] text-primary font-bold">Graded: {sub.grade}/100</p>}
+                                                                                </div>
+                                                                                <Button asChild variant="outline" size="sm" className="h-8 rounded-lg">
+                                                                                    <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/result/${sub.studentId}`}>
+                                                                                        <Eye className="mr-2 h-3.5 w-3.5"/>View Result
+                                                                                    </Link>
+                                                                                </Button>
+                                                                            </div>
+                                                                        ))
+                                                                    )}
+                                                                </div>
+                                                            </ScrollArea>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                    
                                                     <Button 
                                                         variant="ghost" 
                                                         size="icon" 
@@ -376,6 +377,8 @@ export function Assignments() {
                                                         </AlertDialogContent>
                                                     </AlertDialog>
                                                 </>
+                                            ) : (
+                                                <Badge variant="outline" className="text-[10px] opacity-50 uppercase tracking-tighter">View Restricted</Badge>
                                             )}
                                         </>
                                     ) : user && (
