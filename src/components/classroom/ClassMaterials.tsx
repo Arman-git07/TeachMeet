@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Loader2, Link as LinkIcon, Trash2, FileText } from 'lucide-react';
+import { Upload, Loader2, Link as LinkIcon, Trash2, FileText, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Material } from '@/app/dashboard/classrooms/[classroomId]/page';
 import {
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from '@/components/ui/badge';
 
 export function ClassMaterials() {
     const { classroomId, user, userRole } = useClassroom();
@@ -149,7 +150,45 @@ export function ClassMaterials() {
                 )}
                 
                 <div className="grid gap-3">
-                    {materials.length > 0 ? materials.map(m => (
+                    {/* Demo Class Materials */}
+                    <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-xl group hover:shadow-sm transition-all">
+                        <div className="flex items-center gap-3 truncate flex-1">
+                            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="truncate">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium block truncate">Demo: Physics Lecture Notes</span>
+                                    <Badge variant="outline" className="text-[8px] h-4 px-1 border-primary/30 text-primary font-bold">SAMPLE</Badge>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground uppercase">file • Added by Admin</span>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
+                            <a href="https://www.africau.edu/images/default/sample.pdf" target="_blank" rel="noreferrer">View</a>
+                        </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-xl group hover:shadow-sm transition-all">
+                        <div className="flex items-center gap-3 truncate flex-1">
+                            <div className="p-2 rounded-lg bg-accent/10 text-accent">
+                                <LinkIcon className="h-4 w-4" />
+                            </div>
+                            <div className="truncate">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium block truncate">Demo: Recommended Reading</span>
+                                    <Badge variant="outline" className="text-[8px] h-4 px-1 border-primary/30 text-primary font-bold">SAMPLE</Badge>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground uppercase">link • Added by Admin</span>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
+                            <a href="https://wikipedia.org" target="_blank" rel="noreferrer">Open</a>
+                        </Button>
+                    </div>
+
+                    {/* Real Class Materials */}
+                    {materials.map(m => (
                         <div key={m.id} className="flex items-center justify-between p-3 bg-card border rounded-xl group hover:shadow-sm transition-all">
                             <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 truncate flex-1">
                                 <div className={cn("p-2 rounded-lg", m.type === 'link' ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary")}>
@@ -188,9 +227,11 @@ export function ClassMaterials() {
                                 </AlertDialog>
                             )}
                         </div>
-                    )) : (
-                        <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
-                            <p className="text-sm">No materials have been uploaded to this classroom yet.</p>
+                    ))}
+                    
+                    {materials.length === 0 && (
+                        <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl mt-2">
+                            <p className="text-sm">No other materials have been uploaded yet.</p>
                         </div>
                     )}
                 </div>
