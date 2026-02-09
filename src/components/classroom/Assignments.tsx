@@ -29,7 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { Assignment, Submission } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -47,13 +47,22 @@ export function Assignments() {
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Rescheduling state
+    // Tracking which assignments are being modified by the student
+    const [modifyingAssignments, setModifyingAssignments] = useState<Set<string>>(new Set());
+
+    // Rescheduling state for teachers
     const [reschedulingAssignment, setReschedulingAssignment] = useState<Assignment | null>(null);
     const [rescheduleValue, setRescheduleValue] = useState("");
 
     const canUserManage = canManage(userRole);
     const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({ resolver: zodResolver(assignmentSchema) });
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 10000);
+        return () => clearInterval(timer);
+    }, []);
 
     useEffect(() => {
         if (!classroomId) return;
@@ -129,6 +138,11 @@ export function Assignments() {
                 assignmentId: assignmentId
             });
             toast({ title: "Submitted Successfully!" });
+            setModifyingAssignments(prev => {
+                const next = new Set(prev);
+                next.delete(assignmentId);
+                return next;
+            });
         } catch (error) {
             toast({ variant: 'destructive', title: "Submission Failed" });
         } finally {
@@ -169,7 +183,13 @@ export function Assignments() {
         }
     };
 
-    const visibleAssignments = assignments.filter(a => canUserManage || new Date(a.dueDate.toDate()) > new Date());
+    const visibleAssignments = assignments.filter(a => {
+        if (canUserManage) return true;
+        const isDeadlinePassed = new Date(a.dueDate.toDate()) < currentTime;
+        const hasSubmitted = submissions.some(s => s.assignmentId === a.id && s.studentId === user?.uid);
+        // Students see assignments if not expired OR if they have already submitted them
+        return !isDeadlinePassed || hasSubmitted;
+    });
 
     return (
         <Card className="border-0 shadow-none bg-transparent">
@@ -205,6 +225,8 @@ export function Assignments() {
                 {visibleAssignments.length > 0 ? visibleAssignments.map(assignment => {
                     const userSub = submissions.find(s => s.assignmentId === assignment.id && s.studentId === user?.uid);
                     const canEdit = userRole === 'creator' || assignment.creatorId === user?.uid;
+                    const isDeadlinePassed = new Date(assignment.dueDate.toDate()) < currentTime;
+                    const isModifying = modifyingAssignments.has(assignment.id);
 
                     return (
                         <Card key={assignment.id} className="p-4 shadow-md rounded-xl">
@@ -282,7 +304,26 @@ export function Assignments() {
                                     ) : user && (
                                         userSub ? (
                                             <div className="flex flex-col items-end gap-2">
-                                                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Submitted</Badge>
+                                                {isDeadlinePassed ? (
+                                                    <Badge variant="outline" className="border-primary/20 text-primary font-bold bg-primary/5">Already Submitted</Badge>
+                                                ) : (
+                                                    isModifying ? (
+                                                        <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2">
+                                                            <Input type="file" required className="h-9 text-xs" disabled={isProcessing === `submitting-${assignment.id}`}/>
+                                                            <Button size="sm" type="submit" disabled={isProcessing === `submitting-${assignment.id}`}>
+                                                                {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-4 w-4"/> : "Update"}
+                                                            </Button>
+                                                            <Button size="sm" variant="ghost" onClick={() => setModifyingAssignments(prev => { const n = new Set(prev); n.delete(assignment.id); return n; })}>Cancel</Button>
+                                                        </form>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Submitted</Badge>
+                                                            <Button size="sm" variant="outline" onClick={() => setModifyingAssignments(prev => new Set(prev).add(assignment.id))}>
+                                                                <Edit3 className="mr-1.5 h-3.5 w-3.5"/> Modify
+                                                            </Button>
+                                                        </div>
+                                                    )
+                                                )}
                                                 {userSub.grade != null && (
                                                     <Dialog>
                                                         <DialogTrigger asChild><Button size="sm" variant="outline">View Result</Button></DialogTrigger>
@@ -319,7 +360,7 @@ export function Assignments() {
                                     )}
                                 </div>
                             </div>
-                            {userSub?.feedback && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {userSub.feedback}</p>}
+                            {userSub?.feedback && !isModifying && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {userSub.feedback}</p>}
                         </Card>
                     );
                 }) : <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl"><p className="text-sm">No active assignments found.</p></div>}
