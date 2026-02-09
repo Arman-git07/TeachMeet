@@ -165,7 +165,8 @@ export function Exams() {
                 fileUrl: examType === 'file' ? fileUrl : null,
                 storagePath: examType === 'file' ? storagePath : null,
                 type: examType, 
-                createdAt: serverTimestamp() 
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp() // Set initial updatedAt
             };
 
             const examsRef = collection(db, 'classrooms', classroomId, 'exams');
@@ -196,7 +197,10 @@ export function Exams() {
         setIsSubmitting(true);
         const newEndDate = new Date(rescheduleValue);
         const examRef = doc(db, 'classrooms', classroomId, 'exams', reschedulingExam.id);
-        const updateData = { endDate: Timestamp.fromDate(newEndDate) };
+        const updateData = { 
+            endDate: Timestamp.fromDate(newEndDate),
+            updatedAt: serverTimestamp() // CRITICAL: Track update for logical notifications
+        };
 
         try {
             await updateDoc(examRef, updateData);

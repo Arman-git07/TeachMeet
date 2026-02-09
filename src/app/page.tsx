@@ -1,4 +1,3 @@
-
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -23,7 +22,7 @@ import {
 } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
-import { collection, query, where, onSnapshot, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export type ActivityItemType = 
@@ -42,8 +41,10 @@ interface BaseActivityItem {
   type: ActivityItemType;
   title: string;
   timestamp: number;
+  updatedAt?: number;
   classroomId?: string;
   classroomName?: string;
+  isUpdated?: boolean;
 }
 
 export interface JoinRequestActivityItem extends BaseActivityItem {
@@ -84,16 +85,16 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
 export default function HomePage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
-  // We use a Map-like structure in state to store activity chunks from different listeners
   // Key format: `${type}-${classId}` or `personal-${type}`
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
   
   const managedSubsRef = useRef<Record<string, () => void>>({});
   const enrolledSubsRef = useRef<Record<string, () => void>>({});
   const personalSubsRef = useRef<(() => void)[]>([]);
 
-  // Derived flat list of firestore activity
+  // Derived flat list of firestore activity - strictly reflects current server state
   const firestoreActivity = useMemo(() => {
     return Object.values(activityChunks).flat();
   }, [activityChunks]);
@@ -193,21 +194,35 @@ export default function HomePage() {
                         (snap) => {
                             const items = snap.docs.map(d => {
                                 const data = d.data();
-                                // Filtering out vanished announcements
+                                
+                                // Logical Filter: If announcement has expired (vanished), don't show it
                                 if (cat === 'announcement' && data.vanishAt && data.vanishAt.toDate() < new Date()) {
                                     return null;
                                 }
+
+                                const createdAt = (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now();
+                                const updatedAt = data.updatedAt?.toMillis() || createdAt;
+                                
+                                // Logic: Determine if item was updated significantly after creation
+                                const isUpdated = updatedAt > createdAt + 10000; // 10s buffer
+
                                 return {
                                     id: `${cat}-${d.id}`,
                                     type: cat,
                                     title: cat === 'announcement' ? (data.text?.substring(0, 50) || 'New Voice Announcement') : (data.title || data.name),
-                                    timestamp: (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now(),
+                                    timestamp: createdAt,
+                                    updatedAt: updatedAt,
+                                    isUpdated: isUpdated,
                                     classroomId: classId,
                                     classroomName: classTitle
                                 };
                             }).filter(i => i !== null) as ActivityItem[];
 
                             setActivityChunks(prev => ({ ...prev, [key]: items }));
+                        },
+                        (err) => {
+                            console.warn(`Listener failed for ${key}, removing chunk.`, err);
+                            setActivityChunks(prev => { const next = {...prev}; delete next[key]; return next; });
                         }
                     );
                 }
@@ -260,6 +275,20 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated]);
 
+  // 4. Logical Meeting Validator - verifies if ongoing meetings still exist in Firestore
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
+    const started = JSON.parse(localStorage.getItem(STARTED_KEY) || '[]');
+    
+    started.forEach(async (m: any) => {
+        if (!m?.id) return;
+        const meetingRef = doc(db, 'meetings', m.id);
+        const snap = await getDoc(meetingRef);
+        setValidMeetings(prev => ({ ...prev, [m.id]: snap.exists() && snap.data().status !== 'ended' }));
+    });
+  }, [user, isAuthenticated, firestoreActivity]);
+
   // Combine everything for the UI
   const allActivity = useMemo(() => {
     if (!user) return [];
@@ -271,7 +300,7 @@ export default function HomePage() {
     const started = JSON.parse(localStorage.getItem(STARTED_KEY) || '[]');
 
     const ongoingMeetings = started
-        .filter((m: any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS)
+        .filter((m: any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS && validMeetings[m.id] !== false)
         .map((m: any) => ({ 
             type: 'meeting' as ActivityItemType, 
             id: m.id, 
@@ -281,7 +310,7 @@ export default function HomePage() {
     
     const combined = [...ongoingMeetings, ...firestoreActivity]
         .filter(item => item && !dismissed.includes(item.id))
-        .sort((a,b) => b.timestamp - a.timestamp);
+        .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
     // Final unique check
     const unique = combined.reduce((acc: ActivityItem[], current) => {
@@ -290,7 +319,7 @@ export default function HomePage() {
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, firestoreActivity]);
+  }, [user, firestoreActivity, validMeetings]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);
@@ -300,7 +329,7 @@ export default function HomePage() {
     const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
     const dismissed = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify([...dismissed, id]));
-    // Force re-render of useMemo by modifying firestoreActivity local representation
+    // Force re-render by updating local chunks
     setActivityChunks(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(k => {
@@ -334,16 +363,18 @@ export default function HomePage() {
                         const link = itemLinks[item.type as ActivityItemType](item.id, item);
                         
                         let displayTitle = item.title;
+                        const prefix = item.isUpdated ? (item.type === 'exam' ? 'Rescheduled' : 'Updated') : 'New';
+
                         if (item.type === 'joinRequest') {
                             displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
                         } else if (item.classroomName) {
-                            displayTitle = `New ${item.type} in ${item.classroomName}`;
+                            displayTitle = `${prefix} ${item.type} in ${item.classroomName}`;
                         } else {
                             displayTitle = `${item.title}`;
                         }
 
                         return (
-                        <div key={item.id} className="flex items-center gap-2 group">
+                        <div key={item.id} className="flex items-center gap-2 group animate-fade-in">
                             <Link href={link} className="flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm">
                                 <div className={cn(
                                     "p-2 rounded-full shrink-0",
@@ -360,7 +391,7 @@ export default function HomePage() {
                                         {displayTitle}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                                        {item.type} • {new Date(item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                                        {item.type} • {new Date(item.isUpdated ? (item.updatedAt || item.timestamp) : item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
                                     </span>
                                 </div>
                             </Link>
