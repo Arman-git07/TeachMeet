@@ -8,12 +8,11 @@ import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/c
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, MessageSquare } from 'lucide-react';
-import Link from 'next/link';
+import { Clock } from 'lucide-react';
 import type { SubjectTeacher } from '@/app/dashboard/classrooms/[classroomId]/page';
 
 export function SubjectTeachers() {
-    const { classroomId, classroom } = useClassroom();
+    const { classroomId } = useClassroom();
     const [subjectTeachers, setSubjectTeachers] = useState<SubjectTeacher[]>([]);
 
     useEffect(() => {
@@ -42,13 +41,6 @@ export function SubjectTeachers() {
                                     <div className="mt-2 text-xs space-y-1 text-muted-foreground">
                                         <p><Clock className="inline-block h-3 w-3 mr-1.5"/>{t.availability}</p>
                                     </div>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                     <Button size="sm" asChild className="rounded-lg">
-                                        <Link href={`/dashboard/chat/private/${t.teacherId}?name=${encodeURIComponent(t.name)}`}>
-                                            <MessageSquare className="mr-2 h-4 w-4"/>Private Chat
-                                        </Link>
-                                     </Button>
                                 </div>
                             </div>
                         </Card>

@@ -1,13 +1,12 @@
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { 
   Video, 
-  Users as UsersIcon, 
   XCircle, 
   FileText, 
   Clapperboard, 
@@ -19,8 +18,7 @@ import {
   ClipboardList, 
   ClipboardCheck, 
   Bell,
-  CheckCircle2,
-  MessageSquare
+  CheckCircle2
 } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,8 +35,7 @@ export type ActivityItemType =
   | 'assignment' 
   | 'material' 
   | 'exam'
-  | 'submission'
-  | 'privateMessage';
+  | 'submission';
 
 interface BaseActivityItem {
   id: string;
@@ -76,7 +73,6 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   material: BookOpen,
   exam: ClipboardCheck,
   submission: CheckCircle2,
-  privateMessage: MessageSquare
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
@@ -90,7 +86,6 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   material: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   exam: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   submission: (id, item) => item.link || `/dashboard/classrooms/${item.classroomId}`,
-  privateMessage: (id, item) => item.link || `/dashboard/chat/private/${id}`,
 };
 
 export default function HomePage() {
@@ -99,7 +94,6 @@ export default function HomePage() {
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
-  const [currentTime, setCurrentTime] = useState(Date.now());
   
   const managedSubsRef = useRef<Record<string, () => void>>({});
   const enrolledSubsRef = useRef<Record<string, () => void>>({});
@@ -107,12 +101,6 @@ export default function HomePage() {
   const personalSubsRef = useRef<(() => void)[]>([]);
 
   const [allClassroomIds, setAllClassroomIds] = useState<Record<string, { title: string, role: 'teacher' | 'student' }>>({});
-
-  useEffect(() => {
-    setCurrentTime(Date.now());
-    const ticker = setInterval(() => setCurrentTime(Date.now()), 60000);
-    return () => clearInterval(ticker);
-  }, []);
 
   useEffect(() => {
     if (!user || !isAuthenticated) {
@@ -175,26 +163,14 @@ export default function HomePage() {
                     (snap) => {
                         const items = snap.docs.map(d => {
                             const data = d.data();
-                            
-                            if (cat === 'announcement' && data.vanishAt && data.vanishAt.toDate() < new Date()) {
-                                return null;
-                            }
-
                             const startTs = (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now();
                             const endTs = data.endDate?.toMillis() || 0;
                             const updatedTs = data.updatedAt?.toMillis() || startTs;
                             
                             let statusLabel = cat === 'exam' ? 'Exam' : 'New';
-                            let isUpdated = updatedTs > startTs + 5000;
-
-                            if (cat === 'exam') {
-                                if (endTs && Date.now() > endTs) {
-                                    statusLabel = classInfo.role === 'teacher' ? "Exam Ended" : "Exam paper ready to see";
-                                    isUpdated = false;
-                                } else if (isUpdated) {
-                                    statusLabel = "Rescheduled";
-                                }
-                            } else if (isUpdated) {
+                            if (cat === 'exam' && endTs && Date.now() > endTs) {
+                                statusLabel = "Exam paper ready to see";
+                            } else if (updatedTs > startTs + 5000) {
                                 statusLabel = "Updated";
                             }
 
@@ -204,14 +180,14 @@ export default function HomePage() {
                                 title: cat === 'announcement' ? (data.text?.substring(0, 50) || 'New Voice Announcement') : (data.title || data.name),
                                 timestamp: startTs,
                                 updatedAt: updatedTs,
-                                isUpdated: isUpdated,
+                                isUpdated: updatedTs > startTs + 5000,
                                 statusLabel: statusLabel,
                                 classroomId: classId,
                                 classroomName: classInfo.title,
                                 endTs: endTs,
                                 isImportant: cat === 'exam' && endTs && Date.now() > endTs
                             };
-                        }).filter(i => i !== null) as ActivityItem[];
+                        }) as ActivityItem[];
 
                         setActivityChunks(prev => ({ ...prev, [key]: items }));
                     },
@@ -319,50 +295,13 @@ export default function HomePage() {
         }
     );
 
-    const unsubPrivate = onSnapshot(
-        query(collection(db, 'privateMessages'), where('recipientId', '==', user.uid)),
-        (snap) => {
-            const items = snap.docs.map(d => {
-                const data = d.data();
-                return {
-                    id: `pmsg-${d.id}`,
-                    type: 'privateMessage',
-                    title: `Private message from ${data.senderName}`,
-                    timestamp: data.timestamp?.toMillis() || Date.now(),
-                    link: `/dashboard/chat/private/${data.senderId}?name=${encodeURIComponent(data.senderName)}`,
-                    statusLabel: 'New'
-                } as ActivityItem;
-            }).sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
-            setActivityChunks(prev => ({ ...prev, 'private-messages': items }));
-        }
-    );
-
-    personalSubsRef.current = [unsubDocs, unsubRecs, unsubPrivate];
+    personalSubsRef.current = [unsubDocs, unsubRecs];
 
     return () => {
         personalSubsRef.current.forEach(u => u());
         personalSubsRef.current = [];
     };
   }, [user, isAuthenticated]);
-
-  useEffect(() => {
-    if (!user || !isAuthenticated) return;
-    const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
-    const started = JSON.parse(localStorage.getItem(STARTED_KEY) || '[]');
-    
-    started.forEach(async (m: any) => {
-        if (!m?.id) return;
-        const meetingRef = doc(db, 'meetings', m.id);
-        const snap = await getDoc(meetingRef);
-        setValidMeetings(prev => ({ ...prev, [m.id]: snap.exists() && snap.data().status !== 'ended' }));
-    });
-  }, [user, isAuthenticated, activityChunks]);
-
-  const examsFromChunks = useMemo(() => {
-      return Object.entries(activityChunks)
-        .filter(([key]) => key.startsWith('exam-'))
-        .flatMap(([_, items]) => items.map(i => ({ id: i.id, rawId: i.id.split('-').pop(), endTs: (i as any).endTs })));
-  }, [activityChunks]);
 
   const allActivity = useMemo(() => {
     if (!user) return [];
@@ -387,22 +326,8 @@ export default function HomePage() {
     const combined = [...ongoingMeetings, ...firestoreActivity]
         .filter(item => {
             if (!item || dismissed.includes(item.id)) return false;
-            // Logical Guard: If item belongs to a classroom, ensure classroom still exists in user's known set
             if (item.classroomId && !allClassroomIds[item.classroomId]) return false;
             return true;
-        })
-        .map(item => {
-            const newItem = { ...item };
-            if (newItem.type === 'exam') {
-                const exam = examsFromChunks.find(e => `exam-${e.rawId}` === newItem.id);
-                if (exam && Date.now() > exam.endTs) {
-                    const classId = newItem.classroomId;
-                    const role = classId ? allClassroomIds[classId]?.role : 'student';
-                    newItem.statusLabel = role === 'teacher' ? "Exam Session Ended" : "Exam paper ready to see";
-                    newItem.isImportant = true;
-                }
-            }
-            return newItem;
         })
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
@@ -412,7 +337,7 @@ export default function HomePage() {
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, activityChunks, validMeetings, examsFromChunks, allClassroomIds]);
+  }, [user, activityChunks, validMeetings, allClassroomIds]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);

@@ -90,8 +90,7 @@ service cloud.firestore {
       match /exams/{examId} {
         allow get, list: if true;
         allow create: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.resource.data.authorId == request.auth.uid);
-        // Only classroom owner OR the teacher who created the exam can update/delete it
-        allow update, delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
+        allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
         
         match /submissions/{studentId} {
             // Simplified rule to avoid evaluation limits during 'list' operations
