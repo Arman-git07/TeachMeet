@@ -105,7 +105,6 @@ export function Exams() {
         return unsubscribe;
     }, [classroomId]);
 
-    // Track submission listeners by exam ID to prevent flickering and redundant fetches
     const examIdsKey = useMemo(() => exams.map(e => e.id).sort().join(','), [exams]);
 
     useEffect(() => {
@@ -114,27 +113,20 @@ export function Exams() {
         const unsubs: (() => void)[] = [];
 
         exams.forEach(exam => {
-            // 1. Student's own submission status listener
             const subRef = doc(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions', user.uid);
             const unsubUser = onSnapshot(subRef, (docSnap) => {
                 setUserSubmissions(prev => ({ 
                     ...prev, 
                     [exam.id]: docSnap.exists() ? docSnap.data() : null 
                 }));
-            }, (err) => {
-                console.warn(`Submission listener failed for exam ${exam.id}:`, err);
-                setUserSubmissions(prev => ({ ...prev, [exam.id]: null }));
             });
             unsubs.push(unsubUser);
 
-            // 2. All submissions listener for managers/teachers
             if (isManager) {
                 const allSubsQuery = collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions');
                 const unsubAll = onSnapshot(allSubsQuery, (snap) => {
                     const examSubs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                     setSubmissions(prev => ({ ...prev, [exam.id]: examSubs }));
-                }, (err) => {
-                    console.error(`Submissions aggregate listener failed for exam ${exam.id}:`, err);
                 });
                 unsubs.push(unsubAll);
             }
@@ -198,16 +190,7 @@ export function Exams() {
         }
     }, [isManager, user, classroomId, toast, examForm, examType]);
 
-    const onValidationError = useCallback((errors: any) => {
-        const errorMessages = Object.values(errors).map((e: any) => e.message).filter(Boolean);
-        toast({
-            variant: "destructive",
-            title: "Validation Error",
-            description: errorMessages[0] || "Please check the form fields.",
-        });
-    }, [toast]);
-
-    const handleReschedule = () => {
+    const handleReschedule = async () => {
         if (!reschedulingExam || !rescheduleValue || !classroomId) return;
         
         setIsSubmitting(true);
@@ -215,21 +198,22 @@ export function Exams() {
         const examRef = doc(db, 'classrooms', classroomId, 'exams', reschedulingExam.id);
         const updateData = { endDate: Timestamp.fromDate(newEndDate) };
 
-        updateDoc(examRef, updateData)
-            .catch(async (serverError) => {
-                const pError = new FirestorePermissionError({
-                    path: examRef.path,
-                    operation: 'update',
-                    requestResourceData: updateData
-                });
-                errorEmitter.emit('permission-error', pError);
-            })
-            .finally(() => {
-                setIsSubmitting(false);
+        try {
+            await updateDoc(examRef, updateData);
+            toast({ title: "Deadline Updated Successfully" });
+            setReschedulingExam(null);
+        } catch (serverError: any) {
+            console.error("Reschedule failed:", serverError);
+            const pError = new FirestorePermissionError({
+                path: examRef.path,
+                operation: 'update',
+                requestResourceData: updateData
             });
-        
-        toast({ title: "Deadline Updated" });
-        setReschedulingExam(null);
+            errorEmitter.emit('permission-error', pError);
+            toast({ variant: 'destructive', title: "Update Failed", description: "You don't have permission or the server is busy." });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleOpenResults = async (sub: any, examId: string) => {
@@ -271,7 +255,7 @@ export function Exams() {
                                     </Tabs>
                                 </div>
 
-                                <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit, onValidationError)} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+                                <form id="exam-form" onSubmit={examForm.handleSubmit(onExamSubmit)} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2 md:col-span-2">
                                             <Label>Exam Title</Label>
@@ -398,7 +382,9 @@ export function Exams() {
                                                         setReschedulingExam(exam);
                                                         const d = exam.endDate?.toDate();
                                                         if (d) setRescheduleValue(format(d, "yyyy-MM-dd'T'HH:mm"));
-                                                    }}><Clock className="h-4 w-4"/></Button>
+                                                    }}>
+                                                        <Clock className="h-4 w-4"/>
+                                                    </Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
                                                         const examRef = doc(db, "classrooms", classroomId!, "exams", exam.id);
                                                         deleteDoc(examRef);
@@ -420,7 +406,6 @@ export function Exams() {
                                     <CardFooter className="pt-2">
                                         {isStudent ? (
                                             hasSubmitted ? (
-                                                // 1. Student has already submitted -> STRICTLY DISABLE START EXAM
                                                 isExpired ? (
                                                     <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
                                                         <Eye className="mr-2 h-4 w-4" /> View Results & Paper
@@ -434,7 +419,6 @@ export function Exams() {
                                                     </div>
                                                 )
                                             ) : (
-                                                // 2. Student hasn't submitted yet -> ALLOW START IF LIVE
                                                 isExpired ? (
                                                     <Button disabled variant="outline" className="w-full">Expired</Button>
                                                 ) : isUpcoming ? (
@@ -554,10 +538,15 @@ export function Exams() {
                     </DialogHeader>
                     <div className="py-6 space-y-4">
                         <Label>New End Date & Time</Label>
-                        <Input type="datetime-local" value={rescheduleValue} onChange={(e) => setRescheduleValue(e.target.value)} />
+                        <Input 
+                            type="datetime-local" 
+                            value={rescheduleValue} 
+                            onChange={(e) => setRescheduleValue(e.target.value)} 
+                            disabled={isSubmitting}
+                        />
                     </div>
                     <DialogFooter className="gap-2">
-                        <Button variant="outline" onClick={() => setReschedulingExam(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setReschedulingExam(null)} disabled={isSubmitting}>Cancel</Button>
                         <Button onClick={handleReschedule} disabled={isSubmitting || !rescheduleValue} className="btn-gel">
                             {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : "Update Deadline"}
                         </Button>
