@@ -1,10 +1,9 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, AlertTriangle, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -13,11 +12,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/components/ui/popover";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, limit, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
+import { useClassroom } from "@/contexts/ClassroomContext";
 
 interface ChatMessage {
   id: string;
@@ -42,6 +42,7 @@ export default function ClassroomChatPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { userRole } = useClassroom();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -239,6 +240,22 @@ export default function ClassroomChatPage() {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!classroomId || !messageId) return;
+    
+    try {
+      await deleteDoc(doc(db, 'classrooms', classroomId, 'messages', messageId));
+      toast({ title: "Message deleted" });
+    } catch (error: any) {
+      console.error("Failed to delete message:", error);
+      toast({ 
+        variant: 'destructive', 
+        title: "Delete Failed", 
+        description: "You don't have permission to delete this message." 
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-muted/30">
       <header className="flex-none p-3 border-b bg-background shadow-sm">
@@ -279,25 +296,42 @@ export default function ClassroomChatPage() {
                           <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
                         </Avatar>
                       )}
-                      <div
-                        className={cn(
-                          "max-w-[75%] p-3 rounded-xl shadow-sm",
-                          msg.isMe
-                            ? "bg-primary text-primary-foreground rounded-br-none"
-                            : "bg-card text-card-foreground rounded-bl-none border"
+                      <div className="relative group max-w-[75%]">
+                        <div
+                          className={cn(
+                            "p-3 rounded-xl shadow-sm",
+                            msg.isMe
+                              ? "bg-primary text-primary-foreground rounded-br-none"
+                              : "bg-card text-card-foreground rounded-bl-none border"
+                          )}
+                        >
+                          {!msg.isMe && <p className="text-[10px] font-bold mb-1 opacity-80 uppercase tracking-tight">{msg.senderName}</p>}
+                          {msg.text && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>}
+                          {msg.audioUrl && (
+                            <div className="flex items-center gap-2 mt-1 py-1 px-2 bg-black/5 rounded-lg">
+                              <Volume2 className="h-4 w-4 opacity-70" />
+                              <audio src={msg.audioUrl} controls className="h-8 max-w-[200px]" />
+                            </div>
+                          )}
+                          <p className="text-[9px] opacity-60 mt-1.5 text-right">
+                            {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending...'}
+                          </p>
+                        </div>
+                        
+                        {(msg.isMe || userRole === 'creator') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                              "absolute -top-2 h-6 w-6 rounded-full bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10",
+                              msg.isMe ? "-left-2" : "-right-2"
+                            )}
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            title="Delete message"
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                         )}
-                      >
-                        {!msg.isMe && <p className="text-[10px] font-bold mb-1 opacity-80 uppercase tracking-tight">{msg.senderName}</p>}
-                        {msg.text && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>}
-                        {msg.audioUrl && (
-                          <div className="flex items-center gap-2 mt-1 py-1 px-2 bg-black/5 rounded-lg">
-                            <Volume2 className="h-4 w-4 opacity-70" />
-                            <audio src={msg.audioUrl} controls className="h-8 max-w-[200px]" />
-                          </div>
-                        )}
-                        <p className="text-[9px] opacity-60 mt-1.5 text-right">
-                          {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending...'}
-                        </p>
                       </div>
                       {msg.isMe && (
                         <Avatar className="h-8 w-8 self-start">
