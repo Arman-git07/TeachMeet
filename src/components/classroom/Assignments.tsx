@@ -29,7 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle, Sparkles } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle, Sparkles, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { Assignment, Submission } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -270,6 +270,28 @@ export function Assignments() {
                         <span className="font-bold text-foreground shrink-0">Teacher Feedback:</span>
                         <span className="italic">"Great analysis of the French Revolution! Your points on the social causes..."</span>
                     </p>
+                </Card>
+
+                {/* Demo Submitted (Awaiting Check) Assignment */}
+                <Card className="p-4 shadow-md rounded-xl border-blue-200 bg-blue-50/30 animate-in fade-in slide-in-from-top-4 duration-700">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-blue-700">Demo: Physics Project</h3>
+                                <Badge variant="secondary" className="text-[10px] h-4 uppercase font-bold tracking-widest bg-blue-100 text-blue-700 border-none">Sample</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Clock className="h-3 w-3" /> Due: Tomorrow, 5:00 PM
+                            </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-2">
+                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-3 font-bold">Submitted</Badge>
+                                <Button size="sm" variant="outline" className="h-8 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-100/50">Modify</Button>
+                            </div>
+                            <p className="text-[9px] text-blue-600/60 font-bold uppercase tracking-tighter">Handed In • Awaiting Check</p>
+                        </div>
+                    </div>
                 </Card>
 
                 {assignments.length > 0 ? assignments.map(assignment => {
