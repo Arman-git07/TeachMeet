@@ -62,6 +62,7 @@ export type ActivityItem = BaseActivityItem | JoinRequestActivityItem;
 const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_IN_MS = 24 * 60 * 60 * 1000;
 
 const itemIcons: Record<ActivityItemType, React.ElementType> = {
   meeting: Video,
@@ -116,7 +117,6 @@ export default function HomePage() {
         return;
     }
 
-    // Listen to classrooms user owns/manages
     const unsubManaged = onSnapshot(
         query(collection(db, 'classrooms'), where('teacherId', '==', user.uid)),
         (snap) => {
@@ -130,7 +130,6 @@ export default function HomePage() {
         }
     );
 
-    // Listen to classrooms user is enrolled in
     const unsubEnrolled = onSnapshot(
         query(collection(db, 'users', user.uid, 'enrolled')),
         (snap) => {
@@ -159,7 +158,6 @@ export default function HomePage() {
     Object.keys(allClassroomIds).forEach(classId => {
         const classInfo = allClassroomIds[classId];
         
-        // Listen for new content (Materials, Announcements, Exams, Assignments)
         const categories: {cat: ActivityItemType, col: string, order: string}[] = [
             { cat: 'assignment', col: 'assignments', order: 'dueDate' },
             { cat: 'material', col: 'materials', order: 'uploadedAt' },
@@ -215,7 +213,6 @@ export default function HomePage() {
             }
         });
 
-        // If user is a teacher, listen for join requests and submissions
         if (classInfo.role === 'teacher') {
             const jrKey = `join-${classId}`;
             if (!managedSubsRef.current[jrKey]) {
@@ -232,7 +229,6 @@ export default function HomePage() {
                 });
             }
 
-            // Listen for new submissions in this classroom
             const subKey = `subs-${classId}`;
             if (!submissionSubsRef.current[subKey]) {
                 submissionSubsRef.current[subKey] = onSnapshot(
@@ -249,7 +245,6 @@ export default function HomePage() {
                                     (subSnap) => {
                                         const subItems = subSnap.docs.map(sDoc => {
                                             const sData = sDoc.data();
-                                            // Only notify about ungraded work
                                             if (sData.grade != null) return null;
 
                                             return {
@@ -347,6 +342,11 @@ export default function HomePage() {
     const combined = [...ongoingMeetings, ...firestoreActivity]
         .filter(item => {
             if (!item || dismissed.includes(item.id)) return false;
+            
+            // Automatic removal after 24 hours
+            const itemAge = currentTime.getTime() - (item.updatedAt || item.timestamp);
+            if (itemAge > TWENTY_FOUR_HOURS_IN_MS) return false;
+
             // Purge deleted classrooms
             if (item.classroomId && !allClassroomIds[item.classroomId]) return false;
             return true;
@@ -367,7 +367,6 @@ export default function HomePage() {
         })
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
-    // Dedup
     const unique = combined.reduce((acc: ActivityItem[], current) => {
         if (!acc.find(item => item.id === current.id)) acc.push(current);
         return acc;
@@ -385,7 +384,6 @@ export default function HomePage() {
     const dismissed = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify([...dismissed, id]));
     
-    // Optimistic local update
     setActivityChunks(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(k => {
@@ -460,6 +458,7 @@ export default function HomePage() {
                                 size="icon" 
                                 className="rounded-full h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={() => handleDismiss(item.id)}
+                                title="Mute notification"
                             >
                                 <XCircle className="h-4 w-4"/>
                             </Button>
