@@ -109,7 +109,10 @@ export default function AssignmentResultPage() {
                         <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                             <CardTitle className="text-sm flex items-center gap-2">
                                 <FileText className="h-4 w-4 text-primary" />
-                                {submission.checkedUrl ? "Graded & Checked Paper" : "Student Submission"}
+                                {submission.checkedUrl 
+                                    ? (isPdf ? "Graded & Checked PDF" : "Graded & Checked Image") 
+                                    : "Student Submission"
+                                }
                             </CardTitle>
                             {submission.checkedUrl && <Badge className="bg-primary/20 text-primary border-primary/20">Checked & Marked</Badge>}
                         </CardHeader>
