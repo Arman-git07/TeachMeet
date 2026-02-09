@@ -90,7 +90,6 @@ export default function HomePage() {
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
-  const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>({});
   const [currentTime, setCurrentTime] = useState(Date.now());
   
   const managedSubsRef = useRef<Record<string, () => void>>({});
@@ -100,14 +99,10 @@ export default function HomePage() {
 
   // 0. Update ticker for time-sensitive notifications (Exams ending)
   useEffect(() => {
+    setCurrentTime(Date.now());
     const ticker = setInterval(() => setCurrentTime(Date.now()), 60000);
     return () => clearInterval(ticker);
   }, []);
-
-  // Derived flat list of firestore activity
-  const firestoreActivity = useMemo(() => {
-    return Object.values(activityChunks).flat();
-  }, [activityChunks]);
 
   // 1. Listen to Classrooms where user is Teacher (Managed)
   useEffect(() => {
@@ -192,13 +187,6 @@ export default function HomePage() {
             const classId = enrolledDoc.id;
             const classTitle = enrolledDoc.data().title;
 
-            // Listen to User Submissions in this class to show "Results Ready"
-            if (!submissionSubsRef.current[classId]) {
-                // Simplified: We don't have a top level submissions list, so we'll 
-                // just rely on the UI logic within the combined activity feed later if we can.
-                // For accuracy, we'll mark this class as needing result status checks.
-            }
-
             const categories: {cat: ActivityItemType, col: string, order: string}[] = [
                 { cat: 'assignment', col: 'assignments', order: 'dueDate' },
                 { cat: 'material', col: 'materials', order: 'uploadedAt' },
@@ -223,14 +211,13 @@ export default function HomePage() {
                                 const endTs = data.endDate?.toMillis() || 0;
                                 const updatedTs = data.updatedAt?.toMillis() || startTs;
                                 
-                                // Logic: Determine correct status label
                                 let statusLabel = cat === 'exam' ? 'Exam' : 'New';
                                 let isUpdated = updatedTs > startTs + 5000;
 
                                 if (cat === 'exam') {
                                     if (endTs && Date.now() > endTs) {
                                         statusLabel = "Exam Ended";
-                                        isUpdated = false; // "Ended" is more important than "Rescheduled"
+                                        isUpdated = false;
                                     } else if (isUpdated) {
                                         statusLabel = "Rescheduled";
                                     }
@@ -248,6 +235,7 @@ export default function HomePage() {
                                     statusLabel: statusLabel,
                                     classroomId: classId,
                                     classroomName: classTitle,
+                                    endTs: endTs,
                                     isImportant: cat === 'exam' && endTs && Date.now() > endTs
                                 };
                             }).filter(i => i !== null) as ActivityItem[];
@@ -321,7 +309,19 @@ export default function HomePage() {
         const snap = await getDoc(meetingRef);
         setValidMeetings(prev => ({ ...prev, [m.id]: snap.exists() && snap.data().status !== 'ended' }));
     });
-  }, [user, isAuthenticated, firestoreActivity]);
+  }, [user, isAuthenticated, activityChunks]);
+
+  // Derived flat list of firestore activity
+  const firestoreActivity = useMemo(() => {
+    return Object.values(activityChunks).flat();
+  }, [activityChunks]);
+
+  // Helper to find raw exam data from chunks for status checking
+  const examsFromChunks = useMemo(() => {
+      return Object.entries(activityChunks)
+        .filter(([key]) => key.startsWith('exam-'))
+        .flatMap(([_, items]) => items.map(i => ({ id: i.id, rawId: i.id.split('-').pop(), endTs: (i as any).endTs })));
+  }, [activityChunks]);
 
   // Combine everything for the UI
   const allActivity = useMemo(() => {
@@ -345,15 +345,15 @@ export default function HomePage() {
     const combined = [...ongoingMeetings, ...firestoreActivity]
         .filter(item => item && !dismissed.includes(item.id))
         .map(item => {
-            // Contextual final check for labels based on currentTime
-            if (item.type === 'exam') {
-                const exam = examsFromChunks.find(e => `exam-${e.rawId}` === item.id);
-                if (exam && Date.now() > exam.endTs) {
-                    item.statusLabel = "Results Published";
-                    item.isImportant = true;
+            const newItem = { ...item };
+            if (newItem.type === 'exam') {
+                const exam = examsFromChunks.find(e => `exam-${e.rawId}` === newItem.id);
+                if (exam && currentTime > exam.endTs) {
+                    newItem.statusLabel = "Exam paper ready to see";
+                    newItem.isImportant = true;
                 }
             }
-            return item;
+            return newItem;
         })
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
@@ -363,14 +363,7 @@ export default function HomePage() {
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, firestoreActivity, validMeetings, currentTime]);
-
-  // Helper to find raw exam data from chunks for status checking
-  const examsFromChunks = useMemo(() => {
-      return Object.entries(activityChunks)
-        .filter(([key]) => key.startsWith('exam-'))
-        .flatMap(([_, items]) => items.map(i => ({ id: i.id, rawId: i.id.split('-').pop(), endTs: (i as any).endTs })));
-  }, [activityChunks]);
+  }, [user, firestoreActivity, validMeetings, currentTime, examsFromChunks]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);

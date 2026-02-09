@@ -255,7 +255,7 @@ export default function ExamResultPage() {
                         )
                     )}
                     <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="rounded-lg">
-                        <FileDown className="mr-2 h-4 w-4" /> Download Result
+                        <FileDown className="mr-2 h-4 w-4" /> Download to Device
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex rounded-lg">
                         <Printer className="mr-2 h-4 w-4" /> Print
