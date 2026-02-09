@@ -502,22 +502,6 @@ export function Exams() {
                                     <p className="mt-2 text-sm italic">"{activeResult.sub.feedback}"</p>
                                 </div>
                             )}
-                            
-                            {activeResult.sub.results && (
-                                <ScrollArea className="max-h-[40vh]">
-                                    <div className="space-y-3">
-                                        {activeResult.sub.results.map((res: any, i: number) => (
-                                            <div key={i} className={cn("p-3 rounded-lg border", res.isCorrect ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100")}>
-                                                <p className="font-semibold text-sm mb-2">Q{i+1}: {res.question}</p>
-                                                <div className="grid grid-cols-2 gap-4 text-xs">
-                                                    <div><p className="text-muted-foreground">Your Answer</p><p className={cn("font-medium", res.isCorrect ? "text-green-700" : "text-red-700")}>{res.studentAnswer || '(Empty)'}</p></div>
-                                                    {!res.isCorrect && <div><p className="text-muted-foreground">Correct Answer</p><p className="font-medium text-green-700">{res.correctAnswer}</p></div>}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </ScrollArea>
-                            )}
                         </div>
                     )}
                     <DialogFooter><DialogClose asChild><Button variant="secondary" className="w-full">Close</Button></DialogClose></DialogFooter>
