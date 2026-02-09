@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -17,12 +17,13 @@ export default function MaterialViewerPage() {
     
     const [material, setMaterial] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
             if (materialId === 'demo-physics') {
                 setMaterial({
-                    name: "Demo: Physics Lecture Notes",
+                    name: "Demo: Physics Lecture Notes.pdf",
                     url: "https://www.africau.edu/images/default/sample.pdf",
                     type: 'file',
                     uploaderName: 'Admin'
@@ -60,6 +61,47 @@ export default function MaterialViewerPage() {
         fetchData();
     }, [classroomId, materialId, toast, router]);
 
+    const handleDownload = useCallback(async () => {
+        if (!material?.url) return;
+        
+        setIsDownloading(true);
+        const toastId = `download-${Date.now()}`;
+        toast({ id: toastId, title: "Preparing Download...", description: "Fetching file from server..." });
+
+        try {
+            // Fetching as a blob is the most reliable way to force a browser download
+            // for cross-origin assets like Firebase Storage URLs.
+            const response = await fetch(material.url);
+            if (!response.ok) throw new Error("Network response was not ok");
+            
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.setAttribute('download', material.name || 'classroom-material');
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+            
+            toast.update(toastId, { title: "Download Started", description: "Your file is being saved to your device." });
+        } catch (error) {
+            console.error('Download error:', error);
+            // Fallback: Try a direct link in a new window if fetch is blocked by CORS/security
+            window.open(material.url, '_blank');
+            toast.update(toastId, { 
+                variant: 'destructive', 
+                title: "Opening in new tab", 
+                description: "Direct download was blocked. You can save the file from the new tab." 
+            });
+        } finally {
+            setIsDownloading(false);
+        }
+    }, [material, toast]);
+
     if (isLoading) {
         return (
             <div className="container mx-auto p-8 space-y-4">
@@ -88,10 +130,15 @@ export default function MaterialViewerPage() {
                 </div>
                 <div className="flex gap-2">
                     {material.type === 'file' && (
-                        <Button asChild variant="outline" size="sm" className="rounded-lg">
-                            <a href={material.url} download={material.name}>
-                                <Download className="mr-2 h-4 w-4"/> Download
-                            </a>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="rounded-lg" 
+                            onClick={handleDownload}
+                            disabled={isDownloading}
+                        >
+                            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                            Download
                         </Button>
                     )}
                     {material.type === 'link' && (
@@ -128,8 +175,9 @@ export default function MaterialViewerPage() {
                                 <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
                                     <FileText className="h-16 w-16 text-muted-foreground opacity-20" />
                                     <p className="text-muted-foreground">This file type cannot be previewed directly.</p>
-                                    <Button asChild className="btn-gel">
-                                        <a href={material.url} download>Download to View</a>
+                                    <Button className="btn-gel rounded-lg" onClick={handleDownload} disabled={isDownloading}>
+                                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
+                                        Download to View
                                     </Button>
                                 </div>
                             )
@@ -140,7 +188,7 @@ export default function MaterialViewerPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <h2 className="text-xl font-bold">External Resource</h2>
-                                    <p className="text-muted-foreground max-w-sm mx-auto">
+                                    <p className="text-muted-foreground max-sm mx-auto">
                                         This material is an external link. For security reasons, we recommend opening it in a new tab.
                                     </p>
                                 </div>
