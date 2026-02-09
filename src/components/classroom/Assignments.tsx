@@ -343,36 +343,40 @@ export function Assignments() {
                                             </Dialog>
                                             
                                             {canEdit && (
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-8 w-8 text-muted-foreground"
-                                                    onClick={() => {
-                                                        setReschedulingAssignment(assignment);
-                                                        const d = assignment.dueDate?.toDate();
-                                                        if (d) setRescheduleValue(format(d, "yyyy-MM-dd'T'HH:mm"));
-                                                    }}
-                                                    title="Reschedule Assignment"
-                                                >
-                                                    <Clock className="h-4 w-4" />
-                                                </Button>
-                                            )}
+                                                <>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-muted-foreground"
+                                                        onClick={() => {
+                                                            setReschedulingAssignment(assignment);
+                                                            const d = assignment.dueDate?.toDate();
+                                                            if (d) setRescheduleValue(format(d, "yyyy-MM-dd'T'HH:mm"));
+                                                        }}
+                                                        title="Reschedule Assignment"
+                                                    >
+                                                        <Clock className="h-4 w-4" />
+                                                    </Button>
 
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70"><Trash2 className="h-4 w-4" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Delete Assignment?</AlertDialogTitle>
-                                                        <AlertDialogDescription>Are you sure? This will remove all student submissions as well.</AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDelete(assignment)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70" title="Delete Assignment">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete Assignment?</AlertDialogTitle>
+                                                                <AlertDialogDescription>Are you sure? This will remove all student submissions as well.</AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDelete(assignment)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </>
+                                            )}
                                         </>
                                     ) : user && (
                                         userSub ? (
