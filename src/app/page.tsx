@@ -1,3 +1,4 @@
+
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -85,7 +86,6 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
 export default function HomePage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   
-  // Key format: `${type}-${classId}` or `personal-${type}`
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
@@ -101,7 +101,10 @@ export default function HomePage() {
 
   // 1. Listen to Classrooms where user is Teacher (Managed)
   useEffect(() => {
-    if (!user || !isAuthenticated) return;
+    if (!user || !isAuthenticated) {
+        setActivityChunks({});
+        return;
+    }
 
     const q = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -203,8 +206,8 @@ export default function HomePage() {
                                 const createdAt = (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now();
                                 const updatedAt = data.updatedAt?.toMillis() || createdAt;
                                 
-                                // Logic: Determine if item was updated significantly after creation
-                                const isUpdated = updatedAt > createdAt + 10000; // 10s buffer
+                                // Logic: Determine if item was updated significantly after creation (Rescheduled/Updated)
+                                const isUpdated = updatedAt > createdAt + 5000; 
 
                                 return {
                                     id: `${cat}-${d.id}`,
@@ -312,7 +315,7 @@ export default function HomePage() {
         .filter(item => item && !dismissed.includes(item.id))
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
-    // Final unique check
+    // Final unique and non-null check
     const unique = combined.reduce((acc: ActivityItem[], current) => {
         if (!acc.find(item => item.id === current.id)) acc.push(current);
         return acc;
@@ -329,7 +332,7 @@ export default function HomePage() {
     const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
     const dismissed = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify([...dismissed, id]));
-    // Force re-render by updating local chunks
+    // Force immediate local cleanup
     setActivityChunks(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(k => {

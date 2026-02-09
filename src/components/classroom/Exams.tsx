@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -80,7 +81,6 @@ export function Exams() {
     const [rescheduleValue, setRescheduleValue] = useState("");
 
     const isManager = userRole === 'creator' || userRole === 'teacher';
-    const isStudent = userRole === 'student';
     
     const examForm = useForm<z.infer<typeof examSchema>>({ 
         resolver: zodResolver(examSchema),
@@ -121,7 +121,8 @@ export function Exams() {
             });
             unsubs.push(unsubUser);
 
-            if (isManager) {
+            const canManageThisExam = userRole === 'creator' || exam.authorId === user?.uid;
+            if (canManageThisExam) {
                 const allSubsQuery = collection(db, 'classrooms', classroomId, 'exams', exam.id, 'submissions');
                 const unsubAll = onSnapshot(allSubsQuery, (snap) => {
                     const examSubs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -132,7 +133,7 @@ export function Exams() {
         });
         
         return () => unsubs.forEach(unsub => unsub());
-    }, [classroomId, user?.uid, examIdsKey, isManager]);
+    }, [classroomId, user, examIdsKey, userRole]);
 
     const onExamSubmit = useCallback(async (data: z.infer<typeof examSchema>) => {
         if (!isManager || !user || !classroomId) return;
@@ -364,14 +365,14 @@ export function Exams() {
                             const isExpired = end && currentTime > end;
 
                             const examSubmissions = submissions[exam.id] || [];
-                            const canModifyThisExam = userRole === 'creator' || exam.authorId === user?.uid;
+                            const canManageThisSpecificExam = userRole === 'creator' || exam.authorId === user?.uid;
 
                             return (
                                 <Card key={exam.id} className="shadow-md border-border/50 group flex flex-col">
                                     <CardHeader className="pb-2">
                                         <div className="flex justify-between items-start gap-2">
                                             <CardTitle className="text-lg truncate flex-1">{exam.title}</CardTitle>
-                                            {canModifyThisExam && (
+                                            {canManageThisSpecificExam && (
                                                 <div className="flex items-center gap-1 shrink-0">
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => {
                                                         setReschedulingExam(exam);
@@ -398,34 +399,7 @@ export function Exams() {
                                         {hasSubmitted && <Badge className="ml-2 bg-primary/20 text-primary">Submitted</Badge>}
                                     </CardContent>
                                     <CardFooter className="pt-2">
-                                        {isStudent ? (
-                                            hasSubmitted ? (
-                                                isExpired ? (
-                                                    <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
-                                                        <Eye className="mr-2 h-4 w-4" /> View Results & Paper
-                                                    </Button>
-                                                ) : (
-                                                    <div className="w-full flex flex-col items-center gap-1">
-                                                        <Button disabled variant="outline" className="w-full border-primary/20 text-primary font-bold bg-primary/5">
-                                                            <CheckCircle className="mr-2 h-4 w-4" /> Already Submitted
-                                                        </Button>
-                                                        <p className="text-[10px] text-muted-foreground italic text-center font-medium">Wait for result till exam ends.</p>
-                                                    </div>
-                                                )
-                                            ) : (
-                                                isExpired ? (
-                                                    <Button disabled variant="outline" className="w-full">Expired</Button>
-                                                ) : isUpcoming ? (
-                                                    <Button disabled variant="outline" className="w-full"><Clock className="mr-2 h-4 w-4"/> Upcoming</Button>
-                                                ) : (
-                                                    <Button asChild className="w-full btn-gel">
-                                                        <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/take`}>
-                                                            <Play className="mr-2 h-4 w-4" /> Start Exam
-                                                        </Link>
-                                                    </Button>
-                                                )
-                                            )
-                                        ) : isManager ? (
+                                        {canManageThisSpecificExam ? (
                                             <Dialog>
                                                 <DialogTrigger asChild>
                                                     <Button variant="outline" className="w-full">Submissions ({examSubmissions.length})</Button>
@@ -460,6 +434,33 @@ export function Exams() {
                                                     </ScrollArea>
                                                 </DialogContent>
                                             </Dialog>
+                                        ) : user && (userRole === 'student' || userRole === 'teacher') ? (
+                                            hasSubmitted ? (
+                                                isExpired ? (
+                                                    <Button variant="default" className="w-full btn-gel" onClick={() => handleOpenResults(mySub, exam.id)}>
+                                                        <Eye className="mr-2 h-4 w-4" /> View Results & Paper
+                                                    </Button>
+                                                ) : (
+                                                    <div className="w-full flex flex-col items-center gap-1">
+                                                        <Button disabled variant="outline" className="w-full border-primary/20 text-primary font-bold bg-primary/5">
+                                                            <CheckCircle className="mr-2 h-4 w-4" /> Already Submitted
+                                                        </Button>
+                                                        <p className="text-[10px] text-muted-foreground italic text-center font-medium">Wait for result till exam ends.</p>
+                                                    </div>
+                                                )
+                                            ) : (
+                                                isExpired ? (
+                                                    <Button disabled variant="outline" className="w-full">Expired</Button>
+                                                ) : isUpcoming ? (
+                                                    <Button disabled variant="outline" className="w-full"><Clock className="mr-2 h-4 w-4"/> Upcoming</Button>
+                                                ) : (
+                                                    <Button asChild className="w-full btn-gel">
+                                                        <Link href={`/dashboard/classrooms/${classroomId}/exams/${exam.id}/take`}>
+                                                            <Play className="mr-2 h-4 w-4" /> Start Exam
+                                                        </Link>
+                                                    </Button>
+                                                )
+                                            )
                                         ) : (
                                             <p className="text-xs text-muted-foreground text-center w-full">Enroll to take exam</p>
                                         )}
