@@ -19,7 +19,8 @@ import {
   ClipboardList, 
   ClipboardCheck, 
   Bell,
-  CheckCircle2
+  CheckCircle2,
+  MessageSquare
 } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,7 +37,8 @@ export type ActivityItemType =
   | 'assignment' 
   | 'material' 
   | 'exam'
-  | 'submission';
+  | 'submission'
+  | 'privateMessage';
 
 interface BaseActivityItem {
   id: string;
@@ -73,7 +75,8 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   assignment: ClipboardList,
   material: BookOpen,
   exam: ClipboardCheck,
-  submission: CheckCircle2
+  submission: CheckCircle2,
+  privateMessage: MessageSquare
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
@@ -87,6 +90,7 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   material: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   exam: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   submission: (id, item) => item.link || `/dashboard/classrooms/${item.classroomId}`,
+  privateMessage: (id, item) => item.link || `/dashboard/chat/private/${id}`,
 };
 
 export default function HomePage() {
@@ -315,7 +319,25 @@ export default function HomePage() {
         }
     );
 
-    personalSubsRef.current = [unsubDocs, unsubRecs];
+    const unsubPrivate = onSnapshot(
+        query(collection(db, 'privateMessages'), where('recipientId', '==', user.uid)),
+        (snap) => {
+            const items = snap.docs.map(d => {
+                const data = d.data();
+                return {
+                    id: `pmsg-${d.id}`,
+                    type: 'privateMessage',
+                    title: `Private message from ${data.senderName}`,
+                    timestamp: data.timestamp?.toMillis() || Date.now(),
+                    link: `/dashboard/chat/private/${data.senderId}?name=${encodeURIComponent(data.senderName)}`,
+                    statusLabel: 'New'
+                } as ActivityItem;
+            }).sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+            setActivityChunks(prev => ({ ...prev, 'private-messages': items }));
+        }
+    );
+
+    personalSubsRef.current = [unsubDocs, unsubRecs, unsubPrivate];
 
     return () => {
         personalSubsRef.current.forEach(u => u());

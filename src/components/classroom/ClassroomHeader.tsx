@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback, memo } from 'react';
@@ -89,6 +88,11 @@ export function ClassroomHeader() {
                             <DropdownMenuItem asChild>
                                 <Link href={`/dashboard/classrooms/${classroomId}/chat?topic=${encodeURIComponent(classroom.title)}`}>
                                     <MessageSquare className="mr-2 h-4 w-4" />Class Chat
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/chat/private/${classroom.teacherId}?name=${encodeURIComponent(classroom.teacherName)}`}>
+                                    <MessageSquare className="mr-2 h-4 w-4" />Private Chat with Teacher
                                 </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />

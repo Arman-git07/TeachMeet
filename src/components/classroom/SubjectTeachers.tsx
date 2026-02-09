@@ -45,7 +45,7 @@ export function SubjectTeachers() {
                                 </div>
                                 <div className="flex flex-col gap-2">
                                      <Button size="sm" asChild className="rounded-lg">
-                                        <Link href={`/dashboard/classrooms/${classroomId}/chat?topic=${encodeURIComponent(classroom?.title || '')}`}>
+                                        <Link href={`/dashboard/chat/private/${t.teacherId}?name=${encodeURIComponent(t.name)}`}>
                                             <MessageSquare className="mr-2 h-4 w-4"/>Private Chat
                                         </Link>
                                      </Button>

@@ -5,10 +5,12 @@
  * @dataStructure
  *   /meetings/{meetingId}
  *   /classrooms/{classroomId}
+ *   /privateMessages/{messageId}
  * @keySecurityDecisions
  *   - Only authenticated users can create meetings/classrooms.
  *   - Only the host/creator can manage their resources and join requests.
  *   - Users can create and cancel their own join requests.
+ *   - Private messages are strictly restricted to the sender and recipient.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -112,6 +114,14 @@ service cloud.firestore {
       }
     }
     
+    /**
+     * Private Messages Collection
+     */
+    match /privateMessages/{messageId} {
+      allow read: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+    }
+
     /**
      * Users Collection
      */
