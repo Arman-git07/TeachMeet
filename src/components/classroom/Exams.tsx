@@ -370,13 +370,14 @@ export function Exams() {
                             const isExpired = end && currentTime > end;
 
                             const examSubmissions = submissions[exam.id] || [];
+                            const canModifyThisExam = userRole === 'creator' || exam.authorId === user?.uid;
 
                             return (
                                 <Card key={exam.id} className="shadow-md border-border/50 group flex flex-col">
                                     <CardHeader className="pb-2">
                                         <div className="flex justify-between items-start gap-2">
                                             <CardTitle className="text-lg truncate flex-1">{exam.title}</CardTitle>
-                                            {isManager && (
+                                            {canModifyThisExam && (
                                                 <div className="flex items-center gap-1 shrink-0">
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => {
                                                         setReschedulingExam(exam);

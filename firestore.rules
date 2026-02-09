@@ -2,6 +2,13 @@
  * @description This ruleset enforces a strict authorization model for meetings and classrooms,
  *   including their join requests and participant lists. It prioritizes security by ensuring
  *   only authorized users can manage sensitive operations.
+ * @dataStructure
+ *   /meetings/{meetingId}
+ *   /classrooms/{classroomId}
+ * @keySecurityDecisions
+ *   - Only authenticated users can create meetings/classrooms.
+ *   - Only the host/creator can manage their resources and join requests.
+ *   - Users can create and cancel their own join requests.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -13,18 +20,21 @@ service cloud.firestore {
     match /meetings/{meetingId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
-      allow update, delete: if isSignedIn() && isMeetingOwner(meetingId, request.auth.uid);
+      allow update, delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
 
       match /joinRequests/{requestId} {
-        allow get, list: if isSignedIn() && (isMeetingOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
+        // Host can list requests. User can read their own request.
+        allow get, list: if isSignedIn() && (requestId == request.auth.uid || isOwner(meetingId, request.auth.uid));
         allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-        allow update: if isSignedIn() && (isMeetingOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
-        allow delete: if isSignedIn() && (isMeetingOwner(meetingId, request.auth.uid) || request.auth.uid == requestId);
+        allow update: if isSignedIn() && (requestId == request.auth.uid || isOwner(meetingId, request.auth.uid));
+        allow delete: if isSignedIn() && (requestId == request.auth.uid || isOwner(meetingId, request.auth.uid));
       }
 
       match /participants/{userId} {
         allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && isMeetingOwner(meetingId, request.auth.uid);
+        // Allow hosts to manage participants, and allow users to add themselves.
+        allow create, update: if isSignedIn() && (userId == request.auth.uid || isOwner(meetingId, request.auth.uid));
+        allow delete: if isSignedIn() && isOwner(meetingId, request.auth.uid);
       }
     }
     
@@ -33,14 +43,18 @@ service cloud.firestore {
      */
     match /classrooms/{classroomId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && (request.resource.data.teacherId == request.auth.uid || request.resource.data.creatorId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
 
       match /joinRequests/{userId} {
-        allow get, list: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
+        // Allow a user to read their own request so they can check its status.
+        allow get, list: if isSignedIn() && (userId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
+        // Allow a user to create a request for themselves.
         allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
-        allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
-        allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == userId);
+        // Allow user to update their own request (e.g., withdraw).
+        allow update: if isSignedIn() && (userId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
+        // Allow user to delete their own request by checking their auth UID against the document ID.
+        allow delete: if isSignedIn() && (userId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
       }
       
       match /participants/{userId} {
@@ -62,26 +76,29 @@ service cloud.firestore {
 
       match /assignments/{assignmentId} {
         allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.resource.data.creatorId == request.auth.uid);
+        allow create: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.resource.data.creatorId == request.auth.uid);
+        allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.creatorId == request.auth.uid);
         
         match /submissions/{studentId} {
-            allow get, list: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
+            allow get, list: if isSignedIn() && (studentId == request.auth.uid || canManageClassroom(classroomId, request.auth.uid));
             allow create: if isSignedIn() && request.auth.uid == studentId;
-            allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
-            allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.auth.uid == studentId);
+            allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid));
+            allow delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
         }
       }
 
       match /exams/{examId} {
         allow get, list: if true;
         allow create: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || request.resource.data.authorId == request.auth.uid);
-        allow update, delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
+        // Only classroom owner OR the teacher who created the exam can update/delete it
+        allow update, delete: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || resource.data.authorId == request.auth.uid);
         
         match /submissions/{studentId} {
+            // Simplified rule to avoid evaluation limits during 'list' operations
             allow get, list: if isSignedIn() && (studentId == request.auth.uid || isTeacher(classroomId, request.auth.uid) || isClassroomOwner(classroomId, request.auth.uid));
             allow create: if isSignedIn() && request.auth.uid == studentId;
             allow update: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid));
-            allow delete: if isSignedIn() && (canManageClassroom(classroomId, request.auth.uid));
+            allow delete: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
         }
       }
 
@@ -89,10 +106,10 @@ service cloud.firestore {
         allow get, list: if true;
         allow create, update, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
       }
-      
+
       match /messages/{messageId} {
-        allow read: if isSignedIn() && (exists(/databases/$(database)/documents/classrooms/$(classroomId)/participants/$(request.auth.uid)) || canManageClassroom(classroomId, request.auth.uid));
-        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid && (exists(/databases/$(database)/documents/classrooms/$(classroomId)/participants/$(request.auth.uid)) || canManageClassroom(classroomId, request.auth.uid));
+        allow read: if isSignedIn() && (isStudent(classroomId, request.auth.uid) || canManageClassroom(classroomId, request.auth.uid));
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid && (isStudent(classroomId, request.auth.uid) || canManageClassroom(classroomId, request.auth.uid));
       }
     }
     
@@ -109,7 +126,7 @@ service cloud.firestore {
 
         match /enrolled/{classroomId} {
             allow read: if isSignedIn() && request.auth.uid == userId;
-            allow write: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid); 
+            allow write: if isSignedIn() && canManageClassroom(classroomId, request.auth.uid);
         }
     }
     
@@ -139,30 +156,26 @@ service cloud.firestore {
     }
 
     /**
-     * Reports Collection
-     */
-    match /reports/{reportId} {
-        allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
-        allow read: if false; 
-    }
-
-    /**
      * Helper Functions
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isMeetingOwner(meetingId, userId) {
+    function isOwner(meetingId, userId) {
       return get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == userId;
     }
     
     function isClassroomOwner(classroomId, userId) {
       return get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == userId;
     }
-
+    
     function isTeacher(classroomId, userId) {
-      return exists(/databases/$(database)/documents/classrooms/$(classroomId)/teachers/$(userId));
+        return exists(/databases/$(database)/documents/classrooms/$(classroomId)/teachers/$(userId));
+    }
+
+    function isStudent(classroomId, userId) {
+        return exists(/databases/$(database)/documents/classrooms/$(classroomId)/participants/$(userId));
     }
     
     function canManageClassroom(classroomId, userId) {
