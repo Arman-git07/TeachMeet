@@ -29,7 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle, Sparkles, CheckCircle } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, FileDown, Eye, Clock, Edit3, AlertCircle, Sparkles, CheckCircle, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { Assignment, Submission } from '@/app/dashboard/classrooms/[classroomId]/page';
@@ -48,9 +48,6 @@ export function Assignments() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
     const [currentTime, setCurrentTime] = useState(new Date());
-
-    // Tracking which assignments are being modified by the student
-    const [modifyingAssignments, setModifyingAssignments] = useState<Set<string>>(new Set());
 
     // Rescheduling state for teachers
     const [reschedulingAssignment, setReschedulingAssignment] = useState<Assignment | null>(null);
@@ -118,14 +115,14 @@ export function Assignments() {
         }
     }, [canUserManage, user, classroomId, toast, assignmentForm]);
 
-    const handleStudentSubmission = useCallback(async (e: React.FormEvent<HTMLFormElement>, assignmentId: string) => {
-        e.preventDefault();
-        if (!user) return;
-        const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
-        const file = fileInput?.files?.[0];
-        if (!file) return;
+    const handleStudentSubmission = useCallback(async (file: File, assignmentId: string) => {
+        if (!user || !classroomId) return;
         
         setIsProcessing(`submitting-${assignmentId}`);
+        const isUpdate = submissions.some(s => s.assignmentId === assignmentId && s.studentId === user.uid);
+        const toastId = `sub-${Date.now()}`;
+        toast({ id: toastId, title: isUpdate ? "Updating Submission..." : "Submitting Work..." });
+
         try {
             const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${assignmentId}/submissions/${user.uid}-${file.name}`);
             const url = await getDownloadURL(await uploadBytes(fileRef, file).then(s => s.ref));
@@ -138,18 +135,13 @@ export function Assignments() {
                 feedback: null,
                 assignmentId: assignmentId
             });
-            toast({ title: "Submitted Successfully!" });
-            setModifyingAssignments(prev => {
-                const next = new Set(prev);
-                next.delete(assignmentId);
-                return next;
-            });
+            toast.update(toastId, { title: isUpdate ? "Submission Updated!" : "Submitted Successfully!" });
         } catch (error) {
-            toast({ variant: 'destructive', title: "Submission Failed" });
+            toast.update(toastId, { variant: 'destructive', title: "Action Failed" });
         } finally {
             setIsProcessing(null);
         }
-    }, [classroomId, user, toast]);
+    }, [classroomId, user, submissions, toast]);
 
     const handleDelete = useCallback(async (item: Assignment) => {
         if (!classroomId) return;
@@ -287,14 +279,16 @@ export function Assignments() {
                         <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
                                 <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-3 font-bold">Submitted</Badge>
-                                <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    className="h-8 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-100/50"
-                                    onClick={() => toast({ title: "Modify Feature (Demo)", description: "Clicking this allows you to upload a new file to replace your previous submission." })}
-                                >
-                                    Modify
-                                </Button>
+                                <div className="relative overflow-hidden rounded-lg">
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        className="h-8 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-100/50"
+                                        onClick={() => toast({ title: "Modify Feature (Demo)", description: "In a real assignment, this would open the file picker to replace your submission." })}
+                                    >
+                                        Modify
+                                    </Button>
+                                </div>
                             </div>
                             <p className="text-[9px] text-blue-600/60 font-bold uppercase tracking-tighter">Handed In • Awaiting Check</p>
                         </div>
@@ -305,7 +299,6 @@ export function Assignments() {
                     const userSub = submissions.find(s => s.assignmentId === assignment.id && s.studentId === user?.uid);
                     const canEdit = userRole === 'creator' || assignment.creatorId === user?.uid;
                     const isDeadlinePassed = new Date(assignment.dueDate.toDate()) < currentTime;
-                    const isModifying = modifyingAssignments.has(assignment.id);
                     const teacherName = assignment.creatorName || "Teacher";
 
                     return (
@@ -391,46 +384,31 @@ export function Assignments() {
                                                 {isDeadlinePassed ? (
                                                     <Badge variant="outline" className="border-primary/20 text-primary font-bold bg-primary/5">Already Submitted</Badge>
                                                 ) : (
-                                                    isModifying ? (
-                                                        <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2">
-                                                            <Input type="file" required className="h-9 text-xs" disabled={isProcessing === `submitting-${assignment.id}`}/>
-                                                            <Button size="sm" type="submit" disabled={isProcessing === `submitting-${assignment.id}`}>
-                                                                {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-4 w-4"/> : "Update"}
-                                                            </Button>
-                                                            <Button size="sm" variant="ghost" onClick={() => setModifyingAssignments(prev => { const n = new Set(prev); n.delete(assignment.id); return n; })}>Cancel</Button>
-                                                        </form>
-                                                    ) : (
-                                                        <div className="flex items-center gap-2">
-                                                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Submitted</Badge>
-                                                            <Button size="sm" variant="outline" onClick={() => setModifyingAssignments(prev => new Set(prev).add(assignment.id))}>
-                                                                <Edit3 className="mr-1.5 h-3.5 w-3.5"/> Modify
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Submitted</Badge>
+                                                        <div className="relative">
+                                                            <input 
+                                                                type="file" 
+                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                                                disabled={isProcessing === `submitting-${assignment.id}`}
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) handleStudentSubmission(file, assignment.id);
+                                                                }}
+                                                            />
+                                                            <Button size="sm" variant="outline" className="rounded-lg h-8" disabled={isProcessing === `submitting-${assignment.id}`}>
+                                                                {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-3.5 w-3.5"/> : <Edit3 className="mr-1.5 h-3.5 w-3.5"/>}
+                                                                Modify
                                                             </Button>
                                                         </div>
-                                                    )
+                                                    </div>
                                                 )}
                                                 {userSub.grade != null && (
-                                                    <Dialog>
-                                                        <DialogTrigger asChild><Button size="sm" variant="outline">View Result</Button></DialogTrigger>
-                                                        <DialogContent>
-                                                            <DialogHeader><DialogTitle>Result: {assignment.title}</DialogTitle></DialogHeader>
-                                                            <div className="py-4 text-center space-y-4">
-                                                                <div className="text-4xl font-bold text-primary">{userSub.grade}/100</div>
-                                                                {userSub.feedback && <p className="text-sm bg-muted p-4 rounded-lg italic">"{userSub.feedback}"</p>}
-                                                                <div className="grid grid-cols-1 gap-2">
-                                                                    <Button asChild variant="outline" size="sm" className="w-full">
-                                                                        <a href={userSub.submissionUrl} target="_blank" rel="noreferrer"><FileDown className="mr-2 h-4 w-4"/>Download My Original</a>
-                                                                    </Button>
-                                                                    {userSub.checkedUrl && (
-                                                                        <Button asChild className="w-full btn-gel" size="sm">
-                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/result/${user.uid}`}>
-                                                                                <Eye className="mr-2 h-4 w-4"/>View Checked Work
-                                                                            </Link>
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </DialogContent>
-                                                    </Dialog>
+                                                    <Button asChild size="sm" variant="outline">
+                                                        <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/result/${user.uid}`}>
+                                                            View Result
+                                                        </Link>
+                                                    </Button>
                                                 )}
                                             </div>
                                         ) : (
@@ -442,18 +420,29 @@ export function Assignments() {
                                                     <p className="text-[10px] text-muted-foreground font-medium">connect to @{teacherName}</p>
                                                 </div>
                                             ) : (
-                                                <form onSubmit={(e) => handleStudentSubmission(e, assignment.id)} className="flex gap-2">
-                                                    <Input type="file" required className="h-9 text-xs" disabled={isProcessing === `submitting-${assignment.id}`}/>
-                                                    <Button size="sm" type="submit" disabled={isProcessing === `submitting-${assignment.id}`}>
-                                                        {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-4 w-4"/> : "Submit"}
-                                                    </Button>
-                                                </form>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="file" 
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                                            disabled={isProcessing === `submitting-${assignment.id}`}
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) handleStudentSubmission(file, assignment.id);
+                                                            }}
+                                                        />
+                                                        <Button size="sm" className="rounded-lg btn-gel" disabled={isProcessing === `submitting-${assignment.id}`}>
+                                                            {isProcessing === `submitting-${assignment.id}` ? <Loader2 className="animate-spin h-4 w-4 mr-2"/> : <Upload className="mr-2 h-4 w-4" />}
+                                                            Submit Work
+                                                        </Button>
+                                                    </div>
+                                                </div>
                                             )
                                         )
                                     )}
                                 </div>
                             </div>
-                            {userSub?.feedback && !isModifying && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {userSub.feedback}</p>}
+                            {userSub?.feedback && <p className="text-sm text-muted-foreground mt-2 border-t pt-2"><b>Feedback:</b> {userSub.feedback}</p>}
                         </Card>
                     );
                 }) : null}
