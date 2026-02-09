@@ -6,26 +6,51 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Video, Users as UsersIcon, XCircle, History, FileText, Clapperboard, Loader2, AtSign, Megaphone, UserPlus, LogIn } from 'lucide-react';
+import { 
+  Video, 
+  Users as UsersIcon, 
+  XCircle, 
+  History, 
+  FileText, 
+  Clapperboard, 
+  Loader2, 
+  AtSign, 
+  Megaphone, 
+  UserPlus, 
+  BookOpen, 
+  ClipboardList, 
+  ClipboardCheck, 
+  Bell 
+} from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-export type ActivityItemType = 'meeting' | 'document' | 'recording' | 'chatMention' | 'announcement' | 'joinRequest';
+export type ActivityItemType = 
+  | 'meeting' 
+  | 'document' 
+  | 'recording' 
+  | 'chatMention' 
+  | 'announcement' 
+  | 'joinRequest' 
+  | 'assignment' 
+  | 'material' 
+  | 'exam';
 
 interface BaseActivityItem {
   id: string;
   type: ActivityItemType;
   title: string;
   timestamp: number;
+  classroomId?: string;
+  classroomName?: string;
 }
 
 export interface JoinRequestActivityItem extends BaseActivityItem {
     type: 'joinRequest';
-    classroomId: string;
     requesterName: string;
 }
 
@@ -43,6 +68,9 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   chatMention: AtSign,
   announcement: Megaphone,
   joinRequest: UserPlus,
+  assignment: ClipboardList,
+  material: BookOpen,
+  exam: ClipboardCheck,
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
@@ -52,6 +80,9 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   chatMention: () => `/dashboard/classrooms`,
   announcement: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   joinRequest: (id, item) => `/dashboard/classrooms/${item.classroomId}/requests`,
+  assignment: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
+  material: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
+  exam: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
 };
 
 export default function HomePage() {
@@ -60,7 +91,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const classUnsubsRef = useRef<(() => void)[]>([]);
+  const unsubsRef = useRef<(() => void)[]>([]);
   
   useEffect(() => {
     if (!user || !isAuthenticated) {
@@ -69,50 +100,134 @@ export default function HomePage() {
     }
     
     setIsLoading(true);
-    const qClassrooms = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
+    
+    const cleanup = () => {
+        unsubsRef.current.forEach(u => u());
+        unsubsRef.current = [];
+    };
 
-    const unsubClassrooms = onSnapshot(qClassrooms, (snapshot) => {
-        classUnsubsRef.current.forEach(unsub => unsub());
-        classUnsubsRef.current = [];
-        
+    // 1. Listen to classrooms where user is teacher or creator (to see Join Requests)
+    const qManaged = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
+    const unsubManaged = onSnapshot(qManaged, (snapshot) => {
         const activityMap: Record<string, ActivityItem[]> = {};
-
-        if (snapshot.empty) {
-            setFirestoreActivity([]);
-            setIsLoading(false);
-        }
-
+        
         snapshot.docs.forEach(classDoc => {
             const classId = classDoc.id;
             const classTitle = classDoc.data().title;
             
             const unsubRequests = onSnapshot(query(collection(db, 'classrooms', classId, 'joinRequests')), (reqSnap) => {
-                const requests = reqSnap.docs.map(doc => {
-                    const data = doc.data();
-                    return {
-                        id: `join-${classId}-${doc.id}`, 
-                        type: 'joinRequest',
-                        title: classTitle,
-                        timestamp: data.requestedAt?.toMillis() || Date.now(),
-                        classroomId: classId,
-                        requesterName: data.studentName || 'A new user'
-                    } as JoinRequestActivityItem;
-                });
-                
-                activityMap[classId] = requests;
-                const combined = Object.values(activityMap).flat();
-                setFirestoreActivity(combined);
-                setIsLoading(false);
+                activityMap[`join-${classId}`] = reqSnap.docs.map(doc => ({
+                    id: `join-${classId}-${doc.id}`, 
+                    type: 'joinRequest',
+                    title: classTitle,
+                    timestamp: doc.data().requestedAt?.toMillis() || Date.now(),
+                    classroomId: classId,
+                    requesterName: doc.data().studentName || 'A new user'
+                } as JoinRequestActivityItem));
+                updateCombinedFirestoreActivity(activityMap);
             });
-            
-            classUnsubsRef.current.push(unsubRequests);
+            unsubsRef.current.push(unsubRequests);
         });
     });
 
-    return () => { 
-        unsubClassrooms(); 
-        classUnsubsRef.current.forEach(u => u()); 
+    // 2. Listen to enrolled classrooms (to see materials, assignments, etc.)
+    const qEnrolled = query(collection(db, 'users', user.uid, 'enrolled'));
+    const unsubEnrolled = onSnapshot(qEnrolled, (snapshot) => {
+        const classActivityMap: Record<string, ActivityItem[]> = {};
+        
+        snapshot.docs.forEach(enrolledDoc => {
+            const classId = enrolledDoc.id;
+            const classTitle = enrolledDoc.data().title;
+
+            // Listen to Assignments
+            const unsubAssignments = onSnapshot(query(collection(db, 'classrooms', classId, 'assignments'), orderBy('dueDate', 'desc'), limit(5)), (snap) => {
+                classActivityMap[`ass-${classId}`] = snap.docs.map(d => ({
+                    id: `ass-${d.id}`,
+                    type: 'assignment',
+                    title: d.data().title,
+                    timestamp: d.data().createdAt?.toMillis() || Date.now(),
+                    classroomId: classId,
+                    classroomName: classTitle
+                }));
+                updateCombinedFirestoreActivity(classActivityMap);
+            });
+
+            // Listen to Materials
+            const unsubMaterials = onSnapshot(query(collection(db, 'classrooms', classId, 'materials'), orderBy('uploadedAt', 'desc'), limit(5)), (snap) => {
+                classActivityMap[`mat-${classId}`] = snap.docs.map(d => ({
+                    id: `mat-${d.id}`,
+                    type: 'material',
+                    title: d.data().name,
+                    timestamp: d.data().uploadedAt?.toMillis() || Date.now(),
+                    classroomId: classId,
+                    classroomName: classTitle
+                }));
+                updateCombinedFirestoreActivity(classActivityMap);
+            });
+
+            // Listen to Announcements
+            const unsubAnnouncements = onSnapshot(query(collection(db, 'classrooms', classId, 'announcements'), orderBy('createdAt', 'desc'), limit(5)), (snap) => {
+                classActivityMap[`ann-${classId}`] = snap.docs.map(d => ({
+                    id: `ann-${d.id}`,
+                    type: 'announcement',
+                    title: d.data().text?.substring(0, 50) || 'New Voice Announcement',
+                    timestamp: d.data().createdAt?.toMillis() || Date.now(),
+                    classroomId: classId,
+                    classroomName: classTitle
+                }));
+                updateCombinedFirestoreActivity(classActivityMap);
+            });
+
+            // Listen to Exams
+            const unsubExams = onSnapshot(query(collection(db, 'classrooms', classId, 'exams'), orderBy('startDate', 'desc'), limit(5)), (snap) => {
+                classActivityMap[`exm-${classId}`] = snap.docs.map(d => ({
+                    id: `exm-${d.id}`,
+                    type: 'exam',
+                    title: d.data().title,
+                    timestamp: d.data().createdAt?.toMillis() || Date.now(),
+                    classroomId: classId,
+                    classroomName: classTitle
+                }));
+                updateCombinedFirestoreActivity(classActivityMap);
+            });
+
+            unsubsRef.current.push(unsubAssignments, unsubMaterials, unsubAnnouncements, unsubExams);
+        });
+    });
+
+    // 3. Listen to Personal Library
+    const unsubDocs = onSnapshot(query(collection(db, 'documents'), where('uploaderId', '==', user.uid), orderBy('createdAt', 'desc'), limit(5)), (snap) => {
+        const docs = snap.docs.map(d => ({
+            id: `doc-${d.id}`,
+            type: 'document',
+            title: d.data().name,
+            timestamp: d.data().createdAt?.toMillis() || Date.now()
+        } as ActivityItem));
+        updateCombinedFirestoreActivity({ 'personal-docs': docs });
+    });
+
+    const unsubRecs = onSnapshot(query(collection(db, 'recordings'), where('uploaderId', '==', user.uid), orderBy('createdAt', 'desc'), limit(5)), (snap) => {
+        const recs = snap.docs.map(d => ({
+            id: `rec-${d.id}`,
+            type: 'recording',
+            title: d.data().name,
+            timestamp: d.data().createdAt?.toMillis() || Date.now()
+        } as ActivityItem));
+        updateCombinedFirestoreActivity({ 'personal-recs': recs });
+    });
+
+    unsubsRef.current.push(unsubManaged, unsubEnrolled, unsubDocs, unsubRecs);
+
+    const updateCombinedFirestoreActivity = (newChunks: Record<string, ActivityItem[]>) => {
+        setFirestoreActivity(prev => {
+            const combinedMap = new Map<string, ActivityItem[]>();
+            // This is slightly complex because we're merging multiple real-time streams
+            // We'll rely on the loadActivities callback to handle the final flatten and unique
+            return Object.values(newChunks).flat();
+        });
     };
+
+    return () => cleanup();
   }, [user, isAuthenticated]);
   
   const loadActivities = useCallback(() => {
@@ -125,19 +240,29 @@ export default function HomePage() {
     const started = JSON.parse(localStorage.getItem(STARTED_KEY) || '[]');
     const latest = JSON.parse(localStorage.getItem(LATEST_KEY) || '[]');
 
-    const ongoing = started.filter((m:any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS).map((m:any) => ({ type: 'meeting', id: m.id, title: m.title || "Meeting", timestamp: m.startedAt }));
+    const ongoingMeetings = started.filter((m:any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS).map((m:any) => ({ 
+        type: 'meeting', 
+        id: m.id, 
+        title: m.title || "Meeting", 
+        timestamp: m.startedAt 
+    }));
     
-    const filteredLatest = latest.filter((item: any) => item.type !== 'joinRequest');
-    
-    const combined = [...ongoing, ...filteredLatest, ...firestoreActivity]
+    // Merge all sources
+    const combined = [...ongoingMeetings, ...latest, ...firestoreActivity]
         .filter(item => item && !dismissed.includes(item.id))
         .sort((a,b) => b.timestamp - a.timestamp);
 
-    const uniqueCombined = combined.filter((item, index, self) =>
-        index === self.findIndex((t) => t.id === item.id)
-    );
+    // Ensure uniqueness by ID
+    const uniqueCombined = combined.reduce((acc: ActivityItem[], current) => {
+        const x = acc.find(item => item.id === current.id);
+        if (!x) {
+            return acc.concat([current]);
+        } else {
+            return acc;
+        }
+    }, []);
 
-    setAllActivity(uniqueCombined);
+    setAllActivity(uniqueCombined.slice(0, 15)); // Show top 15 activities
     setIsLoading(false);
   }, [user, firestoreActivity]);
 
@@ -153,6 +278,13 @@ export default function HomePage() {
     }
   }, [authLoading, isAuthenticated, loadActivities]);
 
+  const handleDismiss = (id: string) => {
+    const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
+    const dismissed = JSON.parse(localStorage.getItem(key) || '[]');
+    localStorage.setItem(key, JSON.stringify([...dismissed, id]));
+    setAllActivity(prev => prev.filter(i => i.id !== id));
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
@@ -161,7 +293,7 @@ export default function HomePage() {
           <Logo size="medium" className="mb-8" />
           <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border border-border/50">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
-                <History className="mr-3 h-6 w-6" /> Latest Activity
+                <Bell className="mr-3 h-6 w-6" /> Latest Activity
             </h2>
             {authLoading ? (
                 <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
@@ -173,44 +305,58 @@ export default function HomePage() {
             ) : isLoading ? (
                 <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
             ) : allActivity.length > 0 ? (
-                <ul className="space-y-3 text-left">
-                  {allActivity.map(item => {
-                    const Icon = itemIcons[item.type as ActivityItemType];
-                    const link = itemLinks[item.type as ActivityItemType](item.id, item);
-                    return (
-                      <li key={item.id} className="flex items-center gap-2 group">
-                        <Link href={link} className="flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm">
-                          <div className="p-2 bg-primary/10 rounded-full shrink-0">
-                            <Icon className="h-4 w-4 text-primary" />
-                          </div>
-                          <div className="flex flex-col truncate">
-                            <span className="text-sm font-medium truncate">
-                                {item.type === 'joinRequest' ? `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"` : item.title}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{item.type} • {new Date(item.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                          </div>
-                        </Link>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="rounded-full h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => {
-                                const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
-                                const d = JSON.parse(localStorage.getItem(key) || '[]');
-                                localStorage.setItem(key, JSON.stringify([...d, item.id]));
-                                setAllActivity(prev => prev.filter(i => i.id !== item.id));
-                            }}
-                        >
-                            <XCircle className="h-4 w-4"/>
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <ScrollArea className="max-h-[400px] pr-2">
+                    <ul className="space-y-3 text-left">
+                    {allActivity.map(item => {
+                        const Icon = itemIcons[item.type as ActivityItemType];
+                        const link = itemLinks[item.type as ActivityItemType](item.id, item);
+                        
+                        let displayTitle = item.title;
+                        if (item.type === 'joinRequest') {
+                            displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
+                        } else if (item.classroomName) {
+                            displayTitle = `${item.title} (${item.classroomName})`;
+                        }
+
+                        return (
+                        <li key={item.id} className="flex items-center gap-2 group">
+                            <Link href={link} className="flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm">
+                            <div className={cn(
+                                "p-2 rounded-full shrink-0",
+                                item.type === 'meeting' ? "bg-primary/10 text-primary" :
+                                item.type === 'assignment' ? "bg-red-100 text-red-600" :
+                                item.type === 'material' ? "bg-blue-100 text-blue-600" :
+                                item.type === 'exam' ? "bg-purple-100 text-purple-600" :
+                                "bg-accent/10 text-accent"
+                            )}>
+                                <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="flex flex-col truncate">
+                                <span className="text-sm font-medium truncate">
+                                    {displayTitle}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                    {item.type} • {new Date(item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                                </span>
+                            </div>
+                            </Link>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="rounded-full h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleDismiss(item.id)}
+                            >
+                                <XCircle className="h-4 w-4"/>
+                            </Button>
+                        </li>
+                        );
+                    })}
+                    </ul>
+                </ScrollArea>
               ) : (
                 <div className="py-12 text-center text-muted-foreground">
                     <p className="text-sm">No recent activity.</p>
-                    <p className="text-xs mt-1">Start a meeting or create a classroom to get started!</p>
+                    <p className="text-xs mt-1">Activity from your classes and meetings will appear here.</p>
                 </div>
               )
             }
@@ -220,4 +366,12 @@ export default function HomePage() {
       <SlideUpPanel />
     </div>
   );
+}
+
+function ScrollArea({ children, className }: { children: React.ReactNode, className?: string }) {
+    return (
+        <div className={cn("overflow-y-auto", className)}>
+            {children}
+        </div>
+    );
 }
