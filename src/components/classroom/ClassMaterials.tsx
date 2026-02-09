@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 
 export function ClassMaterials() {
     const { classroomId, user, userRole } = useClassroom();
@@ -165,7 +166,7 @@ export function ClassMaterials() {
                             </div>
                         </div>
                         <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
-                            <a href="https://www.africau.edu/images/default/sample.pdf" target="_blank" rel="noreferrer">View</a>
+                            <Link href={`/dashboard/classrooms/${classroomId}/materials/demo-physics`}>View</Link>
                         </Button>
                     </div>
 
@@ -183,14 +184,14 @@ export function ClassMaterials() {
                             </div>
                         </div>
                         <Button variant="ghost" size="sm" className="rounded-lg text-xs" asChild>
-                            <a href="https://wikipedia.org" target="_blank" rel="noreferrer">Open</a>
+                            <Link href={`/dashboard/classrooms/${classroomId}/materials/demo-reading`}>Open</Link>
                         </Button>
                     </div>
 
                     {/* Real Class Materials */}
                     {materials.map(m => (
                         <div key={m.id} className="flex items-center justify-between p-3 bg-card border rounded-xl group hover:shadow-sm transition-all">
-                            <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 truncate flex-1">
+                            <Link href={`/dashboard/classrooms/${classroomId}/materials/${m.id}`} className="flex items-center gap-3 truncate flex-1">
                                 <div className={cn("p-2 rounded-lg", m.type === 'link' ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary")}>
                                     {m.type === 'link' ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                                 </div>
@@ -198,7 +199,7 @@ export function ClassMaterials() {
                                     <span className="text-sm font-medium block truncate">{m.name}</span>
                                     <span className="text-[10px] text-muted-foreground uppercase">{m.type} • Added by {m.uploaderName}</span>
                                 </div>
-                            </a>
+                            </Link>
                             {(canUserManage || m.uploaderId === user?.uid) && (
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
