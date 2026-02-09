@@ -8,7 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette, Maximize, Minimize } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, FileText, CheckCircle2, UserCircle, Pencil, Eraser, RotateCcw, X, Palette, Maximize, Minimize, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
+import Link from 'next/link';
 
 interface AssignmentData {
     title: string;
@@ -65,7 +66,7 @@ export default function CheckingPage() {
 
     // Drawing State
     const [isMarkupMode, setIsMarkupMode] = useState(false);
-    const [drawColor, setDrawColor] = useState("#000000"); 
+    const [drawColor, setDrawColor] = useState("#ff0000"); // Standard red for checking
     const [penSize, setPenSize] = useState(3);
     const [isEraser, setIsEraser] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -275,7 +276,7 @@ export default function CheckingPage() {
                         blob = await new Promise<Blob | null>(resolve => offscreen.toBlob(resolve, 'image/png'));
                     }
                 } else {
-                    // For PDFs, we save the markup layer as a transparent overlay for now
+                    // For PDFs, we save the markup layer as a transparent overlay
                     blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
                 }
 
@@ -336,6 +337,11 @@ export default function CheckingPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Button asChild variant="outline" className="rounded-lg">
+                        <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignmentId}/result/${studentId}`}>
+                            <Eye className="mr-2 h-4 w-4" /> View Result
+                        </Link>
+                    </Button>
                     <Button 
                         variant={isMarkupMode ? "default" : "outline"} 
                         onClick={() => setIsMarkupMode(!isMarkupMode)}
@@ -403,7 +409,7 @@ export default function CheckingPage() {
                                         <Eraser className="h-4 w-4" />
                                     </Button>
                                     <div className="w-px h-4 bg-border mx-1" />
-                                    {["#000000", "#ffffff"].map(color => (
+                                    {["#ff0000", "#000000", "#0000ff"].map(color => (
                                         <button 
                                             key={color}
                                             onClick={() => { setDrawColor(color); setIsEraser(false); }}
@@ -412,7 +418,7 @@ export default function CheckingPage() {
                                                 drawColor === color && !isEraser && "ring-2 ring-primary ring-offset-1"
                                             )}
                                             style={{ backgroundColor: color }}
-                                            title={color === '#000000' ? 'Black' : color === '#ffffff' ? 'White' : ''}
+                                            title={color === '#ff0000' ? 'Red' : color === '#000000' ? 'Black' : 'Blue'}
                                         />
                                     ))}
                                     <div className="relative w-6 h-6 rounded-full border border-black/10 overflow-hidden flex items-center justify-center bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 transition-transform hover:scale-110 shadow-sm" title="Choose custom color">

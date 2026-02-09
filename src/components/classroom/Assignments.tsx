@@ -233,7 +233,7 @@ export function Assignments() {
                                 <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-lg h-8 shadow-sm">View Result</Button></DialogTrigger>
                                 <DialogContent className="sm:max-w-md">
                                     <DialogHeader>
-                                        <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary"/> Exam Result</DialogTitle>
+                                        <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary"/> Assignment Result</DialogTitle>
                                         <DialogDescription>Sample view of a graded assignment.</DialogDescription>
                                     </DialogHeader>
                                     <div className="py-6 text-center space-y-6">
@@ -253,9 +253,9 @@ export function Assignments() {
                                                 </a>
                                             </Button>
                                             <Button asChild className="w-full btn-gel rounded-xl h-12 text-lg">
-                                                <a href="https://picsum.photos/seed/checked/800/1200" target="_blank" rel="noreferrer">
+                                                <Link href={`/dashboard/classrooms/${classroomId}/assignments/demo-assignment/result/demo-student`}>
                                                     <Eye className="mr-2 h-5 w-5"/> View Checked Work
-                                                </a>
+                                                </Link>
                                             </Button>
                                         </div>
                                     </div>
@@ -308,8 +308,8 @@ export function Assignments() {
                                                                             {sub.grade != null && <p className="text-[10px] text-primary font-bold">Graded: {sub.grade}/100</p>}
                                                                         </div>
                                                                         <Button asChild variant="outline" size="sm" className="h-8 rounded-lg">
-                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/check/${sub.studentId}`}>
-                                                                                <Eye className="mr-2 h-3.5 w-3.5"/>View
+                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/result/${sub.studentId}`}>
+                                                                                <Eye className="mr-2 h-3.5 w-3.5"/>View Result
                                                                             </Link>
                                                                         </Button>
                                                                     </div>
@@ -389,9 +389,9 @@ export function Assignments() {
                                                                     </Button>
                                                                     {userSub.checkedUrl && (
                                                                         <Button asChild className="w-full btn-gel" size="sm">
-                                                                            <a href={userSub.checkedUrl} target="_blank" rel="noreferrer">
+                                                                            <Link href={`/dashboard/classrooms/${classroomId}/assignments/${assignment.id}/result/${user.uid}`}>
                                                                                 <Eye className="mr-2 h-4 w-4"/>View Checked Work
-                                                                            </a>
+                                                                            </Link>
                                                                         </Button>
                                                                     )}
                                                                 </div>
