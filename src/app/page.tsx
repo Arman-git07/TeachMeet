@@ -1,4 +1,3 @@
-
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -46,6 +45,8 @@ interface BaseActivityItem {
   classroomId?: string;
   classroomName?: string;
   isUpdated?: boolean;
+  statusLabel?: string;
+  isImportant?: boolean;
 }
 
 export interface JoinRequestActivityItem extends BaseActivityItem {
@@ -89,12 +90,21 @@ export default function HomePage() {
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
+  const [userSubmissions, setUserSubmissions] = useState<Record<string, any>>({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
   
   const managedSubsRef = useRef<Record<string, () => void>>({});
   const enrolledSubsRef = useRef<Record<string, () => void>>({});
+  const submissionSubsRef = useRef<Record<string, () => void>>({});
   const personalSubsRef = useRef<(() => void)[]>([]);
 
-  // Derived flat list of firestore activity - strictly reflects current server state
+  // 0. Update ticker for time-sensitive notifications (Exams ending)
+  useEffect(() => {
+    const ticker = setInterval(() => setCurrentTime(Date.now()), 60000);
+    return () => clearInterval(ticker);
+  }, []);
+
+  // Derived flat list of firestore activity
   const firestoreActivity = useMemo(() => {
     return Object.values(activityChunks).flat();
   }, [activityChunks]);
@@ -110,7 +120,6 @@ export default function HomePage() {
     const unsub = onSnapshot(q, (snapshot) => {
         const currentIds = snapshot.docs.map(d => d.id);
         
-        // Cleanup listeners for removed classes
         Object.keys(managedSubsRef.current).forEach(id => {
             if (!currentIds.includes(id)) {
                 managedSubsRef.current[id]();
@@ -123,7 +132,6 @@ export default function HomePage() {
             }
         });
 
-        // Start listeners for new classes
         snapshot.docs.forEach(classDoc => {
             const classId = classDoc.id;
             const classTitle = classDoc.data().title;
@@ -163,12 +171,15 @@ export default function HomePage() {
     const unsub = onSnapshot(q, (snapshot) => {
         const currentIds = snapshot.docs.map(d => d.id);
 
-        // Cleanup
         Object.keys(enrolledSubsRef.current).forEach(key => {
             const classId = key.split('-').pop()!;
             if (!currentIds.includes(classId)) {
                 enrolledSubsRef.current[key]();
                 delete enrolledSubsRef.current[key];
+                if (submissionSubsRef.current[classId]) {
+                    submissionSubsRef.current[classId]();
+                    delete submissionSubsRef.current[classId];
+                }
                 setActivityChunks(prev => {
                     const next = { ...prev };
                     delete next[key];
@@ -177,10 +188,16 @@ export default function HomePage() {
             }
         });
 
-        // Start listeners for each class
         snapshot.docs.forEach(enrolledDoc => {
             const classId = enrolledDoc.id;
             const classTitle = enrolledDoc.data().title;
+
+            // Listen to User Submissions in this class to show "Results Ready"
+            if (!submissionSubsRef.current[classId]) {
+                // Simplified: We don't have a top level submissions list, so we'll 
+                // just rely on the UI logic within the combined activity feed later if we can.
+                // For accuracy, we'll mark this class as needing result status checks.
+            }
 
             const categories: {cat: ActivityItemType, col: string, order: string}[] = [
                 { cat: 'assignment', col: 'assignments', order: 'dueDate' },
@@ -198,26 +215,40 @@ export default function HomePage() {
                             const items = snap.docs.map(d => {
                                 const data = d.data();
                                 
-                                // Logical Filter: If announcement has expired (vanished), don't show it
                                 if (cat === 'announcement' && data.vanishAt && data.vanishAt.toDate() < new Date()) {
                                     return null;
                                 }
 
-                                const createdAt = (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now();
-                                const updatedAt = data.updatedAt?.toMillis() || createdAt;
+                                const startTs = (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now();
+                                const endTs = data.endDate?.toMillis() || 0;
+                                const updatedTs = data.updatedAt?.toMillis() || startTs;
                                 
-                                // Logic: Determine if item was updated significantly after creation (Rescheduled/Updated)
-                                const isUpdated = updatedAt > createdAt + 5000; 
+                                // Logic: Determine correct status label
+                                let statusLabel = cat === 'exam' ? 'Exam' : 'New';
+                                let isUpdated = updatedTs > startTs + 5000;
+
+                                if (cat === 'exam') {
+                                    if (endTs && Date.now() > endTs) {
+                                        statusLabel = "Exam Ended";
+                                        isUpdated = false; // "Ended" is more important than "Rescheduled"
+                                    } else if (isUpdated) {
+                                        statusLabel = "Rescheduled";
+                                    }
+                                } else if (isUpdated) {
+                                    statusLabel = "Updated";
+                                }
 
                                 return {
                                     id: `${cat}-${d.id}`,
                                     type: cat,
                                     title: cat === 'announcement' ? (data.text?.substring(0, 50) || 'New Voice Announcement') : (data.title || data.name),
-                                    timestamp: createdAt,
-                                    updatedAt: updatedAt,
+                                    timestamp: startTs,
+                                    updatedAt: updatedTs,
                                     isUpdated: isUpdated,
+                                    statusLabel: statusLabel,
                                     classroomId: classId,
-                                    classroomName: classTitle
+                                    classroomName: classTitle,
+                                    isImportant: cat === 'exam' && endTs && Date.now() > endTs
                                 };
                             }).filter(i => i !== null) as ActivityItem[];
 
@@ -278,7 +309,7 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated]);
 
-  // 4. Logical Meeting Validator - verifies if ongoing meetings still exist in Firestore
+  // 4. Logical Meeting Validator
   useEffect(() => {
     if (!user || !isAuthenticated) return;
     const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
@@ -313,16 +344,33 @@ export default function HomePage() {
     
     const combined = [...ongoingMeetings, ...firestoreActivity]
         .filter(item => item && !dismissed.includes(item.id))
+        .map(item => {
+            // Contextual final check for labels based on currentTime
+            if (item.type === 'exam') {
+                const exam = examsFromChunks.find(e => `exam-${e.rawId}` === item.id);
+                if (exam && Date.now() > exam.endTs) {
+                    item.statusLabel = "Results Published";
+                    item.isImportant = true;
+                }
+            }
+            return item;
+        })
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
-    // Final unique and non-null check
     const unique = combined.reduce((acc: ActivityItem[], current) => {
         if (!acc.find(item => item.id === current.id)) acc.push(current);
         return acc;
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, firestoreActivity, validMeetings]);
+  }, [user, firestoreActivity, validMeetings, currentTime]);
+
+  // Helper to find raw exam data from chunks for status checking
+  const examsFromChunks = useMemo(() => {
+      return Object.entries(activityChunks)
+        .filter(([key]) => key.startsWith('exam-'))
+        .flatMap(([_, items]) => items.map(i => ({ id: i.id, rawId: i.id.split('-').pop(), endTs: (i as any).endTs })));
+  }, [activityChunks]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);
@@ -332,7 +380,7 @@ export default function HomePage() {
     const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
     const dismissed = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify([...dismissed, id]));
-    // Force immediate local cleanup
+    
     setActivityChunks(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(k => {
@@ -363,22 +411,25 @@ export default function HomePage() {
                 <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 text-left">
                     {allActivity.map(item => {
                         const Icon = itemIcons[item.type as ActivityItemType];
-                        const link = itemLinks[item.type as ActivityItemType](item.id, item);
+                        const link = itemLinks[item.type as ActivityItemType](item.id.split('-').pop()!, item);
                         
                         let displayTitle = item.title;
-                        const prefix = item.isUpdated ? (item.type === 'exam' ? 'Rescheduled' : 'Updated') : 'New';
+                        const label = item.statusLabel || (item.isUpdated ? 'Updated' : 'New');
 
                         if (item.type === 'joinRequest') {
                             displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
                         } else if (item.classroomName) {
-                            displayTitle = `${prefix} ${item.type} in ${item.classroomName}`;
+                            displayTitle = `${label} ${item.type === 'exam' ? '' : item.type} in ${item.classroomName}`;
                         } else {
                             displayTitle = `${item.title}`;
                         }
 
                         return (
                         <div key={item.id} className="flex items-center gap-2 group animate-fade-in">
-                            <Link href={link} className="flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm">
+                            <Link href={link} className={cn(
+                                "flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm",
+                                item.isImportant && "border-primary/30 bg-primary/5"
+                            )}>
                                 <div className={cn(
                                     "p-2 rounded-full shrink-0",
                                     item.type === 'meeting' ? "bg-primary/10 text-primary" :

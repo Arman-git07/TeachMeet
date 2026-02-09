@@ -6,7 +6,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, FileText, CheckCircle2, UserCircle, Download, Printer, Save, Edit3, X, CheckCircle, AlertTriangle, Info, Clock, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle2, UserCircle, Download, Printer, Save, Edit3, X, CheckCircle, AlertTriangle, Info, Clock, Loader2, FileDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ import { useClassroom } from '@/contexts/ClassroomContext';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import jsPDF from 'jspdf';
 
 export default function ExamResultPage() {
     const { classroomId, examId, studentId } = useParams() as { classroomId: string; examId: string; studentId: string };
@@ -103,6 +104,81 @@ export default function ExamResultPage() {
         }
     };
 
+    const handleDownloadPDF = () => {
+        if (!submission || !exam) return;
+
+        const doc = new jsPDF();
+        const margin = 20;
+        let y = 20;
+
+        // Title
+        doc.setFontSize(22);
+        doc.setTextColor(50, 205, 50); // Primary color
+        doc.text("TeachMeet Exam Result", margin, y);
+        y += 15;
+
+        // Candidate Info
+        doc.setFontSize(12);
+        doc.setTextColor(100);
+        doc.text(`Candidate: ${submission.studentName}`, margin, y);
+        y += 8;
+        doc.text(`Exam: ${exam.title}`, margin, y);
+        y += 15;
+
+        // Score Card
+        doc.setFillColor(245, 245, 245);
+        doc.rect(margin, y, 170, 30, 'F');
+        doc.setTextColor(0);
+        doc.setFontSize(14);
+        doc.text("Assessment Summary", margin + 5, y + 10);
+        doc.setFontSize(12);
+        doc.text(`Score: ${submission.score} / ${submission.total || 100}`, margin + 5, y + 20);
+        doc.text(`Grade: ${submission.percentage ?? 0}%`, margin + 100, y + 20);
+        y += 40;
+
+        // Feedback
+        if (submission.feedback) {
+            doc.setFontSize(14);
+            doc.text("Teacher Feedback:", margin, y);
+            y += 8;
+            doc.setFontSize(11);
+            doc.setTextColor(80);
+            const splitFeedback = doc.splitTextToSize(`"${submission.feedback}"`, 170);
+            doc.text(splitFeedback, margin, y);
+            y += (splitFeedback.length * 6) + 15;
+        }
+
+        // Questions (if available)
+        if (exam.type === 'text' && submission.results) {
+            doc.setFontSize(14);
+            doc.setTextColor(0);
+            doc.text("Detailed breakdown:", margin, y);
+            y += 10;
+
+            submission.results.forEach((res: any, i: number) => {
+                if (y > 270) {
+                    doc.addPage();
+                    y = 20;
+                }
+                doc.setFontSize(10);
+                doc.setTextColor(0);
+                doc.text(`${i + 1}. ${res.question}`, margin, y);
+                y += 6;
+                doc.setTextColor(res.isCorrect ? [0, 150, 0] : [200, 0, 0]);
+                doc.text(`   Status: ${res.isCorrect ? 'Correct' : 'Incorrect'}`, margin, y);
+                y += 5;
+                doc.setTextColor(100);
+                doc.text(`   Student Answer: ${res.studentAnswer || 'N/A'}`, margin, y);
+                y += 5;
+                doc.text(`   Correct Answer: ${res.correctAnswer}`, margin, y);
+                y += 10;
+            });
+        }
+
+        doc.save(`${submission.studentName}_${exam.title}_Result.pdf`);
+        toast({ title: "Report Downloaded", description: "Exam result has been saved to your device." });
+    };
+
     if (isLoading) {
         return <div className="container mx-auto p-8"><Skeleton className="h-[80vh] w-full rounded-2xl" /></div>;
     }
@@ -178,6 +254,9 @@ export default function ExamResultPage() {
                             </Button>
                         )
                     )}
+                    <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="rounded-lg">
+                        <FileDown className="mr-2 h-4 w-4" /> Download Result
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex rounded-lg">
                         <Printer className="mr-2 h-4 w-4" /> Print
                     </Button>
@@ -363,7 +442,7 @@ export default function ExamResultPage() {
                         {isEditing && (
                             <CardFooter className="bg-primary/5 border-t p-4 flex flex-col gap-2">
                                 <Button onClick={handleSaveEdits} disabled={isSaving} className="w-full btn-gel h-12 rounded-xl text-lg">
-                                    {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+                                    {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                                     Finalize Grading
                                 </Button>
                                 <p className="text-[10px] text-primary/70 text-center font-medium">Results will be visible to the student once the exam session ends.</p>
