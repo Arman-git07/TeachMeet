@@ -49,6 +49,7 @@ interface BaseActivityItem {
   statusLabel?: string;
   isImportant?: boolean;
   link?: string;
+  endTs?: number;
 }
 
 export interface JoinRequestActivityItem extends BaseActivityItem {
@@ -94,6 +95,7 @@ export default function HomePage() {
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   const managedSubsRef = useRef<Record<string, () => void>>({});
   const enrolledSubsRef = useRef<Record<string, () => void>>({});
@@ -103,11 +105,18 @@ export default function HomePage() {
   const [allClassroomIds, setAllClassroomIds] = useState<Record<string, { title: string, role: 'teacher' | 'student' }>>({});
 
   useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000); // Sync every 30 seconds
+    return () => clearInterval(timer);
+  }, []);
+
+  // 1. Identify all classrooms the user is involved in (as teacher or student)
+  useEffect(() => {
     if (!user || !isAuthenticated) {
         setAllClassroomIds({});
         return;
     }
 
+    // Listen to classrooms user owns/manages
     const unsubManaged = onSnapshot(
         query(collection(db, 'classrooms'), where('teacherId', '==', user.uid)),
         (snap) => {
@@ -121,6 +130,7 @@ export default function HomePage() {
         }
     );
 
+    // Listen to classrooms user is enrolled in
     const unsubEnrolled = onSnapshot(
         query(collection(db, 'users', user.uid, 'enrolled')),
         (snap) => {
@@ -142,12 +152,14 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated]);
 
+  // 2. Set up real-time listeners for all identified classrooms
   useEffect(() => {
     if (!user || !isAuthenticated || Object.keys(allClassroomIds).length === 0) return;
 
     Object.keys(allClassroomIds).forEach(classId => {
         const classInfo = allClassroomIds[classId];
         
+        // Listen for new content (Materials, Announcements, Exams, Assignments)
         const categories: {cat: ActivityItemType, col: string, order: string}[] = [
             { cat: 'assignment', col: 'assignments', order: 'dueDate' },
             { cat: 'material', col: 'materials', order: 'uploadedAt' },
@@ -168,8 +180,12 @@ export default function HomePage() {
                             const updatedTs = data.updatedAt?.toMillis() || startTs;
                             
                             let statusLabel = cat === 'exam' ? 'Exam' : 'New';
-                            if (cat === 'exam' && endTs && Date.now() > endTs) {
-                                statusLabel = "Exam paper ready to see";
+                            if (cat === 'exam') {
+                                if (endTs && Date.now() > endTs) {
+                                    statusLabel = "Exam paper ready to see";
+                                } else if (updatedTs > startTs + 5000) {
+                                    statusLabel = "Rescheduled";
+                                }
                             } else if (updatedTs > startTs + 5000) {
                                 statusLabel = "Updated";
                             }
@@ -199,6 +215,7 @@ export default function HomePage() {
             }
         });
 
+        // If user is a teacher, listen for join requests and submissions
         if (classInfo.role === 'teacher') {
             const jrKey = `join-${classId}`;
             if (!managedSubsRef.current[jrKey]) {
@@ -215,6 +232,7 @@ export default function HomePage() {
                 });
             }
 
+            // Listen for new submissions in this classroom
             const subKey = `subs-${classId}`;
             if (!submissionSubsRef.current[subKey]) {
                 submissionSubsRef.current[subKey] = onSnapshot(
@@ -231,6 +249,7 @@ export default function HomePage() {
                                     (subSnap) => {
                                         const subItems = subSnap.docs.map(sDoc => {
                                             const sData = sDoc.data();
+                                            // Only notify about ungraded work
                                             if (sData.grade != null) return null;
 
                                             return {
@@ -266,6 +285,7 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated, allClassroomIds]);
 
+  // 3. Listen for personal documents and recordings
   useEffect(() => {
     if (!user || !isAuthenticated) return;
 
@@ -303,6 +323,7 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated]);
 
+  // 4. Combine and filter all activity
   const allActivity = useMemo(() => {
     if (!user) return [];
     
@@ -326,18 +347,34 @@ export default function HomePage() {
     const combined = [...ongoingMeetings, ...firestoreActivity]
         .filter(item => {
             if (!item || dismissed.includes(item.id)) return false;
+            // Purge deleted classrooms
             if (item.classroomId && !allClassroomIds[item.classroomId]) return false;
             return true;
         })
+        .map(item => {
+            // Contextual final check for labels based on current clock
+            if (item.type === 'exam') {
+                const endTs = item.endTs;
+                if (endTs && currentTime.getTime() > endTs) {
+                    return {
+                        ...item,
+                        statusLabel: "Exam paper ready to see",
+                        isImportant: true
+                    };
+                }
+            }
+            return item;
+        })
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
+    // Dedup
     const unique = combined.reduce((acc: ActivityItem[], current) => {
         if (!acc.find(item => item.id === current.id)) acc.push(current);
         return acc;
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, activityChunks, validMeetings, allClassroomIds]);
+  }, [user, activityChunks, validMeetings, allClassroomIds, currentTime]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);
@@ -348,6 +385,7 @@ export default function HomePage() {
     const dismissed = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify([...dismissed, id]));
     
+    // Optimistic local update
     setActivityChunks(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(k => {
@@ -395,7 +433,7 @@ export default function HomePage() {
                         <div key={item.id} className="flex items-center gap-2 group animate-fade-in">
                             <Link href={link} className={cn(
                                 "flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm",
-                                item.isImportant && "border-primary/30 bg-primary/5"
+                                item.isImportant && "border-primary/30 bg-primary/5 ring-1 ring-primary/20"
                             )}>
                                 <div className={cn(
                                     "p-2 rounded-full shrink-0",
@@ -409,7 +447,7 @@ export default function HomePage() {
                                     <Icon className="h-4 w-4" />
                                 </div>
                                 <div className="flex flex-col truncate">
-                                    <span className="text-sm font-medium truncate">
+                                    <span className={cn("text-sm truncate", item.isImportant ? "font-bold text-foreground" : "font-medium")}>
                                         {displayTitle}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">

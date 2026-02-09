@@ -113,13 +113,13 @@ export default function ExamResultPage() {
 
         // Title
         doc.setFontSize(22);
-        doc.setTextColor(50, 205, 50); // Primary color
+        doc.setTextColor(50, 205, 50); // Primary color (RGB for TeachMeet green)
         doc.text("TeachMeet Exam Result", margin, y);
         y += 15;
 
         // Candidate Info
         doc.setFontSize(12);
-        doc.setTextColor(100);
+        doc.setTextColor(100, 100, 100);
         doc.text(`Candidate: ${submission.studentName}`, margin, y);
         y += 8;
         doc.text(`Exam: ${exam.title}`, margin, y);
@@ -128,7 +128,7 @@ export default function ExamResultPage() {
         // Score Card
         doc.setFillColor(245, 245, 245);
         doc.rect(margin, y, 170, 30, 'F');
-        doc.setTextColor(0);
+        doc.setTextColor(0, 0, 0);
         doc.setFontSize(14);
         doc.text("Assessment Summary", margin + 5, y + 10);
         doc.setFontSize(12);
@@ -142,7 +142,7 @@ export default function ExamResultPage() {
             doc.text("Teacher Feedback:", margin, y);
             y += 8;
             doc.setFontSize(11);
-            doc.setTextColor(80);
+            doc.setTextColor(80, 80, 80);
             const splitFeedback = doc.splitTextToSize(`"${submission.feedback}"`, 170);
             doc.text(splitFeedback, margin, y);
             y += (splitFeedback.length * 6) + 15;
@@ -151,7 +151,7 @@ export default function ExamResultPage() {
         // Questions (if available)
         if (exam.type === 'text' && submission.results) {
             doc.setFontSize(14);
-            doc.setTextColor(0);
+            doc.setTextColor(0, 0, 0);
             doc.text("Detailed breakdown:", margin, y);
             y += 10;
 
@@ -161,17 +161,15 @@ export default function ExamResultPage() {
                     y = 20;
                 }
                 doc.setFontSize(10);
-                doc.setTextColor(0);
+                doc.setTextColor(0, 0, 0);
                 doc.text(`${i + 1}. ${res.question}`, margin, y);
                 y += 6;
-                // Fix: pass separate RGB values instead of an array
-                const r = res.isCorrect ? 0 : 200;
-                const g = res.isCorrect ? 150 : 0;
-                const b = 0;
-                doc.setTextColor(r, g, b);
+                // Correct way to set text color in RGB
+                if (res.isCorrect) doc.setTextColor(0, 150, 0);
+                else doc.setTextColor(200, 0, 0);
                 doc.text(`   Status: ${res.isCorrect ? 'Correct' : 'Incorrect'}`, margin, y);
                 y += 5;
-                doc.setTextColor(100);
+                doc.setTextColor(100, 100, 100);
                 doc.text(`   Student Answer: ${res.studentAnswer || 'N/A'}`, margin, y);
                 y += 5;
                 doc.text(`   Correct Answer: ${res.correctAnswer}`, margin, y);

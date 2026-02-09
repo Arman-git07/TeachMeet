@@ -32,8 +32,8 @@ export function SubjectTeachers() {
         <DialogContent className="sm:max-w-md">
             <DialogHeader className="pb-4 border-b">
                 <DialogTitle className="text-xl font-bold">Subject Teachers</DialogTitle>
-                <DialogDescription>
-                    List of educators specializing in different subjects for this classroom.
+                <DialogDescription className="text-xs font-bold text-primary">
+                    Teacher and creator of class can only edit this.
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[60vh]">
