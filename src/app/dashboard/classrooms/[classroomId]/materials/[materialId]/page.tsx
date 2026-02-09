@@ -109,7 +109,7 @@ export default function MaterialViewerPage() {
                     <CardHeader className="py-3 border-b bg-muted/20 flex flex-row items-center justify-between shrink-0">
                         <CardTitle className="text-sm flex items-center gap-2">
                             {material.type === 'file' ? <FileText className="h-4 w-4 text-primary" /> : <Globe className="h-4 w-4 text-accent" />}
-                            {material.type === 'file' ? 'File Content' : 'Website Preview'}
+                            Class Material posted by {material.uploaderName}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="flex-1 p-0 overflow-auto bg-white">
