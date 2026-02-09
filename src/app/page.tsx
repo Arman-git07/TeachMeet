@@ -18,7 +18,8 @@ import {
   BookOpen, 
   ClipboardList, 
   ClipboardCheck, 
-  Bell 
+  Bell,
+  CheckCircle2
 } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,7 +35,8 @@ export type ActivityItemType =
   | 'joinRequest' 
   | 'assignment' 
   | 'material' 
-  | 'exam';
+  | 'exam'
+  | 'submission';
 
 interface BaseActivityItem {
   id: string;
@@ -47,6 +49,7 @@ interface BaseActivityItem {
   isUpdated?: boolean;
   statusLabel?: string;
   isImportant?: boolean;
+  link?: string;
 }
 
 export interface JoinRequestActivityItem extends BaseActivityItem {
@@ -70,6 +73,7 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   assignment: ClipboardList,
   material: BookOpen,
   exam: ClipboardCheck,
+  submission: CheckCircle2
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
@@ -82,6 +86,7 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   assignment: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   material: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   exam: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
+  submission: (id, item) => item.link || `/dashboard/classrooms/${item.classroomId}`,
 };
 
 export default function HomePage() {
@@ -97,169 +102,199 @@ export default function HomePage() {
   const submissionSubsRef = useRef<Record<string, () => void>>({});
   const personalSubsRef = useRef<(() => void)[]>([]);
 
-  // 0. Update ticker for time-sensitive notifications (Exams ending)
+  // Track classrooms where the user has any management or student role
+  const [allClassroomIds, setAllClassroomIds] = useState<Record<string, { title: string, role: 'teacher' | 'student' }>>({});
+
   useEffect(() => {
     setCurrentTime(Date.now());
     const ticker = setInterval(() => setCurrentTime(Date.now()), 60000);
     return () => clearInterval(ticker);
   }, []);
 
-  // 1. Listen to Classrooms where user is Teacher (Managed)
+  // 1. Discover all relevant classrooms (Managed and Enrolled)
   useEffect(() => {
     if (!user || !isAuthenticated) {
-        setActivityChunks({});
+        setAllClassroomIds({});
         return;
     }
 
-    const q = query(collection(db, 'classrooms'), where('teacherId', '==', user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
-        const currentIds = snapshot.docs.map(d => d.id);
-        
-        Object.keys(managedSubsRef.current).forEach(id => {
-            if (!currentIds.includes(id)) {
-                managedSubsRef.current[id]();
-                delete managedSubsRef.current[id];
-                setActivityChunks(prev => {
-                    const next = { ...prev };
-                    delete next[`join-${id}`];
-                    return next;
+    const unsubManaged = onSnapshot(
+        query(collection(db, 'classrooms'), where('teacherId', '==', user.uid)),
+        (snap) => {
+            setAllClassroomIds(prev => {
+                const next = { ...prev };
+                snap.docs.forEach(d => {
+                    next[d.id] = { title: d.data().title, role: 'teacher' };
                 });
-            }
-        });
+                return next;
+            });
+        }
+    );
 
-        snapshot.docs.forEach(classDoc => {
-            const classId = classDoc.id;
-            const classTitle = classDoc.data().title;
+    const unsubEnrolled = onSnapshot(
+        query(collection(db, 'users', user.uid, 'enrolled')),
+        (snap) => {
+            setAllClassroomIds(prev => {
+                const next = { ...prev };
+                snap.docs.forEach(d => {
+                    // Only set as student if not already a teacher (teacher has higher priority)
+                    if (!next[d.id]) {
+                        next[d.id] = { title: d.data().title, role: 'student' };
+                    }
+                });
+                return next;
+            });
+        }
+    );
 
-            if (!managedSubsRef.current[classId]) {
-                managedSubsRef.current[classId] = onSnapshot(
-                    collection(db, 'classrooms', classId, 'joinRequests'), 
-                    (reqSnap) => {
-                        const items = reqSnap.docs.map(doc => ({
-                            id: `join-${classId}-${doc.id}`,
-                            type: 'joinRequest',
-                            title: classTitle,
-                            timestamp: doc.data().requestedAt?.toMillis() || Date.now(),
-                            classroomId: classId,
-                            requesterName: doc.data().studentName || 'A new user'
-                        } as JoinRequestActivityItem));
-                        
-                        setActivityChunks(prev => ({ ...prev, [`join-${classId}`]: items }));
+    return () => {
+        unsubManaged();
+        unsubEnrolled();
+    };
+  }, [user, isAuthenticated]);
+
+  // 2. Listen to Activity in all discovered classrooms
+  useEffect(() => {
+    if (!user || !isAuthenticated || Object.keys(allClassroomIds).length === 0) return;
+
+    Object.keys(allClassroomIds).forEach(classId => {
+        const classInfo = allClassroomIds[classId];
+        
+        // Setup listeners for assignments, materials, announcements, exams
+        const categories: {cat: ActivityItemType, col: string, order: string}[] = [
+            { cat: 'assignment', col: 'assignments', order: 'dueDate' },
+            { cat: 'material', col: 'materials', order: 'uploadedAt' },
+            { cat: 'announcement', col: 'announcements', order: 'createdAt' },
+            { cat: 'exam', col: 'exams', order: 'startDate' }
+        ];
+
+        categories.forEach(({ cat, col, order }) => {
+            const key = `${cat}-${classId}`;
+            if (!enrolledSubsRef.current[key]) {
+                enrolledSubsRef.current[key] = onSnapshot(
+                    query(collection(db, 'classrooms', classId, col), orderBy(order, 'desc'), limit(5)),
+                    (snap) => {
+                        const items = snap.docs.map(d => {
+                            const data = d.data();
+                            
+                            if (cat === 'announcement' && data.vanishAt && data.vanishAt.toDate() < new Date()) {
+                                return null;
+                            }
+
+                            const startTs = (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now();
+                            const endTs = data.endDate?.toMillis() || 0;
+                            const updatedTs = data.updatedAt?.toMillis() || startTs;
+                            
+                            let statusLabel = cat === 'exam' ? 'Exam' : 'New';
+                            let isUpdated = updatedTs > startTs + 5000;
+
+                            if (cat === 'exam') {
+                                if (endTs && Date.now() > endTs) {
+                                    statusLabel = classInfo.role === 'teacher' ? "Exam Ended" : "Exam paper ready to see";
+                                    isUpdated = false;
+                                } else if (isUpdated) {
+                                    statusLabel = "Rescheduled";
+                                }
+                            } else if (isUpdated) {
+                                statusLabel = "Updated";
+                            }
+
+                            return {
+                                id: `${cat}-${d.id}`,
+                                type: cat,
+                                title: cat === 'announcement' ? (data.text?.substring(0, 50) || 'New Voice Announcement') : (data.title || data.name),
+                                timestamp: startTs,
+                                updatedAt: updatedTs,
+                                isUpdated: isUpdated,
+                                statusLabel: statusLabel,
+                                classroomId: classId,
+                                classroomName: classInfo.title,
+                                endTs: endTs,
+                                isImportant: cat === 'exam' && endTs && Date.now() > endTs
+                            };
+                        }).filter(i => i !== null) as ActivityItem[];
+
+                        setActivityChunks(prev => ({ ...prev, [key]: items }));
+                    },
+                    (err) => {
+                        console.warn(`Listener failed for ${key}`, err);
+                        setActivityChunks(prev => { const next = {...prev}; delete next[key]; return next; });
                     }
                 );
             }
         });
-    });
 
-    return () => {
-        unsub();
-        Object.values(managedSubsRef.current).forEach(u => u());
-        managedSubsRef.current = {};
-    };
-  }, [user, isAuthenticated]);
-
-  // 2. Listen to Enrolled Classrooms (Assignments, Materials, etc.)
-  useEffect(() => {
-    if (!user || !isAuthenticated) return;
-
-    const q = query(collection(db, 'users', user.uid, 'enrolled'));
-    const unsub = onSnapshot(q, (snapshot) => {
-        const currentIds = snapshot.docs.map(d => d.id);
-
-        Object.keys(enrolledSubsRef.current).forEach(key => {
-            const classId = key.split('-').pop()!;
-            if (!currentIds.includes(classId)) {
-                enrolledSubsRef.current[key]();
-                delete enrolledSubsRef.current[key];
-                if (submissionSubsRef.current[classId]) {
-                    submissionSubsRef.current[classId]();
-                    delete submissionSubsRef.current[classId];
-                }
-                setActivityChunks(prev => {
-                    const next = { ...prev };
-                    delete next[key];
-                    return next;
+        // 3. Teacher-Specific: Join Requests and Submissions
+        if (classInfo.role === 'teacher') {
+            const jrKey = `join-${classId}`;
+            if (!managedSubsRef.current[jrKey]) {
+                managedSubsRef.current[jrKey] = onSnapshot(collection(db, 'classrooms', classId, 'joinRequests'), (snap) => {
+                    const items = snap.docs.map(doc => ({
+                        id: `join-${classId}-${doc.id}`,
+                        type: 'joinRequest',
+                        title: classInfo.title,
+                        timestamp: doc.data().requestedAt?.toMillis() || Date.now(),
+                        classroomId: classId,
+                        requesterName: doc.data().studentName || 'A new user'
+                    } as JoinRequestActivityItem));
+                    setActivityChunks(prev => ({ ...prev, [jrKey]: items }));
                 });
             }
-        });
 
-        snapshot.docs.forEach(enrolledDoc => {
-            const classId = enrolledDoc.id;
-            const classTitle = enrolledDoc.data().title;
+            // Listen for SUBMISSIONS across all assignments in this class
+            const subKey = `subs-${classId}`;
+            if (!submissionSubsRef.current[subKey]) {
+                submissionSubsRef.current[subKey] = onSnapshot(
+                    query(collection(db, 'classrooms', classId, 'assignments'), orderBy('createdAt', 'desc'), limit(5)),
+                    (assignmentsSnap) => {
+                        // For each recent assignment, listen to its submissions
+                        assignmentsSnap.docs.forEach(aDoc => {
+                            const aId = aDoc.id;
+                            const subPath = `classrooms/${classId}/assignments/${aId}/submissions`;
+                            const innerSubKey = `sub-listen-${aId}`;
+                            
+                            if (!submissionSubsRef.current[innerSubKey]) {
+                                submissionSubsRef.current[innerSubKey] = onSnapshot(
+                                    query(collection(db, subPath), orderBy('submittedAt', 'desc'), limit(3)),
+                                    (subSnap) => {
+                                        const subItems = subSnap.docs.map(sDoc => {
+                                            const sData = sDoc.data();
+                                            if (sData.grade != null) return null; // Don't show if already graded
 
-            const categories: {cat: ActivityItemType, col: string, order: string}[] = [
-                { cat: 'assignment', col: 'assignments', order: 'dueDate' },
-                { cat: 'material', col: 'materials', order: 'uploadedAt' },
-                { cat: 'announcement', col: 'announcements', order: 'createdAt' },
-                { cat: 'exam', col: 'exams', order: 'startDate' }
-            ];
+                                            return {
+                                                id: `sub-${sDoc.id}`,
+                                                type: 'submission',
+                                                title: `New submission from ${sData.studentName}`,
+                                                timestamp: sData.submittedAt?.toMillis() || Date.now(),
+                                                classroomId: classId,
+                                                classroomName: classInfo.title,
+                                                statusLabel: "Needs Grading",
+                                                link: `/dashboard/classrooms/${classId}/assignments/${aId}/check/${sData.studentId}`
+                                            } as ActivityItem;
+                                        }).filter(i => i !== null) as ActivityItem[];
 
-            categories.forEach(({ cat, col, order }) => {
-                const key = `${cat}-${classId}`;
-                if (!enrolledSubsRef.current[key]) {
-                    enrolledSubsRef.current[key] = onSnapshot(
-                        query(collection(db, 'classrooms', classId, col), orderBy(order, 'desc'), limit(5)),
-                        (snap) => {
-                            const items = snap.docs.map(d => {
-                                const data = d.data();
-                                
-                                if (cat === 'announcement' && data.vanishAt && data.vanishAt.toDate() < new Date()) {
-                                    return null;
-                                }
-
-                                const startTs = (data.createdAt || data.uploadedAt || data.startDate)?.toMillis() || Date.now();
-                                const endTs = data.endDate?.toMillis() || 0;
-                                const updatedTs = data.updatedAt?.toMillis() || startTs;
-                                
-                                let statusLabel = cat === 'exam' ? 'Exam' : 'New';
-                                let isUpdated = updatedTs > startTs + 5000;
-
-                                if (cat === 'exam') {
-                                    if (endTs && Date.now() > endTs) {
-                                        statusLabel = "Exam Ended";
-                                        isUpdated = false;
-                                    } else if (isUpdated) {
-                                        statusLabel = "Rescheduled";
+                                        setActivityChunks(prev => ({ ...prev, [`sub-items-${aId}`]: subItems }));
                                     }
-                                } else if (isUpdated) {
-                                    statusLabel = "Updated";
-                                }
-
-                                return {
-                                    id: `${cat}-${d.id}`,
-                                    type: cat,
-                                    title: cat === 'announcement' ? (data.text?.substring(0, 50) || 'New Voice Announcement') : (data.title || data.name),
-                                    timestamp: startTs,
-                                    updatedAt: updatedTs,
-                                    isUpdated: isUpdated,
-                                    statusLabel: statusLabel,
-                                    classroomId: classId,
-                                    classroomName: classTitle,
-                                    endTs: endTs,
-                                    isImportant: cat === 'exam' && endTs && Date.now() > endTs
-                                };
-                            }).filter(i => i !== null) as ActivityItem[];
-
-                            setActivityChunks(prev => ({ ...prev, [key]: items }));
-                        },
-                        (err) => {
-                            console.warn(`Listener failed for ${key}, removing chunk.`, err);
-                            setActivityChunks(prev => { const next = {...prev}; delete next[key]; return next; });
-                        }
-                    );
-                }
-            });
-        });
+                                );
+                            }
+                        });
+                    }
+                );
+            }
+        }
     });
 
     return () => {
-        unsub();
         Object.values(enrolledSubsRef.current).forEach(u => u());
+        Object.values(managedSubsRef.current).forEach(u => u());
+        Object.values(submissionSubsRef.current).forEach(u => u());
         enrolledSubsRef.current = {};
+        managedSubsRef.current = {};
+        submissionSubsRef.current = {};
     };
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, allClassroomIds]);
 
-  // 3. Listen to Personal Library
+  // 4. Listen to Personal Library
   useEffect(() => {
     if (!user || !isAuthenticated) return;
 
@@ -297,7 +332,7 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated]);
 
-  // 4. Logical Meeting Validator
+  // 5. Logical Meeting Validator
   useEffect(() => {
     if (!user || !isAuthenticated) return;
     const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
@@ -348,8 +383,10 @@ export default function HomePage() {
             const newItem = { ...item };
             if (newItem.type === 'exam') {
                 const exam = examsFromChunks.find(e => `exam-${e.rawId}` === newItem.id);
-                if (exam && currentTime > exam.endTs) {
-                    newItem.statusLabel = "Exam paper ready to see";
+                if (exam && Date.now() > exam.endTs) {
+                    const classId = newItem.classroomId;
+                    const role = classId ? allClassroomIds[classId]?.role : 'student';
+                    newItem.statusLabel = role === 'teacher' ? "Exam Session Ended" : "Exam paper ready to see";
                     newItem.isImportant = true;
                 }
             }
@@ -363,7 +400,7 @@ export default function HomePage() {
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, firestoreActivity, validMeetings, currentTime, examsFromChunks]);
+  }, [user, firestoreActivity, validMeetings, examsFromChunks, allClassroomIds]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);
@@ -412,7 +449,7 @@ export default function HomePage() {
                         if (item.type === 'joinRequest') {
                             displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
                         } else if (item.classroomName) {
-                            displayTitle = `${label} ${item.type === 'exam' ? '' : item.type} in ${item.classroomName}`;
+                            displayTitle = `${label} ${item.type === 'exam' || item.type === 'submission' ? '' : item.type} in ${item.classroomName}`;
                         } else {
                             displayTitle = `${item.title}`;
                         }
@@ -429,6 +466,7 @@ export default function HomePage() {
                                     item.type === 'assignment' ? "bg-red-100 text-red-600" :
                                     item.type === 'material' ? "bg-blue-100 text-blue-600" :
                                     item.type === 'exam' ? "bg-purple-100 text-purple-600" :
+                                    item.type === 'submission' ? "bg-green-100 text-green-600" :
                                     "bg-accent/10 text-accent"
                                 )}>
                                     <Icon className="h-4 w-4" />

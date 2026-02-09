@@ -164,7 +164,11 @@ export default function ExamResultPage() {
                 doc.setTextColor(0);
                 doc.text(`${i + 1}. ${res.question}`, margin, y);
                 y += 6;
-                doc.setTextColor(res.isCorrect ? [0, 150, 0] : [200, 0, 0]);
+                // Fix: pass separate RGB values instead of an array
+                const r = res.isCorrect ? 0 : 200;
+                const g = res.isCorrect ? 150 : 0;
+                const b = 0;
+                doc.setTextColor(r, g, b);
                 doc.text(`   Status: ${res.isCorrect ? 'Correct' : 'Incorrect'}`, margin, y);
                 y += 5;
                 doc.setTextColor(100);
@@ -244,7 +248,7 @@ export default function ExamResultPage() {
                                     <X className="mr-2 h-4 w-4" /> Cancel
                                 </Button>
                                 <Button size="sm" onClick={handleSaveEdits} disabled={isSaving} className="btn-gel rounded-lg">
-                                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                                     Save Changes
                                 </Button>
                             </>
