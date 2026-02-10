@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -299,12 +298,19 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                         
                         {classroom.paymentDetails?.qrCodeUrl && (
                             <div className="space-y-4 text-center">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] block">Scan via Payment App</Label>
-                                <div className="p-4 border-2 border-primary/10 rounded-3xl inline-block bg-white shadow-xl relative group">
-                                    <div className="absolute inset-0 bg-primary/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                                    <Image src={classroom.paymentDetails.qrCodeUrl} alt="Payment QR Code" width={220} height={220} className="rounded-xl relative z-10" data-ai-hint="qr code"/>
+                                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] block">Scan QR Code</Label>
+                                <div className="p-4 border-2 border-primary/10 rounded-3xl inline-block bg-white shadow-xl relative group overflow-hidden">
+                                    <div className="relative w-[200px] h-[200px]">
+                                        <Image 
+                                            src={classroom.paymentDetails.qrCodeUrl} 
+                                            alt="Payment QR Code" 
+                                            fill
+                                            style={{ objectFit: 'contain' }}
+                                            data-ai-hint="payment qr"
+                                        />
+                                    </div>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground font-bold italic opacity-60">Screenshots are saved automatically.</p>
+                                <p className="text-[10px] text-muted-foreground font-bold italic opacity-60">Save screenshot to scan in your app.</p>
                             </div>
                         )}
                     </div>
