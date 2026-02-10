@@ -237,10 +237,10 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
 
                             {/* Card 2: Assistant Teacher's own Payment Setup */}
                             {isTeacher && (
-                                <Card className="border-2 border-accent/20 bg-accent/5 rounded-2xl shadow-sm">
+                                <Card className="border-2 border-primary/20 bg-primary/5 rounded-2xl shadow-sm">
                                     <CardHeader className="pb-3">
                                         <CardTitle className="text-lg flex items-center gap-2">
-                                            <Wallet className="h-5 w-5 text-accent" /> My Receiving Details
+                                            <Wallet className="h-5 w-5 text-primary" /> My Receiving Details
                                         </CardTitle>
                                         <CardDescription className="text-xs">Provide details for the creator to pay you.</CardDescription>
                                     </CardHeader>
@@ -260,12 +260,12 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                                 type="file" 
                                                 accept="image/*" 
                                                 onChange={(e) => setTeacherQrFile(e.target.files?.[0] || null)}
-                                                className="rounded-xl h-10 bg-background file:rounded-full file:border-0 file:text-xs file:bg-accent/10 file:text-accent cursor-pointer" 
+                                                className="rounded-xl h-10 bg-background file:rounded-full file:border-0 file:text-xs file:bg-primary/10 file:text-primary cursor-pointer" 
                                             />
                                         </div>
                                         <Button 
                                             onClick={handleSaveTeacherPaymentInfo} 
-                                            className="w-full bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl"
+                                            className="w-full btn-gel rounded-xl"
                                             disabled={isUpdating}
                                         >
                                             {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
