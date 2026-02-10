@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useClassroom } from '@/contexts/ClassroomContext';
-import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,12 +16,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle, Briefcase } from 'lucide-react';
+import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle, Briefcase, Save, Upload } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SubjectTeacher } from './SubjectTeachers';
+import type { SubjectTeacher } from './SubjectTeachers';
 
 const feeSchema = z.object({
   amount: z.coerce.number().positive({ message: "Amount must be positive." }),
@@ -41,16 +40,20 @@ interface FeesAndPaymentProps {
 
 export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     const { classroom, classroomId, user, userRole } = useClassroom();
-    const canUserManage = canManage(userRole);
     const { toast } = useToast();
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isPayNowOpen, setIsPayNowOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     
-    // Teacher Payroll States
+    // Teacher States
     const [teachers, setTeachers] = useState<SubjectTeacher[]>([]);
     const [payTeacherOpen, setPayTeacherOpen] = useState<SubjectTeacher | null>(null);
+    const [teacherUpiId, setTeacherUpiId] = useState("");
+    const [teacherQrFile, setTeacherQrFile] = useState<File | null>(null);
+
+    const isTeacher = userRole === 'teacher';
+    const isCreator = userRole === 'creator';
 
     const feeForm = useForm<z.infer<typeof feeSchema>>({ 
         resolver: zodResolver(feeSchema), 
@@ -68,10 +71,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         } 
     });
 
-    const isTeacher = userRole === 'teacher';
-    const isCreator = userRole === 'creator';
-
-    // Fetch teachers for payroll
+    // Fetch teachers for payroll (Creator only)
     useEffect(() => {
         if (!classroomId || !isCreator) return;
         const q = query(collection(db, `classrooms/${classroomId}/teachers`), orderBy('addedAt', 'desc'));
@@ -79,6 +79,17 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             setTeachers(snap.docs.map(d => ({ teacherId: d.id, ...d.data() } as SubjectTeacher)));
         });
     }, [classroomId, isCreator]);
+
+    // Fetch personal profile for assistant teachers to populate UPI
+    useEffect(() => {
+        if (!classroomId || !user || !isTeacher) return;
+        const teacherRef = doc(db, 'classrooms', classroomId, 'teachers', user.uid);
+        return onSnapshot(teacherRef, (snap) => {
+            if (snap.exists()) {
+                setTeacherUpiId(snap.data().upiId || "");
+            }
+        });
+    }, [classroomId, user, isTeacher]);
 
     const currencySymbols = useMemo(() => ({
         INR: <IndianRupee className="h-6 w-6" />, 
@@ -148,6 +159,30 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         }
     }, [classroomId, classroom?.paymentDetails?.qrCodeUrl, toast]);
 
+    const handleSaveTeacherPaymentInfo = async () => {
+        if (!user || !classroomId || !isTeacher) return;
+        setIsUpdating(true);
+        try {
+            let qrCodeUrl = "";
+            if (teacherQrFile) {
+                const qrRef = storageRef(storage, `classrooms/${classroomId}/teacherPayments/${user.uid}/qr.png`);
+                await uploadBytes(qrRef, teacherQrFile);
+                qrCodeUrl = await getDownloadURL(qrRef);
+            }
+
+            const teacherRef = doc(db, 'classrooms', classroomId, 'teachers', user.uid);
+            const updateData: any = { upiId: teacherUpiId };
+            if (qrCodeUrl) updateData.qrCodeUrl = qrCodeUrl;
+            
+            await updateDoc(teacherRef, updateData);
+            toast({ title: "Details Saved", description: "The Classroom Creator can now pay you directly." });
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Save Failed" });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
     if (!classroom) return null;
 
     return (
@@ -156,15 +191,16 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Classroom Finances</DialogTitle>
-                        <DialogDescription>View fees and manage payroll for this classroom.</DialogDescription>
+                        <DialogDescription>View fees and manage payments for this classroom.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] -mx-6 px-6">
                         <div className="space-y-6 py-4">
+                            {/* Card 1: Student Fee Summary */}
                             <Card className="border shadow-sm rounded-xl">
                                 <CardHeader className="pb-3">
                                     <div className="flex justify-between items-center">
                                         <CardTitle className="text-xl">Fee Summary</CardTitle>
-                                        {canUserManage && (
+                                        {isCreator && (
                                             <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)} className="rounded-full">
                                                 <Settings className="h-5 w-5 text-muted-foreground" />
                                             </Button>
@@ -185,7 +221,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                         <Alert className="mt-6 border-green-200 bg-green-50 text-green-800 rounded-xl">
                                             <CheckCircle className="h-4 w-4 text-green-600" />
                                             <AlertDescription className="text-xs font-medium">
-                                                As a teacher, you are exempt from classroom fees. The creator will pay you directly.
+                                                Assistant teachers are exempt from classroom fees.
                                             </AlertDescription>
                                         </Alert>
                                     ) : (!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
@@ -204,6 +240,47 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                 </CardContent>
                             </Card>
 
+                            {/* Card 2: Assistant Teacher's own Payment Setup */}
+                            {isTeacher && (
+                                <Card className="border-2 border-accent/20 bg-accent/5 rounded-2xl shadow-sm">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Wallet className="h-5 w-5 text-accent" /> My Receiving Details
+                                        </CardTitle>
+                                        <CardDescription className="text-xs">Provide details for the creator to pay you.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold">My UPI ID</Label>
+                                            <Input 
+                                                value={teacherUpiId} 
+                                                onChange={(e) => setTeacherUpiId(e.target.value)} 
+                                                placeholder="name@bank" 
+                                                className="rounded-xl h-10 bg-background" 
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold">My QR Code (Optional)</Label>
+                                            <Input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={(e) => setTeacherQrFile(e.target.files?.[0] || null)}
+                                                className="rounded-xl h-10 bg-background file:rounded-full file:border-0 file:text-xs file:bg-accent/10 file:text-accent cursor-pointer" 
+                                            />
+                                        </div>
+                                        <Button 
+                                            onClick={handleSaveTeacherPaymentInfo} 
+                                            className="w-full bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl"
+                                            disabled={isUpdating}
+                                        >
+                                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
+                                            Save My Details
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Card 3: Creator's Payroll View */}
                             {isCreator && (
                                 <Card className="border-2 border-primary/10 bg-primary/5 rounded-2xl shadow-sm">
                                     <CardHeader className="pb-3">
@@ -247,63 +324,66 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Creator Control Panel</DialogTitle>
-                        <DialogDescription>Configure fees for students.</DialogDescription>
-                    </DialogHeader>
-                    <ScrollArea className="max-h-[75vh] -mx-6 px-6">
-                        <div className="space-y-8 py-6">
-                            <form onSubmit={feeForm.handleSubmit(onFeeSubmit)} className="space-y-4 p-5 border rounded-2xl bg-muted/20">
-                                <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
-                                    <IndianRupee className="h-4 w-4 text-primary" /> 1. Student Fee
-                                </h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold">Total Amount</Label>
-                                        <Input type="number" {...feeForm.register('amount')} className="rounded-xl h-11" placeholder="0.00" />
+            {/* Creator Control Panel Dialog */}
+            {isCreator && (
+                <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                    <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Creator Control Panel</DialogTitle>
+                            <DialogDescription>Configure fees for students.</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="max-h-[75vh] -mx-6 px-6">
+                            <div className="space-y-8 py-6">
+                                <form onSubmit={feeForm.handleSubmit(onFeeSubmit)} className="space-y-4 p-5 border rounded-2xl bg-muted/20">
+                                    <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
+                                        <IndianRupee className="h-4 w-4 text-primary" /> 1. Student Fee
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold">Total Amount</Label>
+                                            <Input type="number" {...feeForm.register('amount')} className="rounded-xl h-11" placeholder="0.00" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold">Currency</Label>
+                                            <Controller name="currency" control={feeForm.control} render={({ field }) => (
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <SelectTrigger className="rounded-xl h-11"><SelectValue/></SelectTrigger>
+                                                    <SelectContent className="rounded-xl">
+                                                        <SelectItem value="INR">INR (₹)</SelectItem>
+                                                        <SelectItem value="USD">USD ($)</SelectItem>
+                                                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                                                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )} />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold">Currency</Label>
-                                        <Controller name="currency" control={feeForm.control} render={({ field }) => (
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <SelectTrigger className="rounded-xl h-11"><SelectValue/></SelectTrigger>
-                                                <SelectContent className="rounded-xl">
-                                                    <SelectItem value="INR">INR (₹)</SelectItem>
-                                                    <SelectItem value="USD">USD ($)</SelectItem>
-                                                    <SelectItem value="EUR">EUR (€)</SelectItem>
-                                                    <SelectItem value="GBP">GBP (£)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        )} />
-                                    </div>
-                                </div>
-                                <Button type="submit" size="sm" className="w-full rounded-xl" disabled={isUpdating}>Save Amount</Button>
-                            </form>
+                                    <Button type="submit" size="sm" className="w-full rounded-xl" disabled={isUpdating}>Save Amount</Button>
+                                </form>
 
-                            <form onSubmit={paymentDetailsForm.handleSubmit(onPaymentDetailsSubmit)} className="space-y-5 p-5 border-2 border-primary/20 rounded-2xl bg-primary/5">
-                                <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-primary">
-                                    <Copy className="h-4 w-4" /> 2. Creator Payment Details
-                                </h4>
-                                <p className="text-[11px] leading-relaxed text-muted-foreground font-medium">Add your UPI or QR so students can pay the classroom fee.</p>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-bold">Your UPI ID</Label>
-                                    <Input {...paymentDetailsForm.register('upiId')} placeholder="e.g. name@bank" className="rounded-xl h-11 bg-background" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-bold">Your QR Code</Label>
-                                    <Input type="file" accept="image/*" {...paymentDetailsForm.register('qrCode')} className="rounded-xl h-11 bg-background file:rounded-full file:border-0 file:text-xs file:bg-primary/10 file:text-primary cursor-pointer" />
-                                </div>
-                                <Button type="submit" className="w-full btn-gel h-12 text-base rounded-xl" disabled={isUpdating}>
-                                    {isUpdating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                                    Update Creator Gateway
-                                </Button>
-                            </form>
-                        </div>
-                    </ScrollArea>
-                </DialogContent>
-            </Dialog>
+                                <form onSubmit={paymentDetailsForm.handleSubmit(onPaymentDetailsSubmit)} className="space-y-5 p-5 border-2 border-primary/20 rounded-2xl bg-primary/5">
+                                    <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-primary">
+                                        <Copy className="h-4 w-4" /> 2. Creator Payment Details
+                                    </h4>
+                                    <p className="text-[11px] leading-relaxed text-muted-foreground font-medium">Add your UPI or QR so students can pay the classroom fee.</p>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold">Your UPI ID</Label>
+                                        <Input {...paymentDetailsForm.register('upiId')} placeholder="e.g. name@bank" className="rounded-xl h-11 bg-background" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold">Your QR Code</Label>
+                                        <Input type="file" accept="image/*" {...paymentDetailsForm.register('qrCode')} className="rounded-xl h-11 bg-background file:rounded-full file:border-0 file:text-xs file:bg-primary/10 file:text-primary cursor-pointer" />
+                                    </div>
+                                    <Button type="submit" className="w-full btn-gel h-12 text-base rounded-xl" disabled={isUpdating}>
+                                        {isUpdating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+                                        Update Creator Gateway
+                                    </Button>
+                                </form>
+                            </div>
+                        </ScrollArea>
+                    </DialogContent>
+                </Dialog>
+            )}
 
             {/* Pay Teacher Dialog (For Creator paying a Teacher) */}
             <Dialog open={!!payTeacherOpen} onOpenChange={(open) => !open && setPayTeacherOpen(null)}>
