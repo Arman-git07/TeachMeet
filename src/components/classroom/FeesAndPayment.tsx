@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet } from 'lucide-react';
+import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -62,6 +62,8 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         } 
     });
 
+    const isTeacher = userRole === 'teacher';
+
     const currencySymbols = useMemo(() => ({
         INR: <IndianRupee className="h-6 w-6" />, 
         USD: <DollarSign className="h-6 w-6" />, 
@@ -75,7 +77,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         const name = encodeURIComponent(classroom.title || "TeachMeet Classroom");
         const amount = classroom.feeAmount || 0;
         const currency = classroom.feeCurrency || "INR";
-        // Standard UPI Deep-link Protocol
         return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=${currency}&tn=${name}`;
     }, [classroom]);
 
@@ -100,11 +101,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         const hasNewFile = data.qrCode && data.qrCode.length > 0;
 
         if (!data.upiId?.trim() && !qrCodeUrl && !hasNewFile) {
-            toast({ 
-                variant: 'destructive', 
-                title: "Setup Required", 
-                description: "Please add a UPI ID or upload a QR Code so students can pay their fees." 
-            });
+            toast({ variant: 'destructive', title: "Setup Required", description: "Provide a UPI ID or upload a QR Code." });
             return;
         }
 
@@ -117,20 +114,12 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 qrCodeUrl = await getDownloadURL(qrRef);
             }
             await updateDoc(doc(db, 'classrooms', classroomId), { 
-                paymentDetails: { 
-                    upiId: data.upiId?.trim() || "", 
-                    qrCodeUrl 
-                } 
+                paymentDetails: { upiId: data.upiId?.trim() || "", qrCodeUrl } 
             });
             toast({ title: 'Payment Details Updated!' });
             setIsSettingsOpen(false);
         } catch (error: any) {
-             console.error("Failed to update payment details:", error);
-             toast({
-                variant: 'destructive',
-                title: "Update Failed",
-                description: "Could not save payment details. Please check your connection."
-             });
+             toast({ variant: 'destructive', title: "Update Failed" });
         } finally {
             setIsUpdating(false);
         }
@@ -143,7 +132,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Fees & Payment</DialogTitle>
+                        <DialogTitle>Student Fees</DialogTitle>
                         <DialogDescription>View classroom fees and settle your payments.</DialogDescription>
                     </DialogHeader>
                     <Card className="border-0 shadow-none bg-transparent">
@@ -158,7 +147,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                             </div>
                         </CardHeader>
                         <CardContent className="text-center px-0">
-                            <p className="text-muted-foreground mb-3 text-sm">Amount Outstanding</p>
+                            <p className="text-muted-foreground mb-3 text-sm">Student Fee Amount</p>
                             <div className="flex justify-center items-center gap-3">
                                 <div className="text-primary p-2 bg-primary/10 rounded-full">
                                     {currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || <IndianRupee className="h-6 w-6" />}
@@ -167,12 +156,17 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                 <Badge variant="secondary" className="font-bold px-3 py-1">{classroom.feeCurrency || 'INR'}</Badge>
                             </div>
                             
-                            {(!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
+                            {isTeacher ? (
+                                <Alert className="mt-8 border-green-200 bg-green-50 text-green-800 rounded-xl">
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    <AlertDescription className="text-xs font-medium">
+                                        As a teacher, you are exempt from classroom fees. The creator will pay you directly.
+                                    </AlertDescription>
+                                </Alert>
+                            ) : (!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
                                 <Alert className="mt-8 border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
                                     <AlertCircle className="h-4 w-4 text-amber-600" />
-                                    <AlertDescription className="text-xs font-medium">
-                                        The teacher has not yet configured a payment method for this class.
-                                    </AlertDescription>
+                                    <AlertDescription className="text-xs font-medium">The teacher has not yet configured a payment method.</AlertDescription>
                                 </Alert>
                             ) : (
                                 <Button 
@@ -190,14 +184,14 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Teacher Control Panel</DialogTitle>
-                        <DialogDescription>Configure how students settle their classroom fees.</DialogDescription>
+                        <DialogTitle>Creator Control Panel</DialogTitle>
+                        <DialogDescription>Configure fees for students.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[75vh] -mx-6 px-6">
                         <div className="space-y-8 py-6">
                             <form onSubmit={feeForm.handleSubmit(onFeeSubmit)} className="space-y-4 p-5 border rounded-2xl bg-muted/20">
                                 <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
-                                    <IndianRupee className="h-4 w-4 text-primary" /> 1. Fee Configuration
+                                    <IndianRupee className="h-4 w-4 text-primary" /> 1. Student Fee
                                 </h4>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -224,38 +218,20 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
 
                             <form onSubmit={paymentDetailsForm.handleSubmit(onPaymentDetailsSubmit)} className="space-y-5 p-5 border-2 border-primary/20 rounded-2xl bg-primary/5">
                                 <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-primary">
-                                    <Copy className="h-4 w-4" /> 2. Payment Methods
+                                    <Copy className="h-4 w-4" /> 2. Creator Payment Details
                                 </h4>
-                                
-                                <div className="flex gap-3 p-3 bg-background rounded-xl border border-primary/10 shadow-sm">
-                                    <Info className="h-5 w-5 text-primary shrink-0" />
-                                    <p className="text-[11px] leading-relaxed text-muted-foreground font-medium">
-                                        You <b>must</b> provide either a UPI ID or a QR Code. This allows students to pay you directly via their preferred banking app.
-                                    </p>
-                                </div>
-
+                                <p className="text-[11px] leading-relaxed text-muted-foreground font-medium">Add your UPI or QR so students can pay the classroom fee.</p>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold">UPI ID</Label>
+                                    <Label className="text-xs font-bold">Your UPI ID</Label>
                                     <Input {...paymentDetailsForm.register('upiId')} placeholder="e.g. name@bank" className="rounded-xl h-11 bg-background" />
                                 </div>
-                                
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold">Update QR Code</Label>
-                                    <Input type="file" accept="image/*" {...paymentDetailsForm.register('qrCode')} className="rounded-xl h-11 bg-background file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer" />
+                                    <Label className="text-xs font-bold">Your QR Code</Label>
+                                    <Input type="file" accept="image/*" {...paymentDetailsForm.register('qrCode')} className="rounded-xl h-11 bg-background file:rounded-full file:border-0 file:text-xs file:bg-primary/10 file:text-primary cursor-pointer" />
                                 </div>
-
-                                {classroom.paymentDetails?.qrCodeUrl && (
-                                    <div className="pt-2 text-center">
-                                        <p className="text-[10px] text-muted-foreground mb-3 font-black uppercase tracking-tighter">Live QR Code</p>
-                                        <div className="relative w-36 h-32 mx-auto border-2 border-dashed rounded-2xl overflow-hidden bg-white p-2">
-                                            <Image src={classroom.paymentDetails.qrCodeUrl} alt="Payment QR" layout="fill" objectFit="contain" data-ai-hint="qr code"/>
-                                        </div>
-                                    </div>
-                                )}
-                                
                                 <Button type="submit" className="w-full btn-gel h-12 text-base rounded-xl" disabled={isUpdating}>
                                     {isUpdating ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                                    Update Payment Gateway
+                                    Update Creator Gateway
                                 </Button>
                             </form>
                         </div>
@@ -267,57 +243,42 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 <DialogContent className="sm:max-w-xs rounded-3xl p-6">
                     <DialogHeader className="mb-4">
                         <DialogTitle className="text-center text-2xl font-black text-primary">Settle Payment</DialogTitle>
-                        <DialogDescription className="text-center font-medium">Pay directly to the classroom account.</DialogDescription>
+                        <DialogDescription className="text-center font-medium">Pay to the classroom account.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-6">
                         {upiUrl && (
                             <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
-                                <a href={upiUrl}>
-                                    <Wallet className="h-5 w-5" />
-                                    Open Payment App
-                                </a>
+                                <a href={upiUrl}><Wallet className="h-5 w-5" /> Open Payment App</a>
                             </Button>
                         )}
-
                         <div className="relative py-2">
                             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
                             <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-background px-2 text-muted-foreground font-bold">Or Manual Settle</span></div>
                         </div>
-
                         {classroom.paymentDetails?.upiId && (
                             <div className="space-y-3">
                                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] block text-center">Copy UPI ID</Label>
                                 <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-2xl border border-border/50">
-                                    <Input readOnly value={classroom.paymentDetails.upiId} className="bg-transparent border-none font-mono text-xs focus-visible:ring-0 shadow-none h-10 px-3" />
+                                    <Input readOnly value={classroom.paymentDetails.upiId} className="bg-transparent border-none text-xs focus-visible:ring-0 shadow-none h-10 px-3" />
                                     <Button size="icon" variant="secondary" className="rounded-xl h-10 w-10 shrink-0 shadow-sm" onClick={() => { navigator.clipboard.writeText(classroom.paymentDetails!.upiId!); toast({ title: 'UPI ID Copied!' }); }}>
                                         <Copy className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </div>
                         )}
-                        
                         {classroom.paymentDetails?.qrCodeUrl && (
                             <div className="space-y-4 text-center">
                                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] block">Scan QR Code</Label>
-                                <div className="p-4 border-2 border-primary/10 rounded-3xl inline-block bg-white shadow-xl relative group overflow-hidden">
+                                <div className="p-4 border-2 border-primary/10 rounded-3xl inline-block bg-white shadow-xl relative">
                                     <div className="relative w-[200px] h-[200px]">
-                                        <Image 
-                                            src={classroom.paymentDetails.qrCodeUrl} 
-                                            alt="Payment QR Code" 
-                                            fill
-                                            style={{ objectFit: 'contain' }}
-                                            data-ai-hint="payment qr"
-                                        />
+                                        <Image src={classroom.paymentDetails.qrCodeUrl} alt="Payment QR" fill style={{ objectFit: 'contain' }} data-ai-hint="payment qr"/>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground font-bold italic opacity-60">Save screenshot to scan in your app.</p>
                             </div>
                         )}
                     </div>
                     <div className="mt-8">
-                        <DialogClose asChild>
-                            <Button type="button" variant="outline" className="w-full rounded-2xl h-12 font-bold text-muted-foreground hover:bg-muted/50">Close Portal</Button>
-                        </DialogClose>
+                        <DialogClose asChild><Button variant="outline" className="w-full rounded-2xl h-12 font-bold text-muted-foreground">Close Portal</Button></DialogClose>
                     </div>
                 </DialogContent>
             </Dialog>

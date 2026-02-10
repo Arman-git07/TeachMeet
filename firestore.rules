@@ -104,7 +104,9 @@ service cloud.firestore {
 
       match /teachers/{teacherId} {
         allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
+        allow create, delete: if isSignedIn() && isClassroomOwner(classroomId, request.auth.uid);
+        // Allow both the classroom creator AND the teacher themselves to update their profile (e.g. for payment info)
+        allow update: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || teacherId == request.auth.uid);
       }
 
       match /messages/{messageId} {
