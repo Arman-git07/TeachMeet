@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2 } from 'lucide-react';
+import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -70,6 +70,16 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         GBP: <PoundSterling className="h-6 w-6" />,
     }), []);
 
+    const upiUrl = useMemo(() => {
+        if (!classroom?.paymentDetails?.upiId) return null;
+        const vpa = classroom.paymentDetails.upiId;
+        const name = encodeURIComponent(classroom.title || "TeachMeet Classroom");
+        const amount = classroom.feeAmount || 0;
+        const currency = classroom.feeCurrency || "INR";
+        // Standard UPI Deep-link Protocol
+        return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=${currency}&tn=${name}`;
+    }, [classroom]);
+
     const onFeeSubmit = useCallback(async (data: z.infer<typeof feeSchema>) => {
         setIsUpdating(true);
         try {
@@ -90,7 +100,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         let qrCodeUrl = classroom?.paymentDetails?.qrCodeUrl || "";
         const hasNewFile = data.qrCode && data.qrCode.length > 0;
 
-        // Requirement: At least one payment method (UPI ID or QR Code) must be provided
         if (!data.upiId?.trim() && !qrCodeUrl && !hasNewFile) {
             toast({ 
                 variant: 'destructive', 
@@ -171,7 +180,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                     className="w-full btn-gel mt-8 h-14 text-xl rounded-2xl shadow-xl hover:shadow-primary/20 transition-all" 
                                     onClick={() => setIsPayNowOpen(true)}
                                 >
-                                    Pay Now
+                                    Settle Payment
                                 </Button>
                             )}
                         </CardContent>
@@ -261,10 +270,24 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                         <DialogTitle className="text-center text-2xl font-black text-primary">Settle Payment</DialogTitle>
                         <DialogDescription className="text-center font-medium">Pay directly to the classroom account.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-8">
+                    <div className="space-y-6">
+                        {upiUrl && (
+                            <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                                <a href={upiUrl}>
+                                    <Wallet className="h-5 w-5" />
+                                    Open Payment App
+                                </a>
+                            </Button>
+                        )}
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-background px-2 text-muted-foreground font-bold">Or Manual Settle</span></div>
+                        </div>
+
                         {classroom.paymentDetails?.upiId && (
                             <div className="space-y-3">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] block text-center">Direct UPI Transfer</Label>
+                                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] block text-center">Copy UPI ID</Label>
                                 <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-2xl border border-border/50">
                                     <Input readOnly value={classroom.paymentDetails.upiId} className="bg-transparent border-none font-mono text-xs focus-visible:ring-0 shadow-none h-10 px-3" />
                                     <Button size="icon" variant="secondary" className="rounded-xl h-10 w-10 shrink-0 shadow-sm" onClick={() => { navigator.clipboard.writeText(classroom.paymentDetails!.upiId!); toast({ title: 'UPI ID Copied!' }); }}>
