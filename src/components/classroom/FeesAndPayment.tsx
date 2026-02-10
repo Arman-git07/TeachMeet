@@ -195,50 +195,45 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] -mx-6 px-6">
                         <div className="space-y-6 py-4">
-                            {/* Card 1: Student Fee Summary */}
-                            <Card className="border shadow-sm rounded-xl">
-                                <CardHeader className="pb-3">
-                                    <div className="flex justify-between items-center">
-                                        <CardTitle className="text-xl">Fee Summary</CardTitle>
-                                        {isCreator && (
-                                            <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)} className="rounded-full">
-                                                <Settings className="h-5 w-5 text-muted-foreground" />
+                            {/* Card 1: Student Fee Summary - Hidden for Subject Teachers */}
+                            {!isTeacher && (
+                                <Card className="border shadow-sm rounded-xl">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex justify-between items-center">
+                                            <CardTitle className="text-xl">Fee Summary</CardTitle>
+                                            {isCreator && (
+                                                <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)} className="rounded-full">
+                                                    <Settings className="h-5 w-5 text-muted-foreground" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="text-center">
+                                        <p className="text-muted-foreground mb-3 text-sm">Student Fee Amount</p>
+                                        <div className="flex justify-center items-center gap-3">
+                                            <div className="text-primary p-2 bg-primary/10 rounded-full">
+                                                {currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || <IndianRupee className="h-6 w-6" />}
+                                            </div>
+                                            <p className="font-black text-4xl tracking-tighter">{classroom.feeAmount?.toLocaleString() || '0.00'}</p>
+                                            <Badge variant="secondary" className="font-bold px-3 py-1">{classroom.feeCurrency || 'INR'}</Badge>
+                                        </div>
+                                        
+                                        {(!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
+                                            <Alert className="mt-6 border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
+                                                <AlertCircle className="h-4 w-4 text-amber-600" />
+                                                <AlertDescription className="text-xs font-medium">The teacher has not yet configured a payment method.</AlertDescription>
+                                            </Alert>
+                                        ) : !isCreator && (
+                                            <Button 
+                                                className="w-full btn-gel mt-6 h-12 text-lg rounded-2xl shadow-lg hover:shadow-primary/20 transition-all" 
+                                                onClick={() => setIsPayNowOpen(true)}
+                                            >
+                                                Settle Payment
                                             </Button>
                                         )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="text-center">
-                                    <p className="text-muted-foreground mb-3 text-sm">Student Fee Amount</p>
-                                    <div className="flex justify-center items-center gap-3">
-                                        <div className="text-primary p-2 bg-primary/10 rounded-full">
-                                            {currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || <IndianRupee className="h-6 w-6" />}
-                                        </div>
-                                        <p className="font-black text-4xl tracking-tighter">{classroom.feeAmount?.toLocaleString() || '0.00'}</p>
-                                        <Badge variant="secondary" className="font-bold px-3 py-1">{classroom.feeCurrency || 'INR'}</Badge>
-                                    </div>
-                                    
-                                    {isTeacher ? (
-                                        <Alert className="mt-6 border-green-200 bg-green-50 text-green-800 rounded-xl">
-                                            <CheckCircle className="h-4 w-4 text-green-600" />
-                                            <AlertDescription className="text-xs font-medium">
-                                                Assistant teachers are exempt from classroom fees.
-                                            </AlertDescription>
-                                        </Alert>
-                                    ) : (!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
-                                        <Alert className="mt-6 border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
-                                            <AlertCircle className="h-4 w-4 text-amber-600" />
-                                            <AlertDescription className="text-xs font-medium">The teacher has not yet configured a payment method.</AlertDescription>
-                                        </Alert>
-                                    ) : !isCreator && (
-                                        <Button 
-                                            className="w-full btn-gel mt-6 h-12 text-lg rounded-2xl shadow-lg hover:shadow-primary/20 transition-all" 
-                                            onClick={() => setIsPayNowOpen(true)}
-                                        >
-                                            Settle Payment
-                                        </Button>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                    </CardContent>
+                                </Card>
+                            )}
 
                             {/* Card 2: Assistant Teacher's own Payment Setup */}
                             {isTeacher && (
