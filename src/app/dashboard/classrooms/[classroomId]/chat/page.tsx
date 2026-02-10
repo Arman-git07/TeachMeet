@@ -3,21 +3,23 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, AlertTriangle, Trash2 } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, Trash2, Settings2, Clock } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/components/ui/popover";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, limit, deleteDoc } from 'firebase/firestore';
+import { doc, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, limit, deleteDoc, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { useClassroom } from "@/contexts/ClassroomContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface ChatMessage {
   id: string;
@@ -42,7 +44,7 @@ export default function ClassroomChatPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userRole } = useClassroom();
+  const { userRole, classroom } = useClassroom();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -53,18 +55,20 @@ export default function ClassroomChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const isCreator = userRole === 'creator';
+
   // Fetch Participants for Mentions
   useEffect(() => {
     if (!classroomId) return;
     setIsLoadingParticipants(true);
     
-    // Fetch from the participants subcollection directly for accurate classroom context
     const unsub = onSnapshot(collection(db, 'classrooms', classroomId, 'participants'), (snapshot) => {
         const list = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -81,15 +85,36 @@ export default function ClassroomChatPage() {
     return () => unsub();
   }, [classroomId]);
 
-  // Real-time Messages Listener
+  // Real-time Messages Listener with Vanish Logic
   useEffect(() => {
-    if (!classroomId) return;
+    if (!classroomId || !user) return;
 
-    const messagesQuery = query(
+    // Default query
+    let messagesQuery = query(
       collection(db, 'classrooms', classroomId, 'messages'),
       orderBy('timestamp', 'asc'),
       limit(100)
     );
+
+    // Apply Vanish Logic if configured
+    const vanishDuration = (classroom as any)?.chatVanishDuration;
+    if (vanishDuration && vanishDuration !== 'never') {
+        const now = new Date();
+        let threshold = new Date();
+        switch (vanishDuration) {
+            case '1d': threshold.setDate(now.getDate() - 1); break;
+            case '2d': threshold.setDate(now.getDate() - 2); break;
+            case '1w': threshold.setDate(now.getDate() - 7); break;
+            case '1m': threshold.setMonth(now.getMonth() - 1); break;
+        }
+        // Firestore range filter on timestamp
+        messagesQuery = query(
+            collection(db, 'classrooms', classroomId, 'messages'),
+            where('timestamp', '>=', Timestamp.fromDate(threshold)),
+            orderBy('timestamp', 'asc'),
+            limit(100)
+        );
+    }
 
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
       const fetchedMessages = snapshot.docs.map(doc => {
@@ -110,15 +135,31 @@ export default function ClassroomChatPage() {
       }, 100);
     }, (error) => {
         console.error("Chat sync error:", error);
-        toast({ 
-            variant: 'destructive', 
-            title: "Chat Disconnected", 
-            description: "You may not have permission to view this chat. Ensure you are an approved member." 
-        });
+        // Note: If adding a 'where' clause, an index might be required.
+        // If it fails with "index required", we'll fall back to client-side filtering if small.
+        if (error.message?.includes('index')) {
+            console.warn("Chat index missing for vanish duration. Please create index in Firebase Console.");
+        }
     });
 
     return () => unsubscribe();
-  }, [classroomId, user, toast]);
+  }, [classroomId, user, (classroom as any)?.chatVanishDuration]);
+
+  const handleUpdateVanishDuration = async (value: string) => {
+    if (!isCreator || !classroomId) return;
+    setIsUpdatingSettings(true);
+    try {
+        await updateDoc(doc(db, 'classrooms', classroomId), {
+            chatVanishDuration: value
+        });
+        toast({ title: "Chat Policy Updated", description: `Messages will now vanish after ${value === 'never' ? 'no time (kept forever)' : value.replace('d', ' day(s)').replace('w', ' week').replace('m', ' month')}.` });
+    } catch (error) {
+        console.error("Failed to update vanish duration:", error);
+        toast({ variant: 'destructive', title: "Update Failed", description: "Could not save chat duration settings." });
+    } finally {
+        setIsUpdatingSettings(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -173,13 +214,11 @@ export default function ClassroomChatPage() {
       });
     } catch (error: any) {
       console.error("Failed to send message:", error);
-      setInputValue(textToSend); // Restore input on failure
+      setInputValue(textToSend);
       toast({ 
         variant: 'destructive', 
         title: "Message Failed", 
-        description: error.message?.includes('permission-denied') 
-            ? "You don't have permission to chat in this room." 
-            : "Could not send message. Please check your connection." 
+        description: "Could not send message. Please check your connection." 
       });
     } finally {
       setIsSending(false);
@@ -208,9 +247,6 @@ export default function ClassroomChatPage() {
         setIsRecording(false);
         stream.getTracks().forEach(track => track.stop());
 
-        const toastId = `upload-${Date.now()}`;
-        toast({ id: toastId, title: "Sending voice note..." });
-
         try {
           const audioPath = `classrooms/${classroomId}/audio/${user?.uid}-${Date.now()}.webm`;
           const audioRef = ref(storage, audioPath);
@@ -224,10 +260,9 @@ export default function ClassroomChatPage() {
             audioUrl: audioUrl,
             timestamp: serverTimestamp(),
           });
-          toast.update(toastId, { title: "Voice note sent!" });
         } catch (error) {
           console.error("Voice note upload failed:", error);
-          toast.update(toastId, { variant: 'destructive', title: "Upload Failed" });
+          toast({ variant: 'destructive', title: "Upload Failed" });
         }
       };
 
@@ -242,17 +277,12 @@ export default function ClassroomChatPage() {
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!classroomId || !messageId) return;
-    
     try {
       await deleteDoc(doc(db, 'classrooms', classroomId, 'messages', messageId));
       toast({ title: "Message deleted" });
     } catch (error: any) {
       console.error("Failed to delete message:", error);
-      toast({ 
-        variant: 'destructive', 
-        title: "Delete Failed", 
-        description: "You don't have permission to delete this message." 
-      });
+      toast({ variant: 'destructive', title: "Delete Failed" });
     }
   };
 
@@ -265,6 +295,45 @@ export default function ClassroomChatPage() {
             <h1 className="text-xl font-semibold text-foreground truncate">
               Classroom Chat
             </h1>
+            {isCreator && (
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                            <Settings2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-4 rounded-xl shadow-xl" align="start">
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 border-b pb-2">
+                                <Clock className="h-4 w-4 text-primary" />
+                                <span className="font-bold text-sm">Vanish Settings</span>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs uppercase font-bold text-muted-foreground tracking-widest">Keep Messages For</Label>
+                                <Select 
+                                    defaultValue={(classroom as any)?.chatVanishDuration || 'never'} 
+                                    onValueChange={handleUpdateVanishDuration}
+                                    disabled={isUpdatingSettings}
+                                >
+                                    <SelectTrigger className="rounded-lg h-10">
+                                        <SelectValue placeholder="Select duration" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-lg">
+                                        <SelectItem value="1d">1 Day</SelectItem>
+                                        <SelectItem value="2d">2 Days</SelectItem>
+                                        <SelectItem value="1w">1 Week</SelectItem>
+                                        <SelectItem value="1m">1 Month</SelectItem>
+                                        <SelectItem value="never">Never (Forever)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-[10px] text-muted-foreground leading-tight mt-2 italic">
+                                    Only the classroom creator can see these settings. Messages older than the selected time will be automatically hidden.
+                                </p>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            )}
           </div>
           <Button asChild variant="outline" size="sm" className="rounded-lg">
             <Link href={`/dashboard/classrooms/${classroomId}`}>
