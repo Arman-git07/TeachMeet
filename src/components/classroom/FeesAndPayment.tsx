@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -286,7 +285,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                                             onClick={() => handleToggleFeePaid(s.uid, !!s.feePaid)}
                                                         >
                                                             {s.feePaid ? <CheckCircle className="mr-1 h-3.5 w-3.5" /> : null}
-                                                            {s.feePaid ? "Paid" : "Mark Paid"}
+                                                            {s.feePaid ? "Paid" : "Not Paid"}
                                                         </Button>
                                                     </div>
                                                 ))
