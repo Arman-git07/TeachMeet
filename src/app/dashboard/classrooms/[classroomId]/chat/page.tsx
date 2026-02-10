@@ -20,6 +20,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClassroom } from "@/contexts/ClassroomContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 interface ChatMessage {
   id: string;
@@ -136,7 +138,6 @@ export default function ClassroomChatPage() {
     }, (error) => {
         console.error("Chat sync error:", error);
         // Note: If adding a 'where' clause, an index might be required.
-        // If it fails with "index required", we'll fall back to client-side filtering if small.
         if (error.message?.includes('index')) {
             console.warn("Chat index missing for vanish duration. Please create index in Firebase Console.");
         }
@@ -275,15 +276,24 @@ export default function ClassroomChatPage() {
     }
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = (messageId: string) => {
     if (!classroomId || !messageId) return;
-    try {
-      await deleteDoc(doc(db, 'classrooms', classroomId, 'messages', messageId));
-      toast({ title: "Message deleted" });
-    } catch (error: any) {
-      console.error("Failed to delete message:", error);
-      toast({ variant: 'destructive', title: "Delete Failed" });
-    }
+    const docRef = doc(db, 'classrooms', classroomId, 'messages', messageId);
+    
+    // Non-blocking delete mutation
+    deleteDoc(docRef)
+      .then(() => {
+        toast({ title: "Message deleted" });
+      })
+      .catch(async (serverError) => {
+        // Construct and emit a rich, contextual error for the dev overlay
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'delete',
+        } satisfies SecurityRuleContext);
+
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   return (
