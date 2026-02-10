@@ -176,6 +176,9 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             
             await updateDoc(teacherRef, updateData);
             toast({ title: "Details Saved", description: "The Classroom Creator can now pay you directly." });
+            
+            // Close the dialog and show the previous page (the classroom dashboard)
+            onOpenChange(false);
         } catch (error) {
             toast({ variant: 'destructive', title: "Save Failed" });
         } finally {
@@ -195,7 +198,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] -mx-6 px-6">
                         <div className="space-y-6 py-4">
-                            {/* Card 1: Student Fee Summary - Hidden for Subject Teachers */}
                             {!isTeacher && (
                                 <Card className="border shadow-sm rounded-xl">
                                     <CardHeader className="pb-3">
@@ -235,7 +237,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                 </Card>
                             )}
 
-                            {/* Card 2: Assistant Teacher's own Payment Setup */}
                             {isTeacher && (
                                 <Card className="border-2 border-primary/20 bg-primary/5 rounded-2xl shadow-sm">
                                     <CardHeader className="pb-3">
@@ -268,14 +269,13 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                             className="w-full btn-gel rounded-xl"
                                             disabled={isUpdating}
                                         >
-                                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
+                                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="mr-2 h-4 w-4 mr-2"/>}
                                             Save My Details
                                         </Button>
                                     </CardContent>
                                 </Card>
                             )}
 
-                            {/* Card 3: Creator's Payroll View */}
                             {isCreator && (
                                 <Card className="border-2 border-primary/10 bg-primary/5 rounded-2xl shadow-sm">
                                     <CardHeader className="pb-3">
@@ -319,7 +319,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 </DialogContent>
             </Dialog>
 
-            {/* Creator Control Panel Dialog */}
             {isCreator && (
                 <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                     <DialogContent className="sm:max-w-lg">
@@ -380,7 +379,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 </Dialog>
             )}
 
-            {/* Pay Teacher Dialog (For Creator paying a Teacher) */}
             <Dialog open={!!payTeacherOpen} onOpenChange={(open) => !open && setPayTeacherOpen(null)}>
                 <DialogContent className="sm:max-w-xs rounded-3xl p-6">
                     <DialogHeader className="mb-4">
@@ -438,7 +436,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 </DialogContent>
             </Dialog>
 
-            {/* Student Payment Dialog */}
             <Dialog open={isPayNowOpen} onOpenChange={setIsPayNowOpen}>
                 <DialogContent className="sm:max-w-xs rounded-3xl p-6">
                     <DialogHeader className="mb-4">
