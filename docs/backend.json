@@ -82,6 +82,10 @@
           "type": "string",
           "format": "date-time",
           "description": "The timestamp when the user joined the meeting."
+        },
+        "feePaid": {
+          "type": "boolean",
+          "description": "Whether the student has paid the classroom fee."
         }
       },
       "required": ["name", "joinedAt"]

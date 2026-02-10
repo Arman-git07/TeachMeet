@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { doc, updateDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
@@ -16,11 +17,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle, Briefcase, Save, Upload } from 'lucide-react';
+import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle, Briefcase, Save, Users, User } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
 import type { SubjectTeacher } from './SubjectTeachers';
 
 const feeSchema = z.object({
@@ -46,8 +48,9 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     const [isPayNowOpen, setIsPayNowOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     
-    // Teacher States
+    // Teacher & Student States
     const [teachers, setTeachers] = useState<SubjectTeacher[]>([]);
+    const [students, setStudents] = useState<any[]>([]);
     const [payTeacherOpen, setPayTeacherOpen] = useState<SubjectTeacher | null>(null);
     const [teacherUpiId, setTeacherUpiId] = useState("");
     const [teacherQrFile, setTeacherQrFile] = useState<File | null>(null);
@@ -77,6 +80,15 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         const q = query(collection(db, `classrooms/${classroomId}/teachers`), orderBy('addedAt', 'desc'));
         return onSnapshot(q, (snap) => {
             setTeachers(snap.docs.map(d => ({ teacherId: d.id, ...d.data() } as SubjectTeacher)));
+        });
+    }, [classroomId, isCreator]);
+
+    // Fetch students for fee tracking (Creator only)
+    useEffect(() => {
+        if (!classroomId || !isCreator) return;
+        const q = query(collection(db, `classrooms/${classroomId}/participants`), where('role', '==', 'student'));
+        return onSnapshot(q, (snap) => {
+            setStudents(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
         });
     }, [classroomId, isCreator]);
 
@@ -176,13 +188,23 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             
             await updateDoc(teacherRef, updateData);
             toast({ title: "Details Saved", description: "The Classroom Creator can now pay you directly." });
-            
-            // Close the dialog and show the previous page (the classroom dashboard)
             onOpenChange(false);
         } catch (error) {
             toast({ variant: 'destructive', title: "Save Failed" });
         } finally {
             setIsUpdating(false);
+        }
+    };
+
+    const handleToggleFeePaid = async (studentId: string, currentStatus: boolean) => {
+        if (!isCreator || !classroomId) return;
+        try {
+            await updateDoc(doc(db, 'classrooms', classroomId, 'participants', studentId), {
+                feePaid: !currentStatus
+            });
+            toast({ title: "Status Updated", description: `Marked as ${!currentStatus ? 'Paid' : 'Unpaid'}.` });
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Update Failed" });
         }
     };
 
@@ -233,6 +255,48 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                                 Settle Payment
                                             </Button>
                                         )}
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {isCreator && (
+                                <Card className="border-2 border-primary/20 bg-primary/5 rounded-2xl shadow-sm">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Users className="h-5 w-5 text-primary" /> Student Fee Tracking
+                                        </CardTitle>
+                                        <CardDescription className="text-xs">Monitor and verify student payments.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {students.length > 0 ? (
+                                                students.map(s => (
+                                                    <div key={s.uid} className="flex items-center justify-between p-3 bg-background rounded-xl border shadow-sm">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <Avatar className="h-8 w-8 shrink-0">
+                                                                <AvatarImage src={s.photoURL} data-ai-hint="avatar user"/>
+                                                                <AvatarFallback>{s.name?.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <p className="text-sm font-bold truncate">{s.name}</p>
+                                                        </div>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant={s.feePaid ? "default" : "outline"}
+                                                            className={cn("h-8 px-3 rounded-lg text-xs font-bold transition-all", s.feePaid ? "bg-primary text-white hover:bg-primary/90" : "hover:bg-primary/5")}
+                                                            onClick={() => handleToggleFeePaid(s.uid, !!s.feePaid)}
+                                                        >
+                                                            {s.feePaid ? <CheckCircle className="mr-1 h-3.5 w-3.5" /> : null}
+                                                            {s.feePaid ? "Paid" : "Mark Paid"}
+                                                        </Button>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-center py-6">
+                                                    <Users className="mx-auto h-8 w-8 text-muted-foreground opacity-20 mb-2" />
+                                                    <p className="text-xs text-muted-foreground italic">No students joined yet.</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </CardContent>
                                 </Card>
                             )}
