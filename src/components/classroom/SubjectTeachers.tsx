@@ -133,14 +133,14 @@ export function SubjectTeachers() {
                 <DialogHeader className="pb-4 border-b">
                     <DialogTitle className="text-xl font-bold">Subject Teachers</DialogTitle>
                     <DialogDescription className="text-xs font-bold text-primary">
-                        {isCreator ? "Manage and edit teacher subjects below." : "View the expert teachers and their subjects."}
+                        {isCreator ? "Manage teacher details below." : "Meet your expert subject teachers."}
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh]">
                     <div className="p-4 space-y-4">
                         {subjectTeachers.length > 0 ? (
                             subjectTeachers.map(t => (
-                                <Card key={t.teacherId} className="overflow-hidden border shadow-sm rounded-xl transition-all hover:shadow-md hover:border-primary/20 group">
+                                <Card key={t.teacherId} className="overflow-hidden border shadow-sm rounded-xl transition-all hover:shadow-md group">
                                     <div className="p-4 flex items-start gap-4">
                                         <Avatar className="h-12 w-12 border-2 border-primary/10">
                                             <AvatarImage src={t.photoURL} data-ai-hint="avatar user"/>
@@ -149,59 +149,58 @@ export function SubjectTeachers() {
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-2 mb-3">
-                                                <h3 className="font-bold text-base truncate text-foreground">{t.name}</h3>
-                                                <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider px-2 h-5 max-w-[120px] truncate">
-                                                    {t.subject}
-                                                </Badge>
-                                            </div>
-                                            
-                                            <div className="bg-muted/30 rounded-lg p-3 border border-border/50 relative">
-                                                <div className="flex items-center gap-2 text-muted-foreground">
-                                                    <Clock className="h-3.5 w-3.5 text-primary" />
-                                                    <span className="text-[10px] font-black uppercase tracking-widest">Availability</span>
-                                                </div>
-                                                <p className="text-sm text-foreground/80 mt-1 italic leading-relaxed">
-                                                    {t.availability}
-                                                </p>
-                                                
-                                                {isCreator && (
-                                                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            className="h-7 w-7 rounded-full bg-background/80 shadow-sm"
-                                                            onClick={() => handleStartEdit(t)}
-                                                            title="Edit details"
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <Button 
-                                                                    variant="ghost" 
-                                                                    size="icon" 
-                                                                    className="h-7 w-7 rounded-full bg-background/80 shadow-sm text-destructive hover:text-destructive"
-                                                                    title="Remove teacher"
-                                                                >
-                                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>Remove Teacher?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>
-                                                                        This will remove <strong>{t.name}</strong> from the classroom teaching staff.
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleRemoveTeacher(t)} className="bg-destructive text-white">Remove</AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="min-w-0">
+                                                    <h3 className="font-bold text-base truncate text-foreground">{t.name}</h3>
+                                                    <div className="flex items-center gap-1.5 text-muted-foreground mt-0.5">
+                                                        <Clock className="h-3 w-3 text-primary/70 shrink-0" />
+                                                        <p className="text-xs italic truncate" title={t.availability}>
+                                                            {t.availability}
+                                                        </p>
                                                     </div>
-                                                )}
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2 shrink-0">
+                                                    <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider px-2 h-5 max-w-[100px] truncate">
+                                                        {t.subject}
+                                                    </Badge>
+                                                    {isCreator && (
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                className="h-7 w-7 rounded-full bg-muted/50 hover:bg-muted"
+                                                                onClick={() => handleStartEdit(t)}
+                                                                title="Edit details"
+                                                            >
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="icon" 
+                                                                        className="h-7 w-7 rounded-full bg-muted/50 hover:bg-muted text-destructive"
+                                                                        title="Remove teacher"
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Remove Teacher?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            This will remove <strong>{t.name}</strong> from the classroom teaching staff.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleRemoveTeacher(t)} className="bg-destructive text-white">Remove</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
