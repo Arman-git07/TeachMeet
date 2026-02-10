@@ -47,7 +47,6 @@ export function SubjectTeachers() {
     const [editName, setEditName] = useState("");
     const [editSubject, setEditSubject] = useState("");
     const [editAvailability, setEditAvailability] = useState("");
-    const [editRoleLabel, setEditRoleLabel] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
     const isCreator = userRole === 'creator';
@@ -69,7 +68,6 @@ export function SubjectTeachers() {
         setEditName(t.name || "");
         setEditSubject(t.subject || "");
         setEditAvailability(t.availability || "");
-        setEditRoleLabel(t.roleLabel || "Teacher");
     };
 
     const handleUpdateTeacher = async () => {
@@ -81,8 +79,7 @@ export function SubjectTeachers() {
             const updateData = {
                 name: editName,
                 subject: editSubject,
-                availability: editAvailability,
-                roleLabel: editRoleLabel
+                availability: editAvailability
             };
             
             await updateDoc(teacherRef, updateData);
@@ -136,7 +133,7 @@ export function SubjectTeachers() {
                 <DialogHeader className="pb-4 border-b">
                     <DialogTitle className="text-xl font-bold">Subject Teachers</DialogTitle>
                     <DialogDescription className="text-xs font-bold text-primary">
-                        {isCreator ? "Manage and edit teacher details below." : "View the expert teachers available in this classroom."}
+                        {isCreator ? "Manage and edit teacher subjects below." : "View the expert teachers and their subjects."}
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh]">
@@ -152,15 +149,12 @@ export function SubjectTeachers() {
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                            <div className="flex items-center justify-between gap-2 mb-3">
                                                 <h3 className="font-bold text-base truncate text-foreground">{t.name}</h3>
-                                                <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider px-2 h-5">
-                                                    {t.roleLabel || "Teacher"}
+                                                <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider px-2 h-5 max-w-[120px] truncate">
+                                                    {t.subject}
                                                 </Badge>
                                             </div>
-                                            <p className="text-sm font-semibold text-primary mb-3">
-                                                {t.subject}
-                                            </p>
                                             
                                             <div className="bg-muted/30 rounded-lg p-3 border border-border/50 relative">
                                                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -241,16 +235,6 @@ export function SubjectTeachers() {
                                 value={editName} 
                                 onChange={(e) => setEditName(e.target.value)} 
                                 placeholder="Teacher's Full Name"
-                                disabled={isSaving}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-role">Role Label (e.g. Teacher, Lecturer)</Label>
-                            <Input 
-                                id="edit-role" 
-                                value={editRoleLabel} 
-                                onChange={(e) => setEditRoleLabel(e.target.value)} 
-                                placeholder="Teacher"
                                 disabled={isSaving}
                             />
                         </div>
