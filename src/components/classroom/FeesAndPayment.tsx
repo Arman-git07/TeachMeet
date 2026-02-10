@@ -23,6 +23,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import type { SubjectTeacher } from './SubjectTeachers';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const feeSchema = z.object({
   amount: z.coerce.number().positive({ message: "Amount must be positive." }),
@@ -195,16 +197,25 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         }
     };
 
-    const handleToggleFeePaid = async (studentId: string, currentStatus: boolean) => {
+    const handleToggleFeePaid = (studentId: string, currentStatus: boolean) => {
         if (!isCreator || !classroomId) return;
-        try {
-            await updateDoc(doc(db, 'classrooms', classroomId, 'participants', studentId), {
-                feePaid: !currentStatus
+        
+        const studentRef = doc(db, 'classrooms', classroomId, 'participants', studentId);
+        const newData = { feePaid: !currentStatus };
+
+        // Perform non-blocking mutation for immediate UI update via latency compensation
+        updateDoc(studentRef, newData)
+            .then(() => {
+                toast({ title: "Status Updated", description: `Marked as ${!currentStatus ? 'Paid' : 'Unpaid'}.` });
+            })
+            .catch(async (error) => {
+                const pError = new FirestorePermissionError({
+                    path: studentRef.path,
+                    operation: 'update',
+                    requestResourceData: newData
+                });
+                errorEmitter.emit('permission-error', pError);
             });
-            toast({ title: "Status Updated", description: `Marked as ${!currentStatus ? 'Paid' : 'Unpaid'}.` });
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Update Failed" });
-        }
     };
 
     if (!classroom) return null;
@@ -281,11 +292,22 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                                         <Button 
                                                             size="sm" 
                                                             variant={s.feePaid ? "default" : "outline"}
-                                                            className={cn("h-8 px-3 rounded-lg text-xs font-bold transition-all", s.feePaid ? "bg-primary text-white hover:bg-primary/90" : "hover:bg-primary/5")}
+                                                            className={cn(
+                                                                "h-8 px-3 rounded-lg text-xs font-bold transition-all", 
+                                                                s.feePaid 
+                                                                    ? "bg-primary text-white hover:bg-primary/90" 
+                                                                    : "text-muted-foreground hover:bg-primary/5 border-muted-foreground/30"
+                                                            )}
                                                             onClick={() => handleToggleFeePaid(s.uid, !!s.feePaid)}
                                                         >
-                                                            {s.feePaid ? <CheckCircle className="mr-1 h-3.5 w-3.5" /> : null}
-                                                            {s.feePaid ? "Paid" : "Not Paid"}
+                                                            {s.feePaid ? (
+                                                                <>
+                                                                    <CheckCircle className="mr-1 h-3.5 w-3.5" />
+                                                                    Paid
+                                                                </>
+                                                            ) : (
+                                                                "Not Paid"
+                                                            )}
                                                         </Button>
                                                     </div>
                                                 ))
