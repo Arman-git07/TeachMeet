@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useClassroom } from '@/contexts/ClassroomContext';
 import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
@@ -17,10 +17,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle } from 'lucide-react';
+import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle, Briefcase } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SubjectTeacher } from './SubjectTeachers';
 
 const feeSchema = z.object({
   amount: z.coerce.number().positive({ message: "Amount must be positive." }),
@@ -38,7 +40,7 @@ interface FeesAndPaymentProps {
 }
 
 export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
-    const { classroom, classroomId, userRole } = useClassroom();
+    const { classroom, classroomId, user, userRole } = useClassroom();
     const canUserManage = canManage(userRole);
     const { toast } = useToast();
 
@@ -46,6 +48,10 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     const [isPayNowOpen, setIsPayNowOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     
+    // Teacher Payroll States
+    const [teachers, setTeachers] = useState<SubjectTeacher[]>([]);
+    const [payTeacherOpen, setPayTeacherOpen] = useState<SubjectTeacher | null>(null);
+
     const feeForm = useForm<z.infer<typeof feeSchema>>({ 
         resolver: zodResolver(feeSchema), 
         defaultValues: { 
@@ -63,6 +69,16 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     });
 
     const isTeacher = userRole === 'teacher';
+    const isCreator = userRole === 'creator';
+
+    // Fetch teachers for payroll
+    useEffect(() => {
+        if (!classroomId || !isCreator) return;
+        const q = query(collection(db, `classrooms/${classroomId}/teachers`), orderBy('addedAt', 'desc'));
+        return onSnapshot(q, (snap) => {
+            setTeachers(snap.docs.map(d => ({ teacherId: d.id, ...d.data() } as SubjectTeacher)));
+        });
+    }, [classroomId, isCreator]);
 
     const currencySymbols = useMemo(() => ({
         INR: <IndianRupee className="h-6 w-6" />, 
@@ -79,6 +95,13 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         const currency = classroom.feeCurrency || "INR";
         return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=${currency}&tn=${name}`;
     }, [classroom]);
+
+    const getTeacherUpiUrl = (teacher: SubjectTeacher) => {
+        if (!teacher?.upiId) return null;
+        const name = encodeURIComponent(teacher.name || "Teacher");
+        const memo = encodeURIComponent(`TeachMeet: ${classroom?.title || "Classroom"}`);
+        return `upi://pay?pa=${teacher.upiId}&pn=${name}&tn=${memo}&cu=INR`;
+    };
 
     const onFeeSubmit = useCallback(async (data: z.infer<typeof feeSchema>) => {
         setIsUpdating(true);
@@ -132,52 +155,95 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Student Fees</DialogTitle>
-                        <DialogDescription>View classroom fees and settle your payments.</DialogDescription>
+                        <DialogTitle>Classroom Finances</DialogTitle>
+                        <DialogDescription>View fees and manage payroll for this classroom.</DialogDescription>
                     </DialogHeader>
-                    <Card className="border-0 shadow-none bg-transparent">
-                        <CardHeader className="px-0">
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="text-xl">Fee Summary</CardTitle>
-                                {canUserManage && (
-                                    <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)} className="rounded-full">
-                                        <Settings className="h-5 w-5 text-muted-foreground" />
-                                    </Button>
-                                )}
-                            </div>
-                        </CardHeader>
-                        <CardContent className="text-center px-0">
-                            <p className="text-muted-foreground mb-3 text-sm">Student Fee Amount</p>
-                            <div className="flex justify-center items-center gap-3">
-                                <div className="text-primary p-2 bg-primary/10 rounded-full">
-                                    {currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || <IndianRupee className="h-6 w-6" />}
-                                </div>
-                                <p className="font-black text-4xl tracking-tighter">{classroom.feeAmount?.toLocaleString() || '0.00'}</p>
-                                <Badge variant="secondary" className="font-bold px-3 py-1">{classroom.feeCurrency || 'INR'}</Badge>
-                            </div>
-                            
-                            {isTeacher ? (
-                                <Alert className="mt-8 border-green-200 bg-green-50 text-green-800 rounded-xl">
-                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                    <AlertDescription className="text-xs font-medium">
-                                        As a teacher, you are exempt from classroom fees. The creator will pay you directly.
-                                    </AlertDescription>
-                                </Alert>
-                            ) : (!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
-                                <Alert className="mt-8 border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
-                                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                                    <AlertDescription className="text-xs font-medium">The teacher has not yet configured a payment method.</AlertDescription>
-                                </Alert>
-                            ) : (
-                                <Button 
-                                    className="w-full btn-gel mt-8 h-14 text-xl rounded-2xl shadow-xl hover:shadow-primary/20 transition-all" 
-                                    onClick={() => setIsPayNowOpen(true)}
-                                >
-                                    Settle Payment
-                                </Button>
+                    <ScrollArea className="max-h-[70vh] -mx-6 px-6">
+                        <div className="space-y-6 py-4">
+                            <Card className="border shadow-sm rounded-xl">
+                                <CardHeader className="pb-3">
+                                    <div className="flex justify-between items-center">
+                                        <CardTitle className="text-xl">Fee Summary</CardTitle>
+                                        {canUserManage && (
+                                            <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)} className="rounded-full">
+                                                <Settings className="h-5 w-5 text-muted-foreground" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="text-center">
+                                    <p className="text-muted-foreground mb-3 text-sm">Student Fee Amount</p>
+                                    <div className="flex justify-center items-center gap-3">
+                                        <div className="text-primary p-2 bg-primary/10 rounded-full">
+                                            {currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || <IndianRupee className="h-6 w-6" />}
+                                        </div>
+                                        <p className="font-black text-4xl tracking-tighter">{classroom.feeAmount?.toLocaleString() || '0.00'}</p>
+                                        <Badge variant="secondary" className="font-bold px-3 py-1">{classroom.feeCurrency || 'INR'}</Badge>
+                                    </div>
+                                    
+                                    {isTeacher ? (
+                                        <Alert className="mt-6 border-green-200 bg-green-50 text-green-800 rounded-xl">
+                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                            <AlertDescription className="text-xs font-medium">
+                                                As a teacher, you are exempt from classroom fees. The creator will pay you directly.
+                                            </AlertDescription>
+                                        </Alert>
+                                    ) : (!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
+                                        <Alert className="mt-6 border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
+                                            <AlertCircle className="h-4 w-4 text-amber-600" />
+                                            <AlertDescription className="text-xs font-medium">The teacher has not yet configured a payment method.</AlertDescription>
+                                        </Alert>
+                                    ) : !isCreator && (
+                                        <Button 
+                                            className="w-full btn-gel mt-6 h-12 text-lg rounded-2xl shadow-lg hover:shadow-primary/20 transition-all" 
+                                            onClick={() => setIsPayNowOpen(true)}
+                                        >
+                                            Settle Payment
+                                        </Button>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {isCreator && (
+                                <Card className="border-2 border-primary/10 bg-primary/5 rounded-2xl shadow-sm">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Briefcase className="h-5 w-5 text-primary" /> Teacher Payroll
+                                        </CardTitle>
+                                        <CardDescription className="text-xs">Settle payments to your teaching staff.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {teachers.filter(t => t.teacherId !== user?.uid).length > 0 ? (
+                                                teachers.filter(t => t.teacherId !== user?.uid).map(t => (
+                                                    <div key={t.teacherId} className="flex items-center justify-between p-3 bg-background rounded-xl border shadow-sm">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <Avatar className="h-8 w-8 shrink-0">
+                                                                <AvatarImage src={t.photoURL} data-ai-hint="avatar user"/>
+                                                                <AvatarFallback>{t.name.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-bold truncate">{t.name}</p>
+                                                                <p className="text-[10px] text-muted-foreground uppercase truncate">{t.subject}</p>
+                                                            </div>
+                                                        </div>
+                                                        <Button size="sm" variant="outline" className="h-8 text-xs rounded-lg flex-shrink-0" onClick={() => setPayTeacherOpen(t)}>
+                                                            Pay
+                                                        </Button>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-center py-6">
+                                                    <Briefcase className="mx-auto h-8 w-8 text-muted-foreground opacity-20 mb-2" />
+                                                    <p className="text-xs text-muted-foreground italic">No other teachers to pay yet.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </ScrollArea>
                 </DialogContent>
             </Dialog>
 
@@ -239,6 +305,65 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                 </DialogContent>
             </Dialog>
 
+            {/* Pay Teacher Dialog (For Creator paying a Teacher) */}
+            <Dialog open={!!payTeacherOpen} onOpenChange={(open) => !open && setPayTeacherOpen(null)}>
+                <DialogContent className="sm:max-w-xs rounded-3xl p-6">
+                    <DialogHeader className="mb-4">
+                        <DialogTitle className="text-center text-2xl font-black text-primary">Pay Teacher</DialogTitle>
+                        <DialogDescription className="text-center">Settling payment to {payTeacherOpen?.name}</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 pt-4">
+                        {payTeacherOpen && getTeacherUpiUrl(payTeacherOpen) && (
+                            <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                                <a href={getTeacherUpiUrl(payTeacherOpen)!}>
+                                    <Wallet className="h-5 w-5" />
+                                    Open Payment App
+                                </a>
+                            </Button>
+                        )}
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-background px-2 text-muted-foreground font-bold">Or Manual Pay</span></div>
+                        </div>
+
+                        {payTeacherOpen?.upiId && (
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block text-center">Teacher UPI ID</Label>
+                                <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-2xl border">
+                                    <Input readOnly value={payTeacherOpen.upiId} className="bg-transparent border-none text-xs focus-visible:ring-0 shadow-none h-10" />
+                                    <Button size="icon" variant="secondary" className="rounded-xl h-10 w-10 shrink-0" onClick={() => { navigator.clipboard.writeText(payTeacherOpen.upiId!); toast({ title: 'UPI ID Copied!' }); }}>
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {payTeacherOpen?.qrCodeUrl ? (
+                            <div className="space-y-4 text-center">
+                                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Scan Teacher's QR</Label>
+                                <div className="p-4 border-2 border-primary/10 rounded-3xl inline-block bg-white shadow-xl relative overflow-hidden">
+                                    <div className="relative w-[180px] h-[180px]">
+                                        <Image src={payTeacherOpen.qrCodeUrl} alt="Teacher QR" fill style={{ objectFit: 'contain' }} data-ai-hint="payment qr" />
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            !payTeacherOpen?.upiId && (
+                                <Alert className="border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
+                                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                                    <AlertDescription className="text-xs font-medium">This teacher has not set their payment details yet.</AlertDescription>
+                                </Alert>
+                            )
+                        )}
+                    </div>
+                    <div className="mt-8">
+                        <DialogClose asChild><Button variant="outline" className="w-full rounded-2xl h-12 font-bold text-muted-foreground">Close Portal</Button></DialogClose>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Student Payment Dialog */}
             <Dialog open={isPayNowOpen} onOpenChange={setIsPayNowOpen}>
                 <DialogContent className="sm:max-w-xs rounded-3xl p-6">
                     <DialogHeader className="mb-4">
