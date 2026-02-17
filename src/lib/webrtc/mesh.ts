@@ -170,7 +170,7 @@ export class MeshRTC {
     };
 
     pc.onnegotiationneeded = async () => {
-      if (entry.negotiating || !isInitiator) return;
+      if (entry.negotiating) return;
       entry.negotiating = true;
       try {
         const offer = await pc.createOffer();
@@ -209,9 +209,58 @@ export class MeshRTC {
   }
 
   public async replaceTrack(newTrack: MediaStreamTrack) {
-    for (const { pc } of this.peers.values()) {
-      const sender = pc.getSenders().find(s => s.track?.kind === newTrack.kind);
-      if (sender) await sender.replaceTrack(newTrack);
+    if (!this.localStream) return;
+    
+    for (const [remoteId, entry] of this.peers.entries()) {
+      const pc = entry.pc;
+      const senders = pc.getSenders();
+      const sender = senders.find(s => s.track?.kind === newTrack.kind);
+      
+      if (sender) {
+        console.log(`[mesh] Replacing ${newTrack.kind} track for peer ${remoteId}`);
+        await sender.replaceTrack(newTrack);
+      } else {
+        console.log(`[mesh] Adding ${newTrack.kind} track for peer ${remoteId} (was missing)`);
+        pc.addTrack(newTrack, this.localStream);
+        // addTrack automatically triggers onnegotiationneeded
+      }
+    }
+  }
+
+  public async addTrack(track: MediaStreamTrack, stream: MediaStream) {
+    for (const [remoteId, entry] of this.peers.entries()) {
+      const pc = entry.pc;
+      const exists = pc.getSenders().some(s => s.track === track);
+      if (!exists) {
+        pc.addTrack(track, stream);
+      }
+    }
+  }
+
+  public async removeTrack(track: MediaStreamTrack) {
+    for (const [remoteId, entry] of this.peers.entries()) {
+      const pc = entry.pc;
+      const sender = pc.getSenders().find(s => s.track === track);
+      if (sender) {
+        pc.removeTrack(sender);
+      }
+    }
+  }
+
+  public async renegotiateAll() {
+    for (const [remoteId, entry] of this.peers.entries()) {
+      if (!entry.negotiating) {
+        try {
+          entry.negotiating = true;
+          const offer = await entry.pc.createOffer();
+          await entry.pc.setLocalDescription(offer);
+          this.socket.emit("offer", remoteId, offer);
+        } catch (e) {
+          console.error(`[mesh] Renegotiation failed for ${remoteId}:`, e);
+        } finally {
+          entry.negotiating = false;
+        }
+      }
     }
   }
 

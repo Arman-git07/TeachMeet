@@ -173,14 +173,24 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   }, [user, meetingId]);
   
-  const toggleCamera = useCallback((forceState?: boolean) => {
-    if (!localStream) return;
+  const toggleCamera = useCallback(async (forceState?: boolean) => {
+    if (!localStream || !rtc) return;
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
-    localStream.getVideoTracks().forEach(track => { track.enabled = nextState; });
+    
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = nextState;
+      // CRITICAL FIX: Ensure the video track is synced to all peer connections
+      // and trigger renegotiation if turning ON.
+      if (nextState) {
+        await rtc.replaceTrack(videoTrack);
+      }
+    }
+    
     setCamOn(nextState);
     localStorage.setItem('teachmeet-cam-state', String(nextState));
     updateMyStatus({ isCameraOn: nextState });
-  }, [localStream, camOn, updateMyStatus]);
+  }, [localStream, camOn, updateMyStatus, rtc]);
 
   const toggleMic = useCallback(() => {
     if (!localStream) return;
@@ -693,7 +703,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     {otherTiles.map(p => (
                         <div key={p.id} className="aspect-[9/16] md:h-32 md:aspect-auto">
                         <VideoTile
-                            stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                            stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
                             isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} 
                             volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} 
                             isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)}
