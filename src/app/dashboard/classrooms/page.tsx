@@ -542,7 +542,7 @@ export default function ClassroomsPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8 flex flex-col h-full bg-background/50">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2 flex-shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-0 flex-shrink-0">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
           <div>
@@ -616,7 +616,7 @@ export default function ClassroomsPage() {
                         ) : (
                             <div className="flex gap-2 w-full">
                                 <Button variant="outline" className="flex-1 rounded-xl h-10 font-semibold" onClick={() => handleRequestToJoinStudent(c.id)}>Join Student</Button>
-                                <Button variant="secondary" className="flex-1 rounded-xl h-10 font-semibold" onClick={() => handleOpenTeacherAppDialog(c)}>Join Teacher</Button>
+                                <Button variant="outline" className="flex-1 rounded-xl h-10 font-semibold" onClick={() => handleOpenTeacherAppDialog(c)}>Join Teacher</Button>
                             </div>
                         )}
                     </CardFooter>
