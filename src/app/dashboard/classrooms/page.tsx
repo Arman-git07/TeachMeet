@@ -320,7 +320,7 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
                      <FormField control={form.control} name="mobile" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Mobile Number (WhatsApp)</FormLabel>
-                            <FormControl><div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="tel" placeholder="Your contact number" {...field} className="pl-10 rounded-xl" disabled={isLoading} /></div></FormControl>
+                            <FormControl><div className="relative"><Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input type="tel" placeholder="Your contact number" {...field} className="pl-10 rounded-xl" disabled={isLoading} /></div></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
