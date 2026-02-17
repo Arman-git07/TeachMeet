@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, Trash2, Settings2, Clock } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, Trash2, Settings2, Clock, Info, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClassroom } from "@/contexts/ClassroomContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
@@ -53,6 +54,7 @@ export default function ClassroomChatPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
   const [showMentions, setShowMentions] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   
   const [isRecording, setIsRecording] = useState(false);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
@@ -91,8 +93,9 @@ export default function ClassroomChatPage() {
   useEffect(() => {
     if (!classroomId || !user) return;
 
-    // Use descending order to get the LATEST messages first, then reverse them locally.
-    // This prevents the chat from being stuck on the oldest 100 messages.
+    setSyncError(null);
+
+    // Default query: Get latest 50 messages
     let messagesQuery = query(
       collection(db, 'classrooms', classroomId, 'messages'),
       orderBy('timestamp', 'desc'),
@@ -131,6 +134,7 @@ export default function ClassroomChatPage() {
       
       // Reverse because we queried DESC to get the latest, but want to display ASC
       setMessages(fetchedMessages.reverse());
+      setSyncError(null);
       
       // Auto-scroll to bottom
       setTimeout(() => {
@@ -141,11 +145,14 @@ export default function ClassroomChatPage() {
     }, (error) => {
         console.error("Chat sync error:", error);
         if (error.message?.includes('index')) {
+            setSyncError("Index Required: Vanish duration requires a Firestore composite index. Messages may not load until this is created in the Firebase console.");
             toast({ 
                 variant: 'destructive', 
                 title: "Index Required", 
                 description: "Vanish duration requires a Firestore composite index. Please contact support." 
             });
+        } else {
+            setSyncError("Connection Error: Unable to sync messages. Please check your permissions.");
         }
     });
 
@@ -303,16 +310,26 @@ export default function ClassroomChatPage() {
   return (
     <div className="flex flex-col h-full bg-muted/30">
       <header className="flex-none p-3 border-b bg-background shadow-sm">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <MessageSquare className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground truncate">
-              Classroom Chat
-            </h1>
+        <div className="container mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <MessageSquare className="h-7 w-7 text-primary shrink-0" />
+            <div className="min-w-0">
+                <h1 className="text-xl font-bold text-foreground truncate">
+                  {classroom?.title || "Classroom Chat"}
+                </h1>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest flex items-center gap-1.5">
+                    Public Chat Room
+                    {(classroom as any)?.chatVanishDuration && (classroom as any)?.chatVanishDuration !== 'never' && (
+                        <span className="text-primary flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> Vanish Mode ON
+                        </span>
+                    )}
+                </p>
+            </div>
             {isCreator && (
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0">
                             <Settings2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
                     </PopoverTrigger>
@@ -341,7 +358,7 @@ export default function ClassroomChatPage() {
                                     </SelectContent>
                                 </Select>
                                 <p className="text-[10px] text-muted-foreground leading-tight mt-2 italic">
-                                    Only the classroom creator can see these settings. Messages older than the selected time will be automatically hidden.
+                                    Only you (the creator) can see these settings. Vanishing messages requires a Firestore index.
                                 </p>
                             </div>
                         </div>
@@ -349,10 +366,10 @@ export default function ClassroomChatPage() {
                 </Popover>
             )}
           </div>
-          <Button asChild variant="outline" size="sm" className="rounded-lg">
+          <Button asChild variant="outline" size="sm" className="rounded-lg shrink-0">
             <Link href={`/dashboard/classrooms/${classroomId}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              Exit
             </Link>
           </Button>
         </div>
@@ -363,6 +380,13 @@ export default function ClassroomChatPage() {
           <CardContent className="flex-grow p-0 overflow-hidden bg-background">
             <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-4">
+                  {syncError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Sync Issue</AlertTitle>
+                      <AlertDescription className="text-xs">{syncError}</AlertDescription>
+                    </Alert>
+                  )}
                   {hasMicPermission === false && (
                     <Alert variant="destructive">
                       <AlertTitle>Microphone Access Denied</AlertTitle>
@@ -371,6 +395,15 @@ export default function ClassroomChatPage() {
                       </AlertDescription>
                     </Alert>
                   )}
+                  
+                  {messages.length === 0 && !syncError && (
+                      <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
+                          <MessageSquare className="h-12 w-12 mb-2" />
+                          <p className="text-sm font-medium">No messages yet.</p>
+                          <p className="text-xs">Start the conversation by typing below.</p>
+                      </div>
+                  )}
+
                   {messages.map((msg) => (
                     <div key={msg.id} className={cn("flex items-end gap-2", msg.isMe ? "justify-end" : "justify-start")}>
                       {!msg.isMe && (
