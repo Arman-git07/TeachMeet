@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -36,16 +35,29 @@ export default function ClassroomDetailLayout({
         router.push('/auth/signin');
         return;
       }
-      const { role, classroom: fetchedClassroom } = await resolveRoleForUser(String(classroomId), user?.uid);
-      if (!cancelled) {
-        setUserRole(role);
-        if (fetchedClassroom) {
-          setClassroom(fetchedClassroom as Classroom);
-        } else {
-          toast({ variant: 'destructive', title: 'Classroom not found.' });
-          router.push('/dashboard/classrooms');
+      
+      try {
+        const { role, classroom: fetchedClassroom } = await resolveRoleForUser(String(classroomId), user?.uid);
+        if (!cancelled) {
+          setUserRole(role);
+          if (fetchedClassroom) {
+            setClassroom(fetchedClassroom as Classroom);
+          } else {
+            toast({ variant: 'destructive', title: 'Classroom not found.' });
+            router.push('/dashboard/classrooms');
+          }
+          setIsLoading(false);
         }
-        setIsLoading(false);
+      } catch (error) {
+        console.error("Failed to resolve role/classroom:", error);
+        if (!cancelled) {
+          toast({ 
+            variant: 'destructive', 
+            title: 'Connection Error', 
+            description: 'Failed to load classroom details. Please check your internet connection.' 
+          });
+          setIsLoading(false);
+        }
       }
     };
 
@@ -57,6 +69,8 @@ export default function ClassroomDetailLayout({
                 setClassroom({ id: doc.id, ...doc.data() } as Classroom);
             }
         }
+    }, (err) => {
+        console.warn("Classroom snapshot error (likely offline):", err);
     });
 
     return () => {
@@ -76,7 +90,7 @@ export default function ClassroomDetailLayout({
     return <div className="container mx-auto p-4"><Skeleton className="h-screen w-full" /></div>;
   }
   if (!classroom) {
-    return <div className="container mx-auto p-4">Classroom not found.</div>;
+    return <div className="container mx-auto p-4">Classroom not found or unavailable.</div>;
   }
 
   return (

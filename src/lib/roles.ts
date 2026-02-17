@@ -1,4 +1,3 @@
-
 // src/lib/roles.ts
 import { db } from "@/lib/firebase";
 import {
@@ -84,31 +83,35 @@ export async function resolveRoleForUser(
   classroomId: string,
   uid: string | undefined | null
 ): Promise<{ role: Role; classroom: any }> {
-  const ref = doc(db, "classrooms", classroomId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return { role: "none", classroom: null };
+  try {
+    const ref = doc(db, "classrooms", classroomId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { role: "none", classroom: null };
 
-  const cls = snap.data();
-  if (!uid) return { role: "none", classroom: { id: classroomId, ...cls } };
+    const cls = snap.data();
+    if (!uid) return { role: "none", classroom: { id: classroomId, ...cls } };
 
-  // 1) Creator (highest priority)
-  const creatorId = resolveCreatorId(cls);
-  if (creatorId && creatorId === uid) {
-    return { role: "creator", classroom: { id: classroomId, ...cls } };
+    // 1) Creator (highest priority)
+    const creatorId = resolveCreatorId(cls);
+    if (creatorId && creatorId === uid) {
+      return { role: "creator", classroom: { id: classroomId, ...cls } };
+    }
+
+    // 2) Subject Teacher
+    if (await isSubjectTeacher(classroomId, cls, uid)) {
+      return { role: "teacher", classroom: { id: classroomId, ...cls } };
+    }
+
+    // 3) Student
+    if (await isStudent(classroomId, cls, uid)) {
+      return { role: "student", classroom: { id: classroomId, ...cls } };
+    }
+
+    return { role: "none", classroom: { id: classroomId, ...cls } };
+  } catch (err) {
+    console.error("resolveRoleForUser Error (offline?):", err);
+    throw err;
   }
-
-  // 2) Subject Teacher
-  if (await isSubjectTeacher(classroomId, cls, uid)) {
-    return { role: "teacher", classroom: { id: classroomId, ...cls } };
-  }
-
-  // 3) Student
-  if (await isStudent(classroomId, cls, uid)) {
-    return { role: "student", classroom: { id: classroomId, ...cls } };
-  }
-
-  // 4) None
-  return { role: "none", classroom: { id: classroomId, ...cls } };
 }
 
 /** Convenience booleans for UI */

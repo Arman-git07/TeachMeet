@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -290,12 +289,17 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => {
     const fetchMeetingCreator = async () => {
       setIsLoadingRole(true);
-      const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
-      if (meetingDoc.exists()) {
-        const hostId = meetingDoc.data().hostId;
-        setIsHost(userId === hostId);
+      try {
+        const meetingDoc = await getDoc(doc(db, "meetings", meetingId));
+        if (meetingDoc.exists()) {
+          const hostId = meetingDoc.data().hostId;
+          setIsHost(userId === hostId);
+        }
+      } catch (err) {
+        console.error("Meeting doc fetch failed (likely offline):", err);
+      } finally {
+        setIsLoadingRole(false);
       }
-      setIsLoadingRole(false);
     };
     fetchMeetingCreator();
   }, [meetingId, userId]);
@@ -446,6 +450,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       }
 
       setLiveParticipants(newParticipants);
+    }, (err) => {
+        console.warn("Meeting participants snapshot error (likely offline):", err);
     });
     return () => unsubscribe();
   }, [meetingId, userId, camOn, toast, toggleCamera]);
@@ -544,16 +550,15 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     isCameraOn: camOn,
                     isMicOn: micOn,
                     joinedAt: serverTimestamp(),
-                });
+                }, { merge: true });
                 participantDocCreated.current = true;
             } catch (error) {
                 console.error("Failed to add participant document:", error);
-                toast({ variant: 'destructive', title: 'Connection Error', description: 'Could not join the meeting room state.'});
             }
         }
     };
     addSelfToParticipants();
-  }, [user, meetingId, isHost, isLoadingRole, localStream, camOn, micOn, toast]);
+  }, [user, meetingId, isHost, isLoadingRole, localStream, camOn, micOn]);
 
   const { allParticipants, localParticipant, remoteParticipants, firstHandRaisedId, raisedCount } = useMemo(() => {
     const localUserDetails = liveParticipants.get(userId);
@@ -584,7 +589,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         }
 
         return {
-          id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://placehold.co/128x128.png?text=${(data.name || 'G').charAt(0)}`,
+          id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://placehold.co/40x40.png?text=${(data.name || 'G').charAt(0)}`,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: videoBlocked || !data.isCameraOn,
           isMicOff: audioBlocked || !data.isMicOn,
