@@ -35,7 +35,8 @@ export type ActivityItemType =
   | 'assignment' 
   | 'material' 
   | 'exam'
-  | 'submission';
+  | 'submission'
+  | 'enrollment';
 
 interface BaseActivityItem {
   id: string;
@@ -75,6 +76,7 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   material: BookOpen,
   exam: ClipboardCheck,
   submission: CheckCircle2,
+  enrollment: UserPlus,
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
@@ -88,6 +90,7 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   material: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   exam: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   submission: (id, item) => item.link || `/dashboard/classrooms/${item.classroomId}`,
+  enrollment: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
 };
 
 export default function HomePage() {
@@ -280,7 +283,7 @@ export default function HomePage() {
     };
   }, [user, isAuthenticated, allClassroomIds]);
 
-  // 3. Listen for personal documents and recordings
+  // 3. Listen for personal documents, recordings, and classroom acceptance
   useEffect(() => {
     if (!user || !isAuthenticated) return;
 
@@ -310,7 +313,22 @@ export default function HomePage() {
         }
     );
 
-    personalSubsRef.current = [unsubDocs, unsubRecs];
+    const unsubEnrollments = onSnapshot(
+        query(collection(db, 'users', user.uid, 'enrolled'), orderBy('enrolledAt', 'desc'), limit(5)),
+        (snap) => {
+            const items = snap.docs.map(d => ({
+                id: `enroll-${d.id}`,
+                type: 'enrollment',
+                title: d.data().title || 'Classroom',
+                timestamp: d.data().enrolledAt?.toMillis() || Date.now(),
+                classroomId: d.id,
+                statusLabel: "Joined"
+            } as ActivityItem));
+            setActivityChunks(prev => ({ ...prev, 'personal-enrollments': items }));
+        }
+    );
+
+    personalSubsRef.current = [unsubDocs, unsubRecs, unsubEnrollments];
 
     return () => {
         personalSubsRef.current.forEach(u => u());
@@ -347,8 +365,8 @@ export default function HomePage() {
             const itemAge = currentTime.getTime() - (item.updatedAt || item.timestamp);
             if (itemAge > TWENTY_FOUR_HOURS_IN_MS) return false;
 
-            // Purge deleted classrooms
-            if (item.classroomId && !allClassroomIds[item.classroomId]) return false;
+            // Purge deleted classrooms (except for enrollment alerts which point to that deleted classroom ID sometimes temporarily)
+            if (item.type !== 'enrollment' && item.classroomId && !allClassroomIds[item.classroomId]) return false;
             return true;
         })
         .map(item => {
@@ -421,6 +439,8 @@ export default function HomePage() {
 
                         if (item.type === 'joinRequest') {
                             displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
+                        } else if (item.type === 'enrollment') {
+                            displayTitle = `Request accepted for "${item.title}"`;
                         } else if (item.classroomName) {
                             displayTitle = `${label} ${item.type === 'exam' || item.type === 'submission' ? '' : item.type} in ${item.classroomName}`;
                         } else {
@@ -440,6 +460,7 @@ export default function HomePage() {
                                     item.type === 'material' ? "bg-blue-100 text-blue-600" :
                                     item.type === 'exam' ? "bg-purple-100 text-purple-600" :
                                     item.type === 'submission' ? "bg-green-100 text-green-600" :
+                                    item.type === 'enrollment' ? "bg-primary/10 text-primary" :
                                     "bg-accent/10 text-accent"
                                 )}>
                                     <Icon className="h-4 w-4" />
@@ -449,7 +470,7 @@ export default function HomePage() {
                                         {displayTitle}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                                        {item.type} • {new Date(item.isUpdated ? (item.updatedAt || item.timestamp) : item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                                        {item.type === 'enrollment' ? 'Classroom' : item.type} • {new Date(item.isUpdated ? (item.updatedAt || item.timestamp) : item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
                                     </span>
                                 </div>
                             </Link>
