@@ -62,7 +62,6 @@ import {
   Briefcase,
   User,
   Phone,
-  MessageSquare,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -74,7 +73,6 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export interface Classroom {
@@ -528,7 +526,7 @@ export default function ClassroomsPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8 flex flex-col h-full bg-background/50">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 flex-shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 flex-shrink-0">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
           <div>
@@ -562,7 +560,7 @@ export default function ClassroomsPage() {
       </AlertDialog>
 
       <Tabs defaultValue="discover" className="w-full flex-1 flex flex-col overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-0 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2 flex-shrink-0">
           <TabsList className="bg-muted/50 p-1.5 rounded-xl">
             <TabsTrigger value="discover" className="rounded-lg px-6">Discover</TabsTrigger>
             <TabsTrigger value="my-classes" className="rounded-lg px-6">My Classes</TabsTrigger>
@@ -580,8 +578,8 @@ export default function ClassroomsPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-1">
-          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pb-12">
+        <ScrollArea className="flex-1 pr-1">
+          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
             {filteredDiscover.map(c => (
                 <Card key={c.id} className="flex flex-col shadow-lg border-border/50 hover:border-primary/30 transition-all rounded-2xl overflow-hidden group">
                     <div className="h-2 bg-primary/10 group-hover:bg-primary/30 transition-colors" />
@@ -615,7 +613,7 @@ export default function ClassroomsPage() {
               </div>
             )}
           </TabsContent>
-          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pb-12">
+          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
             {filteredMyClasses.map(c => (
                 <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden">
                     <div className="h-2 bg-accent/20" />
@@ -638,7 +636,7 @@ export default function ClassroomsPage() {
               </div>
             )}
           </TabsContent>
-          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pb-12">
+          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
             {filteredEnrolled.map(c => (
                 <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden group">
                     <div className="h-2 bg-secondary/20 group-hover:bg-secondary/40 transition-colors" />
@@ -659,7 +657,7 @@ export default function ClassroomsPage() {
               </div>
             )}
           </TabsContent>
-        </div>
+        </ScrollArea>
       </Tabs>
     </div>
   );
