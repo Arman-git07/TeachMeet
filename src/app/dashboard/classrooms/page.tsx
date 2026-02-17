@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -67,13 +68,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export interface Classroom {
   id: string;
@@ -526,7 +528,7 @@ export default function ClassroomsPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8 flex flex-col h-full bg-background/50">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 flex-shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2 flex-shrink-0">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
           <div>
@@ -560,7 +562,7 @@ export default function ClassroomsPage() {
       </AlertDialog>
 
       <Tabs defaultValue="discover" className="w-full flex-1 flex flex-col overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-0 flex-shrink-0">
           <TabsList className="bg-muted/50 p-1.5 rounded-xl">
             <TabsTrigger value="discover" className="rounded-lg px-6">Discover</TabsTrigger>
             <TabsTrigger value="my-classes" className="rounded-lg px-6">My Classes</TabsTrigger>
