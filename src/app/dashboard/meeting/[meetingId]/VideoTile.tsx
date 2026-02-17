@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,7 +8,6 @@ import {
   VideoOff,
   Video,
   ScreenShare,
-  ScreenShareOff,
   Pin,
   Maximize2,
   Minimize2,
@@ -27,7 +27,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// --- Main VideoTile Component ---
 type Props = {
   stream: MediaStream | null;
   isCameraOn: boolean;
@@ -70,14 +69,11 @@ const VideoTile: React.FC<Props> = ({
   isSpotlight = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const tileRef = useRef<HTMLDivElement | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
 
   useEffect(() => {
-    // Only apply mirror setting for the local user's camera feed
     if (isLocal && !isScreenSharing) {
-      const mirrorSetting = localStorage.getItem('teachmeet-camera-mirror');
-      setIsMirrored(mirrorSetting === 'true');
+      setIsMirrored(localStorage.getItem('teachmeet-camera-mirror') === 'true');
     } else {
       setIsMirrored(false);
     }
@@ -85,13 +81,12 @@ const VideoTile: React.FC<Props> = ({
 
   useEffect(() => {
     const videoEl = videoRef.current;
-    if (videoEl) {
-      if (stream && videoEl.srcObject !== stream) {
+    if (videoEl && stream) {
+      if (videoEl.srcObject !== stream) {
         videoEl.srcObject = stream;
-        videoEl.play().catch(e => console.warn(`[VideoTile ${name}] Autoplay was prevented:`, e));
-      } else if (!stream) {
-        videoEl.srcObject = null;
       }
+      // Ensure video plays even if user didn't interact directly with this specific tile
+      videoEl.play().catch(e => console.warn(`[VideoTile] Autoplay pending interaction for ${name}`));
     }
   }, [stream, name]);
 
@@ -99,16 +94,13 @@ const VideoTile: React.FC<Props> = ({
 
   return (
     <div
-      ref={tileRef}
       onDoubleClick={onDoubleClick}
       className={cn(
         "relative bg-black rounded-lg overflow-hidden transition-all duration-300",
-        isSpeaking ? "ring-2 sm:ring-4 ring-primary" : "", // Responsive ring
+        isSpeaking ? "ring-2 sm:ring-4 ring-primary" : "",
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       )}
-      role="group"
-      title={`Double-click to pin/unpin ${name}`}
     >
       <div className="absolute top-2 left-2 z-30 flex items-center gap-1">
         {isPinned && (
@@ -121,9 +113,7 @@ const VideoTile: React.FC<Props> = ({
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Unpin Participant?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to unpin {name}?
-                  </AlertDialogDescription>
+                  <AlertDialogDescription>Are you sure you want to unpin {name}?</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -132,13 +122,9 @@ const VideoTile: React.FC<Props> = ({
               </AlertDialogContent>
             </AlertDialog>
         )}
-        <HandRaiseIcon
-          isRaised={isHandRaised}
-          isFirst={isFirstHand}
-        />
+        <HandRaiseIcon isRaised={isHandRaised} isFirst={isFirstHand} />
       </div>
       
-      {/* Video Layer */}
       <div className="relative w-full h-full z-0">
         <video
           ref={videoRef}
@@ -146,62 +132,42 @@ const VideoTile: React.FC<Props> = ({
           playsInline
           muted={isLocal}
           className={cn(
-            "w-full h-full object-cover transition-opacity duration-200 rounded-lg z-0",
+            "w-full h-full object-cover transition-opacity duration-200 rounded-lg",
             (isCameraOn || isScreenSharing) && stream ? "opacity-100" : "opacity-0",
             isMirrored && "transform -scale-x-100"
           )}
         />
 
-        {/* Avatar fallback */}
         {(!isCameraOn && !isScreenSharing || !stream) && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <Avatar className={cn(
-                "w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300"
-              )}>
+            <Avatar className="w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300">
               <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-              <AvatarFallback className="text-3xl md:text-5xl">
-                {name?.charAt(0) ?? "U"}
-              </AvatarFallback>
+              <AvatarFallback className="text-3xl md:text-5xl">{name?.charAt(0) ?? "U"}</AvatarFallback>
             </Avatar>
           </div>
         )}
       </div>
 
-      {/* Camera status (top-right) - hidden if stop button is shown */}
-        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 p-1 rounded-md bg-transparent">
-          {isCameraOn ? (
-            <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-          ) : (
-            <VideoOff className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />
-          )}
-        </div>
+      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30">
+        {isCameraOn ? <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white" /> : <VideoOff className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />}
+      </div>
 
-      {/* Bottom info container */}
       <div className="absolute bottom-0 left-0 right-0 z-30 p-2 sm:p-3 flex items-center justify-between pointer-events-none">
-        {/* Left-aligned info: Avatar, Name, Status icons */}
         <div className="flex items-center gap-2 text-white pointer-events-auto" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
           <Avatar className="w-6 h-6 sm:w-7 sm:h-7 shrink-0">
             <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
             <AvatarFallback className="text-xs sm:text-sm">{name?.charAt(0)}</AvatarFallback>
           </Avatar>
           <div className="text-xs sm:text-sm font-medium truncate">{name}</div>
-          
-          {isMicOn ? (
-            <Mic className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
-          ) : (
-            <MicOff className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />
-          )}
-          {isScreenSharing && <ScreenShare className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />}
+          {isMicOn ? <Mic className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" /> : <MicOff className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />}
         </div>
         
-        {/* Right-aligned info: Fullscreen button */}
         <div className="pointer-events-auto">
           <Button
             variant="ghost"
             size="icon"
             onClick={onSpotlightClick}
             className="h-7 w-7 sm:h-8 sm:w-8 rounded-full text-white/80 hover:bg-black/50 hover:text-white"
-            title={isSpotlight ? "Exit Spotlight" : "Spotlight User"}
           >
             {isSpotlight ? <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />}
           </Button>
