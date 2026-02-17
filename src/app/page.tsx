@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { motion } from 'framer-motion';
 import { 
   Video, 
   XCircle, 
@@ -419,7 +420,19 @@ export default function HomePage() {
           <Logo size="medium" className="mb-8" />
           <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border border-border/50">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
-                <Bell className="mr-3 h-6 w-6" /> Latest Activity
+                <motion.div
+                  animate={{ rotate: [0, -10, 10, -10, 10, 0] }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    repeatDelay: 2
+                  }}
+                  style={{ transformOrigin: 'top center' }}
+                  className="mr-3"
+                >
+                  <Bell className="h-6 w-6" />
+                </motion.div>
+                Latest Activity
             </h2>
             {authLoading || isLoading ? (
                 <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
