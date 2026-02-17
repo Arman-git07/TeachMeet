@@ -91,11 +91,12 @@ export default function ClassroomChatPage() {
   useEffect(() => {
     if (!classroomId || !user) return;
 
-    // Default query
+    // Use descending order to get the LATEST messages first, then reverse them locally.
+    // This prevents the chat from being stuck on the oldest 100 messages.
     let messagesQuery = query(
       collection(db, 'classrooms', classroomId, 'messages'),
-      orderBy('timestamp', 'asc'),
-      limit(100)
+      orderBy('timestamp', 'desc'),
+      limit(50)
     );
 
     // Apply Vanish Logic if configured
@@ -109,12 +110,12 @@ export default function ClassroomChatPage() {
             case '1w': threshold.setDate(now.getDate() - 7); break;
             case '1m': threshold.setMonth(now.getMonth() - 1); break;
         }
-        // Firestore range filter on timestamp
+        
         messagesQuery = query(
             collection(db, 'classrooms', classroomId, 'messages'),
             where('timestamp', '>=', Timestamp.fromDate(threshold)),
-            orderBy('timestamp', 'asc'),
-            limit(100)
+            orderBy('timestamp', 'desc'),
+            limit(50)
         );
     }
 
@@ -127,7 +128,9 @@ export default function ClassroomChatPage() {
           isMe: data.senderId === user?.uid
         } as ChatMessage;
       });
-      setMessages(fetchedMessages);
+      
+      // Reverse because we queried DESC to get the latest, but want to display ASC
+      setMessages(fetchedMessages.reverse());
       
       // Auto-scroll to bottom
       setTimeout(() => {
@@ -137,14 +140,17 @@ export default function ClassroomChatPage() {
       }, 100);
     }, (error) => {
         console.error("Chat sync error:", error);
-        // Note: If adding a 'where' clause, an index might be required.
         if (error.message?.includes('index')) {
-            console.warn("Chat index missing for vanish duration. Please create index in Firebase Console.");
+            toast({ 
+                variant: 'destructive', 
+                title: "Index Required", 
+                description: "Vanish duration requires a Firestore composite index. Please contact support." 
+            });
         }
     });
 
     return () => unsubscribe();
-  }, [classroomId, user, (classroom as any)?.chatVanishDuration]);
+  }, [classroomId, user, (classroom as any)?.chatVanishDuration, toast]);
 
   const handleUpdateVanishDuration = async (value: string) => {
     if (!isCreator || !classroomId) return;
@@ -219,7 +225,7 @@ export default function ClassroomChatPage() {
       toast({ 
         variant: 'destructive', 
         title: "Message Failed", 
-        description: "Could not send message. Please check your connection." 
+        description: error.message || "Could not send message. Please check your permissions or connection." 
       });
     } finally {
       setIsSending(false);
@@ -280,13 +286,11 @@ export default function ClassroomChatPage() {
     if (!classroomId || !messageId) return;
     const docRef = doc(db, 'classrooms', classroomId, 'messages', messageId);
     
-    // Non-blocking delete mutation
     deleteDoc(docRef)
       .then(() => {
         toast({ title: "Message deleted" });
       })
       .catch(async (serverError) => {
-        // Construct and emit a rich, contextual error for the dev overlay
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'delete',

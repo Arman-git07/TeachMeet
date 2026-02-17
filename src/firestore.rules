@@ -110,8 +110,9 @@ service cloud.firestore {
       }
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && (isStudent(classroomId, request.auth.uid) || canManageClassroom(classroomId, request.auth.uid));
-        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid && (isStudent(classroomId, request.auth.uid) || canManageClassroom(classroomId, request.auth.uid));
+        // Broaden read/write to ensure the Creator and any approved participant can access the public chat
+        allow read: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid) || isTeacher(classroomId, request.auth.uid));
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid && (isClassroomOwner(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid) || isTeacher(classroomId, request.auth.uid));
         // Only the sender or the classroom owner can delete messages
         allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || isClassroomOwner(classroomId, request.auth.uid));
       }
