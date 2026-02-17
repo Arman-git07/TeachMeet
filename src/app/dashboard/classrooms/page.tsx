@@ -562,7 +562,7 @@ export default function ClassroomsPage() {
       </AlertDialog>
 
       <Tabs defaultValue="discover" className="w-full flex-1 flex flex-col overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-0 flex-shrink-0">
           <TabsList className="bg-muted/50 p-1.5 rounded-xl">
             <TabsTrigger value="discover" className="rounded-lg px-6">Discover</TabsTrigger>
             <TabsTrigger value="my-classes" className="rounded-lg px-6">My Classes</TabsTrigger>
