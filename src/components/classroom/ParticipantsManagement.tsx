@@ -80,7 +80,7 @@ export function ParticipantsManagement() {
                                 </Avatar>
                                 <span className="text-sm flex-grow">{p.name}</span>
                                 <Badge variant={p.role === 'teacher' ? 'secondary' : 'default'} className="ml-2 capitalize">{p.role}</Badge>
-                                {((userRole === 'creator' && p.uid !== user?.uid) || (userRole === 'teacher' && p.role === 'student')) && (
+                                {(userRole === 'creator' && p.uid !== user?.uid) && (
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70" disabled={isProcessing === p.uid}>
