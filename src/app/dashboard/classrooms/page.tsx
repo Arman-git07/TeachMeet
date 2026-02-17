@@ -578,8 +578,8 @@ export default function ClassroomsPage() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 pr-1">
-          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
+        <ScrollArea className="flex-1 mt-0 pr-1">
+          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
             {filteredDiscover.map(c => (
                 <Card key={c.id} className="flex flex-col shadow-lg border-border/50 hover:border-primary/30 transition-all rounded-2xl overflow-hidden group">
                     <div className="h-2 bg-primary/10 group-hover:bg-primary/30 transition-colors" />
@@ -613,7 +613,7 @@ export default function ClassroomsPage() {
               </div>
             )}
           </TabsContent>
-          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
+          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
             {filteredMyClasses.map(c => (
                 <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden">
                     <div className="h-2 bg-accent/20" />
@@ -636,7 +636,7 @@ export default function ClassroomsPage() {
               </div>
             )}
           </TabsContent>
-          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
+          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
             {filteredEnrolled.map(c => (
                 <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden group">
                     <div className="h-2 bg-secondary/20 group-hover:bg-secondary/40 transition-colors" />
