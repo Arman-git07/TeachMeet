@@ -210,7 +210,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         </div>
       </div>
       <DialogFooter>
-        <DialogClose asChild><Button type="button" variant="secondary" className="rounded-xl" disabled={isLoading}>Cancel</Button></DialogClose>
+        <DialogClose asChild><Button type="button" variant="outline" className="rounded-xl" disabled={isLoading}>Cancel</Button></DialogClose>
         <Button onClick={handleSubmit} disabled={isLoading} className="btn-gel rounded-xl">
           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           {classroomToEdit ? 'Save Changes' : 'Create Classroom'}
