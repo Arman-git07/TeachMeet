@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -68,13 +67,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export interface Classroom {
@@ -536,7 +534,7 @@ export default function ClassroomsPage() {
                 <School className="h-8 w-8 text-primary" />
                 Classrooms
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Discover, manage, and join interactive learning spaces.</p>
+            <p className="text-sm text-muted-foreground mt-1">Discover, manage, and join learning spaces.</p>
           </div>
         </div>
         { user && (
