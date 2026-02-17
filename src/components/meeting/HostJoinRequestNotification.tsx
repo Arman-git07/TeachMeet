@@ -1,13 +1,13 @@
-
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Check, X, Volume2 } from "lucide-react";
+import { Check, X, Volume2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface JoinRequest {
   id: string;
@@ -25,34 +25,28 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
   const [audioBlocked, setAudioBlocked] = useState(false);
   
   useEffect(() => {
-    // Preload the audio element.
     audioRef.current = new Audio("/sounds/join-request.mp3");
     audioRef.current.volume = 0.75;
   }, []);
 
   const playSound = useCallback(() => {
     if (audioRef.current) {
-      // Always try to play.
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         playPromise.then(() => {
-          // Playback started successfully.
           setAudioBlocked(false);
         }).catch(error => {
-          // Autoplay was prevented. Show the UI to let the user enable it.
           if (error.name === 'NotAllowedError') {
-            console.warn("Audio playback was blocked by the browser's autoplay policy. Showing user interaction prompt.");
             setAudioBlocked(true);
-          } else {
-            console.error("Audio playback failed:", error);
           }
         });
       }
     }
   }, []);
   
-  const handleManualPlaySound = () => {
-    playSound(); // This click will satisfy the browser and play the sound.
+  const handleManualPlaySound = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    playSound();
   };
 
   useEffect(() => {
@@ -65,7 +59,13 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       const newRequests = pendingReqs.filter(req => !playedSoundRef.current[req.id]);
 
       if (newRequests.length > 0) {
-        setRequests(prev => [...prev, ...newRequests].slice(-3)); 
+        setRequests(prev => {
+            const next = [...prev];
+            newRequests.forEach(nr => {
+                if (!next.find(r => r.id === nr.id)) next.push(nr);
+            });
+            return next.slice(-3); // Keep only latest 3 to prevent clutter
+        });
         
         newRequests.forEach((req) => {
           if (!playedSoundRef.current[req.id]) {
@@ -95,10 +95,12 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
           photoURL: req.userPhotoURL || "",
           joinedAt: serverTimestamp(),
           isHost: false,
+          isCameraOn: false,
+          isMicOn: false,
         });
         batch.delete(joinRequestRef);
         await batch.commit();
-        toast({ title: "Request Accepted", description: `${req.userName} can now join the meeting.` });
+        toast({ title: "Request Accepted", description: `${req.userName} has joined the meeting.` });
       } else {
         await updateDoc(joinRequestRef, { status: "denied" });
         toast({ variant: "destructive", title: "Request Denied", description: `${req.userName} was denied access.` });
@@ -107,55 +109,70 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       setRequests(prev => prev.filter(r => r.id !== req.id));
   
     } catch (error) {
-      console.error(`❌ handle ${action} failed:`, error);
-      toast({ variant: "destructive", title: "Action Failed", description: `Could not ${action} the request.` });
+      console.error(`handle ${action} failed:`, error);
+      toast({ variant: "destructive", title: "Action Failed" });
     }
   };
-
 
   if (!requests.length) return null;
 
   return (
-    <>
-      {requests.map((req) => (
-        <div
-          key={req.id}
-          className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[9999] bg-background/80 text-foreground backdrop-blur-sm rounded-2xl shadow-2xl border border-primary/30 p-4 sm:px-6 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-4 w-[90%] max-w-lg animate-slideDown"
-        >
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <Avatar className="h-12 w-12 border-2 border-primary/50 flex-shrink-0">
-              <AvatarImage src={req.userPhotoURL} alt={req.userName} data-ai-hint="avatar user"/>
-              <AvatarFallback>{req.userName?.charAt(0).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col text-center sm:text-left">
-              <span className="text-lg font-semibold">Join Request</span>
-              <span className="text-sm text-muted-foreground">{req.userName || "A participant"} wants to join.</span>
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-[95%] max-w-md flex flex-col gap-3 pointer-events-none">
+      <AnimatePresence>
+        {requests.map((req) => (
+          <motion.div
+            key={req.id}
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="pointer-events-auto bg-background/90 text-foreground backdrop-blur-md rounded-2xl shadow-2xl border border-primary/20 p-4 flex flex-col sm:flex-row items-center gap-4 overflow-hidden"
+          >
+            <div className="flex items-center gap-3 w-full sm:flex-1">
+              <div className="relative shrink-0">
+                <Avatar className="h-12 w-12 border-2 border-primary/20">
+                  <AvatarImage src={req.userPhotoURL} alt={req.userName} data-ai-hint="avatar user"/>
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold">{req.userName?.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full border-2 border-background">
+                    <UserPlus size={10} />
+                </div>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-bold truncate leading-tight">Join Request</span>
+                <span className="text-xs text-muted-foreground truncate">{req.userName || "A user"} wants to join</span>
+              </div>
             </div>
-          </div>
-          <div className="flex gap-3 items-center flex-shrink-0">
-            {audioBlocked && (
-                <button
-                    onClick={handleManualPlaySound}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2"
-                >
-                    <Volume2 size={18} /> Play Sound
-                </button>
-            )}
-            <button
-              onClick={() => handleRequest(req, 'approve')}
-              className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
-            >
-              <Check size={18} /> <span className="hidden sm:inline">Accept</span>
-            </button>
-            <button
-              onClick={() => handleRequest(req, 'deny')}
-              className="bg-destructive hover:bg-destructive/90 text-white px-4 py-2 rounded-xl flex items-center gap-2"
-            >
-              <X size={18} /> <span className="hidden sm:inline">Decline</span>
-            </button>
-          </div>
-        </div>
-      ))}
-    </>
+
+            <div className="flex gap-2 w-full sm:w-auto shrink-0">
+              {audioBlocked && (
+                  <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleManualPlaySound}
+                      className="h-9 px-3 rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50"
+                  >
+                      <Volume2 size={16} />
+                  </Button>
+              )}
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleRequest(req, 'deny')}
+                className="h-9 px-4 sm:px-5 rounded-xl flex items-center gap-2 flex-1 sm:flex-none font-bold"
+              >
+                <X size={16} /> <span className="sm:hidden">Decline</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleRequest(req, 'approve')}
+                className="btn-gel h-9 px-4 sm:px-5 rounded-xl flex items-center gap-2 flex-1 sm:flex-none font-bold"
+              >
+                <Check size={16} /> <span className="sm:hidden">Accept</span>
+              </Button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
   );
 }

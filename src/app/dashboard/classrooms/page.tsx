@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -9,6 +8,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  CardContent,
 } from '@/components/ui/card';
 import {
   Dialog,
@@ -37,7 +37,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
 import {
   collection,
-  addDoc,
   serverTimestamp,
   doc,
   updateDoc,
@@ -47,7 +46,7 @@ import {
   where,
   writeBatch,
   getDocs,
-  setDoc,
+  limit,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -56,10 +55,14 @@ import {
   Trash2,
   Loader2,
   BookOpen,
-  Eye,
   School,
   PanelLeftOpen,
   Search,
+  Globe,
+  Briefcase,
+  User,
+  Phone,
+  MessageSquare,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -71,6 +74,8 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export interface Classroom {
   id: string;
@@ -156,8 +161,6 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         
         batch.set(classroomRef, classroomData);
 
-        // Crucial Fix: Add the creator to participants and teachers sub-collections
-        // so that chat and other restricted features work immediately.
         batch.set(doc(db, 'classrooms', classroomRef.id, 'participants', user.uid), {
             uid: user.uid,
             name: user.displayName || 'Creator',
@@ -194,21 +197,23 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       </DialogHeader>
       <div className="grid gap-4 py-4">
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="title" className="text-right">Title</Label>
-          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., Introduction to React" disabled={isLoading}/>
+          <Label htmlFor="title" className="text-right font-bold text-xs uppercase tracking-widest text-muted-foreground">Title</Label>
+          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3 rounded-xl" placeholder="e.g., Introduction to React" disabled={isLoading}/>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="description" className="text-right">Description</Label>
-          <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" placeholder="A brief summary" disabled={isLoading}/>
+          <Label htmlFor="description" className="text-right font-bold text-xs uppercase tracking-widest text-muted-foreground">Description</Label>
+          <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3 rounded-xl resize-none h-24" placeholder="A brief summary" disabled={isLoading}/>
         </div>
-        <div className="flex items-center space-x-2 justify-end">
-          <Label htmlFor="is-public">{isPublic ? 'Make Private' : 'Make Public'}</Label>
+        <div className="flex items-center space-x-3 justify-end pt-2">
+          <Label htmlFor="is-public" className="font-bold text-xs uppercase tracking-widest text-muted-foreground">
+            {isPublic ? 'Public' : 'Private'}
+          </Label>
           <Switch id="is-public" checked={isPublic} onCheckedChange={setIsPublic} disabled={isLoading}/>
         </div>
       </div>
       <DialogFooter>
-        <DialogClose asChild><Button type="button" variant="secondary" disabled={isLoading}>Cancel</Button></DialogClose>
-        <Button onClick={handleSubmit} disabled={isLoading}>
+        <DialogClose asChild><Button type="button" variant="secondary" className="rounded-xl" disabled={isLoading}>Cancel</Button></DialogClose>
+        <Button onClick={handleSubmit} disabled={isLoading} className="btn-gel rounded-xl">
           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           {classroomToEdit ? 'Save Changes' : 'Create Classroom'}
         </Button>
@@ -291,7 +296,7 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
     };
 
     return (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg rounded-2xl">
             <DialogHeader>
                 <DialogTitle>Apply to Teach: {classroom.title}</DialogTitle>
                 <DialogDescription>
@@ -303,28 +308,28 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
                     <FormField control={form.control} name="fullName" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Full Name</FormLabel>
-                            <FormControl><Input placeholder="Your full name" {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><Input placeholder="Your full name" {...field} className="rounded-xl" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
                      <FormField control={form.control} name="subject" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Subject of Expertise</FormLabel>
-                            <FormControl><Input placeholder="e.g., Mathematics" {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><Input placeholder="e.g., Mathematics" {...field} className="rounded-xl" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
                      <FormField control={form.control} name="mobile" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Mobile Number (WhatsApp)</FormLabel>
-                            <FormControl><Input type="tel" placeholder="Your contact number" {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="tel" placeholder="Your contact number" {...field} className="pl-10 rounded-xl" disabled={isLoading} /></div></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
                     <FormField control={form.control} name="qualification" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Highest Qualification</FormLabel>
-                            <FormControl><Textarea placeholder="e.g., B.S. in Computer Science" {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><Textarea placeholder="e.g., B.S. in Computer Science" {...field} className="rounded-xl resize-none" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -335,8 +340,8 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
                         <FormItem>
                           <FormLabel>Teaching Experience</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select years" /></SelectTrigger></FormControl>
-                            <SelectContent>
+                            <FormControl><SelectTrigger className="rounded-xl"><SelectValue placeholder="Select years" /></SelectTrigger></FormControl>
+                            <SelectContent className="rounded-xl">
                               <SelectItem value="Less than 1 year">Less than 1 year</SelectItem>
                               <SelectItem value="1-3 years">1-3 years</SelectItem>
                               <SelectItem value="3-5 years">3-5 years</SelectItem>
@@ -350,27 +355,27 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
                      <FormField control={form.control} name="availability" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Availability</FormLabel>
-                            <FormControl><Textarea placeholder="e.g., Weekdays 5-8 PM" {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><Textarea placeholder="e.g., Weekdays 5-8 PM" {...field} className="rounded-xl resize-none" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
                     <FormField control={form.control} name="message" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Message (Optional)</FormLabel>
-                            <FormControl><Textarea placeholder="Introduce yourself..." {...field} disabled={isLoading} /></FormControl>
+                            <FormControl><Textarea placeholder="Introduce yourself..." {...field} className="rounded-xl resize-none" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
                      <FormField control={form.control} name="resume" render={({ field: { onChange, value, ...rest } }) => (
                         <FormItem>
                             <FormLabel>Resume/CV (Optional)</FormLabel>
-                            <FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} disabled={isLoading} /></FormControl>
+                            <FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} className="rounded-xl" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
-                     <DialogFooter className="sticky bottom-0 bg-background pt-4">
-                        <DialogClose asChild><Button variant="outline" type="button" disabled={isLoading}>Cancel</Button></DialogClose>
-                        <Button type="submit" disabled={isLoading}>
+                     <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
+                        <DialogClose asChild><Button variant="outline" type="button" className="rounded-xl" disabled={isLoading}>Cancel</Button></DialogClose>
+                        <Button type="submit" disabled={isLoading} className="btn-gel rounded-xl">
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                             Submit Application
                         </Button>
@@ -412,7 +417,7 @@ export default function ClassroomsPage() {
   }, [user]);
 
   useEffect(() => {
-    return onSnapshot(query(collection(db, 'classrooms'), where('isPublic', '==', true)), (snapshot) => {
+    return onSnapshot(query(collection(db, 'classrooms'), where('isPublic', '==', true), limit(50)), (snapshot) => {
         setDiscoverClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom)));
     });
   }, []);
@@ -503,7 +508,6 @@ export default function ClassroomsPage() {
   const filteredDiscover = useMemo(() => {
     const filtered = discoverClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    // Priority Sorting: Owned > Enrolled > Others
     return [...filtered].sort((a, b) => {
       const aIsOwned = a.teacherId === user?.uid;
       const bIsOwned = b.teacherId === user?.uid;
@@ -523,18 +527,24 @@ export default function ClassroomsPage() {
   const filteredEnrolled = useMemo(() => enrolledClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [enrolledClasses, searchQuery]);
 
   return (
-    <div className="container mx-auto p-4 md:p-8 flex flex-col h-full">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 flex-shrink-0">
+    <div className="container mx-auto p-4 md:p-8 flex flex-col h-full bg-background/50">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 flex-shrink-0">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
-          <h1 className="text-3xl font-bold text-foreground">Classrooms</h1>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                <School className="h-8 w-8 text-primary" />
+                Classrooms
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Discover, manage, and join interactive learning spaces.</p>
+          </div>
         </div>
         { user && (
-            <div className="flex flex-shrink-0 gap-2 w-full sm:w-auto">
-                <Button asChild variant="outline" className="flex-1 sm:flex-initial"><Link href="/dashboard/classrooms/join">Join a Class</Link></Button>
+            <div className="flex flex-shrink-0 gap-3 w-full sm:w-auto">
+                <Button asChild variant="outline" className="flex-1 sm:flex-initial rounded-xl h-11"><Link href="/dashboard/classrooms/join">Join a Class</Link></Button>
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                  <DialogTrigger asChild><Button onClick={handleCreateNew} className="flex-1 sm:flex-initial"><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
-                  <DialogContent><CreateClassroomForm onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
+                  <DialogTrigger asChild><Button onClick={handleCreateNew} className="flex-1 sm:flex-initial btn-gel rounded-xl h-11"><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
+                  <DialogContent className="rounded-2xl"><CreateClassroomForm onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
                 </Dialog>
             </div>
         )}
@@ -545,85 +555,107 @@ export default function ClassroomsPage() {
       </Dialog>
 
       <AlertDialog open={!!classroomToDelete} onOpenChange={(isOpen) => !isOpen && setClassroomToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{classroomToDelete?.title}".</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 rounded-xl">Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <Tabs defaultValue="discover" className="w-full flex-1 flex flex-col overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 flex-shrink-0">
-          <TabsList className="bg-muted/50 p-1 rounded-lg">
-            <TabsTrigger value="discover"><Eye className="mr-2 h-4 w-4" /> Discover</TabsTrigger>
-            <TabsTrigger value="my-classes"><School className="mr-2 h-4 w-4" /> My Classes</TabsTrigger>
-            <TabsTrigger value="enrolled"><BookOpen className="mr-2 h-4 w-4" /> Enrolled</TabsTrigger>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 flex-shrink-0">
+          <TabsList className="bg-muted/50 p-1.5 rounded-xl">
+            <TabsTrigger value="discover" className="rounded-lg px-6">Discover</TabsTrigger>
+            <TabsTrigger value="my-classes" className="rounded-lg px-6">My Classes</TabsTrigger>
+            <TabsTrigger value="enrolled" className="rounded-lg px-6">Enrolled</TabsTrigger>
           </TabsList>
           
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input 
-              placeholder="Search by name..." 
-              className="pl-9 h-10 rounded-xl bg-background border-border/50 focus:ring-primary"
+              placeholder="Search classrooms..." 
+              className="pl-10 h-11 rounded-xl bg-background border-border shadow-sm focus:ring-primary transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-0">
+        <div className="flex-1 overflow-y-auto pr-1">
+          <TabsContent value="discover" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pb-12">
             {filteredDiscover.map(c => (
-                <Card key={c.id} className="flex flex-col">
-                    <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>By {c.teacherName}</CardDescription></CardHeader>
-                    <CardFooter className="mt-auto">
+                <Card key={c.id} className="flex flex-col shadow-lg border-border/50 hover:border-primary/30 transition-all rounded-2xl overflow-hidden group">
+                    <div className="h-2 bg-primary/10 group-hover:bg-primary/30 transition-colors" />
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-xl group-hover:text-primary transition-colors truncate">{c.title}</CardTitle>
+                        <CardDescription className="flex items-center gap-1.5 font-medium">
+                            <User className="h-3.5 w-3.5" /> {c.teacherName}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{c.description || "No description provided."}</p>
+                    </CardContent>
+                    <CardFooter className="mt-auto pt-4 border-t bg-muted/5">
                         {pendingRequestIds.has(c.id) ? (
-                            <Button variant="destructive" className="w-full" onClick={() => handleCancelRequest(c.id)}>Cancel Request</Button>
+                            <Button variant="destructive" className="w-full rounded-xl h-10 font-bold" onClick={() => handleCancelRequest(c.id)}>Cancel Request</Button>
                         ) : enrolledClasses.some(e => e.classroomId === c.id) || myClasses.some(m => m.id === c.id) ? (
-                            <Button asChild className="w-full"><Link href={`/dashboard/classrooms/${c.id}`}>Enter</Link></Button>
+                            <Button asChild className="w-full btn-gel rounded-xl h-10 font-bold"><Link href={`/dashboard/classrooms/${c.id}`}>Enter Classroom</Link></Button>
                         ) : (
                             <div className="flex gap-2 w-full">
-                                <Button variant="outline" className="flex-1" onClick={() => handleRequestToJoinStudent(c.id)}>Join as Student</Button>
-                                <Button variant="outline" className="flex-1" onClick={() => handleOpenTeacherAppDialog(c)}>Join as Teacher</Button>
+                                <Button variant="outline" className="flex-1 rounded-xl h-10 font-semibold" onClick={() => handleRequestToJoinStudent(c.id)}>Join Student</Button>
+                                <Button variant="secondary" className="flex-1 rounded-xl h-10 font-semibold" onClick={() => handleOpenTeacherAppDialog(c)}>Join Teacher</Button>
                             </div>
                         )}
                     </CardFooter>
                 </Card>
             ))}
             {filteredDiscover.length === 0 && (
-              <div className="col-span-full py-12 text-center text-muted-foreground">
-                No classrooms found matching "{searchQuery}"
+              <div className="col-span-full py-20 text-center flex flex-col items-center justify-center">
+                <Globe className="h-12 w-12 text-muted-foreground opacity-20 mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">No classrooms found matching "{searchQuery}"</p>
               </div>
             )}
           </TabsContent>
-          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-0">
+          <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pb-12">
             {filteredMyClasses.map(c => (
-                <Card key={c.id}>
-                    <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>{c.id}</CardDescription></CardHeader>
-                    <CardFooter className="flex justify-between">
-                        <Button asChild><Link href={`/dashboard/classrooms/${c.id}`}>Enter</Link></Button>
-                        <div>
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(c)}><Edit className="h-4 w-4"/></Button>
-                            <Button variant="ghost" size="icon" onClick={() => setClassroomToDelete(c)}><Trash2 className="h-4 w-4"/></Button>
-                        </div>
+                <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden">
+                    <div className="h-2 bg-accent/20" />
+                    <CardHeader>
+                        <CardTitle className="truncate">{c.title}</CardTitle>
+                        <CardDescription className="font-mono text-[10px] uppercase tracking-tighter opacity-50">ID: {c.id}</CardDescription>
+                    </CardHeader>
+                    <CardFooter className="flex justify-between gap-2 border-t pt-4 bg-muted/5">
+                        <Button asChild className="flex-1 btn-gel rounded-xl"><Link href={`/dashboard/classrooms/${c.id}`}>Enter</Link></Button>
+                        <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 hover:bg-primary/10 hover:text-primary" onClick={() => handleEdit(c)}><Edit className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 hover:bg-destructive/10 hover:text-destructive" onClick={() => setClassroomToDelete(c)}><Trash2 className="h-4 w-4"/></Button>
                     </CardFooter>
                 </Card>
             ))}
             {filteredMyClasses.length === 0 && (
-              <div className="col-span-full py-12 text-center text-muted-foreground">
-                No classrooms found matching "{searchQuery}"
+              <div className="col-span-full py-20 text-center flex flex-col items-center justify-center">
+                <Briefcase className="h-12 w-12 text-muted-foreground opacity-20 mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">You haven't created any classrooms yet.</p>
+                <Button className="mt-4 rounded-xl btn-gel" onClick={handleCreateNew}>Start a Classroom</Button>
               </div>
             )}
           </TabsContent>
-          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-0">
+          <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pb-12">
             {filteredEnrolled.map(c => (
-                <Card key={c.id}>
-                    <CardHeader><CardTitle>{c.title}</CardTitle><CardDescription>By {c.teacherName}</CardDescription></CardHeader>
-                    <CardFooter><Button asChild className="w-full"><Link href={`/dashboard/classrooms/${c.classroomId}`}>Enter</Link></Button></CardFooter>
+                <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden group">
+                    <div className="h-2 bg-secondary/20 group-hover:bg-secondary/40 transition-colors" />
+                    <CardHeader>
+                        <CardTitle className="truncate">{c.title}</CardTitle>
+                        <CardDescription className="font-medium text-primary">By {c.teacherName}</CardDescription>
+                    </CardHeader>
+                    <CardFooter className="border-t pt-4 bg-muted/5">
+                        <Button asChild className="w-full btn-gel rounded-xl h-10 font-bold"><Link href={`/dashboard/classrooms/${c.classroomId}`}>Enter Classroom</Link></Button>
+                    </CardFooter>
                 </Card>
             ))}
             {filteredEnrolled.length === 0 && (
-              <div className="col-span-full py-12 text-center text-muted-foreground">
-                No classrooms found matching "{searchQuery}"
+              <div className="col-span-full py-20 text-center flex flex-col items-center justify-center">
+                <BookOpen className="h-12 w-12 text-muted-foreground opacity-20 mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">You aren't enrolled in any classrooms.</p>
+                <Button variant="outline" className="mt-4 rounded-xl" onClick={() => (document.querySelector('[value="discover"]') as HTMLElement)?.click()}>Discover Classes</Button>
               </div>
             )}
           </TabsContent>
