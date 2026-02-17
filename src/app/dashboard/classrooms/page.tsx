@@ -443,16 +443,32 @@ export default function ClassroomsPage() {
     if (!classroomToDelete || !user) return;
     try {
         const classroomRef = doc(db, 'classrooms', classroomToDelete.id);
+        
+        // 1. Fetch all participants to clean up their enrollment records
+        const participantsSnap = await getDocs(collection(db, classroomRef.path, 'participants'));
+        const participantIds = participantsSnap.docs.map(d => d.id);
+
+        const batch = writeBatch(db);
+
+        // 2. Queue enrollment removal for all students and teachers
+        participantIds.forEach(pId => {
+            batch.delete(doc(db, `users/${pId}/enrolled`, classroomToDelete.id));
+        });
+
+        // 3. Queue deletion of subcollections
         const subs = ['announcements', 'assignments', 'exams', 'materials', 'participants', 'joinRequests', 'teachers'];
-        for (const sub of subs) {
-            const snap = await getDocs(collection(db, classroomRef.path, sub));
-            const batch = writeBatch(db);
-            snap.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
+        for (const subName of subs) {
+            const subSnap = await getDocs(collection(db, classroomRef.path, subName));
+            subSnap.docs.forEach(d => batch.delete(d.ref));
         }
-        await deleteDoc(classroomRef);
-        toast({ title: 'Classroom Deleted' });
+
+        // 4. Delete the classroom document itself
+        batch.delete(classroomRef);
+
+        await batch.commit();
+        toast({ title: 'Classroom Deleted', description: 'The classroom and all associated student enrollments have been removed.' });
     } catch (error) {
+      console.error('Error deleting classroom:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete.' });
     } finally {
       setClassroomToDelete(null);
