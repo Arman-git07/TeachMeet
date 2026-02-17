@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback, memo } from 'react';
@@ -91,17 +90,19 @@ export function ClassroomHeader() {
                                 </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
+                            
+                            {userRole === 'creator' && (
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
+                                        <UserPlus className="mr-2 h-4 w-4"/>Join Requests
+                                    </Link>
+                                </DropdownMenuItem>
+                            )}
+
                             {canUserManage && (
-                                <>
-                                    <DropdownMenuItem asChild>
-                                        <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
-                                            <UserPlus className="mr-2 h-4 w-4"/>Join Requests
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => setIsParticipantsOpen(true)}>
-                                        <Users className="mr-2 h-4 w-4"/>Manage Participants
-                                    </DropdownMenuItem>
-                                </>
+                                <DropdownMenuItem onSelect={() => setIsParticipantsOpen(true)}>
+                                    <Users className="mr-2 h-4 w-4"/>Manage Participants
+                                </DropdownMenuItem>
                             )}
                             
                             <DropdownMenuItem onSelect={() => setIsTeachersOpen(true)}>

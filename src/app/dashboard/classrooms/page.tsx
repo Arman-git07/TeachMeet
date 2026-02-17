@@ -538,11 +538,16 @@ export default function ClassroomsPage() {
   }, [discoverClasses, searchQuery, user, enrolledClasses]);
 
   const filteredMyClasses = useMemo(() => myClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [myClasses, searchQuery]);
-  const filteredEnrolled = useMemo(() => enrolledClasses.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())), [enrolledClasses, searchQuery]);
+  const filteredEnrolled = useMemo(() => {
+    const myClassIds = new Set(myClasses.map(c => c.id));
+    return enrolledClasses
+      .filter(c => !myClassIds.has(c.classroomId))
+      .filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [enrolledClasses, searchQuery, myClasses]);
 
   return (
     <div className="container mx-auto p-4 md:p-8 flex flex-col h-full bg-background/50">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-0 flex-shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2 flex-shrink-0">
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
           <div>
