@@ -1,4 +1,3 @@
-
 "use client";
 
 import { io, Socket } from "socket.io-client";
@@ -53,7 +52,6 @@ export class MeshRTC {
     console.log("[mesh] Initializing with local stream tracks:", this.localStream?.getTracks().map(t => t.kind));
     
     this._ready = true;
-    // Process any signals that arrived before the camera was ready
     while (this._pendingSignals.length) {
       const fn = this._pendingSignals.shift();
       fn?.();
@@ -110,7 +108,6 @@ export class MeshRTC {
     
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      // Process queued ICE candidates
       while (entry.iceCandidateQueue.length) {
         const cand = entry.iceCandidateQueue.shift();
         if (cand) await pc.addIceCandidate(new RTCIceCandidate(cand));
@@ -183,7 +180,6 @@ export class MeshRTC {
       }
     };
 
-    // Attach local tracks immediately
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         pc.addTrack(track, this.localStream!);
@@ -217,12 +213,9 @@ export class MeshRTC {
       const sender = senders.find(s => s.track?.kind === newTrack.kind);
       
       if (sender) {
-        console.log(`[mesh] Replacing ${newTrack.kind} track for peer ${remoteId}`);
         await sender.replaceTrack(newTrack);
       } else {
-        console.log(`[mesh] Adding ${newTrack.kind} track for peer ${remoteId} (was missing)`);
         pc.addTrack(newTrack, this.localStream);
-        // addTrack automatically triggers onnegotiationneeded
       }
     }
   }

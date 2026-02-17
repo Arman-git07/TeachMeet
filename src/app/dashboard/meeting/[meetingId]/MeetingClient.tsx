@@ -264,7 +264,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           }
         };
         
-        mediaRecorderRef.current.start(1000); // 1-second timeslice
+        mediaRecorderRef.current.start(1000); 
         recordingStartRef.current = Date.now();
         setIsRecording(true);
         toast({ title: 'Recording Started', description: 'Your local audio and video are being recorded.' });
@@ -601,7 +601,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     let all = [self, ...remotes];
 
     if (isSharingScreen && screenShareHelper?.currentMode === 'alongside' && screenShareStream) {
-        self.isScreenSharing = false; // Main tile is camera
+        self.isScreenSharing = false; 
         const screenShareParticipant: Participant = {
             id: `${userId}-screen`,
             name: `${self.name}'s Screen`,

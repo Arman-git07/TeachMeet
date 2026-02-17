@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -85,7 +84,6 @@ const VideoTile: React.FC<Props> = ({
       if (videoEl.srcObject !== stream) {
         videoEl.srcObject = stream;
       }
-      // Ensure video plays even if user didn't interact directly with this specific tile
       videoEl.play().catch(e => console.warn(`[VideoTile] Autoplay pending interaction for ${name}`));
     }
   }, [stream, name]);
