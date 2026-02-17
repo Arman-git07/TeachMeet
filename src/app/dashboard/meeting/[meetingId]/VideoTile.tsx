@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -157,7 +156,7 @@ const VideoTile: React.FC<Props> = ({
         {(!isCameraOn && !isScreenSharing || !stream) && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <Avatar className={cn(
-                "w-1/3 h-1/3 max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300"
+                "w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300"
               )}>
               <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
               <AvatarFallback className="text-3xl md:text-5xl">
