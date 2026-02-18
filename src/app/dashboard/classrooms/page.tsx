@@ -677,7 +677,7 @@ export default function ClassroomsPage() {
                     <Button onClick={handleCreateNew} className="flex-1 sm:flex-initial btn-gel rounded-xl h-11 relative overflow-hidden group">
                         <div className="flex items-center gap-2">
                             <div className="relative flex">
-                                <Star className="h-5 w-5 text-yellow-400 fill-yellow-400 animate-pulse" />
+                                <Star className="h-5 w-5 text-yellow-300 fill-yellow-300 animate-pulse" />
                                 <Star className="h-2.5 w-2.5 text-yellow-300 fill-yellow-300 absolute -top-1 -right-1 animate-bounce" />
                                 <Star className="h-2.5 w-2.5 text-yellow-300 fill-yellow-300 absolute -bottom-1 -left-1 animate-bounce delay-150" />
                             </div>
