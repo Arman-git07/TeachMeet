@@ -56,6 +56,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     const [teacherUpiId, setTeacherUpiId] = useState("");
     const [teacherQrFile, setTeacherQrFile] = useState<File | null>(null);
     const [manualTeacherUpi, setManualTeacherUpi] = useState("");
+    const [manualClassroomUpi, setManualClassroomUpi] = useState("");
 
     const isTeacher = userRole === 'teacher';
     const isCreator = userRole === 'creator';
@@ -82,6 +83,12 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             setManualTeacherUpi("");
         }
     }, [payTeacherOpen]);
+
+    useEffect(() => {
+        if (!isPayNowOpen) {
+            setManualClassroomUpi("");
+        }
+    }, [isPayNowOpen]);
 
     // Fetch teachers for payroll (Creator only)
     useEffect(() => {
@@ -120,19 +127,22 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     }), []);
 
     const upiUrl = useMemo(() => {
-        if (!classroom?.paymentDetails?.upiId) return null;
-        const vpa = classroom.paymentDetails.upiId;
-        const name = encodeURIComponent(classroom.title || "TeachMeet Classroom");
-        const amount = classroom.feeAmount || 0;
-        const currency = classroom.feeCurrency || "INR";
+        const vpa = manualClassroomUpi.trim() || classroom?.paymentDetails?.upiId;
+        if (!vpa || !vpa.includes('@')) return null;
+        
+        const name = encodeURIComponent(classroom?.title || "TeachMeet Classroom");
+        const amount = classroom?.feeAmount || 0;
+        const currency = classroom?.feeCurrency || "INR";
         return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=${currency}&tn=${name}`;
-    }, [classroom]);
+    }, [classroom, manualClassroomUpi]);
 
     const getTeacherUpiUrl = (teacher: SubjectTeacher) => {
-        if (!teacher?.upiId) return null;
+        const vpa = manualTeacherUpi.trim() || teacher?.upiId;
+        if (!vpa || !vpa.includes('@')) return null;
+        
         const name = encodeURIComponent(teacher.name || "Teacher");
         const memo = encodeURIComponent(`TeachMeet: ${classroom?.title || "Classroom"}`);
-        return `upi://pay?pa=${teacher.upiId}&pn=${name}&tn=${memo}&cu=INR`;
+        return `upi://pay?pa=${vpa}&pn=${name}&tn=${memo}&cu=INR`;
     };
 
     const onFeeSubmit = useCallback(async (data: z.infer<typeof feeSchema>) => {
@@ -259,12 +269,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                             <Badge variant="secondary" className="font-bold px-3 py-1">{classroom.feeCurrency || 'INR'}</Badge>
                                         </div>
                                         
-                                        {(!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl) ? (
-                                            <Alert className="mt-6 border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
-                                                <AlertCircle className="h-4 w-4 text-amber-600" />
-                                                <AlertDescription className="text-xs font-medium">The teacher has not yet configured a payment method.</AlertDescription>
-                                            </Alert>
-                                        ) : !isCreator && (
+                                        {!isCreator && (
                                             <Button 
                                                 className="w-full btn-gel mt-6 h-12 text-lg rounded-2xl shadow-lg hover:shadow-primary/20 transition-all" 
                                                 onClick={() => setIsPayNowOpen(true)}
@@ -550,14 +555,17 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                         <DialogDescription className="text-center font-medium">Pay to the classroom account.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-6">
-                        {upiUrl && (
+                        {(upiUrl || (manualClassroomUpi.includes('@'))) && (
                             <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
-                                <a href={upiUrl}><Wallet className="h-5 w-5" /> Open Payment App</a>
+                                <a href={manualClassroomUpi.includes('@') ? `upi://pay?pa=${manualClassroomUpi.trim()}&pn=${encodeURIComponent(classroom?.title || 'Classroom')}&am=${classroom?.feeAmount || 0}&cu=${classroom?.feeCurrency || 'INR'}&tn=${encodeURIComponent(classroom?.title || 'Classroom')}` : upiUrl!}>
+                                    <Wallet className="h-5 w-5" />
+                                    Open Payment App
+                                </a>
                             </Button>
                         )}
                         <div className="relative py-2">
                             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-background px-2 text-muted-foreground font-bold">Or Manual Settle</span></div>
+                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-background px-2 text-muted-foreground font-bold">Payment Methods</span></div>
                         </div>
                         {classroom.paymentDetails?.upiId && (
                             <div className="space-y-3">
@@ -576,6 +584,28 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                 <div className="p-4 border-2 border-primary/10 rounded-3xl inline-block bg-white shadow-xl relative">
                                     <div className="relative w-[200px] h-[200px]">
                                         <Image src={classroom.paymentDetails.qrCodeUrl} alt="Payment QR" fill style={{ objectFit: 'contain' }} data-ai-hint="payment qr"/>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {!classroom.paymentDetails?.upiId && !classroom.paymentDetails?.qrCodeUrl && (
+                            <div className="space-y-4">
+                                <Alert className="border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
+                                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                                    <AlertDescription className="text-xs font-medium">The teacher has not yet configured a payment method.</AlertDescription>
+                                </Alert>
+                                
+                                <div className="space-y-2 border-t pt-4">
+                                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block text-center">Pay via Manual UPI</Label>
+                                    <div className="flex flex-col gap-2">
+                                        <Input 
+                                            placeholder="Enter Teacher's UPI (e.g. name@bank)" 
+                                            value={manualClassroomUpi} 
+                                            onChange={(e) => setManualClassroomUpi(e.target.value)}
+                                            className="rounded-xl h-11 text-center font-mono text-sm"
+                                        />
+                                        <p className="text-[9px] text-center text-muted-foreground italic">If you know the teacher's UPI ID, you can pay directly here.</p>
                                     </div>
                                 </div>
                             </div>
