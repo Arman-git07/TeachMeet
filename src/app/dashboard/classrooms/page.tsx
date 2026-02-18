@@ -51,7 +51,6 @@ import {
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
-  PlusCircle,
   Edit,
   Trash2,
   Loader2,
@@ -67,6 +66,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   CreditCard,
+  Star,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -79,7 +79,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -133,7 +132,6 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   const { toast } = useToast();
 
   const billingCurrency = useMemo(() => {
-      // In a real app, this would come from user settings or IP location
       const locale = typeof window !== 'undefined' ? navigator.language : 'en-IN';
       return locale.includes('IN') ? 'INR' : 'USD';
   }, []);
@@ -561,25 +559,21 @@ export default function ClassroomsPage() {
     try {
         const classroomRef = doc(db, 'classrooms', classroomToDelete.id);
         
-        // 1. Fetch all participants to clean up their enrollment records
         const participantsSnap = await getDocs(collection(db, classroomRef.path, 'participants'));
         const participantIds = participantsSnap.docs.map(d => d.id);
 
         const batch = writeBatch(db);
 
-        // 2. Queue enrollment removal for all students and teachers
         participantIds.forEach(pId => {
             batch.delete(doc(db, `users/${pId}/enrolled`, classroomToDelete.id));
         });
 
-        // 3. Queue deletion of subcollections
         const subs = ['announcements', 'assignments', 'exams', 'materials', 'participants', 'joinRequests', 'teachers'];
         for (const subName of subs) {
             const subSnap = await getDocs(collection(db, classroomRef.path, subName));
             subSnap.docs.forEach(d => batch.delete(d.ref));
         }
 
-        // 4. Delete the classroom document itself
         batch.delete(classroomRef);
 
         await batch.commit();
@@ -679,7 +673,18 @@ export default function ClassroomsPage() {
             <div className="flex flex-shrink-0 gap-3 w-full sm:w-auto">
                 <Button asChild variant="outline" className="flex-1 sm:flex-initial rounded-xl h-11"><Link href="/dashboard/classrooms/join">Join a Class</Link></Button>
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                  <DialogTrigger asChild><Button onClick={handleCreateNew} className="flex-1 sm:flex-initial btn-gel rounded-xl h-11"><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
+                  <DialogTrigger asChild>
+                    <Button onClick={handleCreateNew} className="flex-1 sm:flex-initial btn-gel rounded-xl h-11 relative overflow-hidden group">
+                        <div className="flex items-center gap-2">
+                            <div className="relative flex">
+                                <Star className="h-5 w-5 text-yellow-400 fill-yellow-400 animate-pulse" />
+                                <Star className="h-2.5 w-2.5 text-yellow-300 fill-yellow-300 absolute -top-1 -right-1 animate-bounce" />
+                                <Star className="h-2.5 w-2.5 text-yellow-300 fill-yellow-300 absolute -bottom-1 -left-1 animate-bounce delay-150" />
+                            </div>
+                            <span>Create New</span>
+                        </div>
+                    </Button>
+                  </DialogTrigger>
                   <DialogContent className="rounded-2xl max-w-lg"><CreateClassroomForm onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
                 </Dialog>
             </div>
@@ -787,7 +792,7 @@ export default function ClassroomsPage() {
                         <CardDescription className="font-medium text-primary">By {c.teacherName}</CardDescription>
                     </CardHeader>
                     <CardFooter className="border-t pt-4 bg-muted/5">
-                        <Button asChild className="w-full btn-gel rounded-xl h-10 font-bold"><Link href={`/dashboard/classrooms/${c.classroomId}`}>Enter Classroom</Link></Button>
+                        <Button asChild className="w-full btn-gel rounded-xl h-10 font-bold"><Link href={`/dashboard/classrooms/${c.id}`}>Enter Classroom</Link></Button>
                     </CardFooter>
                 </Card>
             ))}
