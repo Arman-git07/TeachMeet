@@ -1,21 +1,7 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import type { MeshRTC } from '@/lib/webrtc/mesh';
-
-// This is the shape of the message object for the chat.
-// It will be used consistently across the application.
-export interface ChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar?: string;
-  recipientId?: string; // For private messages
-  text: string;
-  timestamp: number; // Using number (Date.now()) for simplicity
-  isPrivate: boolean;
-}
 
 interface RecordingControls {
   start: () => Promise<void>;
@@ -25,10 +11,6 @@ interface RecordingControls {
 interface MeetingRTCContextType {
   rtc: MeshRTC | null;
   setRtc: (rtc: MeshRTC | null) => void;
-  chatHistory: ChatMessage[];
-  addChatMessage: (message: ChatMessage) => void;
-  isChatOpen: boolean;
-  setIsChatOpen: (isOpen: boolean) => void;
   isRecording: boolean;
   setIsRecording: (isRecording: boolean) => void;
   isUploading: boolean;
@@ -43,8 +25,6 @@ const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undef
 
 export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen] = useState(false);
@@ -53,15 +33,9 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
     stop: async (destination) => console.warn('stopRecording not implemented'),
   });
 
-  const addChatMessage = useCallback((message: ChatMessage) => {
-    setChatHistory(prev => [...prev, message]);
-  }, []);
-
   return (
     <MeetingRTCContext.Provider value={{ 
       rtc, setRtc, 
-      chatHistory, addChatMessage,
-      isChatOpen, setIsChatOpen,
       isRecording, setIsRecording,
       isUploading, setIsUploading,
       recordingControls, setRecordingControls,

@@ -1,7 +1,6 @@
 "use client";
 
 import { io, Socket } from "socket.io-client";
-import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
 type PeerEntry = {
   pc: RTCPeerConnection;
@@ -19,7 +18,6 @@ export class MeshRTC {
   private iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
   private onRemoteStream: (userId: string, stream: MediaStream) => void;
   private onRemoteLeft?: (socketId: string) => void;
-  private onChatMessage?: (message: ChatMessage) => void;
   public socketId: string | null = null;
 
   private _ready = false; 
@@ -30,13 +28,11 @@ export class MeshRTC {
     userId: string;
     onRemoteStream: (socketId: string, stream: MediaStream) => void;
     onRemoteLeft?: (socketId: string) => void;
-    onChatMessage?: (message: ChatMessage) => void;
   }) {
     this.roomId = opts.roomId;
     this.userId = opts.userId;
     this.onRemoteStream = opts.onRemoteStream;
     this.onRemoteLeft = opts.onRemoteLeft;
-    this.onChatMessage = opts.onChatMessage;
     
     this.socket = io({
       path: "/api/socketio",
@@ -102,10 +98,6 @@ export class MeshRTC {
     this.socket.on("user-left", (remoteId: string) => {
       this.cleanupPeer(remoteId);
       if (this.onRemoteLeft) this.onRemoteLeft(remoteId);
-    });
-
-    this.socket.on("chat-message", (message: ChatMessage) => {
-        if (this.onChatMessage) this.onChatMessage(message);
     });
   }
 

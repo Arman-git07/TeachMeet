@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
-import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, Check, X, Users, Pin, MessageSquare, Minimize2, Maximize2, XCircle, AlertTriangle } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, getDoc, writeBatch, serverTimestamp, deleteDoc, setDoc, addDoc } from 'firebase/firestore';
+import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, X, Users, Pin, Minimize2, Maximize2 } from "lucide-react";
+import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, setDoc, addDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { getDownloadURL } from "firebase/storage";
@@ -18,13 +18,9 @@ import VideoTile from "./VideoTile";
 import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
 import { ScreenShareModal } from "@/components/modals/ScreenShareModal";
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
-import type { JoinRequest } from '@/app/dashboard/classrooms/[classroomId]/page';
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useBlock } from "@/contexts/BlockContext";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MeetingChatPanel } from "./chat/MeetingChatPanel";
+import Link from "next/link";
 
 
 type Participant = {
@@ -63,9 +59,8 @@ type Props = {
 export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
   const { isBlockedByMe } = useBlock();
-  const { rtc, setRtc, setIsRecording, setIsUploading, setRecordingControls, addChatMessage } = useMeetingRTC();
+  const { rtc, setRtc, setIsRecording, setIsUploading, setRecordingControls } = useMeetingRTC();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
@@ -149,7 +144,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         });
       },
       onRemoteLeft: handleRemoteLeft,
-      onChatMessage: addChatMessage,
     });
 
     setRtc(rtcInstance);
@@ -158,7 +152,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       rtcInstance?.leave();
       setRtc(null);
     }
-  }, [meetingId, userId, setRtc, handleRemoteLeft, addChatMessage]);
+  }, [meetingId, userId, setRtc, handleRemoteLeft]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -179,8 +173,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
       videoTrack.enabled = nextState;
-      // CRITICAL FIX: Ensure the video track is synced to all peer connections
-      // and trigger renegotiation if turning ON.
       if (nextState) {
         await rtc.replaceTrack(videoTrack);
         await rtc.renegotiateAll();
@@ -826,7 +818,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1" onClick={unlockAudio}>
-      <MeetingChatPanel />
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} />
 

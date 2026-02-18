@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,24 +11,20 @@ import {
   MicOff,
   MoreVertical,
   ShieldCheck,
-  User,
   Video,
   VideoOff,
   Users as UsersIcon,
-  MessageSquare,
   Pin,
   AlertCircle,
-  Maximize,
   UserX,
   Loader2,
   CameraOff,
   Hand,
-  UserCheck,
-  UserCog
+  UserCheck
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,27 +73,13 @@ const ParticipantItem = React.memo(({
   pinnedUserId: string | null;
 }) => {
   const { toast } = useToast();
-  const { unblockUser, getBlockSettings, amIBlockedBy } = useBlock();
+  const { unblockUser, getBlockSettings } = useBlock();
   const isMe = auth.currentUser?.uid === participant.id;
   const isPinned = participant.id === pinnedUserId;
   const blockInfo = getBlockSettings(participant.id);
   const isBlockedByMe = !!blockInfo;
   
-  const isPrivateChatDisabled = isBlockedByMe || amIBlockedBy(participant.id, 'privateChat');
-
-
   const searchParams = useSearchParams();
-  const cam = searchParams.get('cam');
-  const mic = searchParams.get('mic');
-
-  const privateChatLinkParams = new URLSearchParams();
-  if (topic) privateChatLinkParams.set('topic', topic);
-  if (cam) privateChatLinkParams.set('cam', cam);
-  if (mic) privateChatLinkParams.set('mic', mic);
-  if (pinnedUserId) privateChatLinkParams.set('pin', pinnedUserId);
-  privateChatLinkParams.set('privateWith', participant.id);
-  privateChatLinkParams.set('privateWithName', participant.name);
-  const privateChatLink = `/dashboard/meeting/${meetingId}/chat?${privateChatLinkParams.toString()}`;
   
   const pinUrlParams = new URLSearchParams(searchParams.toString());
   if (isPinned) {
@@ -114,7 +95,7 @@ const ParticipantItem = React.memo(({
   
   const handleUnblock = () => {
     unblockUser(participant.id);
-    toast({ title: "User Unblocked", description: `You can now see and interact with ${participant.name} again.` });
+    toast({ title: "User Unblocked", description: `You can now interact with ${participant.name} again.` });
   };
 
 
@@ -154,12 +135,6 @@ const ParticipantItem = React.memo(({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 rounded-lg shadow-lg">
                   <>
-                    <DropdownMenuItem asChild className="cursor-pointer" disabled={isPrivateChatDisabled}>
-                      <Link href={privateChatLink}>
-                        <MessageSquare className="mr-2 h-4 w-4" />
-                        <span>Chat Privately</span>
-                      </Link>
-                    </DropdownMenuItem>
                     <DropdownMenuItem asChild className="cursor-pointer">
                       <Link href={pinLink}>
                           <Pin className="mr-2 h-4 w-4" />
