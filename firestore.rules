@@ -121,7 +121,7 @@ service cloud.firestore {
     match /meetings/{id} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
+      allow update, delete: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
       
       match /joinRequests/{rid} { 
         allow get, list: if isSignedIn() && (rid == request.auth.uid || get(/databases/$(database)/documents/meetings/$(id)).data.hostId == request.auth.uid); 
