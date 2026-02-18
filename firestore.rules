@@ -11,10 +11,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isClassMember(classId) {
-      return isSignedIn() && exists(/databases/$(database)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
-    }
-
     function canManageClassroom(classId) {
       return isSignedIn() && (
         get(/databases/$(database)/documents/classrooms/$(classId)).data.teacherId == request.auth.uid || 
@@ -26,14 +22,28 @@ service cloud.firestore {
      * Classrooms Collection
      */
     match /classrooms/{classId} {
+      function isParticipant() {
+        return request.auth != null &&
+          exists(/databases/$(database)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
+      }
+
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if canManageClassroom(classId);
 
-      // Chat sub-collection removed
+      match /messages/{messageId} {
+        allow read: if isParticipant();
+        allow create: if isParticipant()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.timestamp != null;
+        allow update, delete: if false;
+      }
 
       match /participants/{userId} {
-        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow read: if isParticipant();
+        allow get, list: if isParticipant() || canManageClassroom(classId);
         allow create, update, delete: if canManageClassroom(classId);
       }
 
@@ -44,17 +54,17 @@ service cloud.firestore {
       }
       
       match /announcements/{id} {
-        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow get, list: if isParticipant() || canManageClassroom(classId);
         allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.authorId == request.auth.uid);
       }
 
       match /materials/{id} {
-        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow get, list: if isParticipant() || canManageClassroom(classId);
         allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.uploaderId == request.auth.uid);
       }
 
       match /assignments/{id} {
-        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow get, list: if isParticipant() || canManageClassroom(classId);
         allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.creatorId == request.auth.uid);
         
         match /submissions/{studentId} {
@@ -65,7 +75,7 @@ service cloud.firestore {
       }
 
       match /exams/{id} {
-        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow get, list: if isParticipant() || canManageClassroom(classId);
         allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.authorId == request.auth.uid);
         
         match /submissions/{studentId} {

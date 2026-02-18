@@ -101,7 +101,7 @@ export function ClassroomHeader() {
                                 </DropdownMenuItem>
                             )}
                             
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => router.push(`/dashboard/classrooms/${classroomId}/live-chat`)}>
                                 <MessageSquare className="mr-2 h-4 w-4"/>Class Chat
                             </DropdownMenuItem>
 
