@@ -49,8 +49,19 @@ export class MeshRTC {
 
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
-    console.log("[mesh] Initializing with local stream tracks:", this.localStream?.getTracks().map(t => t.kind));
+    console.log("[mesh] Initializing with local stream. Count of existing peers to sync:", this.peers.size);
     
+    // CRITICAL: Attach tracks to any peers that were created before the stream was ready
+    for (const entry of this.peers.values()) {
+      const pc = entry.pc;
+      const senders = pc.getSenders();
+      if (senders.length === 0) {
+        this.localStream.getTracks().forEach(track => {
+          pc.addTrack(track, this.localStream!);
+        });
+      }
+    }
+
     this._ready = true;
     while (this._pendingSignals.length) {
       const fn = this._pendingSignals.shift();
@@ -215,6 +226,7 @@ export class MeshRTC {
       if (sender) {
         await sender.replaceTrack(newTrack);
       } else {
+        // FALLBACK: If track was never added, add it now. This triggers negotiationneeded.
         pc.addTrack(newTrack, this.localStream);
       }
     }
@@ -241,6 +253,7 @@ export class MeshRTC {
   }
 
   public async renegotiateAll() {
+    console.log("[mesh] Manually triggering renegotiation for all peers...");
     for (const [remoteId, entry] of this.peers.entries()) {
       if (!entry.negotiating) {
         try {
