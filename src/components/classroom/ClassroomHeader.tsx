@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback, memo } from 'react';
@@ -8,7 +7,7 @@ import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus, MessageSquare, Star } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus, MessageSquare, Star, Settings } from 'lucide-react';
 import { ParticipantsManagement } from './ParticipantsManagement';
 import { SubjectTeachers } from './SubjectTeachers';
 import { FeesAndPayment } from './FeesAndPayment';
@@ -124,6 +123,14 @@ export function ClassroomHeader() {
                             <DropdownMenuItem onSelect={() => setIsFeesOpen(true)}>
                                 <CreditCard className="mr-2 h-4 w-4"/>Fees & Payment
                             </DropdownMenuItem>
+
+                            {userRole === 'creator' && (
+                                <DropdownMenuItem asChild>
+                                    <Link href="/dashboard/settings">
+                                        <Settings className="mr-2 h-4 w-4"/>Class Settings
+                                    </Link>
+                                </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
