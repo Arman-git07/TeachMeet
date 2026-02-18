@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -47,6 +48,7 @@ import {
   writeBatch,
   getDocs,
   limit,
+  Timestamp,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -62,6 +64,10 @@ import {
   Briefcase,
   User,
   Phone,
+  Wallet,
+  CheckCircle2,
+  AlertTriangle,
+  CreditCard,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -74,6 +80,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export interface Classroom {
   id: string;
@@ -85,6 +92,10 @@ export interface Classroom {
   isPublic: boolean;
   students: string[];
   createdAt?: any;
+  subscriptionStatus?: 'active' | 'grace_period' | 'blocked';
+  nextPaymentDue?: any;
+  lastPaymentAt?: any;
+  billingCurrency?: string;
 }
 
 export interface EnrolledClassroomInfo {
@@ -108,7 +119,11 @@ const teacherApplicationSchema = z.object({
 
 type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
+const PLATFORM_FEE_AMOUNT = 10;
+const GRACE_PERIOD_DAYS = 7;
+
 function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) {
+  const [step, setStep] = useState<'details' | 'payment'>('details');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -116,24 +131,36 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const billingCurrency = useMemo(() => {
+      // In a real app, this would come from user settings or IP location
+      const locale = typeof window !== 'undefined' ? navigator.language : 'en-IN';
+      return locale.includes('IN') ? 'INR' : 'USD';
+  }, []);
+
+  const upiId = "07arman2004-1@oksbi";
+  const upiUrl = useMemo(() => {
+      const name = encodeURIComponent("TeachMeet Platform");
+      return `upi://pay?pa=${upiId}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}&cu=${billingCurrency}&tn=ClassroomSubscription`;
+  }, [billingCurrency]);
+
   useEffect(() => {
     if (classroomToEdit) {
       setTitle(classroomToEdit.title);
       setDescription(classroomToEdit.description);
       setIsPublic(classroomToEdit.isPublic);
-    } else {
-      setTitle('');
-      setDescription('');
-      setIsPublic(true);
     }
   }, [classroomToEdit]);
 
+  const handleNextToPayment = () => {
+      if (!title.trim()) {
+          toast({ variant: 'destructive', title: 'Title is required' });
+          return;
+      }
+      setStep('payment');
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
-    if (!title.trim()) {
-      toast({ variant: 'destructive', title: 'Title is required' });
-      return;
-    }
     setIsLoading(true);
 
     try {
@@ -145,6 +172,10 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         const batch = writeBatch(db);
         const classroomRef = doc(collection(db, 'classrooms'));
         
+        const now = new Date();
+        const nextDue = new Date();
+        nextDue.setMonth(now.getMonth() + 1);
+
         const classroomData = {
           title: title.trim(),
           description: description.trim(),
@@ -155,6 +186,10 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
           students: [], 
           teachers: [{ uid: user.uid, name: user.displayName || 'Creator' }],
           createdAt: serverTimestamp(),
+          subscriptionStatus: 'active',
+          lastPaymentAt: serverTimestamp(),
+          nextPaymentDue: Timestamp.fromDate(nextDue),
+          billingCurrency: billingCurrency,
         };
         
         batch.set(classroomRef, classroomData);
@@ -176,7 +211,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         });
 
         await batch.commit();
-        toast({ title: 'Classroom Created' });
+        toast({ title: 'Classroom Created Successfully!', description: `Your subscription is active until ${nextDue.toLocaleDateString()}.` });
       }
       onSuccess();
     } catch (error) {
@@ -186,6 +221,53 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       setIsLoading(false);
     }
   };
+
+  if (step === 'payment' && !classroomToEdit) {
+      return (
+          <>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <Wallet className="h-6 w-6 text-primary" />
+                    Platform Maintenance Fee
+                </DialogTitle>
+                <DialogDescription>
+                    To maintain high-quality learning spaces, a monthly subscription of {PLATFORM_FEE_AMOUNT} {billingCurrency} is required per classroom.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-6 space-y-6">
+                <Card className="bg-primary/5 border-primary/20 border-2 rounded-2xl shadow-inner">
+                    <CardContent className="pt-6 text-center">
+                        <p className="text-xs font-black uppercase tracking-widest text-primary mb-2">Amount to Pay</p>
+                        <div className="flex items-center justify-center gap-2">
+                            <span className="text-4xl font-black text-foreground">{PLATFORM_FEE_AMOUNT}</span>
+                            <Badge variant="secondary" className="font-bold">{billingCurrency}</Badge>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-4 italic">Next renewal: {new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString()}</p>
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-3">
+                    <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                        <a href={upiUrl}>
+                            <CreditCard className="h-5 w-5" />
+                            Pay via UPI
+                        </a>
+                    </Button>
+                    <p className="text-[10px] text-center text-muted-foreground px-4">
+                        By clicking pay, you will be redirected to your preferred payment app. Once settled, click "I've Paid" below to activate your classroom.
+                    </p>
+                </div>
+            </div>
+            <DialogFooter className="gap-2">
+                <Button variant="outline" className="rounded-xl" onClick={() => setStep('details')} disabled={isLoading}>Back</Button>
+                <Button onClick={handleSubmit} disabled={isLoading} className="flex-1 rounded-xl">
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                    I've Paid & Activate
+                </Button>
+            </DialogFooter>
+          </>
+      );
+  }
 
   return (
     <>
@@ -211,10 +293,16 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       </div>
       <DialogFooter>
         <DialogClose asChild><Button type="button" variant="outline" className="rounded-xl" disabled={isLoading}>Cancel</Button></DialogClose>
-        <Button onClick={handleSubmit} disabled={isLoading} className="btn-gel rounded-xl">
-          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {classroomToEdit ? 'Save Changes' : 'Create Classroom'}
-        </Button>
+        {classroomToEdit ? (
+            <Button onClick={handleSubmit} disabled={isLoading} className="btn-gel rounded-xl">
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Changes
+            </Button>
+        ) : (
+            <Button onClick={handleNextToPayment} className="btn-gel rounded-xl">
+                Proceed to Payment
+            </Button>
+        )}
       </DialogFooter>
     </>
   );
@@ -400,6 +488,34 @@ export default function ClassroomsPage() {
   const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
 
+  // Lifecycle logic to manage subscription states (Active -> Grace -> Blocked)
+  useEffect(() => {
+      if (!user || myClasses.length === 0) return;
+
+      const now = new Date();
+      myClasses.forEach(async (cls) => {
+          if (!cls.nextPaymentDue) return;
+          
+          const dueDate = cls.nextPaymentDue.toDate();
+          const graceEnd = new Date(dueDate);
+          graceEnd.setDate(dueDate.getDate() + GRACE_PERIOD_DAYS);
+
+          let newStatus: Classroom['subscriptionStatus'] = cls.subscriptionStatus || 'active';
+
+          if (now > graceEnd) {
+              newStatus = 'blocked';
+          } else if (now > dueDate) {
+              newStatus = 'grace_period';
+          } else {
+              newStatus = 'active';
+          }
+
+          if (newStatus !== cls.subscriptionStatus) {
+              await updateDoc(doc(db, 'classrooms', cls.id), { subscriptionStatus: newStatus });
+          }
+      });
+  }, [user, myClasses]);
+
   useEffect(() => {
     if (!user) { setMyClasses([]); return; }
     return onSnapshot(query(collection(db, 'classrooms'), where('teacherId', '==', user.uid)), (snapshot) => {
@@ -563,7 +679,7 @@ export default function ClassroomsPage() {
                 <Button asChild variant="outline" className="flex-1 sm:flex-initial rounded-xl h-11"><Link href="/dashboard/classrooms/join">Join a Class</Link></Button>
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild><Button onClick={handleCreateNew} className="flex-1 sm:flex-initial btn-gel rounded-xl h-11"><PlusCircle className="mr-2 h-4 w-4" /> Create New</Button></DialogTrigger>
-                  <DialogContent className="rounded-2xl"><CreateClassroomForm onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
+                  <DialogContent className="rounded-2xl max-w-lg"><CreateClassroomForm onSuccess={() => setIsCreateDialogOpen(false)} classroomToEdit={classroomToEdit} /></DialogContent>
                 </Dialog>
             </div>
         )}
@@ -637,9 +753,13 @@ export default function ClassroomsPage() {
           <TabsContent value="my-classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
             {filteredMyClasses.map(c => (
                 <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden">
-                    <div className="h-2 bg-accent/20" />
+                    <div className={cn("h-2", c.subscriptionStatus === 'blocked' ? 'bg-destructive' : c.subscriptionStatus === 'grace_period' ? 'bg-amber-500' : 'bg-accent/20')} />
                     <CardHeader>
-                        <CardTitle className="truncate">{c.title}</CardTitle>
+                        <div className="flex justify-between items-start gap-2">
+                            <CardTitle className="truncate">{c.title}</CardTitle>
+                            {c.subscriptionStatus === 'blocked' && <Badge variant="destructive">Blocked</Badge>}
+                            {c.subscriptionStatus === 'grace_period' && <Badge className="bg-amber-500 text-white hover:bg-amber-600">Pending Renewal</Badge>}
+                        </div>
                         <CardDescription className="font-mono text-[10px] uppercase tracking-tighter opacity-50">ID: {c.id}</CardDescription>
                     </CardHeader>
                     <CardFooter className="flex justify-between gap-2 border-t pt-4 bg-muted/5">

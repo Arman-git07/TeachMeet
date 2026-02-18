@@ -1,3 +1,4 @@
+
 'use client';
 import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
@@ -19,11 +20,13 @@ import {
   ClipboardList, 
   ClipboardCheck, 
   Bell,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle,
+  Wallet
 } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
-import { collection, query, where, onSnapshot, limit, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export type ActivityItemType = 
@@ -37,7 +40,8 @@ export type ActivityItemType =
   | 'material' 
   | 'exam'
   | 'submission'
-  | 'enrollment';
+  | 'enrollment'
+  | 'subscription_warning';
 
 interface BaseActivityItem {
   id: string;
@@ -78,6 +82,7 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
   exam: ClipboardCheck,
   submission: CheckCircle2,
   enrollment: UserPlus,
+  subscription_warning: AlertTriangle,
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
@@ -92,6 +97,7 @@ const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
   exam: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
   submission: (id, item) => item.link || `/dashboard/classrooms/${item.classroomId}`,
   enrollment: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
+  subscription_warning: (id, item) => `/dashboard/classrooms/${item.classroomId}`,
 };
 
 export default function HomePage() {
@@ -216,6 +222,33 @@ export default function HomePage() {
                 );
             }
         });
+
+        // Specific listener for classroom subscription warnings
+        const subWarningKey = `sub-warn-${classId}`;
+        if (!enrolledSubsRef.current[subWarningKey]) {
+            enrolledSubsRef.current[subWarningKey] = onSnapshot(doc(db, 'classrooms', classId), (snap) => {
+                if (snap.exists()) {
+                    const data = snap.data();
+                    if (data.subscriptionStatus === 'grace_period') {
+                        setActivityChunks(prev => ({
+                            ...prev,
+                            [subWarningKey]: [{
+                                id: `warn-${classId}`,
+                                type: 'subscription_warning',
+                                title: `Classroom Renewal Pending`,
+                                timestamp: data.nextPaymentDue?.toMillis() || Date.now(),
+                                classroomId: classId,
+                                classroomName: data.title,
+                                statusLabel: "Grace Period",
+                                isImportant: true
+                            }]
+                        }));
+                    } else {
+                        setActivityChunks(prev => { const next = {...prev}; delete next[subWarningKey]; return next; });
+                    }
+                }
+            });
+        }
 
         if (classInfo.role === 'teacher') {
             const jrKey = `join-${classId}`;
@@ -454,6 +487,8 @@ export default function HomePage() {
                             displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
                         } else if (item.type === 'enrollment') {
                             displayTitle = `Request accepted for "${item.title}"`;
+                        } else if (item.type === 'subscription_warning') {
+                            displayTitle = `Subscription Renewal Required for ${item.classroomName}`;
                         } else if (item.classroomName) {
                             displayTitle = `${label} ${item.type === 'exam' || item.type === 'submission' ? '' : item.type} in ${item.classroomName}`;
                         } else {
@@ -474,6 +509,7 @@ export default function HomePage() {
                                     item.type === 'exam' ? "bg-purple-100 text-purple-600" :
                                     item.type === 'submission' ? "bg-green-100 text-green-600" :
                                     item.type === 'enrollment' ? "bg-primary/10 text-primary" :
+                                    item.type === 'subscription_warning' ? "bg-amber-100 text-amber-600" :
                                     "bg-accent/10 text-accent"
                                 )}>
                                     <Icon className="h-4 w-4" />
@@ -483,7 +519,7 @@ export default function HomePage() {
                                         {displayTitle}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                                        {item.type === 'enrollment' ? 'Classroom' : item.type} • {new Date(item.isUpdated ? (item.updatedAt || item.timestamp) : item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                                        {item.type === 'enrollment' || item.type === 'subscription_warning' ? 'Classroom' : item.type} • {new Date(item.isUpdated ? (item.updatedAt || item.timestamp) : item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
                                     </span>
                                 </div>
                             </Link>
