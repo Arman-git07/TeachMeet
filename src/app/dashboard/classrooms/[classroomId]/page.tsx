@@ -68,7 +68,7 @@ export interface Exam {
   authorId: string;
   storagePath?: string;
 }
-export interface JoinRequest { id: string; studentId: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; requesterId?: string;}
+export interface JoinRequest { id: string; studentName: string; studentPhotoURL?: string; role: 'student' | 'teacher'; applicationData?: any; resumeURL?: string; requestedAt?: any; requesterId: string;}
 export interface SubjectTeacher { teacherId: string; name: string; subject: string; availability: string; }
 
 export interface Assignment {
@@ -103,8 +103,6 @@ export type DeletableItem = {
 }
 
 export default function ClassroomPage() {
-    // All data fetching and context providing is now handled by the layout.
-    // This component just renders the UI for the main classroom page.
     return (
         <>
             <ClassroomHeader />
