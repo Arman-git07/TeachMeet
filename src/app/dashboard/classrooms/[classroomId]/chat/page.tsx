@@ -3,10 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, Trash2, Settings2, Clock, Info, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Loader2, Mic, StopCircle, Volume2, Trash2, Settings2, Clock, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClassroom } from "@/contexts/ClassroomContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
@@ -89,20 +88,18 @@ export default function ClassroomChatPage() {
     return () => unsub();
   }, [classroomId]);
 
-  // Real-time Messages Listener with Vanish Logic
+  // Real-time Messages Listener
   useEffect(() => {
     if (!classroomId || !user) return;
 
     setSyncError(null);
 
-    // Default query: Get latest 50 messages
     let messagesQuery = query(
       collection(db, 'classrooms', classroomId, 'messages'),
       orderBy('timestamp', 'desc'),
       limit(50)
     );
 
-    // Apply Vanish Logic if configured
     const vanishDuration = (classroom as any)?.chatVanishDuration;
     if (vanishDuration && vanishDuration !== 'never') {
         const now = new Date();
@@ -132,11 +129,9 @@ export default function ClassroomChatPage() {
         } as ChatMessage;
       });
       
-      // Reverse because we queried DESC to get the latest, but want to display ASC
       setMessages(fetchedMessages.reverse());
       setSyncError(null);
       
-      // Auto-scroll to bottom
       setTimeout(() => {
         if (scrollViewportRef.current) {
             scrollViewportRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -144,20 +139,11 @@ export default function ClassroomChatPage() {
       }, 100);
     }, (error) => {
         console.error("Chat sync error:", error);
-        if (error.message?.includes('index')) {
-            setSyncError("Index Required: Vanish duration requires a Firestore composite index. Messages may not load until this is created in the Firebase console.");
-            toast({ 
-                variant: 'destructive', 
-                title: "Index Required", 
-                description: "Vanish duration requires a Firestore composite index. Please contact support." 
-            });
-        } else {
-            setSyncError("Connection Error: Unable to sync messages. Please check your permissions.");
-        }
+        setSyncError(error.message?.includes('permission') ? "Missing or insufficient permissions. Are you enrolled?" : "Connection error. Sync failed.");
     });
 
     return () => unsubscribe();
-  }, [classroomId, user, (classroom as any)?.chatVanishDuration, toast]);
+  }, [classroomId, user, (classroom as any)?.chatVanishDuration]);
 
   const handleUpdateVanishDuration = async (value: string) => {
     if (!isCreator || !classroomId) return;
@@ -166,10 +152,10 @@ export default function ClassroomChatPage() {
         await updateDoc(doc(db, 'classrooms', classroomId), {
             chatVanishDuration: value
         });
-        toast({ title: "Chat Policy Updated", description: `Messages will now vanish after ${value === 'never' ? 'no time (kept forever)' : value.replace('d', ' day(s)').replace('w', ' week').replace('m', ' month')}.` });
+        toast({ title: "Chat Policy Updated" });
     } catch (error) {
         console.error("Failed to update vanish duration:", error);
-        toast({ variant: 'destructive', title: "Update Failed", description: "Could not save chat duration settings." });
+        toast({ variant: 'destructive', title: "Update Failed" });
     } finally {
         setIsUpdatingSettings(false);
     }
@@ -353,13 +339,11 @@ export default function ClassroomChatPage() {
                                         <SelectItem value="1d">1 Day</SelectItem>
                                         <SelectItem value="2d">2 Days</SelectItem>
                                         <SelectItem value="1w">1 Week</SelectItem>
+                                        <SelectItem value="2w">2 Weeks</SelectItem>
                                         <SelectItem value="1m">1 Month</SelectItem>
                                         <SelectItem value="never">Never (Forever)</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <p className="text-[10px] text-muted-foreground leading-tight mt-2 italic">
-                                    Only you (the creator) can see these settings. Vanishing messages requires a Firestore index.
-                                </p>
                             </div>
                         </div>
                     </PopoverContent>
@@ -381,19 +365,10 @@ export default function ClassroomChatPage() {
             <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-4">
                   {syncError && (
-                    <Alert variant="destructive" className="mb-4">
+                    <div className="p-3 bg-destructive/10 text-destructive rounded-lg flex items-center gap-2 mb-4">
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Sync Issue</AlertTitle>
-                      <AlertDescription className="text-xs">{syncError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {hasMicPermission === false && (
-                    <Alert variant="destructive">
-                      <AlertTitle>Microphone Access Denied</AlertTitle>
-                      <AlertDescription>
-                        Voice recording is disabled. Please allow microphone access in your browser settings.
-                      </AlertDescription>
-                    </Alert>
+                      <p className="text-xs font-medium">{syncError}</p>
+                    </div>
                   )}
                   
                   {messages.length === 0 && !syncError && (
