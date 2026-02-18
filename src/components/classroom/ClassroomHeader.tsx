@@ -7,7 +7,7 @@ import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus } from 'lucide-react';
 import { ParticipantsManagement } from './ParticipantsManagement';
 import { SubjectTeachers } from './SubjectTeachers';
 import { FeesAndPayment } from './FeesAndPayment';
@@ -84,19 +84,15 @@ export function ClassroomHeader() {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                                <Link href={`/dashboard/classrooms/${classroomId}/chat?topic=${encodeURIComponent(classroom.title)}`}>
-                                    <MessageSquare className="mr-2 h-4 w-4" />Class Chat
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            
                             {userRole === 'creator' && (
-                                <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
-                                        <UserPlus className="mr-2 h-4 w-4"/>Join Requests
-                                    </Link>
-                                </DropdownMenuItem>
+                                <>
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/classrooms/${classroomId}/requests`}>
+                                            <UserPlus className="mr-2 h-4 w-4"/>Join Requests
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                </>
                             )}
 
                             {canUserManage && (

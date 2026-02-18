@@ -30,12 +30,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if canManageClassroom(classId);
 
-      match /messages/{messageId} {
-        // Anyone in the participants list can read and post.
-        allow read: if isClassMember(classId);
-        allow create: if isClassMember(classId) && request.resource.data.senderId == request.auth.uid;
-        allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || canManageClassroom(classId));
-      }
+      // Chat sub-collection removed
 
       match /participants/{userId} {
         allow get, list: if isClassMember(classId) || canManageClassroom(classId);

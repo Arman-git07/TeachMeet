@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "Meeting": {
@@ -89,20 +88,6 @@
         }
       },
       "required": ["name", "joinedAt"]
-    },
-    "ClassroomMessage": {
-      "title": "Classroom Message",
-      "description": "A message sent in a classroom chat.",
-      "type": "object",
-      "properties": {
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "senderAvatar": { "type": "string" },
-        "text": { "type": "string" },
-        "audioUrl": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      },
-      "required": ["senderId", "senderName", "timestamp"]
     }
   },
   "firestore": {
@@ -125,10 +110,6 @@
     "/classrooms/{classroomId}/participants/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Sub-collection for participants in a specific meeting."
-    },
-    "/classrooms/{classroomId}/messages/{messageId}": {
-      "schema": { "$ref": "#/entities/ClassroomMessage" },
-      "description": "Collection of real-time chat messages for a classroom."
     }
   },
   "auth": {
