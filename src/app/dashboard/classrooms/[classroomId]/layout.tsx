@@ -16,8 +16,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const PLATFORM_FEE_AMOUNT = 10;
+const GRACE_PERIOD_DAYS = 7;
 
 export default function ClassroomDetailLayout({
   children,
