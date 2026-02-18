@@ -19,8 +19,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClassroom } from "@/contexts/ClassroomContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 interface ChatMessage {
   id: string;
@@ -65,7 +63,6 @@ export default function ClassroomChatPage() {
 
   const isCreator = userRole === 'creator';
 
-  // Fetch Participants for Mentions
   useEffect(() => {
     if (!classroomId) return;
     setIsLoadingParticipants(true);
@@ -86,7 +83,6 @@ export default function ClassroomChatPage() {
     return () => unsub();
   }, [classroomId]);
 
-  // Real-time Messages Listener
   useEffect(() => {
     if (!classroomId || !user) return;
 
@@ -137,7 +133,7 @@ export default function ClassroomChatPage() {
       }, 100);
     }, (error) => {
         console.error("Chat sync error:", error);
-        setSyncError(error.message?.includes('permission') ? "Missing or insufficient permissions. Are you enrolled?" : "Connection error. Sync failed.");
+        setSyncError(error.message?.includes('permission') ? "Missing or insufficient permissions. Please check your enrollment status." : "Connection error. Sync failed.");
     });
 
     return () => unsubscribe();
@@ -272,20 +268,9 @@ export default function ClassroomChatPage() {
 
   const handleDeleteMessage = (messageId: string) => {
     if (!classroomId || !messageId) return;
-    const docRef = doc(db, 'classrooms', classroomId, 'messages', messageId);
-    
-    deleteDoc(docRef)
-      .then(() => {
-        toast({ title: "Message deleted" });
-      })
-      .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'delete',
-        } satisfies SecurityRuleContext);
-
-        errorEmitter.emit('permission-error', permissionError);
-      });
+    deleteDoc(doc(db, 'classrooms', classroomId, 'messages', messageId))
+      .then(() => toast({ title: "Message deleted" }))
+      .catch(() => toast({ variant: 'destructive', title: "Delete Failed" }));
   };
 
   return (

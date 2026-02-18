@@ -73,7 +73,8 @@ export default function JoinRequestsPage() {
                 batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
                 batch.delete(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId));
             } else {
-                // 1. Add user to the main participants list (Critical for chat rules)
+                // 1. Add user to the main participants list (Critical for Chat & Permission Rules)
+                // Use the requester's UID as the document ID for 'exists' rule checks.
                 batch.set(doc(db, `classrooms/${classroomId}/participants`, request.requesterId), {
                     uid: request.requesterId, 
                     name: request.studentName, 
@@ -84,7 +85,7 @@ export default function JoinRequestsPage() {
 
                 const classroomRef = doc(db, 'classrooms', classroomId);
                 
-                // 2. Add to specific role structures
+                // 2. Add to role-specific classroom structures
                 if (request.role === 'teacher') {
                      batch.update(classroomRef, { 
                         teachers: arrayUnion({ 
@@ -103,32 +104,36 @@ export default function JoinRequestsPage() {
                     batch.update(classroomRef, { students: arrayUnion(request.requesterId) });
                 }
 
-                // 3. Mark enrollment on the user's side
+                // 3. Update enrollment status on the User's profile
                 if (classroom) {
                     batch.set(doc(db, `users/${request.requesterId}/enrolled`, classroomId), {
-                        classroomId, title: classroom.title, description: classroom.description, teacherName: classroom.teacherName, enrolledAt: serverTimestamp()
+                        classroomId, 
+                        title: classroom.title, 
+                        description: classroom.description, 
+                        teacherName: classroom.teacherName, 
+                        enrolledAt: serverTimestamp()
                     });
                 }
                 
-                // 4. Delete the request document from the classroom
+                // 4. Delete the original request document
                 batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
             }
             
             await batch.commit();
 
-            // 5. Finalize cleanup outside the batch
+            // 5. Cleanup user's side (not in batch to avoid complexity)
             if (request.requesterId) {
                 deleteDoc(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId))
-                    .catch(err => console.warn("Failed to clean up user's pending join request record:", err));
+                    .catch(err => console.warn("Enrollment cleanup warning:", err));
             }
 
             if (action === 'deny') {
                 toast({ title: 'Request Denied' });
             } else {
-                toast({ title: 'Request Approved!', description: `${request.studentName} has been added to the class.` });
+                toast({ title: 'Request Approved!', description: `${request.studentName} is now in the class.` });
             }
         } catch (error: any) {
-            console.error("Join request action failed:", error);
+            console.error("Action failed:", error);
             toast({ 
                 variant: 'destructive', 
                 title: 'Action Failed', 
