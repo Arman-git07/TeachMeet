@@ -67,6 +67,15 @@ export function ClassroomHeader() {
         }
     }, [classroomId, itemToDelete, toast]);
 
+    const handleClassChatClick = () => {
+        toast({
+            title: "Feature Under Development",
+            description: "The Class Chat feature is coming soon! Thank you for your patience.",
+        });
+        // Redirect to Play Store for review
+        window.open('https://play.google.com/store/apps/details?id=com.teachmeet.3d', '_blank');
+    };
+
     if (!classroom) return null;
 
     return (
@@ -101,7 +110,7 @@ export function ClassroomHeader() {
                                 </DropdownMenuItem>
                             )}
                             
-                            <DropdownMenuItem onSelect={() => router.push(`/dashboard/classrooms/${classroomId}/live-chat`)}>
+                            <DropdownMenuItem onSelect={handleClassChatClick}>
                                 <MessageSquare className="mr-2 h-4 w-4"/>Class Chat
                             </DropdownMenuItem>
 
