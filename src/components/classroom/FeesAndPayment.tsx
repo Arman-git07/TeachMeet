@@ -55,6 +55,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     const [payTeacherOpen, setPayTeacherOpen] = useState<SubjectTeacher | null>(null);
     const [teacherUpiId, setTeacherUpiId] = useState("");
     const [teacherQrFile, setTeacherQrFile] = useState<File | null>(null);
+    const [manualTeacherUpi, setManualTeacherUpi] = useState("");
 
     const isTeacher = userRole === 'teacher';
     const isCreator = userRole === 'creator';
@@ -74,6 +75,13 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
             qrCode: null 
         } 
     });
+
+    // Reset manual UPI when teacher payment dialog closes
+    useEffect(() => {
+        if (!payTeacherOpen) {
+            setManualTeacherUpi("");
+        }
+    }, [payTeacherOpen]);
 
     // Fetch teachers for payroll (Creator only)
     useEffect(() => {
@@ -203,7 +211,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         const studentRef = doc(db, 'classrooms', classroomId, 'participants', studentId);
         const newData = { feePaid: !currentStatus };
 
-        // Perform non-blocking mutation for immediate UI update via latency compensation
         updateDoc(studentRef, newData)
             .then(() => {
                 toast({ title: "Status Updated", description: `Marked as ${!currentStatus ? 'Paid' : 'Unpaid'}.` });
@@ -354,7 +361,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                             className="w-full btn-gel rounded-xl"
                                             disabled={isUpdating}
                                         >
-                                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Save className="mr-2 h-4 w-4 mr-2"/>}
+                                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4 mr-2" />}
                                             Save My Details
                                         </Button>
                                     </CardContent>
@@ -471,9 +478,9 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                         <DialogDescription className="text-center">Settling payment to {payTeacherOpen?.name}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-6 pt-4">
-                        {payTeacherOpen && getTeacherUpiUrl(payTeacherOpen) && (
+                        {((payTeacherOpen && getTeacherUpiUrl(payTeacherOpen)) || (manualTeacherUpi.includes('@'))) && (
                             <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
-                                <a href={getTeacherUpiUrl(payTeacherOpen)!}>
+                                <a href={manualTeacherUpi.includes('@') ? `upi://pay?pa=${manualTeacherUpi.trim()}&pn=${encodeURIComponent(payTeacherOpen?.name || 'Teacher')}&tn=${encodeURIComponent(`TeachMeet: ${classroom?.title}`)}&cu=INR` : getTeacherUpiUrl(payTeacherOpen!)!}>
                                     <Wallet className="h-5 w-5" />
                                     Open Payment App
                                 </a>
@@ -482,7 +489,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
 
                         <div className="relative py-2">
                             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-background px-2 text-muted-foreground font-bold">Or Manual Pay</span></div>
+                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-background px-2 text-muted-foreground font-bold">Payment Methods</span></div>
                         </div>
 
                         {payTeacherOpen?.upiId && (
@@ -497,7 +504,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                             </div>
                         )}
                         
-                        {payTeacherOpen?.qrCodeUrl ? (
+                        {payTeacherOpen?.qrCodeUrl && (
                             <div className="space-y-4 text-center">
                                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block">Scan Teacher's QR</Label>
                                 <div className="p-4 border-2 border-primary/10 rounded-3xl inline-block bg-white shadow-xl relative overflow-hidden">
@@ -506,13 +513,28 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            !payTeacherOpen?.upiId && (
+                        )}
+
+                        {!payTeacherOpen?.upiId && !payTeacherOpen?.qrCodeUrl && (
+                            <div className="space-y-4">
                                 <Alert className="border-amber-200 bg-amber-50/50 text-amber-800 rounded-xl">
                                     <AlertCircle className="h-4 w-4 text-amber-600" />
                                     <AlertDescription className="text-xs font-medium">This teacher has not set their payment details yet.</AlertDescription>
                                 </Alert>
-                            )
+                                
+                                <div className="space-y-2 border-t pt-4">
+                                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block text-center">Pay via Manual UPI</Label>
+                                    <div className="flex flex-col gap-2">
+                                        <Input 
+                                            placeholder="Enter UPI (e.g. name@bank)" 
+                                            value={manualTeacherUpi} 
+                                            onChange={(e) => setManualTeacherUpi(e.target.value)}
+                                            className="rounded-xl h-11 text-center font-mono text-sm"
+                                        />
+                                        <p className="text-[9px] text-center text-muted-foreground italic">Type the teacher's UPI ID here to enable payment.</p>
+                                    </div>
+                                </div>
+                            </div>
                         )}
                     </div>
                     <div className="mt-8">
