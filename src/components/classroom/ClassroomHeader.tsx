@@ -7,7 +7,7 @@ import { canManage } from '@/lib/roles';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Users, Briefcase, CreditCard, UserPlus, MessageSquare } from 'lucide-react';
 import { ParticipantsManagement } from './ParticipantsManagement';
 import { SubjectTeachers } from './SubjectTeachers';
 import { FeesAndPayment } from './FeesAndPayment';
@@ -101,6 +101,10 @@ export function ClassroomHeader() {
                                 </DropdownMenuItem>
                             )}
                             
+                            <DropdownMenuItem>
+                                <MessageSquare className="mr-2 h-4 w-4"/>Class Chat
+                            </DropdownMenuItem>
+
                             <DropdownMenuItem onSelect={() => setIsTeachersOpen(true)}>
                                 <Briefcase className="mr-2 h-4 w-4"/>Subject Teachers
                             </DropdownMenuItem>
