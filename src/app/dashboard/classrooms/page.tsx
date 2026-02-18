@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -67,6 +68,7 @@ import {
   AlertTriangle,
   CreditCard,
   Star,
+  ShieldCheck,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -81,6 +83,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 export interface Classroom {
   id: string;
@@ -128,6 +131,8 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationProgress, setVerificationProgress] = useState(0);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -158,7 +163,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       setStep('payment');
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
 
@@ -218,8 +223,36 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       toast({ variant: 'destructive', title: 'Save Failed' });
     } finally {
       setIsLoading(false);
+      setIsVerifying(false);
     }
-  };
+  }, [user, title, description, isPublic, classroomToEdit, billingCurrency, toast, onSuccess]);
+
+  useEffect(() => {
+    if (isVerifying) {
+      const duration = 8000; // 8 seconds verification
+      const interval = 100;
+      const step = (interval / duration) * 100;
+      
+      const progressTimer = setInterval(() => {
+        setVerificationProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(progressTimer);
+            return 100;
+          }
+          return prev + step;
+        });
+      }, interval);
+
+      const completionTimer = setTimeout(() => {
+        handleSubmit();
+      }, duration);
+
+      return () => {
+        clearInterval(progressTimer);
+        clearTimeout(completionTimer);
+      };
+    }
+  }, [isVerifying, handleSubmit]);
 
   if (step === 'payment' && !classroomToEdit) {
       return (
@@ -234,35 +267,50 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                 </DialogDescription>
             </DialogHeader>
             <div className="py-6 space-y-6">
-                <Card className="bg-primary/5 border-primary/20 border-2 rounded-2xl shadow-inner">
-                    <CardContent className="pt-6 text-center">
-                        <p className="text-xs font-black uppercase tracking-widest text-primary mb-2">Amount to Pay</p>
-                        <div className="flex items-center justify-center gap-2">
-                            <span className="text-4xl font-black text-foreground">{PLATFORM_FEE_AMOUNT}</span>
-                            <Badge variant="secondary" className="font-bold">{billingCurrency}</Badge>
+                {isVerifying ? (
+                    <Card className="bg-primary/5 border-primary/20 border-2 rounded-2xl p-6 text-center animate-in zoom-in-95 duration-300">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="relative">
+                                <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                                <ShieldCheck className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="font-black text-lg text-primary uppercase tracking-widest">Verifying Transaction</p>
+                                <p className="text-xs text-muted-foreground">Securing your premium classroom space...</p>
+                            </div>
+                            <Progress value={verificationProgress} className="h-2 w-full mt-2" />
+                            <p className="text-[10px] text-muted-foreground font-bold">{Math.round(verificationProgress)}% COMPLETE</p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground mt-4 italic">Next renewal: {new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString()}</p>
-                    </CardContent>
-                </Card>
+                    </Card>
+                ) : (
+                    <>
+                        <Card className="bg-primary/5 border-primary/20 border-2 rounded-2xl shadow-inner">
+                            <CardContent className="pt-6 text-center">
+                                <p className="text-xs font-black uppercase tracking-widest text-primary mb-2">Amount to Pay</p>
+                                <div className="flex items-center justify-center gap-2">
+                                    <span className="text-4xl font-black text-foreground">{PLATFORM_FEE_AMOUNT}</span>
+                                    <Badge variant="secondary" className="font-bold">{billingCurrency}</Badge>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-4 italic">Next renewal: {new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString()}</p>
+                            </CardContent>
+                        </Card>
 
-                <div className="space-y-3">
-                    <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
-                        <a href={upiUrl}>
-                            <CreditCard className="h-5 w-5" />
-                            Pay via UPI
-                        </a>
-                    </Button>
-                    <p className="text-[10px] text-center text-muted-foreground px-4">
-                        By clicking pay, you will be redirected to your preferred payment app. Once settled, click "I've Paid" below to activate your classroom.
-                    </p>
-                </div>
+                        <div className="space-y-3">
+                            <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2" onClick={() => setIsVerifying(true)}>
+                                <a href={upiUrl}>
+                                    <CreditCard className="h-5 w-5" />
+                                    Pay via UPI
+                                </a>
+                            </Button>
+                            <p className="text-[10px] text-center text-muted-foreground px-4">
+                                Once you settle the payment in your preferred app, return here. The system will automatically detect the transaction and activate your classroom.
+                            </p>
+                        </div>
+                    </>
+                )}
             </div>
             <DialogFooter className="gap-2">
-                <Button variant="outline" className="rounded-xl" onClick={() => setStep('details')} disabled={isLoading}>Back</Button>
-                <Button onClick={handleSubmit} disabled={isLoading} className="flex-1 rounded-xl">
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                    I've Paid & Activate
-                </Button>
+                <Button variant="outline" className="rounded-xl" onClick={() => { setIsVerifying(false); setStep('details'); }} disabled={isLoading || isVerifying}>Back</Button>
             </DialogFooter>
           </>
       );
@@ -677,9 +725,9 @@ export default function ClassroomsPage() {
                     <Button onClick={handleCreateNew} className="flex-1 sm:flex-initial btn-gel rounded-xl h-11 relative overflow-hidden group">
                         <div className="flex items-center gap-2">
                             <div className="relative flex">
-                                <Star className="h-5 w-5 text-yellow-300 fill-yellow-300 animate-pulse" />
-                                <Star className="h-2.5 w-2.5 text-yellow-300 fill-yellow-300 absolute -top-1 -right-1 animate-bounce" />
-                                <Star className="h-2.5 w-2.5 text-yellow-300 fill-yellow-300 absolute -bottom-1 -left-1 animate-bounce delay-150" />
+                                <Star className="h-5 w-5 text-yellow-300/80 fill-yellow-300/80 animate-pulse" />
+                                <Star className="h-2.5 w-2.5 text-yellow-300/80 fill-yellow-300/80 absolute -top-1 -right-1 animate-bounce" />
+                                <Star className="h-2.5 w-2.5 text-yellow-300/80 fill-yellow-300/80 absolute -bottom-1 -left-1 animate-bounce delay-150" />
                             </div>
                             <span>Create New</span>
                         </div>

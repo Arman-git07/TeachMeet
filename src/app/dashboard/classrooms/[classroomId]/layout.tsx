@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
@@ -13,9 +14,10 @@ import { ClassroomProvider } from '@/contexts/ClassroomContext';
 import type { Classroom } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard } from 'lucide-react';
+import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +38,8 @@ export default function ClassroomDetailLayout({
   const [userRole, setUserRole] = useState<Role>('none');
   const [isLoading, setIsLoading] = useState(true);
   const [isRenewing, setIsRenewing] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationProgress, setVerificationProgress] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
@@ -79,7 +83,7 @@ export default function ClassroomDetailLayout({
     };
   }, [classroomId, user, authLoading, router, toast]);
 
-  const handleRenew = async () => {
+  const handleRenew = useCallback(async () => {
       if (!user || !classroom) return;
       setIsRenewing(true);
       try {
@@ -97,8 +101,30 @@ export default function ClassroomDetailLayout({
           toast({ variant: 'destructive', title: "Renewal Failed" });
       } finally {
           setIsRenewing(false);
+          setIsVerifying(false);
       }
-  };
+  }, [user, classroom, classroomId, toast]);
+
+  useEffect(() => {
+    if (isVerifying) {
+      const duration = 8000;
+      const interval = 100;
+      const step = (interval / duration) * 100;
+      
+      const progressTimer = setInterval(() => {
+        setVerificationProgress(prev => Math.min(prev + step, 100));
+      }, interval);
+
+      const completionTimer = setTimeout(() => {
+        handleRenew();
+      }, duration);
+
+      return () => {
+        clearInterval(progressTimer);
+        clearTimeout(completionTimer);
+      };
+    }
+  }, [isVerifying, handleRenew]);
 
   const contextValue = useMemo(() => ({
       classroomId,
@@ -167,19 +193,32 @@ export default function ClassroomDetailLayout({
                       <CardDescription>Your classroom "{classroom.title}" is blocked.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                      <div className="bg-muted p-4 rounded-2xl text-center border">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Renewal Amount</p>
-                          <p className="text-3xl font-black">{PLATFORM_FEE_AMOUNT} {classroom.billingCurrency || 'INR'}</p>
-                      </div>
-                      <div className="space-y-3">
-                          <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl">
-                              <a href={upiUrl}><CreditCard className="mr-2 h-5 w-5" /> Pay via UPI</a>
-                          </Button>
-                          <Button onClick={handleRenew} disabled={isRenewing} className="w-full h-12 rounded-xl">
-                              {isRenewing ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
-                              Confirm Payment & Unblock
-                          </Button>
-                      </div>
+                      {isVerifying ? (
+                          <div className="space-y-4 p-6 bg-primary/5 border-2 border-primary/20 rounded-3xl text-center">
+                              <div className="relative mx-auto w-16 h-16">
+                                <Loader2 className="h-16 w-16 text-primary animate-spin" />
+                                <ShieldCheck className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="font-black text-primary uppercase tracking-widest">Verifying Payment</p>
+                                <p className="text-[10px] text-muted-foreground">Do not refresh this page...</p>
+                              </div>
+                              <Progress value={verificationProgress} className="h-2" />
+                          </div>
+                      ) : (
+                          <>
+                            <div className="bg-muted p-4 rounded-2xl text-center border">
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Renewal Amount</p>
+                                <p className="text-3xl font-black">{PLATFORM_FEE_AMOUNT} {classroom.billingCurrency || 'INR'}</p>
+                            </div>
+                            <div className="space-y-3">
+                                <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setIsVerifying(true)}>
+                                    <a href={upiUrl}><CreditCard className="mr-2 h-5 w-5" /> Pay via UPI</a>
+                                </Button>
+                                <p className="text-[10px] text-center text-muted-foreground">The system will automatically detect your payment after you return from the payment app.</p>
+                            </div>
+                          </>
+                      )}
                   </CardContent>
                   <CardFooter className="bg-muted/50 border-t p-4 text-center">
                       <p className="text-[10px] text-muted-foreground w-full">Your students and subject teachers cannot access this class until unblocked.</p>
@@ -199,8 +238,8 @@ export default function ClassroomDetailLayout({
                     <span>SUBSCRIPTION EXPIRED: Classroom will be blocked in {GRACE_PERIOD_DAYS - Math.floor((Date.now() - classroom.nextPaymentDue.toDate().getTime()) / (1000 * 60 * 60 * 24))} days.</span>
                 </div>
                 {userRole === 'creator' && (
-                    <Button size="sm" variant="secondary" className="h-7 rounded-full text-[10px] font-black" onClick={handleRenew} disabled={isRenewing}>
-                        {isRenewing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    <Button size="sm" variant="secondary" className="h-7 rounded-full text-[10px] font-black" onClick={() => setIsVerifying(true)} disabled={isRenewing || isVerifying}>
+                        {isVerifying ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                         RENEW NOW
                     </Button>
                 )}
