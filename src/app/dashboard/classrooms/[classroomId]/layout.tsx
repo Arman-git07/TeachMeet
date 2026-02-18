@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
@@ -27,50 +28,42 @@ export default function ClassroomDetailLayout({
 
   useEffect(() => {
     if (authLoading) return;
+    
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+
     let cancelled = false;
     
-    const fetchRoleAndClassroom = async () => {
-      if (!classroomId) return;
-      if (!user) {
-        router.push('/auth/signin');
-        return;
-      }
-      
-      try {
-        const { role, classroom: fetchedClassroom } = await resolveRoleForUser(String(classroomId), user?.uid);
-        if (!cancelled) {
-          setUserRole(role);
-          if (fetchedClassroom) {
-            setClassroom(fetchedClassroom as Classroom);
-          } else {
-            toast({ variant: 'destructive', title: 'Classroom not found.' });
-            router.push('/dashboard/classrooms');
-          }
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Failed to resolve role/classroom:", error);
-        if (!cancelled) {
-          toast({ 
-            variant: 'destructive', 
-            title: 'Connection Error', 
-            description: 'Failed to load classroom details. Please check your internet connection.' 
-          });
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchRoleAndClassroom();
-
-    const unsubscribe = onSnapshot(doc(db, "classrooms", classroomId), (doc) => {
-        if (doc.exists()) {
+    // We listen to the role and classroom details in real-time.
+    // If a student is approved while they have the dashboard open,
+    // this listener will trigger and grant them access instantly.
+    const unsubscribe = onSnapshot(doc(db, "classrooms", classroomId), async (docSnap) => {
+        if (docSnap.exists()) {
+            try {
+                // Re-resolve role whenever the classroom doc or membership changes
+                const { role, classroom: fetchedClassroom } = await resolveRoleForUser(String(classroomId), user?.uid);
+                
+                if (!cancelled) {
+                    setUserRole(role);
+                    setClassroom({ id: docSnap.id, ...docSnap.data() } as Classroom);
+                    setIsLoading(false);
+                }
+            } catch (error) {
+                console.error("Role resolution failed:", error);
+                if (!cancelled) setIsLoading(false);
+            }
+        } else {
             if (!cancelled) {
-                setClassroom({ id: doc.id, ...doc.data() } as Classroom);
+                toast({ variant: 'destructive', title: 'Classroom not found.' });
+                router.push('/dashboard/classrooms');
+                setIsLoading(false);
             }
         }
     }, (err) => {
-        console.warn("Classroom snapshot error (likely offline):", err);
+        console.warn("Classroom detail sync error:", err);
+        if (!cancelled) setIsLoading(false);
     });
 
     return () => {
@@ -87,8 +80,14 @@ export default function ClassroomDetailLayout({
   }), [classroomId, classroom, user, userRole]);
 
   if (isLoading || authLoading) {
-    return <div className="container mx-auto p-4"><Skeleton className="h-screen w-full" /></div>;
+    return (
+      <div className="container mx-auto p-4 flex flex-col items-center justify-center h-screen space-y-4">
+        <Skeleton className="h-12 w-48 rounded-xl" />
+        <Skeleton className="h-[60vh] w-full max-w-4xl rounded-3xl" />
+      </div>
+    );
   }
+
   if (!classroom) {
     return <div className="container mx-auto p-4">Classroom not found or unavailable.</div>;
   }

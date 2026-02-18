@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -74,7 +75,7 @@ export default function JoinRequestsPage() {
                 batch.delete(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId));
             } else {
                 // 1. Add user to the main participants list (Critical for Chat & Permission Rules)
-                // Use the requester's UID as the document ID for 'exists' rule checks.
+                // We MUST use the requesterId (their Auth UID) as the document ID.
                 batch.set(doc(db, `classrooms/${classroomId}/participants`, request.requesterId), {
                     uid: request.requesterId, 
                     name: request.studentName, 
@@ -120,12 +121,6 @@ export default function JoinRequestsPage() {
             }
             
             await batch.commit();
-
-            // 5. Cleanup user's side (not in batch to avoid complexity)
-            if (request.requesterId) {
-                deleteDoc(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId))
-                    .catch(err => console.warn("Enrollment cleanup warning:", err));
-            }
 
             if (action === 'deny') {
                 toast({ title: 'Request Denied' });
