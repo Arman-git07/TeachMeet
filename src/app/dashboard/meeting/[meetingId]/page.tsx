@@ -11,7 +11,7 @@ import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Brush, Users, Settings, Loader2, Video } from 'lucide-react';
+import { MoreVertical, Brush, Users, Settings, Loader2, Video, MessageSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { SaveRecordingDialog } from "@/components/meeting/SaveRecordingDialog";
@@ -190,6 +190,10 @@ function MeetingPageContent() {
               </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="rounded-xl w-56">
+              <DropdownMenuItem className="cursor-pointer">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                <span>Meeting Chat</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={handleRecordingToggle} disabled={isUploading} className="cursor-pointer">
                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Video className="mr-2 h-4 w-4" />}
                 <span>{isUploading ? 'Uploading...' : isRecording ? 'Stop Recording' : 'Start Recording'}</span>
