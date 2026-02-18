@@ -2,9 +2,6 @@
  * @description This ruleset enforces a strict authorization model for meetings and classrooms,
  *   including their join requests and participant lists. It prioritizes security by ensuring
  *   only authorized users can manage sensitive operations.
- * @dataStructure
- *   /meetings/{meetingId}
- *   /classrooms/{classroomId}
  */
 rules_version = '2';
 service cloud.firestore {
