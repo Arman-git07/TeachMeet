@@ -70,11 +70,10 @@ export default function JoinRequestsPage() {
 
         try {
             if (action === 'deny') {
-                // Deny logic: relatively simple batch
                 batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
                 batch.delete(doc(db, `users/${request.requesterId}/pendingJoinRequests`, classroomId));
             } else {
-                // 1. Add user to the main participants list
+                // 1. Add user to the main participants list (Critical for chat rules)
                 batch.set(doc(db, `classrooms/${classroomId}/participants`, request.requesterId), {
                     uid: request.requesterId, 
                     name: request.studentName, 
@@ -113,9 +112,6 @@ export default function JoinRequestsPage() {
                 
                 // 4. Delete the request document from the classroom
                 batch.delete(doc(db, `classrooms/${classroomId}/joinRequests`, request.id));
-                
-                // Note: We move the cleanup of user's private pending list outside the main batch
-                // to avoid transaction complexity limits (insufficient permissions errors).
             }
             
             await batch.commit();
