@@ -22,11 +22,9 @@ service cloud.firestore {
     match /meetings/{meetingId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
-      // Optimization: use resource.data for internal match to avoid get() call
       allow update, delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
 
       match /joinRequests/{requestId} {
-        // Host can list requests. User can read their own request.
         allow get, list: if isSignedIn() && (requestId == request.auth.uid || get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid);
         allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
         allow update: if isSignedIn() && (requestId == request.auth.uid || get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid);
@@ -35,7 +33,6 @@ service cloud.firestore {
 
       match /participants/{userId} {
         allow get, list: if true;
-        // Allow hosts to manage participants, and allow users to add themselves.
         allow create, update: if isSignedIn() && (userId == request.auth.uid || get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid);
         allow delete: if isSignedIn() && get(/databases/$(database)/documents/meetings/$(meetingId)).data.hostId == request.auth.uid;
       }
@@ -47,7 +44,6 @@ service cloud.firestore {
     match /classrooms/{classroomId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
-      // Optimization: Check teacherId locally before falling back to teacher subcollection
       allow update, delete: if isSignedIn() && (resource.data.teacherId == request.auth.uid || isTeacher(classroomId, request.auth.uid));
 
       match /joinRequests/{userId} {
@@ -106,8 +102,9 @@ service cloud.firestore {
       }
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && (isClassroomOwner(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid) || isTeacher(classroomId, request.auth.uid));
-        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid && (isClassroomOwner(classroomId, request.auth.uid) || isStudent(classroomId, request.auth.uid) || isTeacher(classroomId, request.auth.uid));
+        // Public chat room: Any valid participant/member can read and create messages.
+        allow read: if isSignedIn() && isMember(classroomId, request.auth.uid);
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid && isMember(classroomId, request.auth.uid);
         allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || isClassroomOwner(classroomId, request.auth.uid));
       }
     }
@@ -178,6 +175,11 @@ service cloud.firestore {
     }
 
     function isStudent(classroomId, userId) {
+        return exists(/databases/$(database)/documents/classrooms/$(classroomId)/participants/$(userId));
+    }
+
+    function isMember(classroomId, userId) {
+        // Source of truth: every approved student, assistant teacher, and the creator is in 'participants'
         return exists(/databases/$(database)/documents/classrooms/$(classroomId)/participants/$(userId));
     }
     
