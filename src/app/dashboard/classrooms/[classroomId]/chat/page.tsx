@@ -15,7 +15,6 @@ import { db, storage } from "@/lib/firebase";
 import { doc, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, limit, deleteDoc, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { useClassroom } from "@/contexts/ClassroomContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,7 +55,6 @@ export default function ClassroomChatPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   
   const [isRecording, setIsRecording] = useState(false);
-  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
   
@@ -233,8 +231,6 @@ export default function ClassroomChatPage() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setHasMicPermission(true);
-
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
 
@@ -270,7 +266,6 @@ export default function ClassroomChatPage() {
       setIsRecording(true);
     } catch (error) {
       console.error("Mic access error:", error);
-      setHasMicPermission(false);
       toast({ variant: 'destructive', title: "Mic Access Required" });
     }
   };
