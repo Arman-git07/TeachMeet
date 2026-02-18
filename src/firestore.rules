@@ -1,7 +1,6 @@
 /**
  * @description This ruleset enforces a strict authorization model for meetings and classrooms,
- *   including their join requests and participant lists. It prioritizes security by ensuring
- *   only authorized users can manage sensitive operations.
+ *   using the 'participants' sub-collection as the definitive source of truth for membership.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -13,12 +12,14 @@ service cloud.firestore {
     }
 
     function isClassMember(classId) {
-      return exists(/databases/$(database)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
+      return isSignedIn() && exists(/databases/$(database)/documents/classrooms/$(classId)/participants/$(request.auth.uid));
     }
 
     function canManageClassroom(classId) {
-      return get(/databases/$(database)/documents/classrooms/$(classId)).data.teacherId == request.auth.uid || 
-             exists(/databases/$(database)/documents/classrooms/$(classId)/teachers/$(request.auth.uid));
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/classrooms/$(classId)).data.teacherId == request.auth.uid || 
+        exists(/databases/$(database)/documents/classrooms/$(classId)/teachers/$(request.auth.uid))
+      );
     }
 
     /**
@@ -27,20 +28,18 @@ service cloud.firestore {
     match /classrooms/{classId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
-      allow update, delete: if isSignedIn() && canManageClassroom(classId);
+      allow update, delete: if canManageClassroom(classId);
 
       match /messages/{messageId} {
-        // Public chat room: Any valid participant/member can read and create messages.
-        allow read: if isSignedIn() && isClassMember(classId);
-        allow create: if isSignedIn() 
-                      && isClassMember(classId) 
-                      && request.resource.data.senderId == request.auth.uid;
+        // Anyone in the participants list can read and post.
+        allow read: if isClassMember(classId);
+        allow create: if isClassMember(classId) && request.resource.data.senderId == request.auth.uid;
         allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || canManageClassroom(classId));
       }
 
       match /participants/{userId} {
-        allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && canManageClassroom(classId);
+        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow create, update, delete: if canManageClassroom(classId);
       }
 
       match /joinRequests/{userId} {
@@ -50,40 +49,40 @@ service cloud.firestore {
       }
       
       match /announcements/{id} {
-        allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && (canManageClassroom(classId) || request.resource.data.authorId == request.auth.uid);
+        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.authorId == request.auth.uid);
       }
 
       match /materials/{id} {
-        allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && (canManageClassroom(classId) || request.resource.data.uploaderId == request.auth.uid);
+        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.uploaderId == request.auth.uid);
       }
 
       match /assignments/{id} {
-        allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && (canManageClassroom(classId) || request.resource.data.creatorId == request.auth.uid);
+        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.creatorId == request.auth.uid);
         
         match /submissions/{studentId} {
           allow get, list: if isSignedIn() && (studentId == request.auth.uid || canManageClassroom(classId));
           allow create: if isSignedIn() && studentId == request.auth.uid;
-          allow update, delete: if isSignedIn() && canManageClassroom(classId);
+          allow update, delete: if canManageClassroom(classId);
         }
       }
 
       match /exams/{id} {
-        allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && (canManageClassroom(classId) || request.resource.data.authorId == request.auth.uid);
+        allow get, list: if isClassMember(classId) || canManageClassroom(classId);
+        allow create, update, delete: if canManageClassroom(classId) || (isSignedIn() && request.resource.data.authorId == request.auth.uid);
         
         match /submissions/{studentId} {
           allow get, list: if isSignedIn() && (studentId == request.auth.uid || canManageClassroom(classId));
           allow create: if isSignedIn() && studentId == request.auth.uid;
-          allow update, delete: if isSignedIn() && canManageClassroom(classId);
+          allow update, delete: if canManageClassroom(classId);
         }
       }
 
       match /teachers/{teacherId} {
         allow get, list: if true;
-        allow create, update, delete: if isSignedIn() && canManageClassroom(classId);
+        allow create, update, delete: if canManageClassroom(classId);
       }
     }
 
@@ -94,7 +93,7 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn() && request.auth.uid == userId;
       match /pendingJoinRequests/{classId} { allow read, write, delete: if isSignedIn() && request.auth.uid == userId; }
-      match /enrolled/{classId} { allow read: if isSignedIn() && request.auth.uid == userId; allow write: if isSignedIn() && canManageClassroom(classId); }
+      match /enrolled/{classId} { allow read: if isSignedIn() && request.auth.uid == userId; allow write: if canManageClassroom(classId); }
     }
 
     /**
