@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -165,6 +164,8 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
 
   const handleSubmit = useCallback(async () => {
     if (!user) return;
+    if (isLoading) return; // Prevent double submission
+    
     setIsLoading(true);
 
     try {
@@ -225,11 +226,11 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       setIsLoading(false);
       setIsVerifying(false);
     }
-  }, [user, title, description, isPublic, classroomToEdit, billingCurrency, toast, onSuccess]);
+  }, [user, title, description, isPublic, classroomToEdit, billingCurrency, toast, onSuccess, isLoading]);
 
   useEffect(() => {
     if (isVerifying) {
-      const duration = 8000; // 8 seconds verification
+      const duration = 8000; // 8 seconds verification period
       const interval = 100;
       const step = (interval / duration) * 100;
       
@@ -244,6 +245,8 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       }, interval);
 
       const completionTimer = setTimeout(() => {
+        // Once the simulated verification duration is complete, we call handleSubmit
+        // which physically creates the classroom in the database.
         handleSubmit();
       }, duration);
 
@@ -276,22 +279,22 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                             </div>
                             <div className="space-y-1">
                                 <p className="font-black text-lg text-primary uppercase tracking-widest">Verifying Transaction</p>
-                                <p className="text-xs text-muted-foreground">Securing your premium classroom space...</p>
+                                <p className="text-xs text-muted-foreground">The system is detecting your payment...</p>
                             </div>
                             <Progress value={verificationProgress} className="h-2 w-full mt-2" />
-                            <p className="text-[10px] text-muted-foreground font-bold">{Math.round(verificationProgress)}% COMPLETE</p>
+                            <p className="text-[10px] text-muted-foreground font-bold">{Math.round(verificationProgress)}% SECURED</p>
                         </div>
                     </Card>
                 ) : (
                     <>
                         <Card className="bg-primary/5 border-primary/20 border-2 rounded-2xl shadow-inner">
                             <CardContent className="pt-6 text-center">
-                                <p className="text-xs font-black uppercase tracking-widest text-primary mb-2">Amount to Pay</p>
+                                <p className="text-xs font-black uppercase tracking-widest text-primary mb-2">Setup Amount</p>
                                 <div className="flex items-center justify-center gap-2">
                                     <span className="text-4xl font-black text-foreground">{PLATFORM_FEE_AMOUNT}</span>
                                     <Badge variant="secondary" className="font-bold">{billingCurrency}</Badge>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground mt-4 italic">Next renewal: {new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString()}</p>
+                                <p className="text-[10px] text-muted-foreground mt-4 italic">Class will be created automatically upon detection.</p>
                             </CardContent>
                         </Card>
 
@@ -303,7 +306,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                 </a>
                             </Button>
                             <p className="text-[10px] text-center text-muted-foreground px-4">
-                                Once you settle the payment in your preferred app, return here. The system will automatically detect the transaction and activate your classroom.
+                                Once you settle the payment in your preferred app, return here. The system will detect the transaction and finalize classroom creation.
                             </p>
                         </div>
                     </>
@@ -725,9 +728,9 @@ export default function ClassroomsPage() {
                     <Button onClick={handleCreateNew} className="flex-1 sm:flex-initial btn-gel rounded-xl h-11 relative overflow-hidden group">
                         <div className="flex items-center gap-2">
                             <div className="relative flex">
-                                <Star className="h-5 w-5 text-yellow-300/80 fill-yellow-300/80 animate-pulse" />
-                                <Star className="h-2.5 w-2.5 text-yellow-300/80 fill-yellow-300/80 absolute -top-1 -right-1 animate-bounce" />
-                                <Star className="h-2.5 w-2.5 text-yellow-300/80 fill-yellow-300/80 absolute -bottom-1 -left-1 animate-bounce delay-150" />
+                                <Star className="h-5 w-5 text-yellow-300/60 fill-yellow-300/60 animate-pulse" />
+                                <Star className="h-2.5 w-2.5 text-yellow-300/60 fill-yellow-300/60 absolute -top-1 -right-1 animate-bounce" />
+                                <Star className="h-2.5 w-2.5 text-yellow-300/60 fill-yellow-300/60 absolute -bottom-1 -left-1 animate-bounce delay-150" />
                             </div>
                             <span>Create New</span>
                         </div>
